@@ -83,3 +83,39 @@ Validation:
 - PyTorch working (MPS available: True)
 - Core ML imports working (transformers, diffusers, Bio)
 - ViennaRNA import now working
+
+## 2026-04-25 — H200 access attempt
+
+Attempted to SSH into the H200 server via university VPN.
+
+Status:
+- VPN connected successfully.
+- Server reachable over SSH.
+- Username appears correct.
+- Login failing due to password/authentication issue.
+
+Action:
+- Contacted support / relevant contact for assistance.
+- Pausing H200 environment setup until access is resolved.
+- Booked H200 access for 4 May to resume setup and coding.
+
+## 2026-04-25 — Forked RNAGenesis repository
+
+Forked the upstream RNAGenesis repository to my GitHub account for stable annotation and modification.
+
+Repository:
+- Upstream: zaixizhang/RNAGenesis
+- Fork: laura-hardy/RNAGenesis
+
+Local clone:
+- ~/Desktop/RNAGenesis
+
+Current commit:
+- [paste commit hash here]
+
+Decision:
+- Keeping RNAGenesis as a separate repository for now rather than adding it as a submodule.
+- The MRes project repository will record commit hashes and environment notes for reproducibility.
+
+Current RNAGenesis commit:
+- d00899e — Update README.md
