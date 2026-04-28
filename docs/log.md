@@ -48,3 +48,38 @@ Inspecting environment requirements before attempting installation.
 ### Open questions
 - Which dependencies are actually required for the aptamer pipeline vs optional modules?
 - What CUDA version is compatible with H200 + PyTorch 2.1.2?
+
+## 2026-04-24 — End of session
+
+- Set up project repository
+- Configured SSH access
+- Inspected RNAGenesis environment requirements
+- Created environment notes
+
+Next:
+- Set up Mac lightweight environment (Phase 1.3)
+
+
+## 2026-04-25 — Lightweight Mac environment setup
+
+Created local Mac environment `rnagenesis-mac` for code reading, notebooks, import testing, and utility scripts.
+
+Decision:
+- Did not attempt full reproduction environment on MacBook because RNAGenesis execution is expected to require NVIDIA/CUDA.
+- H200 will be used for full model execution.
+
+Environment:
+- Python 3.10
+- Installed core scientific packages, ViennaRNA, PyTorch, transformers, diffusers, and likely missing code dependencies such as einops, timm, torchinfo, and tqdm.
+- Used Python 3.10 locally as a pragmatic Apple Silicon development environment. This is not intended to be the strict reproduction environment. The H200 environment will use Python 3.8.13 to match RNAGenesis.
+
+Validation:
+- Tested PyTorch import.
+- Tested ViennaRNA import.
+- Tested core transformer/diffusion imports.
+- Mac environment initially produced compatibility errors due to NumPy 2.x, missing ViennaRNA Python bindings, and incompatible huggingface-hub version with diffusers 0.25.0. Fixed by downgrading NumPy below 2, installing ViennaRNA via pip, and pinning huggingface-hub to 0.20.3.
+
+### Current status
+- PyTorch working (MPS available: True)
+- Core ML imports working (transformers, diffusers, Bio)
+- ViennaRNA import now working
