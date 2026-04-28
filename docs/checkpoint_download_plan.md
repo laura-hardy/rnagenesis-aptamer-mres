@@ -33,3 +33,18 @@ models/autoencoder/decoder/checkpoints/progen2-small/
 - Exact contents of configs.zip
 - Correct decoder_config argument
 - Minimal working generation command
+
+## Server storage policy alignment
+
+- Datasets → /Datasets (if used)
+- Model checkpoints and configs → ~/RNAGenesis/
+- Code and environments → home directory (~)
+
+~/RNAGenesis/              # code
+~/rnagenesis-aptamer-mres/ # your project repo
+~/envs/                    # conda envs (optional)
+~/checkpoints/             # model weights (optional)
+
+Decision:
+- Zenodo model weights treated as model artifacts, not datasets.
+- Will not store large files in /Datasets unless explicitly required.

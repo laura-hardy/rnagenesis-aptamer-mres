@@ -157,3 +157,20 @@ Conclusion:
 Decision:
 - Will not download Hugging Face model at this stage.
 - Focus remains on Zenodo checkpoints for reproduction.
+
+## 2026-04-28 — H200 server usage constraints
+
+Reviewed server usage policies.
+
+Key constraints:
+- Must register usage before running code (H200ServerBooking.xlsx)
+- Datasets must be stored under /Datasets
+- Code, environments, and checkpoints must be stored in home directory (~)
+- Users are responsible for managing storage and deleting unused files
+- Excessive storage usage may result in reduced priority or access restrictions
+
+Adjustments to plan:
+- Zenodo model weights will be stored under ~/RNAGenesis/
+- Only true datasets (if used) will be stored under /Datasets
+- Will monitor storage usage regularly and delete unnecessary files
+- Will ensure all runs are registered before execution
