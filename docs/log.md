@@ -141,3 +141,19 @@ Issues identified:
 Decision:
 - Will perform all downloads on H200 once access is available.
 - Will verify directory structure after extraction before attempting execution.
+
+## 2026-04-28 — Hugging Face model inspection
+
+Inspected RNAGenesis model on Hugging Face.
+
+Observation:
+- Hugging Face model provides encoder-only functionality (sequence embeddings).
+- Contains standard transformer files (pytorch_model.bin, tokenizer, config).
+
+Conclusion:
+- This is NOT the full generation pipeline used for aptamer design.
+- Aptamer generation requires Zenodo checkpoints (diffusion + autoencoder + decoder).
+
+Decision:
+- Will not download Hugging Face model at this stage.
+- Focus remains on Zenodo checkpoints for reproduction.
