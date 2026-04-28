@@ -60,7 +60,7 @@ Next:
 - Set up Mac lightweight environment (Phase 1.3)
 
 
-## 2026-04-25 — Lightweight Mac environment setup
+## 2026-04-25 — Lightweight Mac environment setup (1.3)
 
 Created local Mac environment `rnagenesis-mac` for code reading, notebooks, import testing, and utility scripts.
 
@@ -84,7 +84,7 @@ Validation:
 - Core ML imports working (transformers, diffusers, Bio)
 - ViennaRNA import now working
 
-## 2026-04-25 — H200 access attempt
+## 2026-04-25 — H200 access attempt (Phase 1.4)
 
 Attempted to SSH into the H200 server via university VPN.
 
@@ -99,7 +99,7 @@ Action:
 - Pausing H200 environment setup until access is resolved.
 - Booked H200 access for 4 May to resume setup and coding.
 
-## 2026-04-25 — Forked RNAGenesis repository
+## 2026-04-25 — Forked RNAGenesis repository (Phase 1.6)
 
 Forked the upstream RNAGenesis repository to my GitHub account for stable annotation and modification.
 
@@ -119,3 +119,25 @@ Decision:
 
 Current RNAGenesis commit:
 - d00899e — Update README.md
+
+## 2026-04-28 — Checkpoint and data preparation (Phase 1.5)
+
+Reviewed RNAGenesis repository instructions for checkpoint and data download.
+
+Findings:
+- Aptamer pipeline depends on external model weights from Zenodo.
+- Required files:
+  - checkpoints.zip
+  - configs.zip
+  - progen2-base.zip
+  - progen2-small.zip
+- These must be downloaded directly to H200.
+
+Issues identified:
+- README contains typo ("confiigs/" instead of "configs/")
+- README references generate.py, but repository uses generation.py
+- Required configuration files are not present in repository and come from configs.zip
+
+Decision:
+- Will perform all downloads on H200 once access is available.
+- Will verify directory structure after extraction before attempting execution.
