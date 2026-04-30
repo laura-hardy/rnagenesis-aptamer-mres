@@ -174,3 +174,82 @@ Adjustments to plan:
 - Only true datasets (if used) will be stored under /Datasets
 - Will monitor storage usage regularly and delete unnecessary files
 - Will ensure all runs are registered before execution
+
+
+## 2026-04-30 — H200 access and system inspection
+
+Successfully logged into H200 server.
+
+System:
+- Hostname: aai
+- OS: Ubuntu 24.04.4 LTS
+- GPUs: 2 x NVIDIA H200 NVL
+- NVIDIA driver: 580.95.05
+- CUDA version reported by nvidia-smi: 13.0
+
+Initial observations:
+- `python` command not available; need to use `python3` or create environment.
+- `conda` not available on PATH.
+- GPUs were already heavily in use at login, so no GPU workloads were started.
+
+Next:
+- Identify available Python/environment tools.
+- Decide whether to install Miniconda/Mambaforge under home directory.
+
+## 2026-04-30 — H200 environment setup (initial)
+
+System inspection:
+- Python 3.12.3 available as system Python
+- No conda/mamba installed
+- GPU available but fully in use at login
+- Large shared filesystem available (~60TB free)
+
+Decision:
+- Will install Miniconda in home directory (~) for isolated environment
+- Will not use system Python due to incompatibility with RNAGenesis dependencies
+- Will create Python 3.8.13 environment to match repository
+
+Status:
+- Miniconda installation in progress / completed
+- Environment creation planned next
+
+## 2026-04-30 — H200 environment setup (pre-GPU phase)
+
+Completed:
+- SSH access to H200 server
+- Installed Miniconda in home directory
+- Created rnagenesis-h200 environment (Python 3.8.13)
+- Installed core scientific stack and ViennaRNA
+- Verified imports
+
+Prepared:
+- Cloned RNAGenesis repository on server
+- Created directory structure for checkpoints/configs
+
+Deferred:
+- PyTorch + CUDA installation
+- Model checkpoint downloads
+- Pipeline execution
+
+Reason:
+- GPUs currently in use
+- Will proceed after booking server time
+
+## 2026-04-30 — H200 setup complete
+
+Completed:
+- SSH access configured and verified
+- GitHub SSH key added for server
+- RNAGenesis repo cloned to H200
+- Project repo cloned to H200
+- Conda environment created (Python 3.8.13)
+- Core dependencies installed and verified
+
+Status:
+- Environment ready for model installation and checkpoint download
+
+Next:
+- Book server usage
+- Install PyTorch with CUDA
+- Download Zenodo checkpoints
+- Begin pipeline execution
