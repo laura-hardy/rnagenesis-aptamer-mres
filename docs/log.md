@@ -290,3 +290,78 @@ Status:
 - Phase 1.4 complete on A6000.
 - Ready to proceed to Phase 1.5: download and verify RNAGenesis checkpoints/configs.
 
+
+## 2026-05-05 — A6000 setup and checkpoint download started
+
+Continued Aim 1 Phase 1.4–1.5 on the A6000 server.
+
+Completed:
+- SSH access to A6000 server confirmed.
+- Server identified as `warpgolem`.
+- GPU confirmed available:
+  - NVIDIA RTX 6000 Ada Generation
+  - NVIDIA driver: 555.58.02
+  - CUDA version reported by `nvidia-smi`: 12.5
+- Created conda environment:
+  - `/home/laura/.conda/envs/rnagenesis-a6000`
+  - Python 3.8.13
+- Installed CUDA-compatible PyTorch:
+  - torch 2.1.2+cu121
+  - torchvision 0.16.2
+  - torchaudio 2.1.2
+- Verified PyTorch GPU access:
+  - `torch.cuda.is_available()` returned True
+  - PyTorch detected NVIDIA RTX 6000 Ada Generation
+- Installed and verified core dependencies:
+  - numpy 1.24.4
+  - transformers 4.36.2
+  - diffusers 0.25.0
+  - huggingface_hub 0.20.3
+  - BioPython
+  - ViennaRNA
+  - einops
+  - timm
+  - torchinfo
+  - tqdm
+- Resolved dependency mismatch:
+  - `diffusers==0.25.0` required older `huggingface_hub` because it imports `cached_download`.
+  - Pinned `huggingface_hub==0.20.3`.
+  - Pinned `transformers==4.36.2` to remain compatible.
+- Exported A6000 environment to:
+  - `environment/environment_a6000.yml`
+- Configured Git identity on server:
+  - name: Laura Hardy
+  - email: laura.hardy625@gmail.com
+- Set up GitHub SSH access from `warpgolem`.
+- Cloned project repository:
+  - `~/rnagenesis-aptamer-mres`
+- Cloned RNAGenesis fork:
+  - `~/RNAGenesis`
+- Confirmed RNAGenesis commit:
+  - `d00899e (HEAD -> main, origin/main, origin/HEAD) Update README.md`
+
+Checkpoint/config download:
+- Began Phase 1.5 Zenodo downloads directly on A6000.
+- `checkpoints.zip` completed downloading.
+- Remaining downloads were moved into a `tmux` session so they can continue after SSH disconnect:
+  - tmux session: `rnagenesis-downloads`
+  - remaining expected files:
+    - `configs.zip`
+    - `progen2-base.zip`
+    - `progen2-small.zip`
+
+Notes:
+- The checkpoint files are large and are not tracked in Git.
+- Because the A6000 server is scheduled for formatting after May 8, important code, logs, environment files, and small results must be committed and pushed to GitHub.
+- Large Zenodo checkpoint files may need to be redownloaded after the server upgrade unless copied elsewhere.
+
+Next:
+- Reconnect to `warpgolem`.
+- Reattach to tmux with:
+  - `tmux attach -t rnagenesis-downloads`
+- Check whether downloads completed.
+- Verify file sizes with:
+  - `ls -lh ~/RNAGenesis/checkpoints.zip ~/RNAGenesis/configs.zip ~/RNAGenesis/progen2-base.zip ~/RNAGenesis/progen2-small.zip`
+- Unzip and verify expected RNAGenesis paths.
+- If checkpoint/config structure is correct, proceed to Phase 2: operational reproduction of the aptamer pipeline.
+
