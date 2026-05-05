@@ -254,66 +254,47 @@ Next:
 - Download Zenodo checkpoints
 - Begin pipeline execution
 
-## 2026-05-05 — A6000 environment setup
 
-Set up RNAGenesis execution environment on A6000 server.
+## 2026-05-05 — A6000 environment setup and checkpoint download started
 
-System:
-- Hostname: warpgolem
-- GPU: NVIDIA RTX 6000 Ada Generation
-- NVIDIA driver: 555.58.02
-- CUDA version reported by nvidia-smi: 12.5
-- PyTorch CUDA runtime: 12.1
+Continued Aim 1 Phase 1.4–1.5 by setting up the RNAGenesis execution environment on the A6000 server and beginning the checkpoint/config download process.
 
-Environment:
-- Conda environment: /home/laura/.conda/envs/rnagenesis-a6000
-- Python: 3.8.13
-- NumPy: 1.24.4
-- PyTorch: 2.1.2+cu121
-- torchvision: 0.16.2
-- torchaudio: 2.1.2
-- transformers: 4.36.2
-- diffusers: 0.25.0
-- huggingface_hub: 0.20.3
-- ViennaRNA import: OK
-- BioPython import: OK
-- CUDA available to PyTorch: True
-- GPU detected by PyTorch: NVIDIA RTX 6000 Ada Generation
+### Completed
 
-Notes:
-- Used existing system Anaconda at /opt/anaconda3.
-- System conda package cache caused permission errors, so environment and package cache were configured under /home/laura/.conda.
-- Pinned huggingface_hub to 0.20.3 because diffusers 0.25.0 requires cached_download.
-- Pinned transformers to 4.36.2 to remain compatible with huggingface_hub 0.20.3.
-
-Status:
-- Phase 1.4 complete on A6000.
-- Ready to proceed to Phase 1.5: download and verify RNAGenesis checkpoints/configs.
-
-
-## 2026-05-05 — A6000 setup and checkpoint download started
-
-Continued Aim 1 Phase 1.4–1.5 on the A6000 server.
-
-Completed:
-- SSH access to A6000 server confirmed.
-- Server identified as `warpgolem`.
-- GPU confirmed available:
+#### Server access and system inspection
+- SSH access to the A6000 server was confirmed.
+- Server identified as:
+  - Hostname: `warpgolem`
+- GPU confirmed available with `nvidia-smi`:
   - NVIDIA RTX 6000 Ada Generation
   - NVIDIA driver: 555.58.02
   - CUDA version reported by `nvidia-smi`: 12.5
-- Created conda environment:
+- GPU was available for use, with only minor display-related memory usage at login.
+
+#### Conda environment setup
+- Used the existing system Anaconda installation:
+  - `/opt/anaconda3`
+- Created a user-owned conda environment:
   - `/home/laura/.conda/envs/rnagenesis-a6000`
+- Environment Python version:
   - Python 3.8.13
+- Encountered a permissions issue with the system conda package cache under `/opt/anaconda3/pkgs`.
+- Resolved this by configuring conda to use user-owned environment and package directories under:
+  - `/home/laura/.conda`
+
+#### PyTorch and CUDA validation
 - Installed CUDA-compatible PyTorch:
   - torch 2.1.2+cu121
   - torchvision 0.16.2
   - torchaudio 2.1.2
 - Verified PyTorch GPU access:
-  - `torch.cuda.is_available()` returned True
-  - PyTorch detected NVIDIA RTX 6000 Ada Generation
-- Installed and verified core dependencies:
-  - numpy 1.24.4
+  - `torch.cuda.is_available()` returned `True`
+  - PyTorch CUDA runtime: 12.1
+  - PyTorch detected GPU: NVIDIA RTX 6000 Ada Generation
+
+#### Core dependency installation
+- Installed and verified core RNAGenesis dependencies:
+  - NumPy 1.24.4
   - transformers 4.36.2
   - diffusers 0.25.0
   - huggingface_hub 0.20.3
@@ -323,45 +304,52 @@ Completed:
   - timm
   - torchinfo
   - tqdm
-- Resolved dependency mismatch:
-  - `diffusers==0.25.0` required older `huggingface_hub` because it imports `cached_download`.
+- Resolved a dependency mismatch:
+  - `diffusers==0.25.0` required an older `huggingface_hub` because it imports `cached_download`.
   - Pinned `huggingface_hub==0.20.3`.
-  - Pinned `transformers==4.36.2` to remain compatible.
-- Exported A6000 environment to:
+  - Pinned `transformers==4.36.2` to remain compatible with `huggingface_hub==0.20.3`.
+
+#### Environment documentation
+- Exported the validated A6000 environment to:
   - `environment/environment_a6000.yml`
-- Configured Git identity on server:
+- Configured Git identity on the server:
   - name: Laura Hardy
   - email: laura.hardy625@gmail.com
 - Set up GitHub SSH access from `warpgolem`.
-- Cloned project repository:
+
+#### Repository setup
+- Cloned the project repository:
   - `~/rnagenesis-aptamer-mres`
-- Cloned RNAGenesis fork:
+- Cloned the RNAGenesis fork:
   - `~/RNAGenesis`
-- Confirmed RNAGenesis commit:
+- Confirmed RNAGenesis repository commit:
   - `d00899e (HEAD -> main, origin/main, origin/HEAD) Update README.md`
 
-Checkpoint/config download:
-- Began Phase 1.5 Zenodo downloads directly on A6000.
-- `checkpoints.zip` completed downloading.
-- Remaining downloads were moved into a `tmux` session so they can continue after SSH disconnect:
-  - tmux session: `rnagenesis-downloads`
-  - remaining expected files:
-    - `configs.zip`
-    - `progen2-base.zip`
-    - `progen2-small.zip`
+### Checkpoint/config download
 
-Notes:
+- Began Phase 1.5 Zenodo downloads directly on the A6000 server.
+- `checkpoints.zip` completed downloading.
+- The remaining downloads were moved into a `tmux` session so they can continue after SSH disconnect:
+  - tmux session: `rnagenesis-downloads`
+- Remaining expected files:
+  - `configs.zip`
+  - `progen2-base.zip`
+  - `progen2-small.zip`
+
+### Notes
+
 - The checkpoint files are large and are not tracked in Git.
 - Because the A6000 server is scheduled for formatting after May 8, important code, logs, environment files, and small results must be committed and pushed to GitHub.
 - Large Zenodo checkpoint files may need to be redownloaded after the server upgrade unless copied elsewhere.
+- The A6000 environment is now ready for RNAGenesis checkpoint verification and, once downloads/extraction are complete, Phase 2 operational reproduction.
 
-Next:
+### Next
+
 - Reconnect to `warpgolem`.
-- Reattach to tmux with:
+- Reattach to the download session:
   - `tmux attach -t rnagenesis-downloads`
 - Check whether downloads completed.
 - Verify file sizes with:
   - `ls -lh ~/RNAGenesis/checkpoints.zip ~/RNAGenesis/configs.zip ~/RNAGenesis/progen2-base.zip ~/RNAGenesis/progen2-small.zip`
 - Unzip and verify expected RNAGenesis paths.
 - If checkpoint/config structure is correct, proceed to Phase 2: operational reproduction of the aptamer pipeline.
-
