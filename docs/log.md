@@ -253,3 +253,40 @@ Next:
 - Install PyTorch with CUDA
 - Download Zenodo checkpoints
 - Begin pipeline execution
+
+## 2026-05-05 — A6000 environment setup
+
+Set up RNAGenesis execution environment on A6000 server.
+
+System:
+- Hostname: warpgolem
+- GPU: NVIDIA RTX 6000 Ada Generation
+- NVIDIA driver: 555.58.02
+- CUDA version reported by nvidia-smi: 12.5
+- PyTorch CUDA runtime: 12.1
+
+Environment:
+- Conda environment: /home/laura/.conda/envs/rnagenesis-a6000
+- Python: 3.8.13
+- NumPy: 1.24.4
+- PyTorch: 2.1.2+cu121
+- torchvision: 0.16.2
+- torchaudio: 2.1.2
+- transformers: 4.36.2
+- diffusers: 0.25.0
+- huggingface_hub: 0.20.3
+- ViennaRNA import: OK
+- BioPython import: OK
+- CUDA available to PyTorch: True
+- GPU detected by PyTorch: NVIDIA RTX 6000 Ada Generation
+
+Notes:
+- Used existing system Anaconda at /opt/anaconda3.
+- System conda package cache caused permission errors, so environment and package cache were configured under /home/laura/.conda.
+- Pinned huggingface_hub to 0.20.3 because diffusers 0.25.0 requires cached_download.
+- Pinned transformers to 4.36.2 to remain compatible with huggingface_hub 0.20.3.
+
+Status:
+- Phase 1.4 complete on A6000.
+- Ready to proceed to Phase 1.5: download and verify RNAGenesis checkpoints/configs.
+
