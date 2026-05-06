@@ -400,3 +400,68 @@ Next:
 - Run the first unmodified aptamer pipeline command.
 - Log any errors and fixes.
 
+
+## 2026-05-06 — Phase 2 tiny aptamer generation succeeded
+
+Started Aim 1 Phase 2 operational reproduction of the RNAGenesis aptamer pipeline.
+
+Findings:
+- The README aptamer command refers to `generate.py`, but the repository contains `generation.py`.
+- `generation.py --help` initially failed due to missing dependencies:
+  - `rna-fm`
+  - `omegaconf`
+- Installed missing dependencies incrementally until `generation.py --help` worked.
+- `generation.py` requires additional arguments not shown in the README, including:
+  - `--decoder_config`
+  - `--num_inference_steps`
+  - `--seed`
+  - `--eta`
+  - `--bos_token`
+  - guidance/search placeholder arguments
+  - `--remark`
+  - `--device`
+
+Decoder/config decision:
+- Used decoder config:
+  - `config-progen2-small-rna_tokenizer_v2`
+- This corresponds to the ProGen2-small RNA decoder config available under:
+  - `models/autoencoder/decoder/progen_configs/`
+
+Compatibility issue:
+- Initial tiny run loaded the EncDec and diffusion model but failed inside `diffusers.models.normalization.AdaLayerNorm.forward`.
+- Error:
+  - `ValueError: not enough values to unpack (expected 2, got 1)`
+- Cause:
+  - `diffusers==0.25.0` used `torch.chunk(emb, 2)` without specifying a dimension, so PyTorch split along `dim=0`.
+  - RNAGenesis passed timestep tensors into this AdaLayerNorm path, requiring scale/shift to be split along the feature dimension instead.
+- Applied local environment compatibility patch:
+  - file: `/home/laura/.conda/envs/rnagenesis-a6000/lib/python3.8/site-packages/diffusers/models/normalization.py`
+  - original backed up as: `normalization.py.bak_rnagenesis_2026_05_06`
+  - changed:
+    - `scale, shift = torch.chunk(emb, 2)`
+  - to:
+    - `scale, shift = torch.chunk(emb, 2, dim=-1)`
+
+Tiny generation test:
+- Ran unguided aptamer generation using:
+  - `generation.py`
+  - `configs/rnagenesis/autoencoder`
+  - `checkpoints/Aptamer/diffusion`
+  - `config-progen2-small-rna_tokenizer_v2`
+  - `num_inference_steps=5`
+  - `batch_size=2`
+  - `batch_num=1`
+  - `seed=42`
+  - `max_seq_len=37`
+  - `top_p=0.95`
+- Output file:
+  - `generation_sequences/RNAGenesis_Aptamer_tiny_test/seqs_wo_guidance_top_p=0.95_2_2_tiny_test_seed42_steps5_batch2_after_adaln_patch.txt`
+- Generated sequences:
+  - `11CGGGUCGUUUGGUUAUUUGUGGUUGGGUGUGGGGGG`
+  - `11GACGUUGGGUGGAUGGGGGGGUAGUUUGGUUUUUUU`
+
+Status:
+- First tiny Phase 2 aptamer generation run succeeded.
+- RNAGenesis can now generate aptamer-like sequences on the A6000 server.
+- Next step is to run a slightly larger small-scale test and then inspect/evaluate output format before attempting larger baseline reproduction.
+
