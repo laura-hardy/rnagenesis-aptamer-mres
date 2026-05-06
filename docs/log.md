@@ -353,3 +353,50 @@ Continued Aim 1 Phase 1.4–1.5 by setting up the RNAGenesis execution environme
   - `ls -lh ~/RNAGenesis/checkpoints.zip ~/RNAGenesis/configs.zip ~/RNAGenesis/progen2-base.zip ~/RNAGenesis/progen2-small.zip`
 - Unzip and verify expected RNAGenesis paths.
 - If checkpoint/config structure is correct, proceed to Phase 2: operational reproduction of the aptamer pipeline.
+
+## 2026-05-06 — RNAGenesis checkpoint/config download verified
+
+Completed Aim 1 Phase 1.5 checkpoint/config setup on the A6000 server.
+
+Downloads:
+- Downloaded Zenodo RNAGenesis assets directly to `~/RNAGenesis`.
+- Total download time was approximately 8 hours.
+- Downloaded files:
+  - `checkpoints.zip`: 14G
+  - `configs.zip`: 15G
+  - `progen2-base.zip`: 1.4G
+  - `progen2-small.zip`: 536M
+
+Extraction:
+- Extracted checkpoint, config, and ProGen decoder files.
+- Initial extraction produced nested directories:
+  - `checkpoints/checkpoints/...`
+  - `configs/configs/...`
+  - `progen2-base/progen2-base/...`
+  - `progen2-small/progen2-small/...`
+- Resolved by flattening extracted directories to match the expected RNAGenesis paths.
+- Some extracted directories were read-only (`dr-xr-xr-x`), so permissions were fixed with `chmod -R u+rwX` before moving files.
+
+Verified expected paths:
+- `~/RNAGenesis/checkpoints/Aptamer/diffusion`
+- `~/RNAGenesis/configs/rnagenesis/autoencoder`
+- `~/RNAGenesis/models/autoencoder/decoder/checkpoints/progen2-base`
+- `~/RNAGenesis/models/autoencoder/decoder/checkpoints/progen2-small`
+
+Environment re-check:
+- Active environment: `/home/laura/.conda/envs/rnagenesis-a6000`
+- Python: 3.8.13
+- PyTorch: 2.1.2+cu121
+- CUDA available to PyTorch: True
+- GPU detected by PyTorch: NVIDIA RTX 6000 Ada Generation
+
+Status:
+- Phase 1.5 complete.
+- Ready to proceed to Phase 2: operational reproduction of the RNAGenesis aptamer pipeline.
+
+Next:
+- Inspect RNAGenesis README/example commands.
+- Locate the aptamer generation/evaluation entry point.
+- Run the first unmodified aptamer pipeline command.
+- Log any errors and fixes.
+
