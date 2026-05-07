@@ -465,3 +465,121 @@ Status:
 - RNAGenesis can now generate aptamer-like sequences on the A6000 server.
 - Next step is to run a slightly larger small-scale test and then inspect/evaluate output format before attempting larger baseline reproduction.
 
+
+## 2026-05-06 — Phase 2 small aptamer generation sanity test succeeded
+
+Ran a slightly larger unguided RNAGenesis aptamer generation sanity test after the successful tiny test.
+
+Run settings:
+- Entry point: `generation.py`
+- Encoder-decoder checkpoint: `configs/rnagenesis/autoencoder`
+- Aptamer diffusion checkpoint: `checkpoints/Aptamer/diffusion`
+- Decoder config: `config-progen2-small-rna_tokenizer_v2`
+- num_inference_steps: 20
+- batch_size: 8
+- batch_num: 1
+- seed: 42
+- max_seq_len: 37
+- top_p: 0.95
+- top_k: 0
+- eos_token: `2`
+- bos_token: `1`
+- guidance: off
+- tree/search: off
+
+Output:
+- RNAGenesis output directory:
+  - `~/RNAGenesis/generation_sequences/RNAGenesis_Aptamer_small_test`
+- Output file:
+  - `seqs_wo_guidance_top_p=0.95_2_8_small_test_seed42_steps20_batch8.txt`
+- Sequence count:
+  - 8 sequences, matching expected `batch_size × batch_num`.
+
+Generated sequences:
+- `11CGGGUCGUUUGGUUAAUUGUGGUUGGGUGUGGGGGG`
+- `11GACGUUGGGUGGAUGGGGGGGUAGUUUGGUUUUUUU`
+- `11GUUGGAGGUUUGGUUGGUGUUUUCUUGGUGGGGUGU`
+- `11GGUUGGGGAGGCUCUAGGUAUGGUCGGGGGGGGGGG`
+- `11GACGUGUGGGGUUCCUUGGUCGGCCGGGCGGUGGUU`
+- `11UUCCACGGUUUUUGUUUUGUCUGUGUGUUUGCAAUG`
+- `11CGGGGGGGGGUAAUGAGGCGGGUACGUGUGUUAAUU`
+- `11UGGGGUGUUAAGGUUGGGUGGAUUGGGGGGUCGGUA`
+
+Notes:
+- The run completed successfully after the local `diffusers` AdaLayerNorm compatibility patch.
+- The leading `11` prefix appears consistently and likely reflects decoder/BOS-related tokens rather than biological RNA sequence. Downstream structural/evaluation work should consider trimming this prefix and documenting the decision.
+- This small test confirms the pipeline remains stable beyond the minimal 5-step tiny test.
+
+Status:
+- Phase 2 operational reproduction is progressing.
+- RNAGenesis can generate small batches of aptamer-like sequences on A6000.
+
+Next:
+- Save the run command as a reproducible script.
+- Copy small-test outputs into the project repo.
+- Decide the next scaling step, e.g. `batch_size=16`, `batch_num=1`, `num_inference_steps=50`, or begin output-format cleaning/evaluation before scaling further.
+
+
+## 2026-05-06 — Phase 2 medium aptamer generation test succeeded
+
+Ran a medium-sized unguided RNAGenesis aptamer generation test after the successful tiny and small sanity tests.
+
+Run settings:
+- Entry point: `generation.py`
+- Encoder-decoder checkpoint: `configs/rnagenesis/autoencoder`
+- Aptamer diffusion checkpoint: `checkpoints/Aptamer/diffusion`
+- Decoder config: `config-progen2-small-rna_tokenizer_v2`
+- num_inference_steps: 50
+- batch_size: 16
+- batch_num: 1
+- seed: 42
+- max_seq_len: 37
+- top_p: 0.95
+- top_k: 0
+- eos_token: `2`
+- bos_token: `1`
+- guidance: off
+- tree/search: off
+
+Output:
+- RNAGenesis output directory:
+  - `~/RNAGenesis/generation_sequences/RNAGenesis_Aptamer_medium_test`
+- Output file:
+  - `seqs_wo_guidance_top_p=0.95_2_16_medium_test_seed42_steps50_batch16.txt`
+- Sequence count:
+  - 16 sequences, matching expected `batch_size × batch_num`.
+
+Generated sequences:
+- `11CGGGUCGUUUGGUUAAUUUUGGUUGGGUGUGGGGGG`
+- `11GACGUUGGGUGGAUGGGGGGGUAGUUUGGUUUUUUU`
+- `11GUUGGAGGUUUGGUUGGUGUUUUCUUGGUGGGGUGU`
+- `11GGUUGGGGAGGCUCUAGGUAUGGUCGGGGGGGGGGG`
+- `11GACGUGUGGGGUUCCUUGGUCGGCCGGGCGGUGGUU`
+- `11UUCCACGGUUUUUGUUUUGUCUGUGUGUUUCCAAUG`
+- `11CGGGGGGGGGUAAUGAGGCGGGUACGUGUGUUAAUU`
+- `11UGGGGUGUUAAGGUUGGGUGGAUUGGGGGGUCGGUA`
+- `11GGGUCGGGGGGGGGGGUGGAGUGGUUGCGGGUGUGG`
+- `11UGGGGGGGUGGGAUGUGGGUAGGUAGGAGUGGGUGU`
+- `11GGUUGGGUACGUUGGUGGGGUUUGGUGUUCUUUUGG`
+- `11CGCGGGUGGUGGUUUUUGUCUGGUCCUGGGUCAUGU`
+- `11GGGGGCGUGGAAAAUUGGGUUGGGCUGGGCGGGGGU`
+- `11GGUGGUUGGCGGUUUGGAUGUGGGUGGUGUUGGUGG`
+- `11UUCGUGAGAUCGGGUUGGAUUGGUUCGGAUGAGUGC`
+- `11GAGUGGGAGUGGGAUGAAGGAGGUUGGUUGGGUUUG`
+
+Notes:
+- The medium run completed successfully after the local `diffusers` AdaLayerNorm compatibility patch.
+- Sequence count matched the expected output count.
+- The leading `11` prefix persists across generated sequences and should be handled consistently in downstream cleaning/evaluation.
+- Several early sequences are very similar to those produced in the smaller tests, consistent with using the same seed and overlapping generation settings.
+
+Status:
+- Phase 2 operational reproduction has now progressed from tiny to small to medium successful generation runs.
+- The pipeline appears stable for at least `batch_size=16`, `batch_num=1`, and `num_inference_steps=50`.
+
+Next:
+- Copy output into the project repo.
+- Save the medium-test command as a reproducible script.
+- Begin output cleaning/format validation before scaling to larger baseline generation.
+- Decide whether to trim leading decoder tokens before structural or sequence-level evaluation.
+
