@@ -583,3 +583,52 @@ Next:
 - Begin output cleaning/format validation before scaling to larger baseline generation.
 - Decide whether to trim leading decoder tokens before structural or sequence-level evaluation.
 
+
+## 2026-05-07 — A6000 backup before server upgrade
+
+Prepared for scheduled A6000 server upgrade/format.
+
+Backed up to GitHub:
+- Project logs in `docs/log.md`
+- A6000 environment export in `environment/environment_a6000.yml`
+- Start-of-day checklist
+- A6000 reinstall procedure
+- RNAGenesis tiny/small/medium generation scripts
+- Phase 2 tiny/small/medium generated sequence outputs
+- AlphaFold structure folders/notes for Phase 2 tiny test where applicable
+
+Important server-only files:
+- Large RNAGenesis checkpoint/config zip files and extracted model assets were not committed to GitHub.
+- These files are public Zenodo artifacts and may need to be redownloaded after the server upgrade:
+  - `checkpoints.zip` (~14G)
+  - `configs.zip` (~15G)
+  - `progen2-base.zip` (~1.4G)
+  - `progen2-small.zip` (~536M)
+
+Documented reinstall procedure:
+- Added `docs/a6000_reinstall_procedure.md`.
+- Includes:
+  - cloning project and RNAGenesis repos
+  - recreating the conda environment
+  - installing dependencies
+  - applying the local `diffusers` AdaLayerNorm compatibility patch
+  - redownloading/extracting Zenodo assets
+  - verifying checkpoint paths
+  - rerunning known working Phase 2 tests
+
+Status before cleanup:
+- Phase 1.4 complete: A6000 environment setup
+- Phase 1.5 complete: checkpoint/config download and verification
+- Phase 1.6 complete: RNAGenesis fork/clone
+- Phase 2 started successfully:
+  - tiny test succeeded
+  - small test succeeded
+  - medium test succeeded
+
+Next work item after server upgrade:
+- Recreate environment if needed.
+- Restore/check repositories from GitHub.
+- Redownload checkpoints if needed.
+- Resume Phase 2 by writing a cleaning/summary script for generated sequences.
+- Cleaning script should remove/handle leading `11` decoder tokens, check RNA alphabet validity, calculate raw/cleaned lengths, detect duplicates, and export cleaned CSV/FASTA files.
+
