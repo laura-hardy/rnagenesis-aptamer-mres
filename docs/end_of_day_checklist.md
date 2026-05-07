@@ -144,6 +144,32 @@ to quickly check:
 - disk usage
 - repo state
 
+
+
+To close a tmux session, first check what sessions exist:
+
+```
+tmux ls
+```
+
+If you are **inside** the tmux session, close it by typing:
+
+```
+exit
+```
+
+or pressing:
+
+```
+Ctrl-d
+```
+
+If you are **outside** tmux and want to kill a specific session, use:
+
+```
+tmux kill-session -t rnagenesis-phase2-small-test
+```
+
 ---
 
 ## 🧠 Principle
