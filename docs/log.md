@@ -664,7 +664,7 @@ Parameters to fill in before generation:
 - Generation script path:
 - Output file path:
 
-Implemented initial RNAGenesis output cleaning script.
+## 2026-06-05 - Implemented initial RNAGenesis output cleaning script.
 
 The script reads raw RNAGenesis sequence text files, strips the leading "11" decoder artefact, validates the cleaned RNA alphabet, records raw and cleaned lengths, flags duplicate cleaned sequences, and writes auditable CSV, FASTA, and summary outputs.
 
