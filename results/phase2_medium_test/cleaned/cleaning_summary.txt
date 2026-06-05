@@ -1,0 +1,19 @@
+RNAGenesis sequence cleaning summary
+===================================
+Input directory: results/phase2_medium_test
+Condition: unadapted_rnagenesis
+Input files: 1
+Total sequences: 16
+Leading '11' stripped: 16
+Valid RNA alphabet: 16
+Invalid alphabet rows: 0
+Empty after cleaning: 0
+Duplicate cleaned sequences: 0
+Rows marked duplicate: 0
+FASTA sequences written: 16
+
+Cleaning status counts:
+  ok: 16
+
+Source files:
+  - seqs_wo_guidance_top_p=0.95_2_16_medium_test_seed42_steps50_batch16.txt
