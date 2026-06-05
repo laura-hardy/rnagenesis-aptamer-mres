@@ -632,3 +632,34 @@ Next work item after server upgrade:
 - Resume Phase 2 by writing a cleaning/summary script for generated sequences.
 - Cleaning script should remove/handle leading `11` decoder tokens, check RNA alphabet validity, calculate raw/cleaned lengths, detect duplicates, and export cleaned CSV/FASTA files.
 
+## 2026-06-05 — Added null model generation script
+
+Added a small NumPy-based null model script for generating random RNA sequences as a baseline for generator-level evaluation.
+
+Purpose:
+- Establish a lower-bound comparison for RNAGenesis-generated aptamer candidates.
+- Test whether generated sequences show stronger structural or compositional signal than compositionally matched random RNA.
+- Provide a baseline distinct from the Level 2 shuffled-sequence control.
+
+Design decisions:
+- Generate 30,000 sequences to match other generation conditions.
+- Sample nucleotide identities independently from global corpus-derived A/U/C/G frequencies.
+- Sample sequence lengths from the empirical corpus length distribution.
+- Use no structural, thermodynamic, positional, or GC-content constraints.
+- Use NumPy only; no GPU required.
+- Fix and log the random seed for reproducibility.
+
+Rationale:
+- Corpus-derived nucleotide frequencies avoid an unrealistically weak uniform-random baseline.
+- Empirical length sampling avoids MFE artefacts caused by mismatched length distributions.
+- GC content is not directly constrained, so the null model does not partially reproduce the guided GC reward used later in the pipeline.
+- The Level 2 shuffled control remains separate: it tests structure-scoring behaviour under dinucleotide-preserving shuffles, whereas this null model is a generation-condition baseline.
+
+Parameters to fill in before generation:
+- Corpus nucleotide frequencies: A = ; U = ; C = ; G =
+- Corpus length range: min = ; max = ; mean = ; median =
+- Length sampling method: empirical histogram with 1-nt bins
+- Random seed:
+- NumPy version:
+- Generation script path:
+- Output file path:
