@@ -663,3 +663,11 @@ Parameters to fill in before generation:
 - NumPy version:
 - Generation script path:
 - Output file path:
+
+Implemented initial RNAGenesis output cleaning script.
+
+The script reads raw RNAGenesis sequence text files, strips the leading "11" decoder artefact, validates the cleaned RNA alphabet, records raw and cleaned lengths, flags duplicate cleaned sequences, and writes auditable CSV, FASTA, and summary outputs.
+
+Tested on results/phase2_medium_test using condition label unadapted_rnagenesis. The script processed 16 sequences. All 16 had the leading "11" prefix stripped, all 16 were valid RNA after cleaning, no empty sequences or invalid alphabet rows were detected, and no duplicate cleaned sequences were found. Outputs were written to results/phase2_medium_test/cleaned/.
+
+This completes the first cleaning step needed before Stage 1 hard filtering. Biological filtering has deliberately not yet been implemented in this script; it will be handled separately in the Stage 1 filtering module.
