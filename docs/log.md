@@ -724,3 +724,14 @@ Result:
 Interpretation:
 - Checkpoint/config installation appears successful.
 - The next blocker is a missing Python dependency or missing local module, likely related to the encoder stack.
+
+## 2026-06-10 — H200 diffusers patch recorded
+
+Recorded the local H200 `diffusers` compatibility patch in `docs/run_notes/h200_tiny_test_summary.md`.
+
+Verified patched line:
+- `/home/laura/miniconda3/envs/rnagenesis-h200/lib/python3.8/site-packages/diffusers/models/normalization.py:46`
+- `scale, shift = torch.chunk(emb, 2, dim=-1)`
+
+Note:
+- This manual site-package patch is not captured by `conda env export`, so it must remain documented separately for reproducibility.
