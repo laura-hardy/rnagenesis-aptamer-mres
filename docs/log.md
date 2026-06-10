@@ -742,3 +742,48 @@ Installed `accelerate==0.25.0` into the `rnagenesis-h200` environment to support
 
 Updated:
 - `environment/environment_h200.yml`
+
+## 2026-06-10 — Started H200 unadapted RNAGenesis 30k baseline generation
+
+Started Phase 4.1 unadapted RNAGenesis baseline generation on the H200 server.
+
+Run context:
+- Host: aai / H200
+- RNAGenesis repo: `~/RNAGenesis`
+- Project repo: `~/rnagenesis-aptamer-mres`
+- Conda environment: `rnagenesis-h200`
+- Script: `scripts/run_rnagenesis_aptamer_baseline_30k_h200_gpu1.sh`
+- tmux session: `rnagenesis_baseline_30k_gpu1`
+- GPU isolation: `CUDA_VISIBLE_DEVICES=1`
+- Physical GPU used: GPU1
+
+Pre-run status:
+- H200 tiny, small and medium operational reproduction tests completed successfully.
+- GPU1 was confirmed clear before launch.
+- Git working tree was clean before launching the long run.
+- Script passed `bash -n`.
+
+Generation configuration:
+- Output folder: `~/RNAGenesis/generation_sequences/RNAGenesis_Aptamer_h200_baseline_30k`
+- 10 chunks
+- Seeds: 4201–4210
+- `num_inference_steps=50`
+- `batch_size=16`
+- `batch_num=188`
+- Expected raw total: 30,080 sequences
+
+Launch command:
+```bash
+tmux new -s rnagenesis_baseline_30k_gpu1
+cd ~/rnagenesis-aptamer-mres
+bash scripts/run_rnagenesis_aptamer_baseline_30k_h200_gpu1.sh \
+  2>&1 | tee docs/run_notes/h200_baseline_30k_output.log
+Initial monitoring:
+
+nvidia-smi showed a Python process on GPU1.
+GPU1 utilisation rose to approximately 94%.
+GPU0 remained occupied by other users' jobs and was not affected.
+
+Status:
+
+Long baseline generation run is currently active inside tmux.
