@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd ~/RNAGenesis
+
+source "$HOME/miniconda3/etc/profile.d/conda.sh"
+conda activate rnagenesis-h200
+
+python generation.py \
+  --enc_dec_file "configs/rnagenesis/autoencoder" \
+  --dm_file "checkpoints/Aptamer/diffusion" \
+  --decoder_config "config-progen2-small-rna_tokenizer_v2" \
+  --num_inference_steps 5 \
+  --batch_size 2 \
+  --batch_num 1 \
+  --seed 42 \
+  --eta 0 \
+  --target_class 0 \
+  --guidance_classifier_model_config "dummy_unused.yaml" \
+  --guidance_scale 1.0 \
+  --classifier_loss_type "l2" \
+  --recurrence_step 1 \
+  --guidance_start_step 0 \
+  --guidance_stop_step 5 \
+  --search_goal "similarity" \
+  --active_size 1 \
+  --branch_size 1 \
+  --max_seq_len 37 \
+  --do_sample \
+  --top_p 0.95 \
+  --top_k 0 \
+  --eos_token "2" \
+  --bos_token "1" \
+  --remark "_h200_tiny_test_seed42_steps5_batch2" \
+  --device "cuda" \
+  --superfolder "generation_sequences" \
+  --mid_folder "RNAGenesis_Aptamer_h200_tiny_test"
