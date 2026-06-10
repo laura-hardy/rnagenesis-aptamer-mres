@@ -1,6 +1,41 @@
-.DS_Store
+# macOS
 .DS_Store
 
-# Python cache files
+# Python / cache
 __pycache__/
-*.pyc
+*.py[cod]
+.ipynb_checkpoints/
+
+# Virtual environments / local envs
+.venv/
+.env/
+conda-meta/
+
+# Large model/checkpoint artifacts
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+*.zip
+*.tar
+*.tar.gz
+*.gz
+
+# Large RNAGenesis asset/checkpoint directories if ever copied here
+RNAGenesis/
+checkpoints/
+configs/
+zenodo_downloads/
+_extract_tmp/
+models/autoencoder/decoder/checkpoints/
+asset/
+
+# Large or regenerable outputs
+results/
+!results/README.md
+!results/**/README.md
+
+# Editor/local files
+.vscode/
+.cursor/

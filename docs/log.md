@@ -671,3 +671,56 @@ The script reads raw RNAGenesis sequence text files, strips the leading "11" dec
 Tested on results/phase2_medium_test using condition label unadapted_rnagenesis. The script processed 16 sequences. All 16 had the leading "11" prefix stripped, all 16 were valid RNA after cleaning, no empty sequences or invalid alphabet rows were detected, and no duplicate cleaned sequences were found. Outputs were written to results/phase2_medium_test/cleaned/.
 
 This completes the first cleaning step needed before Stage 1 hard filtering. Biological filtering has deliberately not yet been implemented in this script; it will be handled separately in the Stage 1 filtering module.
+
+
+## 2026-05-26 H200 CUDA PyTorch verification
+
+Date: 2026-05-26  
+Host: aai / H200 server  
+Conda environment: rnagenesis-h200  
+Python: 3.8.13  
+PyTorch: 2.1.2+cu121  
+Torch CUDA runtime: 12.1  
+CUDA available: True  
+GPU count: 2  
+GPU detected: NVIDIA H200 NVL  
+
+Verification:
+- Successfully imported torch
+- `torch.cuda.is_available()` returned True
+- CUDA tensor multiplication test passed
+
+Decision:
+- PyTorch installed via pip CUDA wheels rather than conda because conda solver failed under the Python 3.8/OpenBLAS environment.
+- Proceeding to Zenodo checkpoint/config download.
+
+## 2026-05-26 RNAGenesis asset installation and first import issue
+
+Date: 2026-05-26  
+Host: aai / H200  
+RNAGenesis path: `~/RNAGenesis`  
+Environment: `rnagenesis-h200`
+
+Asset installation status:
+- `checkpoints/`: 15G
+- `configs/`: 20G
+- `models/autoencoder/decoder/checkpoints/progen2-base`: 1.5G
+- `models/autoencoder/decoder/checkpoints/progen2-small`: 578M
+- `checkpoints/Aptamer/diffusion`: 7.4G
+
+Key files observed:
+- `configs/rnagenesis/autoencoder/pytorch_model.bin`
+- `checkpoints/Aptamer/diffusion/unet/diffusion_pytorch_model.safetensors`
+- `models/autoencoder/decoder/checkpoints/progen2-base/pytorch_model.bin`
+- `models/autoencoder/decoder/checkpoints/progen2-small/pytorch_model.bin`
+
+Attempted:
+- `python generation.py --help`
+
+Result:
+- Failed at import stage with `ModuleNotFoundError: No module named 'fm'`
+- Error occurs via `models/autoencoder/encdec.py`, which imports `fm.modules`
+
+Interpretation:
+- Checkpoint/config installation appears successful.
+- The next blocker is a missing Python dependency or missing local module, likely related to the encoder stack.
