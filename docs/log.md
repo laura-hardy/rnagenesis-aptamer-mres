@@ -735,3 +735,10 @@ Verified patched line:
 
 Note:
 - This manual site-package patch is not captured by `conda env export`, so it must remain documented separately for reproducibility.
+
+## 2026-06-10 — Added accelerate to H200 environment
+
+Installed `accelerate==0.25.0` into the `rnagenesis-h200` environment to support the Hugging Face `transformers`/`diffusers` stack used by RNAGenesis generation.
+
+Updated:
+- `environment/environment_h200.yml`
