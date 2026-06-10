@@ -39,3 +39,7 @@ results/
 # Editor/local files
 .vscode/
 .cursor/
+
+# Raw run logs
+*.log
+docs/run_notes/*.log
