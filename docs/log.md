@@ -787,3 +787,39 @@ GPU0 remained occupied by other users' jobs and was not affected.
 Status:
 
 Long baseline generation run is currently active inside tmux.
+
+## 2026-06-10 — Completed H200 unadapted RNAGenesis 30k baseline generation
+
+Completed Phase 4.1 unadapted RNAGenesis baseline generation on the H200 server.
+
+Run context:
+- Host: aai / H200
+- RNAGenesis repo: `~/RNAGenesis`
+- Project repo: `~/rnagenesis-aptamer-mres`
+- Conda environment: `rnagenesis-h200`
+- Script: `scripts/run_rnagenesis_aptamer_baseline_30k_h200_gpu1.sh`
+- tmux session: `rnagenesis_baseline_30k_gpu1`
+- GPU isolation: `CUDA_VISIBLE_DEVICES=1`
+- Physical GPU used: GPU1
+
+Output:
+- Folder: `~/RNAGenesis/generation_sequences/RNAGenesis_Aptamer_h200_baseline_30k`
+- Chunks completed: 10/10
+- Sequences per chunk: 3,008
+- Total raw sequences: 30,080
+
+Runtime:
+- Start: Wed 10 Jun 2026 16:11:51 AEST
+- End: Wed 10 Jun 2026 17:39:40 AEST
+- Elapsed: 1 hour, 27 minutes, 49 seconds
+- Total elapsed seconds: 5,269
+- Approximate throughput: 5.71 raw sequences per second
+
+Chunk timing:
+- Each chunk took approximately 8 minutes 45–49 seconds.
+- Runtime was consistent across all 10 chunks.
+
+Status:
+- Run completed successfully.
+- Raw generated sequence files remain outside Git under `~/RNAGenesis/generation_sequences/`.
+- Next step: merge/clean generated outputs, deduplicate, and prepare exactly 30,000 sequences for baseline characterisation.
