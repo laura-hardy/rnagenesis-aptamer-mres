@@ -863,3 +863,27 @@ Result:
 Status:
 - Phase 2.4 repeatability check completed successfully.
 - Next step: proceed to cleaning, merging, deduplicating and characterising the 30,080-sequence unadapted RNAGenesis baseline pool.
+
+## 2026-06-10 — Saved Phase 4.1 raw baseline outputs into project repo
+
+Saved the successful H200 unadapted RNAGenesis baseline generation outputs into the MRes project repository structure.
+
+Source:
+- `~/RNAGenesis/generation_sequences/RNAGenesis_Aptamer_h200_baseline_30k`
+
+Project copy:
+- `results/phase4_1_unadapted_rnagenesis_30k/raw/`
+
+Raw output:
+- 10 chunk files
+- 3,008 sequences per chunk
+- 30,080 raw generated sequences total
+- Total size approximately 1.2 MB
+
+Version-control decision:
+- Because the generated sequence files are small text files and represent a core Phase 4.1 research artifact, they will be committed to Git.
+- Large model checkpoints and Zenodo assets remain excluded from Git.
+
+Next step:
+- Verify checksums after syncing to the Mac.
+- Proceed to cleaning, merging, deduplicating and preparing exactly 30,000 sequences for baseline characterisation.

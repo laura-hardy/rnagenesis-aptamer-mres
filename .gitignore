@@ -43,3 +43,8 @@ results/
 # Raw run logs
 *.log
 docs/run_notes/*.log
+
+# Keep Phase 4.1 RNAGenesis generated baseline sequence outputs in Git
+!results/
+!results/phase4_1_unadapted_rnagenesis_30k/
+!results/phase4_1_unadapted_rnagenesis_30k/**
