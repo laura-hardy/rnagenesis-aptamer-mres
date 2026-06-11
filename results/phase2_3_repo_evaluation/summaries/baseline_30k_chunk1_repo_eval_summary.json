@@ -1,9 +1,9 @@
 {
-  "candidate_file": "/home/laura/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk10_seed4210_steps50_batch16_batchnum188_gpu1.txt",
+  "candidate_file": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk1_seed4201_steps50_batch16_batchnum188_gpu1.txt",
   "run_label": "baseline_30k_chunk1",
-  "timestamp_utc": "2026-06-11T07:35:57.892313+00:00",
-  "host": "aai",
-  "rnagenesis_repo": "/home/laura/RNAGenesis",
+  "timestamp_utc": "2026-06-11T08:01:03.204984+00:00",
+  "host": "Gerald.local",
+  "rnagenesis_repo": "/Users/laura/Desktop/RNAGenesis",
   "rnagenesis_commit": "d00899e",
   "threshold_a": 80.0,
   "threshold_b": 2.0,
@@ -14,21 +14,21 @@
   "reference_structure": ".((..(.((((.(.(((((((((.........))))))))).).)))))..))(((((.......))).)).....",
   "reference_mfe": -24.200000762939453,
   "prop_similarity": 0.0,
-  "prop_mfe": 37.234042553191486,
+  "prop_mfe": 34.60771276595745,
   "similarity_stats": {
-    "mean": 6.188769342359773,
+    "mean": 6.096681576402329,
     "min": 0.0,
-    "max": 64.81818181818181
+    "max": 60.54545454545455
   },
   "mfe_stats": {
-    "mean": -22.023816496133804,
-    "min": -34.5,
-    "max": -12.600000381469727
+    "mean": -21.908676866521226,
+    "min": -38.099998474121094,
+    "max": -13.199999809265137
   },
   "mfe_diff_stats": {
-    "mean": 3.2111573010048966,
+    "mean": 3.279887368070318,
     "min": 0.0,
-    "max": 11.600000381469727
+    "max": 13.89999771118164
   },
   "run_rna_analysis_verified": true
 }
