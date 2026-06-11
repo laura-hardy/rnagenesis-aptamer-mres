@@ -887,3 +887,19 @@ Version-control decision:
 Next step:
 - Verify checksums after syncing to the Mac.
 - Proceed to cleaning, merging, deduplicating and preparing exactly 30,000 sequences for baseline characterisation.
+
+## 2026-06-10 — Removed duplicate RNAGenesis baseline output folder from aai
+
+After copying and committing the Phase 4.1 unadapted RNAGenesis baseline outputs into the MRes project repo, removed the duplicate generated-output folder from the RNAGenesis repo on the shared H200 server.
+
+Deleted duplicate source folder:
+- `~/RNAGenesis/generation_sequences/RNAGenesis_Aptamer_h200_baseline_30k`
+
+Retained project copy:
+- `~/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/`
+
+Verification:
+- Project copy retained 30,080 raw generated sequences across 10 chunk files.
+
+Rationale:
+- Avoid retaining duplicate generated results indefinitely in the RNAGenesis working directory on a shared server.
