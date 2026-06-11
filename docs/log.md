@@ -823,3 +823,43 @@ Status:
 - Run completed successfully.
 - Raw generated sequence files remain outside Git under `~/RNAGenesis/generation_sequences/`.
 - Next step: merge/clean generated outputs, deduplicate, and prepare exactly 30,000 sequences for baseline characterisation.
+
+## 2026-06-10 — Completed Phase 2.4 H200 repeatability check
+
+Completed Phase 2.4 of the RNAGenesis reproduction workflow: fixed random seeds and confirmed repeatability on the H200 server.
+
+Run context:
+- Host: aai / H200
+- RNAGenesis repo: `~/RNAGenesis`
+- Project repo: `~/rnagenesis-aptamer-mres`
+- Conda environment: `rnagenesis-h200`
+- Script: `scripts/run_rnagenesis_phase2_4_repeatability_h200.sh`
+- Analysis script: `scripts/analyze_phase2_4_repeatability.py`
+- GPU isolation: `CUDA_VISIBLE_DEVICES=1`
+
+Test design:
+- Ran the same small aptamer generation workload twice with seed 42.
+- Ran the same workload once with seed 43.
+- Workload:
+  - `num_inference_steps=20`
+  - `batch_size=8`
+  - `batch_num=1`
+  - `max_seq_len=37`
+  - `top_p=0.95`
+  - `top_k=0`
+
+Outputs:
+- RNAGenesis raw outputs remain under `~/RNAGenesis/generation_sequences/`.
+- Small copied outputs for reproducibility checking are stored under:
+  - `results/phase2_4_repeatability/`
+- Markdown report:
+  - `docs/run_notes/h200_phase2_4_repeatability_report.md`
+
+Result:
+- Same-seed outputs were compared byte-for-byte and by SHA256 hash.
+- Different-seed output was compared against the seed 42 run.
+- See the Phase 2.4 report for exact hashes, line counts and interpretation.
+
+Status:
+- Phase 2.4 repeatability check completed successfully.
+- Next step: proceed to cleaning, merging, deduplicating and characterising the 30,080-sequence unadapted RNAGenesis baseline pool.

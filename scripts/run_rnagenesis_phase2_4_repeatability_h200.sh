@@ -98,6 +98,11 @@ REMARK_A="_h200_phase2_4_seed42_runA_steps20_batch8"
 REMARK_B="_h200_phase2_4_seed42_runB_steps20_batch8"
 REMARK_C="_h200_phase2_4_seed43_steps20_batch8"
 
+rm -rf \
+  "$RNAGENESIS_REPO/generation_sequences/$MID_FOLDER_A" \
+  "$RNAGENESIS_REPO/generation_sequences/$MID_FOLDER_B" \
+  "$RNAGENESIS_REPO/generation_sequences/$MID_FOLDER_C"
+
 run_generation 42 "${MID_FOLDER_A}" "${REMARK_A}" "seed42 replicate A"
 run_generation 42 "${MID_FOLDER_B}" "${REMARK_B}" "seed42 replicate B"
 run_generation 43 "${MID_FOLDER_C}" "${REMARK_C}" "seed43 different-seed comparison"
