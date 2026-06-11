@@ -903,3 +903,155 @@ Verification:
 
 Rationale:
 - Avoid retaining duplicate generated results indefinitely in the RNAGenesis working directory on a shared server.
+
+## 2026-06-11 — Reproduced RNAGenesis repository aptamer evaluation on full baseline pool
+
+Completed Stage 2.3 by reproducing the RNAGenesis repository-provided aptamer evaluation procedure on generated outputs.
+
+The repository evaluation procedure is implemented in:
+- `~/RNAGenesis/test_wrap_aptamer.py`
+
+The project wrapper is:
+- `scripts/run_repo_aptamer_evaluation.py`
+
+The H200 runner is:
+- `scripts/run_phase2_3_repo_aptamer_eval_h200.sh`
+
+Evaluation scope:
+- Medium test output: 16 generated sequences
+- Baseline chunk 1: 3,008 generated sequences
+- Full unadapted baseline pool: 30,080 generated sequences
+
+Repository metrics reproduced:
+- Secondary-structure similarity threshold pass rate
+- MFE-difference threshold pass rate
+
+Default parameters:
+- Similarity threshold: `threshold_a = 80.0`
+- MFE-difference threshold: `threshold_b = 2.0` kcal/mol
+- Base-pair distance factor: `factor = 2.0`
+
+Important repository behaviour:
+- The original RNAGenesis CLI runs silently because `run_rna_analysis()` returns metrics but does not print them.
+- The project wrapper imports the repository functions directly and verifies that its exposed values match `run_rna_analysis()`.
+- Raw `seqs_wo_guidance_*.txt` outputs were used directly to preserve repository-faithful preprocessing.
+- The full baseline evaluation used a merged raw input file with 30,080 lines:
+  - `results/phase2_3_repo_evaluation/inputs/merged_30080_raw.txt`
+
+Full baseline result:
+- Run label: `baseline_30080_full`
+- Timestamp (UTC): `2026-06-11T07:38:37.302606+00:00`
+- Host: `aai`
+- RNAGenesis commit: `d00899e`
+- Raw lines: 30,080
+- Candidates after repo preprocessing: 30,080
+
+Reference aptamer:
+- Sequence: `TCCAGCACTCCACGCATAACGGCGGTGGGTGGGTTGTTGTGGGAGGGGGAGGGGGAGTTATGCGTGCTACCGTGAA`
+- Reference MFE: -24.200001 kcal/mol
+- Reference structure: `.((..(.((((.(.(((((((((.........))))))))).).)))))..))(((((.......))).)).....`
+
+Aggregate metrics for the full 30,080-sequence baseline:
+- Proportion passing secondary-structure similarity threshold (`similarity >= 80.0`): **0.000000%**
+- Proportion passing MFE-difference threshold (`mfe_diff <= 2.0 kcal/mol`): **35.511968%**
+
+Per-sequence summary statistics:
+- Similarity:
+  - mean: 6.197090
+  - min: 0.000000
+  - max: 69.090909
+- MFE:
+  - mean: -21.968365 kcal/mol
+  - min: -39.299999 kcal/mol
+  - max: -12.280000 kcal/mol
+- MFE difference from reference:
+  - mean: 3.260825 kcal/mol
+  - min: 0.000000 kcal/mol
+  - max: 15.099998 kcal/mol
+
+Earlier smoke-test results:
+- `medium_test_16`:
+  - n = 16
+  - prop_similarity = 0.0%
+  - prop_mfe = 25.0%
+- `baseline_30k_chunk1`:
+  - n = 3,008
+  - prop_similarity = 0.0%
+  - prop_mfe = 34.61%
+
+Outputs:
+- Full summary markdown:
+  - `results/phase2_3_repo_evaluation/summaries/baseline_30080_full_repo_eval_summary.md`
+- Full summary JSON:
+  - `results/phase2_3_repo_evaluation/summaries/baseline_30080_full_repo_eval_summary.json`
+- Full evaluation log:
+  - `results/phase2_3_repo_evaluation/logs/baseline_30080_full_repo_eval.log`
+- Medium-test per-sequence output:
+  - `results/phase2_3_repo_evaluation/per_sequence/medium_test_16_repo_eval_per_sequence.csv`
+- Run log:
+  - `docs/run_notes/h200_phase2_3_repo_eval_full_30080.log`
+
+Interpretation:
+- The full unadapted RNAGenesis baseline produced no candidates meeting the repository's high secondary-structure similarity threshold of 80.0.
+- Approximately one third of candidates met the repository's MFE-difference threshold of 2.0 kcal/mol relative to the hard-coded reference aptamer.
+- This reproduces the repository's own aptamer evaluation procedure but does not replace the later project-specific baseline characterisation pipeline.
+
+Status:
+- Stage 2.3 repository evaluation reproduction completed.
+- Full custom baseline characterisation metrics remain deferred to a later project stage.
+- Raw lines: 30,080
+- Candidates after repo preprocessing: 30,080
+
+Reference aptamer:
+- Sequence: `TCCAGCACTCCACGCATAACGGCGGTGGGTGGGTTGTTGTGGGAGGGGGAGGGGGAGTTATGCGTGCTACCGTGAA`
+- Reference MFE: -24.200001 kcal/mol
+- Reference structure: `.((..(.((((.(.(((((((((.........))))))))).).)))))..))(((((.......))).)).....`
+
+Aggregate metrics for the full 30,080-sequence baseline:
+- Proportion passing secondary-structure similarity threshold (`similarity >= 80.0`): **0.000000%**
+- Proportion passing MFE-difference threshold (`mfe_diff <= 2.0 kcal/mol`): **35.511968%**
+
+Per-sequence summary statistics:
+- Similarity:
+  - mean: 6.197090
+  - min: 0.000000
+  - max: 69.090909
+- MFE:
+  - mean: -21.968365 kcal/mol
+  - min: -39.299999 kcal/mol
+  - max: -12.280000 kcal/mol
+- MFE difference from reference:
+  - mean: 3.260825 kcal/mol
+  - min: 0.000000 kcal/mol
+  - max: 15.099998 kcal/mol
+
+Earlier smoke-test results:
+- `medium_test_16`:
+  - n = 16
+  - prop_similarity = 0.0%
+  - prop_mfe = 25.0%
+- `baseline_30k_chunk1`:
+  - n = 3,008
+  - prop_similarity = 0.0%
+  - prop_mfe = 34.61%
+
+Outputs:
+- Full summary markdown:
+  - `results/phase2_3_repo_evaluation/summaries/baseline_30080_full_repo_eval_summary.md`
+- Full summary JSON:
+  - `results/phase2_3_repo_evaluation/summaries/baseline_30080_full_repo_eval_summary.json`
+- Full evaluation log:
+  - `results/phase2_3_repo_evaluation/logs/baseline_30080_full_repo_eval.log`
+- Medium-test per-sequence output:
+  - `results/phase2_3_repo_evaluation/per_sequence/medium_test_16_repo_eval_per_sequence.csv`
+- Run log:
+  - `docs/run_notes/h200_phase2_3_repo_eval_full_30080.log`
+
+Interpretation:
+- The full unadapted RNAGenesis baseline produced no candidates meeting the repository's high secondary-structure similarity threshold of 80.0.
+- Approximately one third of candidates met the repository's MFE-difference threshold of 2.0 kcal/mol relative to the hard-coded reference aptamer.
+- This reproduces the repository's own aptamer evaluation procedure but does not replace the later project-specific baseline characterisation pipeline.
+
+Status:
+- Stage 2.3 repository evaluation reproduction completed.
+- Full custom baseline characterisation metrics remain deferred to a later project stage.

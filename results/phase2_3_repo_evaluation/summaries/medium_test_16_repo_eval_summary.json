@@ -1,0 +1,34 @@
+{
+  "candidate_file": "/home/laura/rnagenesis-aptamer-mres/results/phase2_medium_test/seqs_wo_guidance_top_p=0.95_2_16_medium_test_seed42_steps50_batch16.txt",
+  "run_label": "medium_test_16",
+  "timestamp_utc": "2026-06-11T07:35:41.829113+00:00",
+  "host": "aai",
+  "rnagenesis_repo": "/home/laura/RNAGenesis",
+  "rnagenesis_commit": "d00899e",
+  "threshold_a": 80.0,
+  "threshold_b": 2.0,
+  "factor": 2.0,
+  "raw_line_count": 16,
+  "candidate_count_after_preprocessing": 16,
+  "reference_sequence": "TCCAGCACTCCACGCATAACGGCGGTGGGTGGGTTGTTGTGGGAGGGGGAGGGGGAGTTATGCGTGCTACCGTGAA",
+  "reference_structure": ".((..(.((((.(.(((((((((.........))))))))).).)))))..))(((((.......))).)).....",
+  "reference_mfe": -24.200000762939453,
+  "prop_similarity": 0.0,
+  "prop_mfe": 25.0,
+  "similarity_stats": {
+    "mean": 7.318181818181818,
+    "min": 4.0,
+    "max": 17.545454545454547
+  },
+  "mfe_stats": {
+    "mean": -20.887500047683716,
+    "min": -26.399999618530273,
+    "max": -16.5
+  },
+  "mfe_diff_stats": {
+    "mean": 3.58750057220459,
+    "min": 0.7000007629394531,
+    "max": 7.700000762939453
+  },
+  "run_rna_analysis_verified": true
+}

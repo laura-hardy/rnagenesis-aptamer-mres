@@ -1,0 +1,34 @@
+{
+  "candidate_file": "/home/laura/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk10_seed4210_steps50_batch16_batchnum188_gpu1.txt",
+  "run_label": "baseline_30k_chunk1",
+  "timestamp_utc": "2026-06-11T07:35:57.892313+00:00",
+  "host": "aai",
+  "rnagenesis_repo": "/home/laura/RNAGenesis",
+  "rnagenesis_commit": "d00899e",
+  "threshold_a": 80.0,
+  "threshold_b": 2.0,
+  "factor": 2.0,
+  "raw_line_count": 3008,
+  "candidate_count_after_preprocessing": 3008,
+  "reference_sequence": "TCCAGCACTCCACGCATAACGGCGGTGGGTGGGTTGTTGTGGGAGGGGGAGGGGGAGTTATGCGTGCTACCGTGAA",
+  "reference_structure": ".((..(.((((.(.(((((((((.........))))))))).).)))))..))(((((.......))).)).....",
+  "reference_mfe": -24.200000762939453,
+  "prop_similarity": 0.0,
+  "prop_mfe": 37.234042553191486,
+  "similarity_stats": {
+    "mean": 6.188769342359773,
+    "min": 0.0,
+    "max": 64.81818181818181
+  },
+  "mfe_stats": {
+    "mean": -22.023816496133804,
+    "min": -34.5,
+    "max": -12.600000381469727
+  },
+  "mfe_diff_stats": {
+    "mean": 3.2111573010048966,
+    "min": 0.0,
+    "max": 11.600000381469727
+  },
+  "run_rna_analysis_verified": true
+}
