@@ -1055,3 +1055,36 @@ Interpretation:
 Status:
 - Stage 2.3 repository evaluation reproduction completed.
 - Full custom baseline characterisation metrics remain deferred to a later project stage.
+
+## 2026-06-19 — Aim 3 Stage 1 hard filtering
+
+Implemented the first Aim 3 filtering stage: binary hard filtering for intrinsic RNA sequence quality.
+
+Created:
+- `src/aim3_pipeline/` package (`config.py`, `io.py`, `stage1_hard_filter.py`)
+- Config-driven CLI: `scripts/run_stage1_hard_filter.py`
+- Default config: `configs/stage1_hard_filter_default.json`
+- Tests: `tests/test_stage1_hard_filter.py` (13 passed)
+- Run notes: `docs/run_notes/stage1_hard_filtering.md`
+
+Stage 1 functionality:
+- Canonical RNAGenesis preprocessing (leading `11` strip, uppercase, metadata)
+- RNA alphabet validation (A/U/C/G)
+- Exact within-condition deduplication (keep first occurrence)
+- Homopolymer run filter (default fail if max run ≥ 5)
+- GC fraction computation
+- ViennaRNA MFE, dot-bracket structure, and normalised MFE computation
+- Placeholder / reference-dependent near-deduplication (not applied without corpus)
+- Per-filter status columns, `stage1_pass`, and `stage1_failure_reasons`
+
+Runs:
+- Medium smoke test (`results/phase2_medium_test/`): 16 processed, 6 passed, 10 failed — all failures due to homopolymer runs ≥ 5.
+- Unadapted 30k baseline (`results/phase4_1_unadapted_rnagenesis_30k/raw/`): 30,080 processed, 13,136 passed, 16,944 failed — pass rate 43.7%. All failures were homopolymer runs ≥ 5; alphabet validity and exact deduplication removed no sequences.
+
+Reference-free filters not yet applied as exclusion criteria (computed or scaffolded only until AptaDiff / training corpus thresholds are available): length bounds, GC bounds, MFE threshold, near-deduplication.
+
+Outputs written to `results/aim3_stage1_medium_test/` and `results/aim3_stage1_unadapted_30k/`; these are regenerable and should remain uncommitted.
+
+Status:
+- Stage 1 hard filtering implemented and QA-checked.
+- Next: download reference aptamer corpus (AptaDiff Dataset A) for Stage 0 validation and empirical Stage 1 threshold calibration.

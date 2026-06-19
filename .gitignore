@@ -26,6 +26,8 @@ conda-meta/
 RNAGenesis/
 checkpoints/
 configs/
+!configs/
+!configs/stage1_*.json
 zenodo_downloads/
 _extract_tmp/
 models/autoencoder/decoder/checkpoints/
