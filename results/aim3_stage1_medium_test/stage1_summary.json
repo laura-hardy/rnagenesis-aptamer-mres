@@ -1,0 +1,91 @@
+{
+  "timestamp_utc": "2026-06-19T07:29:43.197746+00:00",
+  "stage": "stage1_hard_filter",
+  "condition": "unadapted_medium_test",
+  "config_path": "/Users/laura/Desktop/rnagenesis-aptamer-mres/configs/stage1_hard_filter_default.json",
+  "input_glob": "results/phase2_medium_test/*.txt",
+  "input_files": [
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase2_medium_test/seqs_wo_guidance_top_p=0.95_2_16_medium_test_seed42_steps50_batch16.txt"
+  ],
+  "reference_corpus": null,
+  "limit": null,
+  "skip_mfe": false,
+  "total_sequences": 16,
+  "passed_sequences": 6,
+  "failed_sequences": 10,
+  "pass_rate": 0.375,
+  "filter_counts": [
+    {
+      "filter": "alphabet",
+      "status": "applied_pass",
+      "count": 16,
+      "fraction": 1.0
+    },
+    {
+      "filter": "alphabet",
+      "status": "applied_fail",
+      "count": 0,
+      "fraction": 0.0
+    },
+    {
+      "filter": "length",
+      "status": "not_applied",
+      "count": 16,
+      "fraction": 1.0
+    },
+    {
+      "filter": "exact_dedup",
+      "status": "applied_pass",
+      "count": 16,
+      "fraction": 1.0
+    },
+    {
+      "filter": "exact_dedup",
+      "status": "applied_fail",
+      "count": 0,
+      "fraction": 0.0
+    },
+    {
+      "filter": "homopolymer",
+      "status": "applied_pass",
+      "count": 6,
+      "fraction": 0.375
+    },
+    {
+      "filter": "homopolymer",
+      "status": "applied_fail",
+      "count": 10,
+      "fraction": 0.625
+    },
+    {
+      "filter": "gc",
+      "status": "not_applied",
+      "count": 16,
+      "fraction": 1.0
+    },
+    {
+      "filter": "mfe",
+      "status": "not_applied",
+      "count": 16,
+      "fraction": 1.0
+    },
+    {
+      "filter": "near_dedup",
+      "status": "not_applied_reference_missing",
+      "count": 16,
+      "fraction": 1.0
+    },
+    {
+      "filter": "stage1_overall",
+      "status": "pass",
+      "count": 6,
+      "fraction": 0.375
+    },
+    {
+      "filter": "stage1_overall",
+      "status": "fail",
+      "count": 10,
+      "fraction": 0.625
+    }
+  ]
+}

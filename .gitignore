@@ -50,3 +50,6 @@ docs/run_notes/*.log
 !results/
 !results/phase4_1_unadapted_rnagenesis_30k/
 !results/phase4_1_unadapted_rnagenesis_30k/**
+
+# Local raw data - do not commit
+/data/raw/
