@@ -1,0 +1,106 @@
+{
+  "timestamp_utc": "2026-06-26T06:46:22.192968+00:00",
+  "stage": "stage1_hard_filter",
+  "condition": "unadapted_rnagenesis_30k_mfe_filter",
+  "config_path": "/Users/laura/Desktop/rnagenesis-aptamer-mres/configs/stage1_hard_filter_aptadiffA_poster_with_mfe.json",
+  "input_glob": "results/phase4_1_unadapted_rnagenesis_30k/raw/*.txt",
+  "input_files": [
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk10_seed4210_steps50_batch16_batchnum188_gpu1.txt",
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk1_seed4201_steps50_batch16_batchnum188_gpu1.txt",
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk2_seed4202_steps50_batch16_batchnum188_gpu1.txt",
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk3_seed4203_steps50_batch16_batchnum188_gpu1.txt",
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk4_seed4204_steps50_batch16_batchnum188_gpu1.txt",
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk5_seed4205_steps50_batch16_batchnum188_gpu1.txt",
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk6_seed4206_steps50_batch16_batchnum188_gpu1.txt",
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk7_seed4207_steps50_batch16_batchnum188_gpu1.txt",
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk8_seed4208_steps50_batch16_batchnum188_gpu1.txt",
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/phase4_1_unadapted_rnagenesis_30k/raw/seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk9_seed4209_steps50_batch16_batchnum188_gpu1.txt"
+  ],
+  "reference_corpus": null,
+  "limit": null,
+  "skip_mfe": false,
+  "total_sequences": 30080,
+  "passed_sequences": 12337,
+  "failed_sequences": 17743,
+  "pass_rate": 0.41013962765957446,
+  "filter_counts": [
+    {
+      "filter": "alphabet",
+      "status": "applied_pass",
+      "count": 30080,
+      "fraction": 1.0
+    },
+    {
+      "filter": "alphabet",
+      "status": "applied_fail",
+      "count": 0,
+      "fraction": 0.0
+    },
+    {
+      "filter": "length",
+      "status": "applied_pass",
+      "count": 30080,
+      "fraction": 1.0
+    },
+    {
+      "filter": "exact_dedup",
+      "status": "applied_pass",
+      "count": 30080,
+      "fraction": 1.0
+    },
+    {
+      "filter": "exact_dedup",
+      "status": "applied_fail",
+      "count": 0,
+      "fraction": 0.0
+    },
+    {
+      "filter": "homopolymer",
+      "status": "applied_pass",
+      "count": 13136,
+      "fraction": 0.43670212765957445
+    },
+    {
+      "filter": "homopolymer",
+      "status": "applied_fail",
+      "count": 16944,
+      "fraction": 0.5632978723404255
+    },
+    {
+      "filter": "gc",
+      "status": "applied_fail",
+      "count": 3093,
+      "fraction": 0.10282579787234042
+    },
+    {
+      "filter": "gc",
+      "status": "applied_pass",
+      "count": 26987,
+      "fraction": 0.8971742021276595
+    },
+    {
+      "filter": "mfe",
+      "status": "applied_pass",
+      "count": 30080,
+      "fraction": 1.0
+    },
+    {
+      "filter": "near_dedup",
+      "status": "not_applied_reference_missing",
+      "count": 30080,
+      "fraction": 1.0
+    },
+    {
+      "filter": "stage1_overall",
+      "status": "pass",
+      "count": 12337,
+      "fraction": 0.41013962765957446
+    },
+    {
+      "filter": "stage1_overall",
+      "status": "fail",
+      "count": 17743,
+      "fraction": 0.5898603723404255
+    }
+  ]
+}

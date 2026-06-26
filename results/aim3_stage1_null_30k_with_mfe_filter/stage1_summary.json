@@ -1,0 +1,97 @@
+{
+  "timestamp_utc": "2026-06-26T06:46:07.326586+00:00",
+  "stage": "stage1_hard_filter",
+  "condition": "null_model_30k_mfe_filter",
+  "config_path": "/Users/laura/Desktop/rnagenesis-aptamer-mres/configs/stage1_hard_filter_aptadiffA_poster_with_mfe.json",
+  "input_glob": "results/null_model_30k/null_sequences.txt",
+  "input_files": [
+    "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/null_model_30k/null_sequences.txt"
+  ],
+  "reference_corpus": null,
+  "limit": null,
+  "skip_mfe": false,
+  "total_sequences": 30000,
+  "passed_sequences": 12602,
+  "failed_sequences": 17398,
+  "pass_rate": 0.42006666666666664,
+  "filter_counts": [
+    {
+      "filter": "alphabet",
+      "status": "applied_pass",
+      "count": 30000,
+      "fraction": 1.0
+    },
+    {
+      "filter": "alphabet",
+      "status": "applied_fail",
+      "count": 0,
+      "fraction": 0.0
+    },
+    {
+      "filter": "length",
+      "status": "applied_pass",
+      "count": 30000,
+      "fraction": 1.0
+    },
+    {
+      "filter": "exact_dedup",
+      "status": "applied_pass",
+      "count": 30000,
+      "fraction": 1.0
+    },
+    {
+      "filter": "exact_dedup",
+      "status": "applied_fail",
+      "count": 0,
+      "fraction": 0.0
+    },
+    {
+      "filter": "homopolymer",
+      "status": "applied_pass",
+      "count": 13318,
+      "fraction": 0.44393333333333335
+    },
+    {
+      "filter": "homopolymer",
+      "status": "applied_fail",
+      "count": 16682,
+      "fraction": 0.5560666666666667
+    },
+    {
+      "filter": "gc",
+      "status": "applied_fail",
+      "count": 2802,
+      "fraction": 0.0934
+    },
+    {
+      "filter": "gc",
+      "status": "applied_pass",
+      "count": 27198,
+      "fraction": 0.9066
+    },
+    {
+      "filter": "mfe",
+      "status": "applied_pass",
+      "count": 30000,
+      "fraction": 1.0
+    },
+    {
+      "filter": "near_dedup",
+      "status": "not_applied_reference_missing",
+      "count": 30000,
+      "fraction": 1.0
+    },
+    {
+      "filter": "stage1_overall",
+      "status": "pass",
+      "count": 12602,
+      "fraction": 0.42006666666666664
+    },
+    {
+      "filter": "stage1_overall",
+      "status": "fail",
+      "count": 17398,
+      "fraction": 0.5799333333333333
+    }
+  ]
+}

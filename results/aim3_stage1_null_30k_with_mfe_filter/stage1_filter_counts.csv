@@ -1,0 +1,14 @@
+filter,status,count,fraction
+alphabet,applied_pass,30000,1.0
+alphabet,applied_fail,0,0.0
+length,applied_pass,30000,1.0
+exact_dedup,applied_pass,30000,1.0
+exact_dedup,applied_fail,0,0.0
+homopolymer,applied_pass,13318,0.44393333333333335
+homopolymer,applied_fail,16682,0.5560666666666667
+gc,applied_fail,2802,0.0934
+gc,applied_pass,27198,0.9066
+mfe,applied_pass,30000,1.0
+near_dedup,not_applied_reference_missing,30000,1.0
+stage1_overall,pass,12602,0.42006666666666664
+stage1_overall,fail,17398,0.5799333333333333

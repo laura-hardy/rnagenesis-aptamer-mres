@@ -91,11 +91,12 @@ def quantile_summary(values: list[float] | np.ndarray) -> dict[str, float]:
             "q05": None,
             "q25": None,
             "q75": None,
+            "q90": None,
             "q95": None,
             "q99": None,
         }
 
-    quantiles = np.quantile(arr, [0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99])
+    quantiles = np.quantile(arr, [0.01, 0.05, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99])
     return {
         "min": float(np.min(arr)),
         "max": float(np.max(arr)),
@@ -105,8 +106,9 @@ def quantile_summary(values: list[float] | np.ndarray) -> dict[str, float]:
         "q05": float(quantiles[1]),
         "q25": float(quantiles[2]),
         "q75": float(quantiles[4]),
-        "q95": float(quantiles[5]),
-        "q99": float(quantiles[6]),
+        "q90": float(quantiles[5]),
+        "q95": float(quantiles[6]),
+        "q99": float(quantiles[7]),
     }
 
 
@@ -160,8 +162,8 @@ def compute_mfe_distribution(sequences: list[str]) -> dict[str, Any]:
             )
 
     return {
-        "sequences_folded": len(mfe_values),
-        "fold_failures": fold_failures,
+        "folded_sequences": len(mfe_values),
+        "fold_failures": len(fold_failures),
         "mfe_summary": quantile_summary(mfe_values),
         "normalised_mfe_summary": quantile_summary(normalised_values),
     }
@@ -381,6 +383,36 @@ def write_summary_markdown(
         "",
         f"- MFE computed: `{compute_mfe}`",
         "",
+    ]
+
+    mfe_distribution = payload.get("mfe_distribution")
+    if isinstance(mfe_distribution, dict):
+        norm_summary = mfe_distribution.get("normalised_mfe_summary", {})
+        mfe_summary = mfe_distribution.get("mfe_summary", {})
+        lines.extend(
+            [
+                f"- Folded sequences: {mfe_distribution.get('folded_sequences', 'n/a')}",
+                f"- Fold failures: {mfe_distribution.get('fold_failures', 'n/a')}",
+                "",
+                "### Raw MFE summary",
+                "",
+                f"- Mean: {format_summary_value(mfe_summary.get('mean'))}",
+                f"- Q90: {format_summary_value(mfe_summary.get('q90'))}",
+                f"- Q95: {format_summary_value(mfe_summary.get('q95'))}",
+                f"- Q99: {format_summary_value(mfe_summary.get('q99'))}",
+                "",
+                "### Normalised MFE summary (MFE / length)",
+                "",
+                f"- Mean: {format_summary_value(norm_summary.get('mean'))}",
+                f"- Q90: {format_summary_value(norm_summary.get('q90'))}",
+                f"- Q95: {format_summary_value(norm_summary.get('q95'))}",
+                f"- Q99: {format_summary_value(norm_summary.get('q99'))}",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
         "## Notes",
         "",
         (
@@ -389,7 +421,8 @@ def write_summary_markdown(
             "replaced by distributions estimated from the full curated aptamer corpus."
         ),
         "",
-    ]
+        ]
+    )
 
     if invalid_examples:
         lines.extend(["## Invalid examples", ""])

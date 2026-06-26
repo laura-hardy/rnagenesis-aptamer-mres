@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 SCRIPT_NAME = "scripts/make_stage1_config_from_distributions.py"
+MFE_UPPER_QUANTILE_CHOICES = ("q90", "q95", "q99")
 
 
 def parse_bool(value: str) -> bool:
@@ -66,6 +67,15 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="Enable MFE filter using reference MFE distribution (default: false).",
     )
+    parser.add_argument(
+        "--mfe-upper-quantile",
+        choices=MFE_UPPER_QUANTILE_CHOICES,
+        default="q95",
+        help=(
+            "Normalised MFE upper-tail quantile for max_normalised_mfe "
+            "(default: q95; q99 is more lenient)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -75,6 +85,12 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError(f"Expected JSON object: {path}")
     return data
+
+
+def format_summary_value(value: float | None) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value:.6f}"
 
 
 def quantile_value(summary: dict[str, Any], key: str, label: str) -> float:
@@ -94,6 +110,7 @@ def build_config(
     gc_upper_quantile: str,
     homopolymer_threshold: int,
     enable_mfe_filter: bool,
+    mfe_upper_quantile: str,
 ) -> dict[str, Any]:
     length_summary = distributions["length_distribution"]["summary"]
     gc_summary = distributions["gc_content_distribution"]["summary"]
@@ -117,17 +134,17 @@ def build_config(
             raise ValueError(
                 "MFE filter requested but distributions JSON has no mfe_distribution object."
             )
-        mfe_summary = mfe_distribution.get("summary")
-        if not isinstance(mfe_summary, dict):
+        norm_summary = mfe_distribution.get("normalised_mfe_summary")
+        if not isinstance(norm_summary, dict):
             raise ValueError(
-                "MFE filter requested but mfe_distribution.summary is missing."
+                "MFE filter requested but mfe_distribution.normalised_mfe_summary is missing."
             )
-        mfe_key = "q95"
-        if mfe_key not in mfe_summary or mfe_summary[mfe_key] is None:
+        if mfe_upper_quantile not in norm_summary or norm_summary[mfe_upper_quantile] is None:
             raise ValueError(
-                f"MFE filter requested but mfe_distribution.summary[{mfe_key!r}] is null."
+                "MFE filter requested but "
+                f"mfe_distribution.normalised_mfe_summary[{mfe_upper_quantile!r}] is null."
             )
-        config["max_normalised_mfe"] = float(mfe_summary[mfe_key])
+        config["max_normalised_mfe"] = float(norm_summary[mfe_upper_quantile])
     else:
         config["max_normalised_mfe"] = None
 
@@ -147,11 +164,14 @@ def write_summary_markdown(
     config: dict[str, Any],
     gc_lower_quantile: str,
     gc_upper_quantile: str,
+    enable_mfe_filter: bool,
+    mfe_upper_quantile: str,
     distributions: dict[str, Any],
 ) -> None:
     retained = distributions.get("counts", {}).get("retained_sequences", "unknown")
     gc_summary = distributions["gc_content_distribution"]["summary"]
     gc_mean = gc_summary.get("mean")
+    mfe_distribution = distributions.get("mfe_distribution") or {}
 
     lines = [
         f"# Stage 1 config summary: `{output_config.name}`",
@@ -171,24 +191,54 @@ def write_summary_markdown(
         "(from reference length distribution min/max).",
         f"- GC bounds: **{config['min_gc_fraction']:.6f}–{config['max_gc_fraction']:.6f}** "
         f"({gc_lower_quantile}–{gc_upper_quantile} percentiles of Aptadiff A; "
-        f"reference mean GC = {gc_mean:.6f}).",
+        f"reference mean GC = {format_summary_value(gc_mean)}).",
         f"- Homopolymer fail threshold: run length **≥ {config['homopolymer_max_run_fail_threshold']}**.",
-        "- MFE filter: **not enabled** (reference MFE distribution not used).",
-        "- Near-deduplication filter: **not enabled**.",
-        "",
-        "## Active filters preserved from base config",
-        "",
-        f"- RNA alphabet validity: `{config['enforce_rna_alphabet']}`",
-        f"- Leading `11` stripping: `{config['strip_leading_11']}`",
-        f"- Exact deduplication: `{config['enforce_exact_deduplication']}`",
-        f"- Homopolymer filter: `{config['enforce_homopolymer_filter']}`",
-        "",
-        "## Purpose",
-        "",
-        "Preliminary poster Stage 1 comparison of unadapted RNAGenesis and "
-        "Aptadiff-calibrated null sequences under empirically grounded thresholds.",
-        "",
     ]
+
+    if enable_mfe_filter:
+        norm_summary = mfe_distribution.get("normalised_mfe_summary", {})
+        mfe_summary = mfe_distribution.get("mfe_summary", {})
+        raw_cutoff = mfe_summary.get(mfe_upper_quantile)
+        norm_cutoff = config["max_normalised_mfe"]
+        lines.extend(
+            [
+                f"- MFE filter: **enabled** (lenient upper-tail hard filter).",
+                f"- MFE quantile used: **{mfe_upper_quantile}** of Aptadiff A normalised MFE "
+                f"(q99 is more lenient than q95).",
+                f"- Normalised MFE cutoff (`max_normalised_mfe`): **{norm_cutoff:.6f}**.",
+            ]
+        )
+        if raw_cutoff is not None:
+            lines.append(
+                f"- Reference raw MFE at {mfe_upper_quantile}: **{float(raw_cutoff):.6f}** kcal/mol."
+            )
+        lines.append(
+            "- MFE filter logic: pass if `normalised_mfe <= max_normalised_mfe`; "
+            "fail if `normalised_mfe > max_normalised_mfe`. "
+            "This removes sequences with unusually weak predicted folding relative to "
+            "the Aptadiff A reference corpus; it does not select for optimal folders."
+        )
+    else:
+        lines.append("- MFE filter: **not enabled** (reference MFE distribution not used).")
+
+    lines.extend(
+        [
+            "- Near-deduplication filter: **not enabled**.",
+            "",
+            "## Active filters preserved from base config",
+            "",
+            f"- RNA alphabet validity: `{config['enforce_rna_alphabet']}`",
+            f"- Leading `11` stripping: `{config['strip_leading_11']}`",
+            f"- Exact deduplication: `{config['enforce_exact_deduplication']}`",
+            f"- Homopolymer filter: `{config['enforce_homopolymer_filter']}`",
+            "",
+            "## Purpose",
+            "",
+            "Preliminary poster Stage 1 comparison of unadapted RNAGenesis and "
+            "Aptadiff-calibrated null sequences under empirically grounded thresholds.",
+            "",
+        ]
+    )
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -205,6 +255,7 @@ def main() -> int:
         gc_upper_quantile=args.gc_upper_quantile,
         homopolymer_threshold=args.homopolymer_threshold,
         enable_mfe_filter=args.enable_mfe_filter,
+        mfe_upper_quantile=args.mfe_upper_quantile,
     )
 
     args.output_config.parent.mkdir(parents=True, exist_ok=True)
@@ -220,11 +271,15 @@ def main() -> int:
         config=config,
         gc_lower_quantile=args.gc_lower_quantile,
         gc_upper_quantile=args.gc_upper_quantile,
+        enable_mfe_filter=args.enable_mfe_filter,
+        mfe_upper_quantile=args.mfe_upper_quantile,
         distributions=distributions,
     )
 
     print(f"Wrote config: {args.output_config}")
     print(f"Wrote summary: {summary_path}")
+    if args.enable_mfe_filter:
+        print(f"max_normalised_mfe ({args.mfe_upper_quantile}): {config['max_normalised_mfe']}")
     return 0
 
 
