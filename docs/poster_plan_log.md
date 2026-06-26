@@ -26,3 +26,10 @@ Short execution log for the poster Stage 1 preliminary-results sprint.
   - Bases sampled independently from corpus mononucleotide frequencies.
   - No structural, GC, MFE, motif, or homopolymer constraints applied.
   - Duplicate sequences are intentionally not removed at generation time.
+
+## Phase 3 — Poster-specific Stage 1 config from Aptadiff A distributions
+
+- Implemented `scripts/make_stage1_config_from_distributions.py`.
+- Created `configs/stage1_hard_filter_aptadiffA_poster.json`.
+- Length and GC thresholds are empirically derived from Aptadiff A reference distributions.
+- MFE and near-dedup filters are intentionally deferred for poster Stage 1.
