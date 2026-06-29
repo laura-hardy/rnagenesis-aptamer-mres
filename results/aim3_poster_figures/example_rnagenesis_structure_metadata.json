@@ -1,0 +1,46 @@
+{
+  "description": "Example folded unadapted RNAGenesis sequence selected from the Stage 1 poster-config run.",
+  "sequence_id": "unadapted_rnagenesis_30k_seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk10_seed4210_steps50_batch16_batchnum188_gpu1_00080",
+  "condition": "unadapted_rnagenesis_30k",
+  "cleaned_sequence": "CAUGGUGGGUUGGUUGGCCGAUUGGUGGGCUGGGAU",
+  "length": 36,
+  "gc_fraction": 0.6111111111111112,
+  "gc_percent": 61.1111,
+  "mfe_kcal_per_mol": -8.0,
+  "normalised_mfe": -0.2222222222222222,
+  "dot_bracket_structure": ".........((((((.(((....))).))))))...",
+  "paired_base_count": 9,
+  "stage1_pass": true,
+  "stage1_failure_reasons": null,
+  "source_csv": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_stage1_unadapted_30k_poster_config/stage1_all_sequences.csv",
+  "selection_rule": "Example folded unadapted RNAGenesis sequence selected from the Stage 1 poster-config run using a deterministic rule: (1) load stage1_all_sequences.csv; (2) when a condition column is present, keep only rows with an explicit label containing 'unadapted' and 'rnagenesis' (exclude rows with missing condition values); (3) prefer stage1_pass == True; (4) require valid A/C/G/U alphabet and non-empty sequence; (5) require non-trivial dot-bracket structure with at least four '(' and four ')'; (6) among passing sequences, sort by normalised_mfe ascending (more negative first); (7) take the 10th\u201325th percentile slice by normalised_mfe to avoid the single most extreme outlier; (8) within that slice, choose the sequence with smallest absolute distance from GC target 0.6165, breaking ties by sequence_id ascending.",
+  "selection_parameters": {
+    "gc_target": 0.6165,
+    "min_paired_bases": 4,
+    "mfe_percentile_low": 0.1,
+    "mfe_percentile_high": 0.25
+  },
+  "mfe_verification": {
+    "recomputed_mfe_kcal_per_mol": -8.0,
+    "recomputed_dot_bracket_structure": ".........((((((.(((....))).))))))...",
+    "csv_values_match_recomputed": true
+  },
+  "output_files": {
+    "png": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/example_rnagenesis_structure.png",
+    "svg": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/example_rnagenesis_structure.svg",
+    "metadata_txt": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/example_rnagenesis_structure_metadata.txt",
+    "metadata_json": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/example_rnagenesis_structure_metadata.json"
+  },
+  "figure_settings": {
+    "canvas_width_px": 650,
+    "canvas_height_px": 1100,
+    "title": null,
+    "caption": null
+  },
+  "png_dimensions": {
+    "width_px": 650,
+    "height_px": 1100
+  },
+  "generated_at_utc": "2026-06-27T05:56:46.980255+00:00",
+  "script": "scripts/export_example_structure.py"
+}

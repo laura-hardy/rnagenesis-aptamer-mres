@@ -1,0 +1,48 @@
+{
+  "created_at_utc": "2026-06-28T09:08:44.637214+00:00",
+  "figure_title": "GC content distributions",
+  "figure_description": "Descriptive comparison of GC content for unadapted RNAGenesis generated sequences and Aptadiff-A-calibrated null model random RNA, with Aptadiff Dataset A Stage 1 training corpus bounds shown as dashed vertical lines.",
+  "plotting_method": "overlapping histograms with density normalization; discrete bins aligned to GC count / sequence length (1/36 increments)",
+  "source_files": {
+    "null_model_csv": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_stage1_null_30k/stage1_all_sequences.csv",
+    "rnagenesis_csv": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_stage1_unadapted_30k_poster_config/stage1_all_sequences.csv",
+    "reference_json": "/Users/laura/Desktop/rnagenesis-aptamer-mres/data/processed/corpus_distributions/aptadiff_datasetA_p6.json"
+  },
+  "sequence_counts": {
+    "null_model": 30000,
+    "rnagenesis": 30080
+  },
+  "null_model_gc": {
+    "min": 0.2222222222222222,
+    "max": 0.9166666666666666,
+    "mean": 0.6166185185185185,
+    "count": 30000
+  },
+  "rnagenesis_gc": {
+    "min": 0.25,
+    "max": 0.8888888888888888,
+    "mean": 0.6168578235815604,
+    "count": 30080
+  },
+  "aptadiff_reference_gc": {
+    "lower_bound_q05": 0.4722222222222222,
+    "upper_bound_q95": 0.7222222222222222,
+    "mean": 0.6165108921412354
+  },
+  "gc_diagnostics_interpretation": "mixture of both: the previous 25-bin linspace misaligned with discrete 1/36 GC fractions and created artificial gaps; after discrete binning, remaining blank spaces reflect true zero-count GC-count values within the observed range",
+  "diagnostics_files": {
+    "txt": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/gc_content_distribution_diagnostics.txt",
+    "json": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/gc_content_distribution_diagnostics.json"
+  },
+  "output_files": {
+    "png": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/gc_content_distribution_plot.png",
+    "pdf": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/gc_content_distribution_plot.pdf",
+    "svg": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/gc_content_distribution_plot.svg"
+  },
+  "metadata_path": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/gc_content_distribution_plot_metadata.json",
+  "canvas_size_px": {
+    "width": 800,
+    "height": 750
+  },
+  "dpi": 100
+}

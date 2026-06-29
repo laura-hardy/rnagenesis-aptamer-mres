@@ -1,0 +1,43 @@
+Example folded unadapted RNAGenesis structure export
+============================================================
+Description: Example folded unadapted RNAGenesis sequence selected from the Stage 1 poster-config run.
+
+Selected sequence
+------------------------------------------------------------
+Sequence ID: unadapted_rnagenesis_30k_seqs_wo_guidance_top_p=0.95_2_3008_h200_baseline_30k_chunk10_seed4210_steps50_batch16_batchnum188_gpu1_00080
+Condition: unadapted_rnagenesis_30k
+Sequence (A/C/G/U): CAUGGUGGGUUGGUUGGCCGAUUGGUGGGCUGGGAU
+Length (nt): 36
+GC fraction: 0.611111
+GC percent: 61.1111%
+MFE (kcal/mol): -8.000000
+Normalised MFE: -0.222222
+Dot-bracket structure: .........((((((.(((....))).))))))...
+Paired bases in structure: 9
+Stage 1 pass: True
+Stage 1 failure reasons: none
+
+Provenance
+------------------------------------------------------------
+Source CSV: /Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_stage1_unadapted_30k_poster_config/stage1_all_sequences.csv
+
+Selection rule
+------------------------------------------------------------
+Example folded unadapted RNAGenesis sequence selected from the Stage 1 poster-config run using a deterministic rule: (1) load stage1_all_sequences.csv; (2) when a condition column is present, keep only rows with an explicit label containing 'unadapted' and 'rnagenesis' (exclude rows with missing condition values); (3) prefer stage1_pass == True; (4) require valid A/C/G/U alphabet and non-empty sequence; (5) require non-trivial dot-bracket structure with at least four '(' and four ')'; (6) among passing sequences, sort by normalised_mfe ascending (more negative first); (7) take the 10th–25th percentile slice by normalised_mfe to avoid the single most extreme outlier; (8) within that slice, choose the sequence with smallest absolute distance from GC target 0.6165, breaking ties by sequence_id ascending.
+
+Output files
+------------------------------------------------------------
+PNG: /Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/example_rnagenesis_structure.png
+SVG: /Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/example_rnagenesis_structure.svg
+Metadata JSON: /Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/example_rnagenesis_structure_metadata.json
+
+PNG dimensions
+------------------------------------------------------------
+Width: 650 px
+Height: 1100 px
+
+ViennaRNA verification
+------------------------------------------------------------
+Recomputed MFE (kcal/mol): -8.000000
+Recomputed structure: .........((((((.(((....))).))))))...
+CSV matches recomputed values: True

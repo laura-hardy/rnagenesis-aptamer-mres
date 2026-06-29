@@ -1,0 +1,41 @@
+{
+  "created_at_utc": "2026-06-27T06:28:08.257044+00:00",
+  "figure_title": "Level 1 pass rate",
+  "figure_description": "Column chart comparing Level 1 Stage 1 hard-filter pass rates for unadapted RNAGenesis generated sequences and Aptadiff-A-calibrated null model random RNA under identical hard filters.",
+  "note": "No error bars are shown because this is a deterministic summary of one generated sequence pool per condition.",
+  "conditions": [
+    {
+      "condition_name": "Unadapted RNAGenesis",
+      "source_summary_path": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_stage1_unadapted_30k_poster_config/stage1_summary.json",
+      "generated": 30080,
+      "passed": 12337,
+      "failed": 17743,
+      "pass_rate": 0.41013962765957446,
+      "pass_rate_percent": 41.0,
+      "count_label": "12,337 / 30,080",
+      "count_label_on_figure": true
+    },
+    {
+      "condition_name": "Aptadiff-A-calibrated null model",
+      "source_summary_path": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_stage1_null_30k/stage1_summary.json",
+      "generated": 30000,
+      "passed": 12602,
+      "failed": 17398,
+      "pass_rate": 0.42006666666666664,
+      "pass_rate_percent": 42.0,
+      "count_label": "12,602 / 30,000",
+      "count_label_on_figure": true
+    }
+  ],
+  "output_files": {
+    "png": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/stage1_pass_rate_column_plot.png",
+    "pdf": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/stage1_pass_rate_column_plot.pdf",
+    "svg": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/stage1_pass_rate_column_plot.svg"
+  },
+  "metadata_path": "/Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_poster_figures/stage1_pass_rate_column_plot_metadata.json",
+  "canvas_size_px": {
+    "width": 800,
+    "height": 750
+  },
+  "dpi": 100
+}

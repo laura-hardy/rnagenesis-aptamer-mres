@@ -1,0 +1,41 @@
+GC content distribution diagnostics
+===================================
+
+Null model source: /Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_stage1_null_30k/stage1_all_sequences.csv
+RNAGenesis source: /Users/laura/Desktop/rnagenesis-aptamer-mres/results/aim3_stage1_unadapted_30k_poster_config/stage1_all_sequences.csv
+Sequence length (expected): 36 nt
+GC increment (1/length): 0.027777777778
+
+Null model
+----------
+Rows: 30,000
+Cleaned length range: 36–36
+GC min / max / mean: 0.222222 / 0.916667 / 0.616619
+Unique GC values: 25
+First 10 unique GC values: [0.2222222222222222, 0.2777777777777778, 0.3055555555555556, 0.3333333333333333, 0.3611111111111111, 0.3888888888888889, 0.4166666666666667, 0.4444444444444444, 0.4722222222222222, 0.5]
+Last 10 unique GC values: [0.6666666666666666, 0.6944444444444444, 0.7222222222222222, 0.75, 0.7777777777777778, 0.8055555555555556, 0.8333333333333334, 0.8611111111111112, 0.8888888888888888, 0.9166666666666666]
+Inferred spacing between unique values: 0.027777777778
+Aligns with 1/length increments: True
+Missing GC-count values within observed range (8–33): [9]
+
+Unadapted RNAGenesis
+--------------------
+Rows: 30,080
+Cleaned length range: 36–36
+GC min / max / mean: 0.250000 / 0.888889 / 0.616858
+Unique GC values: 24
+First 10 unique GC values: [0.25, 0.2777777777777778, 0.3055555555555556, 0.3333333333333333, 0.3611111111111111, 0.3888888888888889, 0.4166666666666667, 0.4444444444444444, 0.4722222222222222, 0.5]
+Last 10 unique GC values: [0.6388888888888888, 0.6666666666666666, 0.6944444444444444, 0.7222222222222222, 0.75, 0.7777777777777778, 0.8055555555555556, 0.8333333333333334, 0.8611111111111112, 0.8888888888888888]
+Inferred spacing between unique values: 0.027777777778
+Aligns with 1/length increments: True
+Missing GC-count values within observed range (9–32): []
+
+Histogram binning comparison
+----------------------------
+Previous bins: np.linspace(0.25, 0.85, 25)
+Previous empty bin slots (both conditions): 5
+Revised bins: bin edges at (k - 0.5) / length for k in 0..length+1
+Revised empty bin slots (both conditions, all bins): 25
+Revised empty bin slots within x-axis view (0.25–0.85): 1
+
+Interpretation: mixture of both: the previous 25-bin linspace misaligned with discrete 1/36 GC fractions and created artificial gaps; after discrete binning, remaining blank spaces reflect true zero-count GC-count values within the observed range
