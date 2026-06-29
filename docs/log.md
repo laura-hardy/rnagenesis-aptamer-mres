@@ -1088,3 +1088,9 @@ Outputs written to `results/aim3_stage1_medium_test/` and `results/aim3_stage1_u
 Status:
 - Stage 1 hard filtering implemented and QA-checked.
 - Next: download reference aptamer corpus (AptaDiff Dataset A) for Stage 0 validation and empirical Stage 1 threshold calibration.
+
+## 2026-06-22 - 2026-06-26
+
+## Poster preliminary results preparation
+
+Prepared and committed the poster-stage preliminary results workflow on the `poster-stage1-preliminary-results` branch, then pushed the branch to GitHub and returned to `main`. The work established an Aptadiff Dataset A-calibrated reference workflow for comparing unadapted RNAGenesis outputs against a composition- and length-matched null model. I estimated Dataset A nucleotide, GC, length, and MFE reference distributions; generated 30,000 null model RNA sequences using the empirical mononucleotide and length distributions; created Stage 1 poster configs with Dataset A-derived GC and lenient MFE thresholds; and ran Stage 1 filtering on both the null model and unadapted RNAGenesis pools. The final preliminary Stage 1 pass rates were similar between conditions, with homopolymer filtering as the dominant rejection driver and the very lenient MFE threshold adding no further exclusions. I also generated the poster-ready preliminary result figures: an illustrative RNAfold/ViennaRNA secondary structure from a passed RNAGenesis sequence, a Level 1 pass-rate comparison, and a GC content distribution plot with Dataset A 5th–95th percentile bounds. These results are intended as preliminary poster evidence only: Dataset A is a proxy reference subset, and passing Stage 1 filters does not imply NDM-1 binding or aptamer function.
