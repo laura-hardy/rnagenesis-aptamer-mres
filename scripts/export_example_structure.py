@@ -31,6 +31,8 @@ MIN_PAIRED_BASES = 4
 MFE_PERCENTILE_LOW = 0.10
 MFE_PERCENTILE_HIGH = 0.25
 VALID_RNA_BASES = frozenset("AUCG")
+PNG_DPI = 600
+SVG_RASTER_BASE_DPI = 96.0
 
 SELECTION_RULE = (
     "Example folded unadapted RNAGenesis sequence selected from the Stage 1 poster-config "
@@ -407,12 +409,13 @@ def rasterize_viennarna_svg_with_pil(svg_path: Path) -> Any:
     return image
 
 
-def svg_to_png_bytes(svg_path: Path) -> bytes:
+def svg_to_png_bytes(svg_path: Path, canvas_width: int, canvas_height: int) -> bytes:
     """Convert SVG to PNG bytes using the first available converter."""
+    render_width = int(max(canvas_width, canvas_height) * PNG_DPI / SVG_RASTER_BASE_DPI)
     try:
         import cairosvg  # noqa: PLC0415
 
-        return cairosvg.svg2png(url=str(svg_path))
+        return cairosvg.svg2png(url=str(svg_path), output_width=render_width)
     except ImportError:
         pass
 
@@ -424,13 +427,14 @@ def svg_to_png_bytes(svg_path: Path) -> bytes:
             tmp_png_path = Path(tmp_png.name)
         try:
             if command_name == "rsvg-convert":
-                cmd = [converter, str(svg_path), "-o", str(tmp_png_path)]
+                cmd = [converter, "-w", str(render_width), str(svg_path), "-o", str(tmp_png_path)]
             else:
                 cmd = [
                     converter,
                     str(svg_path),
                     "--export-type=png",
                     f"--export-filename={tmp_png_path}",
+                    f"--export-width={render_width}",
                 ]
             completed = subprocess.run(cmd, capture_output=True, text=True, check=False)
             if completed.returncode == 0 and tmp_png_path.is_file():
@@ -653,7 +657,7 @@ def main() -> int:
     sanitize_viennarna_svg(svg_path)
 
     try:
-        png_bytes = svg_to_png_bytes(svg_path)
+        png_bytes = svg_to_png_bytes(svg_path, args.max_width, args.max_height)
     except Exception as exc:
         raise SystemExit(
             "ViennaRNA SVG was written, but PNG conversion failed. "
@@ -669,7 +673,7 @@ def main() -> int:
         canvas_height=args.max_height,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    poster_image.save(png_path, format="PNG")
+    poster_image.save(png_path, format="PNG", dpi=(PNG_DPI, PNG_DPI))
 
     write_metadata(
         selected=selected,

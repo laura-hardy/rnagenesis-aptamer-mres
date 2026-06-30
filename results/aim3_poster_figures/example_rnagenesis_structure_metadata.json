@@ -41,6 +41,6 @@
     "width_px": 650,
     "height_px": 1100
   },
-  "generated_at_utc": "2026-06-27T05:56:46.980255+00:00",
+  "generated_at_utc": "2026-06-29T02:30:26.512521+00:00",
   "script": "scripts/export_example_structure.py"
 }
