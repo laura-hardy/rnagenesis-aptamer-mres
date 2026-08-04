@@ -1300,3 +1300,55 @@ Every stage reads only the previous stage's outputs, writes a QC report, appends
 ### Status and next step
 
 The search for major raw sources is sufficiently complete to proceed to the checkpointed curation pipeline. Before this documentation milestone, the inventory artefacts were sanitised to remove sequence-level examples. The inventory, assessment, Q1–Q6 resolutions, curation specification and this log entry are now ready to be committed together. The first curation task is S0 registry and leakage-exclusion construction; the first source adapter will be selected with Laura immediately before S1 implementation. The master corpus, cross-source duplicate resolution, target/family balancing and cluster-level `FT`/`REF`/`EVAL` partitions remain to be created.
+
+## 2026-08-04 — S0a registry framework and AptaBase registration
+
+### Stage
+
+S0a — source-registry framework and first-source registration. Full S0 remains incomplete until the leakage-exclusion set is built. S1 must not begin.
+
+### What was done
+
+A deterministic S0a registry builder was added. It reads a tracked specification (`config/source_registry.csv`), validates each registered input against on-disk SHA-256 and CSV data-row counts (UTF-8-SIG, quoted embedded newlines handled), compares paths with `docs/data_curation/raw_data_inventory.csv`, and writes an operational copy to `data/interim/registry/source_registry.csv`. AptaBase is the first and currently only registered source. The cleaned scrape validated successfully (hash and 610 rows). Inventory divergence was emitted as warnings rather than failures. A pre/post hash of all 203 inventory-listed raw files confirmed the raw tree was unchanged. Unit tests cover success, mismatch, forbidden-path and inventory-warning cases; existing offline AptaBase tests were re-run for regression.
+
+### Decisions made
+
+- `data/raw/aptabase/aptabase_cleaned.csv` is the binding Tier 1 registered input (`source_dataset=aptabase_cleaned_scrape_2026-07-20`).
+- `aptabase_raw.csv`, cached HTML under `html/`, fixtures, and duplicate search-page HTML files are forbidden pipeline inputs (retained as scrape provenance only).
+- Later S1 must map from `sequence_raw` only; prior derived fields such as `sequence_clean` / inferred molecule type remain noncanonical diagnostics.
+- The user-supplied note that AptaBase is referenced by Maptamer is stored as database-level source confidence only and must not raise any record’s experimental evidence level.
+- `redistribution_status` remains `unknown` pending explicit reuse terms.
+- Cross-source and intra-corpus deduplication remains deferred until S5.
+- Inventory `recommended_S0_status` for the cleaned file (`derived_output_not_raw_input`) is intentionally overridden by the curation plan; the inventory’s preference for `aptabase_raw.csv` does not make that companion eligible for ingest.
+
+### Inputs used
+
+- Tracked registry specification: `config/source_registry.csv`
+- AptaBase cleaned CSV: `data/raw/aptabase/aptabase_cleaned.csv` (SHA-256 `649ca9c2db37743917fc611eb2154ebaf7a3aa1a8a729f05c0f9c61fc376430e`)
+- Tracked inventory: `docs/data_curation/raw_data_inventory.csv`
+- AptaBase local documentation: `data/raw/aptabase/README_aptabase_curation.txt`, `aptabase_qc_report.md`
+- Corpus curation specification: `docs/data_curation/rna_aptamer_corpus_curation_plan.md`
+
+### Outputs produced
+
+- `config/source_registry.csv` — tracked, reviewable registry specification (no sequence values)
+- `scripts/data_preparation/s0_build_registry.py` — S0a validator/writer
+- `tests/data_preparation/test_s0_build_registry.py` — synthetic non-biological fixtures
+- `data/interim/registry/source_registry.csv` — operational registry; ignored by Git via `/data/`; contains the same registry metadata as the tracked specification and no sequence values
+
+### Numbers
+
+- Registered sources: 1 (`aptabase`)
+- AptaBase expected rows: 610; actual rows: 610
+- AptaBase SHA-256 (actual = registry): `649ca9c2db37743917fc611eb2154ebaf7a3aa1a8a729f05c0f9c61fc376430e`
+- Inventory warnings on the real run: 2 (cleaned derived-output override; raw companion recommended-but-forbidden)
+- Tests: `test_inventory_raw_data.py` + `test_s0_build_registry.py` → 34 passed; offline AptaBase cleaning/parser tests → 25 passed
+- Raw-tree immutability: 203/203 inventory-listed raw-file hashes unchanged after S0a
+
+### Open questions carried forward
+
+- S0 leakage-exclusion set still required before S0 is complete
+- Shared sequence normalisation and constant-region detection still required (S2)
+- DNA-like AptaBase records remain unclassified pending molecule-type policy
+- Redistribution terms for AptaBase remain unknown
+- No AptaBase S1 adapter has been written; S1 must not start until S0 is finished
