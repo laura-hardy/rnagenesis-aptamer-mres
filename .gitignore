@@ -4,6 +4,7 @@
 # Python / cache
 __pycache__/
 *.py[cod]
+*.pyc
 .ipynb_checkpoints/
 
 # Virtual environments / local envs
@@ -51,5 +52,10 @@ docs/run_notes/*.log
 !results/phase4_1_unadapted_rnagenesis_30k/
 !results/phase4_1_unadapted_rnagenesis_30k/**
 
-# Local raw data - do not commit
-/data/raw/
+# Data is local-only — never committed
+# (replaces the narrower /data/raw/ rule; entire top-level data/ is ignored)
+/data/
+
+# OS and editor noise (Excel lock files, temp files)
+~$*
+*.tmp

@@ -1094,3 +1094,209 @@ Status:
 ## Poster preliminary results preparation
 
 Prepared and committed the poster-stage preliminary results workflow on the `poster-stage1-preliminary-results` branch, then pushed the branch to GitHub and returned to `main`. The work established an Aptadiff Dataset A-calibrated reference workflow for comparing unadapted RNAGenesis outputs against a composition- and length-matched null model. I estimated Dataset A nucleotide, GC, length, and MFE reference distributions; generated 30,000 null model RNA sequences using the empirical mononucleotide and length distributions; created Stage 1 poster configs with Dataset A-derived GC and lenient MFE thresholds; and ran Stage 1 filtering on both the null model and unadapted RNAGenesis pools. The final preliminary Stage 1 pass rates were similar between conditions, with homopolymer filtering as the dominant rejection driver and the very lenient MFE threshold adding no further exclusions. I also generated the poster-ready preliminary result figures: an illustrative RNAfold/ViennaRNA secondary structure from a passed RNAGenesis sequence, a Level 1 pass-rate comparison, and a GC content distribution plot with Dataset A 5th–95th percentile bounds. These results are intended as preliminary poster evidence only: Dataset A is a proxy reference subset, and passing Stage 1 filters does not imply NDM-1 binding or aptamer function.
+
+## 2026-05-05 - 2026-08-04 — Raw aptamer dataset search and curation-input inventory
+
+### Context and objective
+
+Completed the principal search for raw aptamer data to support construction of the project corpus. The main search was completed on 28 July 2026 and the raw-data inventory was refreshed on 4 August 2026. The search began with the original aim of finding target-specific RNA HT-SELEX or activity-screening data for carbapenemases at a scale suitable for fine-tuning. No such dataset was identified for KPC-2, NDM-1 or OXA-48. However, seven RNA aptamers reported against NDM-1 were recovered from the selektion source and retained as evaluation references. The resulting strategy is to assemble a curated multi-source corpus of published RNA aptamers with experimentally supported protein targets, rather than treating a large late-round SELEX pool against one unrelated target as equivalent to a general aptamer corpus.
+
+This is a data-discovery and raw-input milestone, not completion of the cleaned corpus. No cross-source master corpus has yet been created. The next pipeline stage, S0, will freeze an explicit source registry and construct the leakage-exclusion set. Source-specific extraction, normalisation and eligibility filtering occur subsequently at S1, S2 and S3. Cross-source target normalisation, deduplication, clustering, balancing and partitioning do not occur until later stages.
+
+### Intended downstream uses
+
+| Use | Role of the corpus | Data-separation requirement |
+|---|---|---|
+| RNAGenesis fine-tuning | Shift the RNA foundation model towards the distribution of experimentally reported, protein-binding RNA aptamers so that it generates aptamer-like RNA sequences for subsequent NDM-1 candidate generation. | Use only the `FT` partition for model adaptation. A later RNA-aware split will divide `FT` into train and validation subsets at cluster level. |
+| AptaRank reference distributions | Define empirical distributions for sequence and predicted secondary-structure features used to score generated candidates relative to validated RNA aptamers. | Fit all calibration distributions from the independent `REF` partition only, not from `FT`. |
+| AptaRank evaluation | Test whether the tool ranks held-out validated aptamers above suitable controls and model-generated candidates without leakage from calibration. | Use the cluster-held-out `EVAL` partition only. No sequence cluster may span `FT`, `REF` and `EVAL`. |
+| Target-specific biological grounding | Retain known NDM-1, KPC-2 and related carbapenemase aptamers as positive references and methodological examples. | Route all carbapenemase and human-serum-albumin sequences to the leakage-exclusion/evaluation lane. The NDM-1 D9 records are RNA aptamers reported in DNA alphabet; genuine ssDNA references remain ssDNA. |
+
+### Corpus design decision
+
+The target training distribution is **diverse published RNA aptamers that bind proteins**, not all sequences observed in a single HT-SELEX experiment. This decision follows from the project objective: the model should learn transferable RNA aptamer sequence and structural regularities rather than reproduce the enriched sequence distribution of one experiment and one target.
+
+The corpus should therefore:
+
+- contain RNA aptamer sequences with a resolved protein or protein-domain target;
+- prioritise experimentally selected and reported binders over unselected library members or bulk late-round reads;
+- span many protein targets and protein families, including enzymes and non-enzyme proteins;
+- avoid domination by a single target, publication, database, experimental family or highly similar sequence family;
+- preserve selection, assay, source and publication provenance wherever available;
+- distinguish exact duplicates from near-duplicate variants rather than treating every database row as independent;
+- retain enough source and family identifiers to support leakage-aware cluster-level `FT`/`REF`/`EVAL` partitioning and the later train/validation split within `FT`; and
+- keep true DNA aptamers separate rather than converting them to RNA solely to increase corpus size.
+
+One corpus record is one `(sequence, target)` pair. A sequence reported against two targets therefore remains two records, while clustering is performed on sequence so that all occurrences remain in one partition. A sequence written with `T` may be converted to `U` only when the source establishes that it represents an RNA aptamer or an RNA sequencing representation, and the transformation must be recorded in `alphabet_as_reported` and `t_to_u_applied`. A genuine ssDNA aptamer is not made an RNA aptamer by alphabet substitution and remains outside the primary RNA corpus.
+
+### Search strategy
+
+The search was organised into target-specific, general-corpus, related-work and supplementary workstreams. Search actions, zero-result searches, access dates, URLs/accessions, candidate decisions and follow-up actions were recorded in `dataset_search_log.xlsx`.
+
+| Workstream | Principal sources searched | Representative search concepts | Purpose and outcome |
+|---|---|---|---|
+| Carbapenemase-specific repositories | NCBI GEO, NCBI SRA, NCBI Nucleotide/GenBank and ENA | `KPC`, `KPC-2`, `NDM`, `NDM-1`, `New Delhi metallo-beta-lactamase`, `OXA-48`, `carbapenemase`, `beta-lactamase` combined with `aptamer`, `SELEX`, `HT-SELEX` and `SELEX-seq` | Searched first for target-specific RNA sequencing data. No suitable RNA HT-SELEX corpus was identified. The main NDM-1 sequencing hit, BioProject `PRJNA830749`, contains ssDNA selection pools and was retained as target-specific reference material rather than direct RNA fine-tuning data. |
+| Patents and target-specific papers | Google Patents, Espacenet, PubMed/full text and supplementary files | Carbapenemase target names plus `RNA aptamer`, `DNA aptamer`, `nucleic acid aptamer`, `oligonucleotide aptamer` and `SELEX` | Recovered small numbers of reported KPC-2/NDM-1 aptamers and selection tables. These are valuable for evaluation and biological context but are too small and often DNA-based for the main training corpus. |
+| Curated aptamer databases | AptaDB, Apta-Index, UTexas Aptamer Database, AptamerBase, AptaBase, RiboaptDB/RiboCentre and SELEX-DB | RNA aptamers, protein/enzyme targets, target name, molecule type and sequence availability | Identified the main source collections for the multi-source corpus. Most require molecule-type filtering, target resolution, sequence cleaning and substantial cross-source deduplication. |
+| Datasets used in aptamer ML papers | AptaDiff, RaptGen, RaptRanker, AptaBLE, AptaGPT, InstructNA and RBM-based aptamer modelling | Paper/repository names plus `data`, `GitHub`, `HT-SELEX` and accession searches | Confirmed that several related papers reuse the same target-specific HT-SELEX datasets. AptaDiff datasets were acquired for comparison or fallback use, but they are not the preferred general RNA aptamer corpus. Some reported data, including the approximately 4,000 AptaGPT round-20 sequences, were not publicly available. |
+| Broader archive searches | ENA text search, NCBI GEO/SRA simplified searches and NCBI Nucleotide `RNA aptamer` searches | Initially complex Boolean searches, followed by simpler source-native queries | Complex archive queries frequently returned no useful results or were poorly matched to archive search interfaces. Searches were simplified and candidate records were then screened manually. |
+| Synthetic-data feasibility | Literature searches for `in silico SELEX`, computational SELEX simulation and synthetic aptamer datasets | Synthetic augmentation and simulated selection | Full in silico SELEX was not adopted because it would require a defensible RNA-protein binding or enrichment model and would exceed the MRes scope. Synthetic data will not substitute for experimentally supported aptamers in the reference corpus. |
+
+This was a structured project dataset search rather than a formal systematic review. Major named databases, sequence archives, related-work repositories, patents and known carbapenemase papers were covered. Broad paper-by-paper Google Scholar mining beyond the already identified literature was limited, and this limitation should be stated in the thesis.
+
+### Eligibility criteria for the primary RNA protein-aptamer corpus
+
+| Criterion | Required rule at S0 | Rationale |
+|---|---|---|
+| Molecule type | Record must represent RNA. Accept `U` sequences and `T`-encoded records only where RNA identity is supported by source metadata or publication context. | RNAGenesis is RNA-native, and DNA and RNA aptamer sequence/structure distributions are not interchangeable. |
+| Target type | Target must be a protein, enzyme or resolved protein domain/region. | The model is being adapted for protein-binding aptamer generation against NDM-1. |
+| Sequence availability | A concrete aptamer sequence must be recoverable after removal of explicit notation, modifications and non-sequence formatting. | Sequence-only names, paper indexes and target records cannot train or calibrate the model. |
+| Aptamer status | Sequence must be presented as a selected, enriched or experimentally tested aptamer/candidate, with provenance sufficient to distinguish it from a random library template. | Prevents unselected degenerate pools, primers and natural RNAs from entering the validated-aptamer distribution. |
+| Evidence/provenance | Retain source database, source record ID, publication/patent reference and available binding/selection evidence. Direct affinity measurements are preferred but not mandatory if selection provenance is credible. | Supports auditability, evidence stratification and later sensitivity analyses. |
+| Sequence role | Exclude full degenerate libraries, primer-only records, promoter-containing templates unless the aptamer region can be resolved, and ambiguous constructs that cannot be interpreted confidently. | Ensures the model sees aptamer sequences rather than experimental scaffolds or unresolved constructs. |
+| Target resolution | Normalise synonyms but retain the original target string and target region. Exclude unresolved cell/tissue targets unless a specific protein target is documented. | Enables target-family balancing and avoids treating whole-cell selections with unknown molecular targets as protein-binding examples. |
+| Duplication | Retain one canonical sequence-target pair with merged provenance; preserve evidence that several sources or accessions reported it. | Prevents repeated database copies from overweighting famous aptamers. |
+| Near-duplicate families | Cluster related variants and retain family/group identifiers. Variants may remain as separate sequences where experimentally distinct, but must be grouped for weighting and splitting. | Avoids family-level leakage and overrepresentation of mutational series or patent clone families. |
+| Length and alphabet | Require a valid canonical RNA `sequence_core` of 20–100 nt after justified normalisation. Records at 20–25 nt and 90–100 nt are flagged; records pushed below 20 nt by trimming are reviewed before rejection. | The fixed range matches the intended generation window while retaining an audit path for boundary cases and potentially over-aggressive trimming. |
+| Availability and reuse | Source must permit project use; redistribution restrictions must be recorded. | Apta-Index access is subject to a data-use agreement and may constrain release of the combined corpus. |
+
+### Records retained outside the primary training corpus
+
+| Record class | Planned handling |
+|---|---|
+| Experimentally reported ssDNA aptamers against NDM-1, KPC-2 or related targets | Keep as a separate target-specific positive-reference/evaluation set. Do not include in RNA training or RNA reference distributions by default. |
+| AptaDiff datasets A and B | Include in the Tier-1 build but cap each target at cluster level during balancing so that IGFBP3 and PTK7 do not dominate. Preserve Dataset A separately and uncapped for the replication/comparability run. |
+| AptaDiff datasets C and D | Defer from v1 because they lack target annotation and add preprocessing cost without target diversity; revisit only if the diverse corpus is too small. |
+| Small-molecule, ion, metabolite, cell, tissue and organism aptamers | Exclude from the primary protein corpus unless a resolved protein target is explicitly documented; retain source records for possible future corpora. |
+| Natural riboswitches, genomic motifs, regulatory RNAs and non-aptamer binding motifs | Exclude because the selection objective is experimentally selected protein-binding aptamers. |
+| Non-standard oligonucleotide-like polymers such as HFNAPs | Exclude from the canonical RNA corpus because their chemical side chains and alphabet are not represented by standard RNA sequence. |
+| Synthetic/generated sequences | Keep separate from validated aptamers and never use them to define the empirical validated-aptamer reference distribution. |
+| Records without a sequence or with unresolved sequence notation | Hold for manual review or exclude with a documented reason. |
+| Inaccessible or sequence-free discovery indexes | Use only for literature discovery and cross-checking, not as direct corpus inputs. |
+
+### Raw data assembled and current planned role
+
+The raw inventory contains overlapping records; the row counts below are source-file counts and must not be added to estimate the final corpus size.
+
+| Source | Principal raw artefact(s) | Observed raw size | Planned role and main curation issues |
+|---|---|---:|---|
+| AptaDB | `aptamer.csv`, `interaction.csv`, `protein.csv` | 1,293 aptamer rows; 1,350 interaction rows; 194 protein rows | High-priority source. Join aptamer, interaction and protein information; filter molecule and target chemistry; resolve conflicting targets; deduplicate repeated sequence-target pairs. |
+| Apta-Index | `aptamers-export-2026-07-22.csv` plus data-use agreement | 1,050 rows | High-priority mixed aptamer source with target, affinity and conditions. Filter to RNA/protein rows, clean sequence notation and respect redistribution restrictions. The inventory found missing sequences/targets, duplicated sequences and extensive formatting/modification notation. |
+| UTexas Aptamer Database | `UTexas Aptamer Database dataset_Sept2023.xlsx` | 1,894 tabular rows | High-priority, well-annotated mixed source. Reconcile the workbook row count with earlier database-level counts; filter RNA/protein records and resolve 399 rows without observed sequences. |
+| AptamerBase | `aptamerbase_aptamers.csv` | 2,128 rows | Broad mixed source. Requires target information to be recovered or joined from source context, removal of missing sequences and consolidation of duplicated sequences. |
+| AptaBase | `aptabase_cleaned.csv` | 610 rows | Registered Tier-1 input. Use its `sequence_raw` field as the adapter input and run the shared normaliser again so the corpus alphabet policy is applied uniformly. `aptabase_raw.csv` and cached HTML are forbidden as parallel inputs because they would duplicate the same scrape. |
+| RiboaptDB/RiboCentre | `all_sequences_509_rows.csv` plus README | 509 rows | Valuable RNA-focused source. Use `Category`, `Type` and description fields to separate protein aptamers from small-molecule and other categories before inclusion. |
+| ENA | `ena_embl_20260720-0853.txt`; reviewed selected lane in `review_v2/` | 5,841 source records; 679 selected unique sequence-target pairs | Supplementary archive-derived source. The original EMBL download is retained as raw provenance. The manually reviewed selected file is the authoritative ENA lane for later cleaning and cross-source integration. |
+| NCBI Nucleotide/GenBank | 18 `.gb` records | 18 records | Small supplementary set. Review each record for RNA identity, sequence role, target resolution and overlap with curated databases/ENA. |
+| KPC-2 Precision-SELEX paper | `extracted_data.xlsx` plus schema README and paper | 20 aptamer records in a 43-row workbook layout | ssDNA evaluation source. Parse the N40 sequence from column B and the construct from column D using the documented multi-row layout; retain the incomplete column-I heading as a note rather than guessing. |
+| Other carbapenemase papers | Chen et al. table, NDM-1 selection table and Shi et al. table | 8, 7 and 2 rows respectively | Small target-specific collections. Review true molecular target, sequence type, controls, primers/modifications and overlap. Keep DNA/cell-binding records outside the primary RNA training lane. |
+| AptaDiff datasets | Dataset A/B CSV files; Dataset C/D FASTQ files retained locally | 13,803; 11,547; 80,864; 121,185 rows/reads | Dataset A and B are Tier-1 inputs, computationally transcribed to RNA with provenance recorded, then aggressively capped by target at cluster level. Dataset A is also exported uncapped for replication. Dataset C/D are deferred from v1 because target annotation and adapter state are unresolved. |
+| NDM-1 SRA metadata | `PRJNA830749` run metadata | 8 public runs | Target-specific ssDNA SELEX metadata. Retain for reference and possible later preprocessing, but not direct RNA corpus inclusion. |
+
+Sources investigated but not selected as direct raw inputs included Maptamer (principally an index without sequences), SELEX-DB (old/inaccessible sequence interface), HTP-SELEX transcription-factor DNA data, private BasePair Bio data, non-public AptaGPT data and sources whose chemistry or target class did not match the corpus objective.
+
+### ENA search and manual-review outcome
+
+ENA was treated separately because the search result was a heterogeneous EMBL text download rather than a curated aptamer table. The search produced 5,841 accession records. Automated parsing and conservative triage were used to expose sequence, target, publication and evidence fields while preserving the deposited record and accession-level provenance.
+
+The review workflow grouped accessions into sequence-target units, experiment groups and near-duplicate families before manual decisions. This reduced repeated clerical review of patent clone families and allowed group-level exclusion of unsuitable experimental sources. Natural motifs, riboswitches, non-protein aptamers, degenerate libraries, unresolved constructs and records without sufficient aptamer evidence were separated from plausible RNA aptamer-protein records.
+
+The final reviewed ENA lane is:
+
+- `data/raw/ENA/review_v2/ena_selected_after_manual_review.csv`
+- 679 unique sequence-target pairs;
+- 37 columns, including both `experiment_group_id` and `near_duplicate_family_id`;
+- 230 rejected rows in `ena_rejected_after_manual_review.csv`;
+- 0 unreviewed rows in `ena_unreviewed_after_manual_review.csv`; and
+- 924 accession-level provenance rows in `ena_selected_sequence_provenance.csv`.
+
+The two grouping fields must be retained beyond S0. `experiment_group_id` supports group-wise decisions, source-aware weighting and leakage-safe splitting. `near_duplicate_family_id` supports family-aware clustering, balancing and validation of the later sequence-similarity pipeline. Approximately 46% of selected rows have no near-duplicate family identifier. The curation specification resolves these as singletons: S1 will materialise deterministic `ena_singleton_{n}` identifiers and record family size 1, while retaining the original missingness in provenance. The separate 679-versus-676 ENA export difference remains a required CHECKPOINT-1 reconciliation.
+
+The older empty file `data/raw/ENA/review/ena_selected_after_manual_review.csv` is superseded and must not be ingested. Although the final reviewed file is technically a derived manual-review output rather than an untouched raw download, it is the authoritative selected ENA input lane for the next corpus stage; the original EMBL file remains the raw source of record.
+
+### Raw inventory and reproducibility controls
+
+Generated `raw_data_inventory.csv` to capture the state of the complete `data/raw/` tree before S0 processing. The inventory records relative path, source, file role, size, modification time, SHA-256 hash, readability, row and column counts, observed schema, candidate sequence/target/label/provenance columns, inferred sequence and target types, issue flags, associated documentation, recommended S0 status and changes since the previous inventory.
+
+Inventory summary:
+
+| Recommended S0 status | File count | Interpretation |
+|---|---:|---|
+| `include_as_authoritative_input` | 37 | Source tables, exports, archive records or reads from which S0 processing should begin. |
+| `include_with_documented_caveat` | 16 | Papers, READMEs and agreements required to interpret or license the data, but not sequence rows themselves. |
+| `hold_for_manual_review` | 78 | Cached HTML, metadata, documentation or unresolved inputs requiring a source-specific decision. |
+| `derived_output_not_raw_input` | 56 | Inspection, QC, review or cleaned outputs that must not be mistaken for independent raw sources. Some, such as the final reviewed ENA lane, are explicitly designated authoritative inputs to the next stage while retaining their derived provenance. |
+| `not_relevant_to_protein_aptamer_corpus` | 15 | Operating-system files, fixtures or sources outside the protein RNA aptamer objective. |
+| `superseded` | 1 | Older empty ENA selected-output file replaced by the `review_v2` result. |
+| **Total** | **203** | Files distributed across 21 top-level source directories. |
+
+This inventory is intended to prevent three common errors: treating a derived cleaning output as an independent source, silently using an obsolete or backup file, and losing the exact raw bytes needed to reproduce later curation decisions. The read-only inventory script passed 11 unit tests, and pre/post SHA-256 fingerprints matched for all 203 files. Before version control, trackable inventory artefacts are sanitised so that they contain schemas, counts, paths and hashes but no aptamer sequence values; sequence-level overlap samples are written only beneath ignored `data/`. Hashes will be checked again at S0, and all generated outputs will be written outside `data/raw/`.
+
+### Curation questions resolved during inventory refresh
+
+| Question | Resolution carried into the curation specification |
+|---|---|
+| Q1 — ENA input and grouping fields | Use `data/raw/ENA/review_v2/ena_selected_after_manual_review.csv` (679 rows). It retains `experiment_group_id` and `near_duplicate_family_id`; materialise deterministic singleton family IDs at S1 and reconcile the three-row difference from the 676-row processed export at CHECKPOINT-1. |
+| Q2 — corrected RiboAptamer input | Use `data/raw/riboaptamer/all_sequences_509_rows.csv` (509 rows). Treat `Category` as a prior only; resolve target name and type per record and surface disagreements at CHECKPOINT-2. |
+| Q3 — AptaDB aptamer-to-protein join | Read `interaction.csv` as the interaction-grain spine, join `Apta_index` to `aptamer.csv`, and join protein `TargetID` to `protein.csv` UniProt IDs. |
+| Q4 — `li_et_al` | Excluded because the workbook's provenance could not be established; do not reconstruct or reintroduce it without a documented DOI/supplement identity. |
+| Q5 — Precision-SELEX layout | Parse 20 even-row records beginning at row 4; use column B as the N40 core and column D as the construct. Keep the incomplete column-I heading documented rather than inferred in code. |
+| Q6 — selektion D9 molecule type | Treat D902, D907, D909, D913, D914, D918 and D920 as RNA aptamers selected by RNA SELEX but reported in DNA alphabet; retain the reported string and record computational T-to-U transcription. |
+
+### Harmonised record contract for per-source outputs
+
+The full curation specification defines a fixed 47-column schema used by cleaned per-source files, parked files and the master corpus. The summary below records the main field groups; implementation must use the complete schema rather than treating this table as sufficient:
+
+| Field group | Required information |
+|---|---|
+| Sequence | Original sequence string, cleaned canonical RNA sequence, molecule type, sequence length and normalisation actions. |
+| Target | Original target text, normalised protein name, protein family where available, target region/domain and target-type decision. |
+| Evidence | Selection method/round or final-candidate status, binding evidence/affinity where reported, evidence scope and any control status. |
+| Provenance | Source database, source file, source record/accession, publication/patent identifier and exact source location where available. |
+| Grouping | Source experiment/publication group, exact-duplicate group and near-duplicate/family identifier. |
+| Eligibility | Primary-corpus inclusion decision, exclusion/separate-lane reason and unresolved-review flag. |
+| Reuse | Data-use or redistribution restriction where applicable. |
+
+### Planned curation workflow
+
+1. **S0 — registry and leakage exclusion:** author `data/interim/registry/source_registry.csv`, verify every registered file hash and row count, warn on inventory divergence, and build `leakage_exclusion_set.csv`. The registry is authoritative; `recommended_S0_status` is a starting classification rather than an automatically inferred input list.
+2. **S1 — extraction:** use one source adapter per registered source and preserve every input row. Extraction performs column mapping and format parsing only.
+3. **S2 — normalisation and constant-region trimming:** apply one shared sequence normaliser, preserve `sequence_raw`, build `sequence_full` and `sequence_core`, record transcription provenance, and detect known or group-consensus constant regions without dropping records.
+4. **S3 — per-source filtering and CHECKPOINT-1:** apply the closed-vocabulary rejection rules, route ssDNA/non-protein/E5 records to parked lanes, emit source review files, reconcile ENA 679 versus 676, and stop for manual review.
+5. **S4 — target normalisation and CHECKPOINT-2:** construct and review the raw-target-to-canonical-target dictionary, seeded from AptaDB protein/UniProt metadata; then apply leakage and the evidence threshold.
+6. **S5 — exact deduplication and 90% sequence clustering:** deduplicate `(sequence_core, target_name)` pairs while merging provenance, cluster by sequence, validate against ENA near-duplicate families, and report cross-source overlap.
+7. **S6 — profile report and CHECKPOINT-3:** produce the supervisor-facing pre-balancing corpus profile and obtain decisions on the target cap and any relaxation of the E4/protein-only rules.
+8. **S7 — balance, partition and finalise:** apply the target cap at cluster level, assign cluster-level `FT`/`REF`/`EVAL` partitions, and write the final, parked, evaluation, rejection, report and manifest outputs.
+
+Every stage reads only the previous stage's outputs, writes a QC report, appends a project-log entry, and leaves `data/raw/` unchanged.
+
+### Key findings and decisions
+
+- No public target-specific RNA HT-SELEX or activity-screening corpus at fine-tuning scale was found for NDM-1/KPC-2/OXA-48. Seven NDM-1 RNA aptamers were identified as evaluation references, not training-scale data.
+- The useful public data landscape consists mainly of several moderate curated databases, small paper-derived collections and archive records requiring substantial interpretation.
+- Dataset construction is therefore a substantive methodological component of the project rather than a simple download step.
+- A smaller, carefully curated and diverse RNA protein-aptamer corpus is more aligned with the model objective than a much larger single-target late-round pool.
+- DNA aptamers remain scientifically useful for target-specific evaluation and discussion but will not be used to define the primary RNA training or AptaRank reference distribution merely by replacing `T` with `U`.
+- Cross-source duplication is expected to be substantial because the major databases draw from overlapping literature. Raw row counts are not estimates of unique sequences.
+- The final corpus must be balanced by target and near-duplicate family, not only deduplicated exactly.
+- Sequence-similarity, experiment-family and source grouping must be established before train/validation/test splitting.
+- AptaRank calibration must use only the independent `REF` partition, while held-out real aptamers remain in `EVAL`; the fine-tuning data remain in `FT`.
+- Apta-Index licensing/data-use terms must be carried forward and may limit publication or redistribution of the combined sequence-level corpus.
+
+### Outputs
+
+- Rough search and decision record: `docs/dataset_search_log.xlsx`
+- Raw-tree inventory and S0 recommendations: `docs/data_curation/raw_data_inventory.csv`
+- Sanitised aggregate inventory summary: `docs/data_curation/raw_data_inventory_summary.json`
+- Raw-state assessment: `docs/data_curation/raw_data_state_assessment.md`
+- Q1–Q6 resolutions: `docs/data_curation/raw_data_curation_questions.csv`
+- Curation implementation specification: `docs/data_curation/rna_aptamer_corpus_curation_plan.md`
+- Read-only inventory implementation: `scripts/data_preparation/inventory_raw_data.py`
+- Inventory tests: `tests/data_preparation/test_inventory_raw_data.py`
+- Existing source documentation and QC reports under each `data/raw/<source>/` directory
+- Final reviewed ENA input lane: `data/raw/ENA/review_v2/ena_selected_after_manual_review.csv`
+- ENA selected-record provenance: `data/raw/ENA/review_v2/ena_selected_sequence_provenance.csv`
+
+### Status and next step
+
+The search for major raw sources is sufficiently complete to proceed to the checkpointed curation pipeline. Before this documentation milestone, the inventory artefacts were sanitised to remove sequence-level examples. The inventory, assessment, Q1–Q6 resolutions, curation specification and this log entry are now ready to be committed together. The first curation task is S0 registry and leakage-exclusion construction; the first source adapter will be selected with Laura immediately before S1 implementation. The master corpus, cross-source duplicate resolution, target/family balancing and cluster-level `FT`/`REF`/`EVAL` partitions remain to be created.
