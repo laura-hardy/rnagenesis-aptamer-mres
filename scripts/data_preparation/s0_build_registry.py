@@ -14,9 +14,11 @@ import os
 import re
 import sys
 import tempfile
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
+from xml.etree import ElementTree as ET
 
 REQUIRED_COLUMNS: tuple[str, ...] = (
     "source_key",
@@ -164,6 +166,78 @@ def count_csv_data_rows(path: Path) -> int:
                 f"Registered CSV header is empty or invalid: {path}"
             )
         return sum(1 for _ in reader)
+
+
+def count_xlsx_physical_data_rows(path: Path) -> int:
+    """Count physical data rows on the first worksheet of an XLSX workbook.
+
+    Uses ZIP/XML only (stdlib). Never saves or rewrites the workbook. The count
+    is ``len(sheetData/row) - 1`` when at least one row exists (first row treated
+    as header layout), matching the inventory convention for worksheet layout.
+    Logical aptamer-record counts for irregular layouts must be asserted by
+    source adapters separately.
+    """
+    if path.name.startswith("~$"):
+        raise RegistryError(f"Excel lock/temp file is not a valid input: {path.name}")
+    try:
+        with zipfile.ZipFile(path, "r") as zf:
+            names = zf.namelist()
+            sheet_paths = sorted(
+                n
+                for n in names
+                if n.startswith("xl/worksheets/sheet") and n.endswith(".xml")
+            )
+            if not sheet_paths:
+                raise RegistryError(
+                    f"Registered XLSX has no worksheets: {path.name}"
+                )
+            # Prefer workbook.xml sheet order when available.
+            selected = sheet_paths[0]
+            ns = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+            if "xl/workbook.xml" in names:
+                wb = ET.fromstring(zf.read("xl/workbook.xml"))
+                sheets = wb.findall("m:sheets/m:sheet", ns)
+                if sheets:
+                    rels_root = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
+                    rid_to_target = {
+                        rel.attrib["Id"]: rel.attrib["Target"]
+                        for rel in rels_root
+                        if "Id" in rel.attrib and "Target" in rel.attrib
+                    }
+                    rid = sheets[0].attrib.get(
+                        "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+                    )
+                    target = rid_to_target.get(rid or "")
+                    if target:
+                        if not target.startswith("xl/"):
+                            target = "xl/" + target.lstrip("/")
+                        if target in names:
+                            selected = target
+            sheet_root = ET.fromstring(zf.read(selected))
+            rows_xml = sheet_root.findall("m:sheetData/m:row", ns)
+            if not rows_xml:
+                return 0
+            return max(0, len(rows_xml) - 1)
+    except zipfile.BadZipFile as exc:
+        raise RegistryError(
+            f"Registered XLSX is not a valid ZIP/OOXML workbook: {path.name}"
+        ) from exc
+    except ET.ParseError as exc:
+        raise RegistryError(
+            f"Registered XLSX worksheet XML could not be parsed: {path.name}"
+        ) from exc
+
+
+def count_registered_rows(path: Path) -> int:
+    """Count rows for a registered input according to its file type."""
+    suffix = path.suffix.lower()
+    if suffix == ".csv":
+        return count_csv_data_rows(path)
+    if suffix in {".xlsx", ".xlsm"}:
+        return count_xlsx_physical_data_rows(path)
+    raise RegistryError(
+        f"Unsupported registered input type for row counting: {path.name}"
+    )
 
 
 def _require_exact_columns(fieldnames: Sequence[str] | None) -> None:
@@ -436,7 +510,7 @@ def validate_registered_file(
             f"SHA-256 mismatch for source_key={row.source_key!r} path={row.path}: "
             f"expected {row.sha256}, actual {actual_sha}"
         )
-    actual_rows = count_csv_data_rows(resolved)
+    actual_rows = count_registered_rows(resolved)
     if actual_rows != row.n_rows_expected:
         raise RegistryError(
             f"Row-count mismatch for source_key={row.source_key!r} "

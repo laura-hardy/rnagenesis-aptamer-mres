@@ -1352,3 +1352,55 @@ A deterministic S0a registry builder was added. It reads a tracked specification
 - DNA-like AptaBase records remain unclassified pending molecule-type policy
 - Redistribution terms for AptaBase remain unknown
 - No AptaBase S1 adapter has been written; S1 must not start until S0 is finished
+
+## 2026-08-05 — S0b evaluation-reference and leakage-exclusion build
+
+### Stage
+
+S0b — carbapenemase evaluation-reference manifest, target-exclusion aliases, and sequence leakage-exclusion set. S0a registry validation was re-run against the expanded specification. Shared general sequence normalisation, AptaBase S1 adapters, source filtering, target normalisation, corpus merging and partitioning were not started.
+
+### What was done
+
+Intentional evaluation-reference raw additions under `data/raw/evaluation_references/` were audited (README, additions-and-overrides CSV, supporting PDFs, and `source_documents/` supplements). The read-only inventory was reconciled against the committed 203-row baseline with an explicit transient-file exclusion rule (``.DS_Store``, ``.Rhistory``, Excel ``~$`` locks, ``Thumbs.db``, ``desktop.ini``). Tier `eval` registry rows were added for every machine-readable file parsed by S0b. `config/leakage_target_aliases.csv` was created for target-level exclusion. Leakage-specific comparison helpers were added in `scripts/data_preparation/common/leakage_matching.py`. The S0b builder reconciles D9, Precision-SELEX, Chen, Shi (with authoritative override), Sabrowski additions/controls, both patent sequences, and the PRJNA830749 dataset-level record into ignored interim outputs. A tracked resolution note records the final zero-pending status without sequences.
+
+### Decisions made
+
+- Sequence comparison uses global Levenshtein identity `1 - edit_distance / max(len_a, len_b)` with threshold 0.90 for later merge matching (T/U-aware comparison representation).
+- Comparison representation collapses U→T so DNA/RNA T↔U equivalents have identity 1.0; empty strings are never compared; no local substring matching; no automatic promoter/primer trimming.
+- D9 clones are experimental RNA printed with DNA alphabet (`alphabet_as_reported=DNA_T`); RNA form is derived computationally (`t_to_u_applied=true`). Genuine ssDNA retains T (`t_to_u_applied=false`).
+- Full and core forms are both retained where documented (Precision column D full / column B core; D9 full equals core; patents may flag `core_unresolved`).
+- Positive binders, pool non-binders, HIS-tag controls and masking probes from the selected evaluation pool all enter the leakage set; evaluation labels remain distinct.
+- XK10 is one sequence family with merged Yu/Precision, Chen, and Shi provenance (application/replication, not independent corroborating selection).
+- APNV carries combined NDM-1|VIM-2 target provenance. H14-01 is a HIS-tag control; H14-01-FR is a masking control.
+- PRJNA830749 is dataset-level only and never expands to per-SRA-run sequence rows.
+- Supporting Table S1 / Supplementary Table S2 resolve Shi XK10 and Sabrowski H14.2_43; pending sequence extractions = 0.
+- Generic `albumin` alone is not an exclusion alias; HSA uses explicit human-serum-albumin forms only.
+- Transient filesystem artefacts are excluded from the authoritative inventory and substantive hash-comparison denominator; they are reported separately and never deleted or modified.
+
+### Inputs used
+
+- D9 Table 6 CSV; Precision-SELEX `extracted_data.xlsx` (registry physical layout 43 rows; adapter asserts 20 logical XK records); Chen XK10 CSV; Shi CSV; `carbapenemase_reference_additions_and_overrides.csv`
+- Supporting documentation PDFs under `data/raw/evaluation_references/` and `source_documents/` (not registered as sequence-table inputs)
+- Tracked target aliases: `config/leakage_target_aliases.csv`
+
+### Outputs produced
+
+- Tracked: expanded `config/source_registry.csv`; `config/leakage_target_aliases.csv`; `scripts/data_preparation/common/leakage_matching.py`; `scripts/data_preparation/s0_build_leakage_exclusion.py`; registry XLSX validation and transient-aware inventory updates; tests; regenerated sanitised inventory artefacts; `docs/data_curation/carbapenemase_evaluation_reference_resolution.md`; this log entry
+- Ignored under `/data/`: `data/interim/leakage_exclusion_set.csv`; `data/interim/evaluation/evaluation_reference_manifest.csv`; `data/interim/evaluation/reference_dataset_manifest.csv`; `data/interim/evaluation/pending_reference_extractions.csv`; `data/interim/evaluation/leakage_build_report.md`; operational registry refresh
+
+### Numbers
+
+- All 193 previously inventoried substantive raw-source files remained byte-identical. Changes involving `.DS_Store` files and the disappearance of an Excel lock file were classified as transient filesystem activity and excluded from the authoritative source-integrity denominator (11 transient paths ignored on disk; 10 transient paths present in the prior inventory).
+- New substantive raw files: 10
+- Modified previous substantive source files: 0
+- Removed previous substantive source files: 0
+- Registered sources after S0a refresh: 6 (AptaBase + 5 eval inputs); all validated by hash and row count
+- Inventory warnings on registry rebuild: 2 (unchanged AptaBase overrides); no new registry warnings
+- S0b aggregates: sources validated 5; records read 36; resolved evaluation records 35; unique sequence exclusions 32; distinct full/core forms 20; DNA 25; RNA 7; positive-class labels 26; negative/control labels 6; merged duplicate-provenance groups 3; dataset-level references 1; pending sequence extractions 0
+- Target-alias rows: 29
+- No contiguous nucleotide strings of length ≥20 in tracked S0b artefacts
+- Nothing under `data/` is tracked; leakage outputs remain gitignored
+
+### Status and next step
+
+S0 is complete: the source registry and carbapenemase leakage-exclusion controls are operational and all required evaluation-reference sequences have been resolved. S1 must still not begin until the first source adapter is selected with Laura. Shared S2 normalisation, corpus merge (≥90% identity using the shared leakage matcher), target balancing and FT/REF/EVAL partitioning remain ahead.

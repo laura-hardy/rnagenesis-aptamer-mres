@@ -1,0 +1,30 @@
+canonical_target,alias,match_type,target_family,exclusion_reason,notes
+NDM-1,NDM-1,exact_alias,carbapenemase,evaluation_reference_target,Primary New Delhi metallo-beta-lactamase 1 alias
+NDM-1,NDM1,exact_alias,carbapenemase,evaluation_reference_target,Compact NDM-1 alias without hyphen
+NDM-1,New Delhi metallo-beta-lactamase 1,exact_alias,carbapenemase,evaluation_reference_target,Expanded enzyme name
+NDM-1,New Delhi metallo-β-lactamase 1,exact_alias,carbapenemase,evaluation_reference_target,Expanded enzyme name with beta character
+NDM-1,HIS-NDM-1,exact_alias,carbapenemase,evaluation_reference_target,HIS-tagged NDM-1 used in Sabrowski SELEX
+NDM-1,HIS NDM-1,normalised_alias,carbapenemase,evaluation_reference_target,Space-separated HIS-tagged form
+KPC-2,KPC-2,exact_alias,carbapenemase,evaluation_reference_target,Primary Klebsiella pneumoniae carbapenemase 2 alias
+KPC-2,KPC2,exact_alias,carbapenemase,evaluation_reference_target,Compact KPC-2 alias without hyphen
+KPC-2,Klebsiella pneumoniae carbapenemase 2,exact_alias,carbapenemase,evaluation_reference_target,Expanded enzyme name
+KPC-2,KPC-2 KP,exact_alias,carbapenemase,evaluation_reference_target,KPC-2-expressing K. pneumoniae strain label
+KPC-2,KPC-2-expressing Klebsiella pneumoniae,normalised_alias,carbapenemase,evaluation_reference_target,Strain-level KPC-2 KP wording
+KPC-2,KPC-2-expressing Escherichia coli,normalised_alias,carbapenemase,evaluation_reference_target,Engineered KPC-2 E. coli application target
+OXA-48,OXA-48,exact_alias,carbapenemase,evaluation_reference_target,OXA-48 carbapenemase
+OXA-48,OXA48,exact_alias,carbapenemase,evaluation_reference_target,Compact OXA-48 alias
+VIM-2,VIM-2,exact_alias,carbapenemase,evaluation_reference_target,VIM-2 metallo-beta-lactamase
+VIM-2,VIM2,exact_alias,carbapenemase,evaluation_reference_target,Compact VIM-2 alias
+OXA-23,OXA-23,exact_alias,carbapenemase,evaluation_reference_target,OXA-23 carbapenemase
+OXA-23,OXA23,exact_alias,carbapenemase,evaluation_reference_target,Compact OXA-23 alias
+OXA-23,HIS-OXA-23,exact_alias,carbapenemase,evaluation_reference_target,HIS-tagged OXA-23 control target in Sabrowski
+HSA,human serum albumin,exact_alias,serum_protein,evaluation_counterselection_or_control,Full HSA name; generic albumin alone is intentionally omitted
+HSA,HSA,exact_alias,serum_protein,evaluation_counterselection_or_control,Common abbreviation for human serum albumin
+HSA,Human Serum Albumin,exact_alias,serum_protein,evaluation_counterselection_or_control,Title-case HSA form
+carbapenemase,carbapenemase,family_pattern,carbapenemase,target_family_exclusion,Bounded family token; matches as a whole-word family label
+beta-lactamase,beta-lactamase,family_pattern,beta_lactamase,target_family_exclusion,ASCII family token for beta-lactamase
+beta-lactamase,β-lactamase,family_pattern,beta_lactamase,target_family_exclusion,Greek-beta family token for beta-lactamase
+metallo-beta-lactamase,metallo-beta-lactamase,family_pattern,metallo_beta_lactamase,target_family_exclusion,MBL family token
+metallo-beta-lactamase,metallo-β-lactamase,family_pattern,metallo_beta_lactamase,target_family_exclusion,MBL family token with Greek beta
+serine beta-lactamase,serine beta-lactamase,family_pattern,serine_beta_lactamase,target_family_exclusion,Serine beta-lactamase family phrasing
+serine beta-lactamase,serine β-lactamase,family_pattern,serine_beta_lactamase,target_family_exclusion,Serine beta-lactamase family phrasing with Greek beta

@@ -9,36 +9,35 @@
     "Tracked inventory artefacts omit raw aptamer sequence values and prefixes",
     "Change detection uses prior inventory SHA-256/row_count/column_names when available",
     "README snippets are truncated extracts for inventory notes, not full documents",
-    "AptaDiff *_x_z.csv files are latent-coordinate inputs, not corpus sequence tables"
+    "AptaDiff *_x_z.csv files are latent-coordinate inputs, not corpus sequence tables",
+    "Transient artefacts (.DS_Store, .Rhistory, ~$*, Thumbs.db, desktop.ini) are excluded from authoritative inventory rows"
   ],
   "changes_since_previous_inventory": {
     "added": [
-      "data/raw/AptaDB/interaction.csv",
-      "data/raw/precision_selex_against_kpc2_paper/README_extracted_data.md",
-      "data/raw/precision_selex_against_kpc2_paper/~$extracted_data.xlsx",
-      "data/raw/riboaptamer/.DS_Store",
-      "data/raw/riboaptamer/all_sequences_509_rows.csv"
+      "data/raw/aptabase/README_aptabase_curation.txt",
+      "data/raw/evaluation_references/CN102965377B_patent.pdf",
+      "data/raw/evaluation_references/CN108949766B_patent.pdf",
+      "data/raw/evaluation_references/README_carbapenemase_evaluation_references.md",
+      "data/raw/evaluation_references/carbapenemase_reference_additions_and_overrides.csv",
+      "data/raw/evaluation_references/chen_2020_xk10_application.pdf",
+      "data/raw/evaluation_references/sabrowski_2022_main_article.pdf",
+      "data/raw/evaluation_references/shi2025_kpc2kp.pdf",
+      "data/raw/evaluation_references/source_documents/sabrowski_2022_supplementary.pdf",
+      "data/raw/evaluation_references/source_documents/shi_2025_supplementary.pdf"
     ],
-    "modified": [
-      "data/raw/.DS_Store",
-      "data/raw/ENA/.DS_Store"
-    ],
-    "n_added": 5,
-    "n_modified": 2,
-    "n_removed": 3,
-    "n_unchanged": 196,
-    "removed": [
-      "data/raw/li_et_al/pone.0086729.s001.xlsx",
-      "data/raw/riboaptamer/rna_aptamer_seqs.csv",
-      "data/raw/riboaptamer/rna_aptamer_seqs.xlsx"
-    ],
+    "modified": [],
+    "n_added": 10,
+    "n_modified": 0,
+    "n_removed": 0,
+    "n_unchanged": 193,
+    "removed": [],
     "unchanged": [
       "data/raw/AptaDB/AptaDB_ About.pdf",
       "data/raw/AptaDB/aptamer.csv",
+      "data/raw/AptaDB/interaction.csv",
       "data/raw/AptaDB/protein.csv",
       "data/raw/AptaIndex/AptaIndex-Data_Use_Agreement.pdf",
       "data/raw/AptaIndex/aptamers-export-2026-07-22.csv",
-      "data/raw/Aptadiff_datasetA/.DS_Store",
       "data/raw/Aptadiff_datasetA/aptadiff_repo_readme.rtf",
       "data/raw/Aptadiff_datasetA/datasetA_IGFBP3_P6.csv",
       "data/raw/Aptadiff_datasetA/datasetA_IGFBP3_x_z.csv",
@@ -126,13 +125,11 @@
       "data/raw/NCBI_nucleotide/sequence (8).gb",
       "data/raw/NCBI_nucleotide/sequence (9).gb",
       "data/raw/NCBI_nucleotide/sequence.gb",
-      "data/raw/UTexas_aptamer_dataset/.DS_Store",
       "data/raw/UTexas_aptamer_dataset/UTexas Aptamer Database dataset_Sept2023.xlsx",
       "data/raw/UTexas_aptamer_dataset/utexas_information.rtfd/Attachment.png",
       "data/raw/UTexas_aptamer_dataset/utexas_information.rtfd/Dataset-categoris-.png",
       "data/raw/UTexas_aptamer_dataset/utexas_information.rtfd/Internal-review-process-flow-chart.png",
       "data/raw/UTexas_aptamer_dataset/utexas_information.rtfd/TXT.rtf",
-      "data/raw/aptabase/.DS_Store",
       "data/raw/aptabase/Aptamer Search Page 1.html",
       "data/raw/aptabase/Aptamer Search Page 2.html",
       "data/raw/aptabase/Aptamer Search Page 37.html",
@@ -208,17 +205,17 @@
       "data/raw/aptabase/html/page_060.html",
       "data/raw/aptabase/html/page_061.html",
       "data/raw/aptabase/html/page_062.html",
-      "data/raw/aptamerbase/.DS_Store",
       "data/raw/aptamerbase/aptamerbase_aptamers.csv",
       "data/raw/aptamerbase/paper.pdf",
-      "data/raw/chen_et_al_kpc/.DS_Store",
       "data/raw/chen_et_al_kpc/README_chen2020_kpc2_ecoli_xk10_aptamers.md",
       "data/raw/chen_et_al_kpc/chen2020_kpc2_ecoli_xk10_aptamer_sequences.csv",
       "data/raw/instructNA_paper/ena-file-download-read_run-ERP001824-fastq_ftp-20260624-1257.sh",
       "data/raw/instructNA_paper/readme.rtf",
+      "data/raw/precision_selex_against_kpc2_paper/README_extracted_data.md",
       "data/raw/precision_selex_against_kpc2_paper/extracted_data.xlsx",
       "data/raw/precision_selex_against_kpc2_paper/paper.pdf",
       "data/raw/rbms_paper/README.md",
+      "data/raw/riboaptamer/all_sequences_509_rows.csv",
       "data/raw/riboaptamer/readme.rtf",
       "data/raw/selektion_paper/Selektion und Charakterisierung von RNAAptameren zur Genregulation und Antibiotikatherapie copy.pdf",
       "data/raw/selektion_paper/data.xlsx",
@@ -226,7 +223,6 @@
       "data/raw/selektion_paper/table6_d9_ndm1_sequences.csv",
       "data/raw/shi_et_al_paper/README_shi2025_kpc2kp_mdrab_aptamers.md",
       "data/raw/shi_et_al_paper/shi2025_kpc2kp_mdrab_aptamer_sequences.csv",
-      "data/raw/sra_metadata_ndm1_aptamers/.DS_Store",
       "data/raw/sra_metadata_ndm1_aptamers/PRJNA830749/SraAccList.txt",
       "data/raw/sra_metadata_ndm1_aptamers/PRJNA830749/SraRunInfo.csv"
     ]
@@ -254,10 +250,14 @@
       "data/raw/ENA/review_v2/ena_group_review_qc_report.md"
     ],
     "aptabase": [
+      "data/raw/aptabase/README_aptabase_curation.txt",
       "data/raw/aptabase/aptabase_qc_report.md"
     ],
     "chen_et_al_kpc": [
       "data/raw/chen_et_al_kpc/README_chen2020_kpc2_ecoli_xk10_aptamers.md"
+    ],
+    "evaluation_references": [
+      "data/raw/evaluation_references/README_carbapenemase_evaluation_references.md"
     ],
     "instructNA_paper": [
       "data/raw/instructNA_paper/readme.rtf"
@@ -279,22 +279,52 @@
     ]
   },
   "extension_counts": {
-    "(none)": 9,
-    "csv": 60,
+    "csv": 61,
     "fastq": 2,
     "gb": 18,
     "html": 70,
-    "md": 12,
-    "pdf": 10,
+    "md": 13,
+    "pdf": 17,
     "png": 3,
     "rtf": 5,
     "sh": 1,
-    "txt": 9,
-    "xlsx": 4
+    "txt": 10,
+    "xlsx": 3
   },
-  "generated_at_utc": "2026-08-04T06:58:20.173532+00:00",
-  "n_directories": 29,
+  "generated_at_utc": "2026-08-05T01:23:06.640474+00:00",
+  "ignored_transient_files": {
+    "n_ignored_on_disk": 11,
+    "n_previous_inventory_transient_paths": 10,
+    "note": "Transient filesystem artefacts are excluded from the authoritative source-file inventory and from the substantive hash-comparison denominator. They are never deleted or modified.",
+    "paths_on_disk": [
+      "data/raw/.DS_Store",
+      "data/raw/Aptadiff_datasetA/.DS_Store",
+      "data/raw/ENA/.DS_Store",
+      "data/raw/UTexas_aptamer_dataset/.DS_Store",
+      "data/raw/aptabase/.DS_Store",
+      "data/raw/aptamerbase/.DS_Store",
+      "data/raw/chen_et_al_kpc/.DS_Store",
+      "data/raw/evaluation_references/.DS_Store",
+      "data/raw/rbms_paper/.Rhistory",
+      "data/raw/riboaptamer/.DS_Store",
+      "data/raw/sra_metadata_ndm1_aptamers/.DS_Store"
+    ],
+    "previous_inventory_transient_paths": [
+      "data/raw/.DS_Store",
+      "data/raw/Aptadiff_datasetA/.DS_Store",
+      "data/raw/ENA/.DS_Store",
+      "data/raw/UTexas_aptamer_dataset/.DS_Store",
+      "data/raw/aptabase/.DS_Store",
+      "data/raw/aptamerbase/.DS_Store",
+      "data/raw/chen_et_al_kpc/.DS_Store",
+      "data/raw/precision_selex_against_kpc2_paper/~$extracted_data.xlsx",
+      "data/raw/riboaptamer/.DS_Store",
+      "data/raw/sra_metadata_ndm1_aptamers/.DS_Store"
+    ]
+  },
+  "n_directories": 31,
   "n_files": 203,
+  "n_files_on_disk": 214,
   "overlap": {
     "exact_byte_duplicate_groups": [
       {
@@ -346,7 +376,7 @@
     "n_cross_file_sequence_target_pair_overlaps": 100,
     "n_exact_duplicate_groups": 5,
     "n_files_in_cross_sequence_overlap": 31,
-    "n_files_in_cross_sequence_target_pair_overlap": 10,
+    "n_files_in_cross_sequence_target_pair_overlap": 6,
     "n_files_in_duplicate_groups": 14,
     "shared_schema_groups": [
       {
@@ -389,14 +419,14 @@
       }
     ]
   },
-  "previous_inventory": "/Users/laura/Desktop/rnagenesis-aptamer-mres/docs/data_curation/_prior_raw_data_inventory.csv",
+  "previous_inventory": "/private/tmp/s0b_prior_inventory.csv",
   "raw_dir": "data/raw",
   "repo_root": "/Users/laura/Desktop/rnagenesis-aptamer-mres",
   "role_counts": {
     "cleaned_derived_output": 1,
     "derived_candidate_processing": 9,
     "derived_inspection_output": 12,
-    "documentation": 9,
+    "documentation": 11,
     "download_script": 1,
     "fixture_or_test_input": 4,
     "flat_file_or_text": 2,
@@ -404,42 +434,26 @@
     "image_asset": 3,
     "latent_coordinate_or_embedding": 1,
     "manual_review_output_or_template": 35,
-    "manually_extracted_table": 2,
-    "os_metadata": 9,
+    "manually_extracted_table": 1,
     "process_log_or_qc_report": 2,
     "scraped_or_assembled_raw_table": 1,
     "scraped_or_cached_html": 66,
     "sequence_reads_fastq": 2,
-    "source_document_pdf": 10,
+    "source_document_pdf": 17,
     "sra_metadata": 2,
-    "tabular_data": 13,
+    "tabular_data": 14,
     "unclassified_or_source_file": 1
   },
   "s0_status_counts": {
     "derived_output_not_raw_input": 56,
     "hold_for_manual_review": 78,
-    "include_as_authoritative_input": 36,
-    "include_with_documented_caveat": 16,
-    "not_relevant_to_protein_aptamer_corpus": 16,
+    "include_as_authoritative_input": 37,
+    "include_with_documented_caveat": 25,
+    "not_relevant_to_protein_aptamer_corpus": 6,
     "superseded": 1
   },
   "sequence_overlap_samples_path": "data/interim/inventory/sequence_overlap_samples.json",
   "sources": {
-    "(raw_root)": {
-      "approx_row_or_record_sum": 0,
-      "extensions": {
-        "(none)": 1
-      },
-      "n_files": 1,
-      "paths": [
-        "data/raw/.DS_Store"
-      ],
-      "roles": {
-        "os_metadata": 1
-      },
-      "top_flags": [],
-      "total_bytes": 18436
-    },
     "AptaDB": {
       "approx_row_or_record_sum": 2837,
       "extensions": {
@@ -563,13 +577,11 @@
     "Aptadiff_datasetA": {
       "approx_row_or_record_sum": 27721,
       "extensions": {
-        "(none)": 1,
         "csv": 2,
         "rtf": 1
       },
-      "n_files": 4,
+      "n_files": 3,
       "paths": [
-        "data/raw/Aptadiff_datasetA/.DS_Store",
         "data/raw/Aptadiff_datasetA/aptadiff_repo_readme.rtf",
         "data/raw/Aptadiff_datasetA/datasetA_IGFBP3_P6.csv",
         "data/raw/Aptadiff_datasetA/datasetA_IGFBP3_x_z.csv"
@@ -577,7 +589,6 @@
       "roles": {
         "documentation": 1,
         "latent_coordinate_or_embedding": 1,
-        "os_metadata": 1,
         "tabular_data": 1
       },
       "top_flags": [
@@ -590,7 +601,7 @@
           1
         ]
       ],
-      "total_bytes": 1413684
+      "total_bytes": 1407536
     },
     "Aptadiff_otherdata": {
       "approx_row_or_record_sum": 213596,
@@ -627,14 +638,12 @@
     "ENA": {
       "approx_row_or_record_sum": 123868,
       "extensions": {
-        "(none)": 1,
         "csv": 45,
         "md": 7,
         "txt": 6
       },
-      "n_files": 59,
+      "n_files": 58,
       "paths": [
-        "data/raw/ENA/.DS_Store",
         "data/raw/ENA/README_ena_inspection.md",
         "data/raw/ENA/candidates/ena_candidate_evidence_long.csv",
         "data/raw/ENA/candidates/ena_candidate_exclusions.csv",
@@ -699,8 +708,7 @@
         "derived_inspection_output": 12,
         "documentation": 1,
         "flat_file_or_text": 1,
-        "manual_review_output_or_template": 35,
-        "os_metadata": 1
+        "manual_review_output_or_template": 35
       },
       "top_flags": [
         [
@@ -764,7 +772,7 @@
           2
         ]
       ],
-      "total_bytes": 47748619
+      "total_bytes": 47738375
     },
     "NCBI_GEO_papers": {
       "approx_row_or_record_sum": 0,
@@ -861,14 +869,12 @@
     "UTexas_aptamer_dataset": {
       "approx_row_or_record_sum": 2194,
       "extensions": {
-        "(none)": 1,
         "png": 3,
         "rtf": 1,
         "xlsx": 1
       },
-      "n_files": 6,
+      "n_files": 5,
       "paths": [
-        "data/raw/UTexas_aptamer_dataset/.DS_Store",
         "data/raw/UTexas_aptamer_dataset/UTexas Aptamer Database dataset_Sept2023.xlsx",
         "data/raw/UTexas_aptamer_dataset/utexas_information.rtfd/Attachment.png",
         "data/raw/UTexas_aptamer_dataset/utexas_information.rtfd/Dataset-categoris-.png",
@@ -877,7 +883,6 @@
       ],
       "roles": {
         "image_asset": 3,
-        "os_metadata": 1,
         "tabular_data": 1,
         "unclassified_or_source_file": 1
       },
@@ -919,24 +924,23 @@
           1
         ]
       ],
-      "total_bytes": 886654
+      "total_bytes": 880506
     },
     "aptabase": {
-      "approx_row_or_record_sum": 1561,
+      "approx_row_or_record_sum": 1633,
       "extensions": {
-        "(none)": 1,
         "csv": 2,
         "html": 70,
         "md": 1,
-        "txt": 2
+        "txt": 3
       },
       "n_files": 76,
       "paths": [
-        "data/raw/aptabase/.DS_Store",
         "data/raw/aptabase/Aptamer Search Page 1.html",
         "data/raw/aptabase/Aptamer Search Page 2.html",
         "data/raw/aptabase/Aptamer Search Page 37.html",
         "data/raw/aptabase/Aptamer Search Page 61.html",
+        "data/raw/aptabase/README_aptabase_curation.txt",
         "data/raw/aptabase/aptabase_cleaned.csv",
         "data/raw/aptabase/aptabase_qc_report.md",
         "data/raw/aptabase/aptabase_raw.csv",
@@ -1011,9 +1015,9 @@
       ],
       "roles": {
         "cleaned_derived_output": 1,
+        "documentation": 1,
         "fixture_or_test_input": 4,
         "flat_file_or_text": 1,
-        "os_metadata": 1,
         "process_log_or_qc_report": 2,
         "scraped_or_assembled_raw_table": 1,
         "scraped_or_cached_html": 66
@@ -1072,23 +1076,20 @@
           1
         ]
       ],
-      "total_bytes": 1776360
+      "total_bytes": 1773701
     },
     "aptamerbase": {
       "approx_row_or_record_sum": 2128,
       "extensions": {
-        "(none)": 1,
         "csv": 1,
         "pdf": 1
       },
-      "n_files": 3,
+      "n_files": 2,
       "paths": [
-        "data/raw/aptamerbase/.DS_Store",
         "data/raw/aptamerbase/aptamerbase_aptamers.csv",
         "data/raw/aptamerbase/paper.pdf"
       ],
       "roles": {
-        "os_metadata": 1,
         "source_document_pdf": 1,
         "tabular_data": 1
       },
@@ -1130,24 +1131,21 @@
           1
         ]
       ],
-      "total_bytes": 1049451
+      "total_bytes": 1043303
     },
     "chen_et_al_kpc": {
       "approx_row_or_record_sum": 126,
       "extensions": {
-        "(none)": 1,
         "csv": 1,
         "md": 1
       },
-      "n_files": 3,
+      "n_files": 2,
       "paths": [
-        "data/raw/chen_et_al_kpc/.DS_Store",
         "data/raw/chen_et_al_kpc/README_chen2020_kpc2_ecoli_xk10_aptamers.md",
         "data/raw/chen_et_al_kpc/chen2020_kpc2_ecoli_xk10_aptamer_sequences.csv"
       ],
       "roles": {
         "documentation": 1,
-        "os_metadata": 1,
         "tabular_data": 1
       },
       "top_flags": [
@@ -1160,7 +1158,47 @@
           1
         ]
       ],
-      "total_bytes": 17914
+      "total_bytes": 11766
+    },
+    "evaluation_references": {
+      "approx_row_or_record_sum": 66,
+      "extensions": {
+        "csv": 1,
+        "md": 1,
+        "pdf": 7
+      },
+      "n_files": 9,
+      "paths": [
+        "data/raw/evaluation_references/CN102965377B_patent.pdf",
+        "data/raw/evaluation_references/CN108949766B_patent.pdf",
+        "data/raw/evaluation_references/README_carbapenemase_evaluation_references.md",
+        "data/raw/evaluation_references/carbapenemase_reference_additions_and_overrides.csv",
+        "data/raw/evaluation_references/chen_2020_xk10_application.pdf",
+        "data/raw/evaluation_references/sabrowski_2022_main_article.pdf",
+        "data/raw/evaluation_references/shi2025_kpc2kp.pdf",
+        "data/raw/evaluation_references/source_documents/sabrowski_2022_supplementary.pdf",
+        "data/raw/evaluation_references/source_documents/shi_2025_supplementary.pdf"
+      ],
+      "roles": {
+        "documentation": 1,
+        "source_document_pdf": 7,
+        "tabular_data": 1
+      },
+      "top_flags": [
+        [
+          "conflicting_targets_for_same_sequence_1",
+          1
+        ],
+        [
+          "duplicate_sequences_1",
+          1
+        ],
+        [
+          "missing_sequences_1",
+          1
+        ]
+      ],
+      "total_bytes": 14495428
     },
     "instructNA_paper": {
       "approx_row_or_record_sum": 2837,
@@ -1185,27 +1223,21 @@
       "extensions": {
         "md": 1,
         "pdf": 1,
-        "xlsx": 2
+        "xlsx": 1
       },
-      "n_files": 4,
+      "n_files": 3,
       "paths": [
         "data/raw/precision_selex_against_kpc2_paper/README_extracted_data.md",
         "data/raw/precision_selex_against_kpc2_paper/extracted_data.xlsx",
-        "data/raw/precision_selex_against_kpc2_paper/paper.pdf",
-        "data/raw/precision_selex_against_kpc2_paper/~$extracted_data.xlsx"
+        "data/raw/precision_selex_against_kpc2_paper/paper.pdf"
       ],
       "roles": {
         "documentation": 1,
-        "manually_extracted_table": 2,
+        "manually_extracted_table": 1,
         "source_document_pdf": 1
       },
-      "top_flags": [
-        [
-          "unreadable_bad_xlsx_zip",
-          1
-        ]
-      ],
-      "total_bytes": 8995488
+      "top_flags": [],
+      "total_bytes": 8995323
     },
     "rbms_paper": {
       "approx_row_or_record_sum": 69,
@@ -1225,19 +1257,16 @@
     "riboaptamer": {
       "approx_row_or_record_sum": 525,
       "extensions": {
-        "(none)": 1,
         "csv": 1,
         "rtf": 1
       },
-      "n_files": 3,
+      "n_files": 2,
       "paths": [
-        "data/raw/riboaptamer/.DS_Store",
         "data/raw/riboaptamer/all_sequences_509_rows.csv",
         "data/raw/riboaptamer/readme.rtf"
       ],
       "roles": {
         "documentation": 1,
-        "os_metadata": 1,
         "tabular_data": 1
       },
       "top_flags": [
@@ -1270,7 +1299,7 @@
           1
         ]
       ],
-      "total_bytes": 282599
+      "total_bytes": 276451
     },
     "selektion_paper": {
       "approx_row_or_record_sum": 359,
@@ -1329,18 +1358,15 @@
     "sra_metadata_ndm1_aptamers": {
       "approx_row_or_record_sum": 17,
       "extensions": {
-        "(none)": 1,
         "csv": 1,
         "txt": 1
       },
-      "n_files": 3,
+      "n_files": 2,
       "paths": [
-        "data/raw/sra_metadata_ndm1_aptamers/.DS_Store",
         "data/raw/sra_metadata_ndm1_aptamers/PRJNA830749/SraAccList.txt",
         "data/raw/sra_metadata_ndm1_aptamers/PRJNA830749/SraRunInfo.csv"
       ],
       "roles": {
-        "os_metadata": 1,
         "sra_metadata": 2
       },
       "top_flags": [
@@ -1349,11 +1375,16 @@
           1
         ]
       ],
-      "total_bytes": 11414
+      "total_bytes": 5266
     }
   },
-  "total_bytes": 123742615,
-  "unreadable_or_partial": [
-    "data/raw/precision_selex_against_kpc2_paper/~$extracted_data.xlsx"
-  ]
+  "substantive_integrity": {
+    "new_substantive_files": 10,
+    "previous_substantive_files": 193,
+    "previous_substantive_modified": 0,
+    "previous_substantive_removed": 0,
+    "previous_substantive_unchanged": 193
+  },
+  "total_bytes": 138169651,
+  "unreadable_or_partial": []
 }

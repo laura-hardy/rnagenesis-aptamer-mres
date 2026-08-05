@@ -20,6 +20,7 @@ from inventory_raw_data import (  # noqa: E402
     FileInspection,
     enrich_inventory_rows,
     human_size,
+    is_transient_raw_file,
     load_previous_inventory,
     match_sequence_columns,
     recommend_s0_status,
@@ -57,9 +58,15 @@ def test_human_size() -> None:
 
 
 def test_redact_sequence_like_column_names_headerless_three_col() -> None:
-    colnames = ["CGCATTTGGGTTGGTTTGGACTGGTTTTGCTGTTTG", "3.037", "-2.599"]
+    # Build a ≥20-nt synthetic token at runtime so the tracked test file itself
+    # does not contain a contiguous nucleotide run of length 20+.
+    seq_token = ("ACGT" * 5) + "A"  # 21 nt
+    colnames = [seq_token, "3.037", "-2.599"]
+    assert len(re.sub(r"\s+", "", seq_token)) >= 20
     assert redact_sequence_like_column_names(colnames) == "headerless_three_column_file"
     assert UNREDACTED_NT_RE.search(redact_sequence_like_column_names(colnames)) is None
+    source = Path(__file__).read_text(encoding="utf-8")
+    assert UNREDACTED_NT_RE.search(source) is None
 
 
 def test_recommend_s0_ignores_excel_lock_and_ds_store() -> None:
@@ -83,6 +90,147 @@ def test_recommend_s0_ignores_excel_lock_and_ds_store() -> None:
     )
     assert recommend_s0_status(lock) == "not_relevant_to_protein_aptamer_corpus"
     assert recommend_s0_status(ds) == "not_relevant_to_protein_aptamer_corpus"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        ".DS_Store",
+        ".ds_store",
+        ".Rhistory",
+        ".rhistory",
+        "~$extracted_data.xlsx",
+        "~$workbook.xlsx",
+        "Thumbs.db",
+        "thumbs.db",
+        "desktop.ini",
+        "Desktop.ini",
+    ],
+)
+def test_transient_basenames_are_excluded(name: str) -> None:
+    assert is_transient_raw_file(name) is True
+    assert is_transient_raw_file(Path("data/raw/demo") / name) is True
+
+
+def test_legitimate_hidden_research_file_is_not_transient() -> None:
+    assert is_transient_raw_file(".hidden_selection_notes.csv") is False
+    assert is_transient_raw_file("data/raw/demo/.aptamer_manifest.csv") is False
+    assert is_transient_raw_file("table6_d9_ndm1_sequences.csv") is False
+
+
+def test_transient_changes_do_not_reduce_substantive_hash_success(
+    tmp_path: Path,
+) -> None:
+    prior_path = tmp_path / "prior.csv"
+    with prior_path.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(
+            f,
+            fieldnames=["relative_path", "sha256", "row_count", "column_names"],
+        )
+        w.writeheader()
+        w.writerow(
+            {
+                "relative_path": "data/raw/demo/source.csv",
+                "sha256": "abc",
+                "row_count": "2",
+                "column_names": "id|label",
+            }
+        )
+        w.writerow(
+            {
+                "relative_path": "data/raw/demo/.DS_Store",
+                "sha256": "old_ds",
+                "row_count": "",
+                "column_names": "",
+            }
+        )
+        w.writerow(
+            {
+                "relative_path": "data/raw/demo/~$lock.xlsx",
+                "sha256": "old_lock",
+                "row_count": "",
+                "column_names": "",
+            }
+        )
+    previous = load_previous_inventory(prior_path)
+    # Only the substantive file is present in the new inventory rows; transient
+    # prior paths are filtered by enrich_inventory_rows.
+    row = FileInspection(
+        relative_path="data/raw/demo/source.csv",
+        top_level_source="demo",
+        file_name="source.csv",
+        extension="csv",
+        file_size_bytes=10,
+        file_size_human="10 B",
+        last_modified="",
+        sha256="abc",
+        row_count="2",
+        column_names="id|label",
+    )
+    changes = enrich_inventory_rows(
+        [row],
+        previous=previous,
+        docs_by_source={},
+        repo_root=REPO_ROOT,
+    )
+    assert changes["n_unchanged"] == 1
+    assert changes["n_modified"] == 0
+    assert changes["n_removed"] == 0
+    assert changes["removed"] == []
+
+
+def test_ignored_transient_paths_reported_in_summary_shape() -> None:
+    # Contract for the summary payload written by main(): aggregate count + paths.
+    payload = {
+        "n_ignored_on_disk": 2,
+        "paths_on_disk": [
+            "data/raw/.DS_Store",
+            "data/raw/demo/.Rhistory",
+        ],
+        "n_previous_inventory_transient_paths": 1,
+        "previous_inventory_transient_paths": [
+            "data/raw/demo/~$lock.xlsx",
+        ],
+    }
+    assert payload["n_ignored_on_disk"] == len(payload["paths_on_disk"])
+    assert all(is_transient_raw_file(p) for p in payload["paths_on_disk"])
+    assert all(
+        is_transient_raw_file(p) for p in payload["previous_inventory_transient_paths"]
+    )
+    blob = json.dumps(payload)
+    assert UNREDACTED_NT_RE.search(blob) is None
+
+
+def test_inventory_deterministic_sort_key_for_substantive_rows() -> None:
+    rows = [
+        FileInspection(
+            relative_path="data/raw/b/file.csv",
+            top_level_source="b",
+            file_name="file.csv",
+            extension="csv",
+            file_size_bytes=1,
+            file_size_human="1 B",
+            last_modified="",
+            sha256="1",
+        ),
+        FileInspection(
+            relative_path="data/raw/a/file.csv",
+            top_level_source="a",
+            file_name="file.csv",
+            extension="csv",
+            file_size_bytes=1,
+            file_size_human="1 B",
+            last_modified="",
+            sha256="2",
+        ),
+    ]
+    ordered = sorted(rows, key=lambda r: r.relative_path)
+    assert [r.relative_path for r in ordered] == [
+        "data/raw/a/file.csv",
+        "data/raw/b/file.csv",
+    ]
+    # Transient names never participate in the authoritative row set.
+    assert not any(is_transient_raw_file(r.relative_path) for r in ordered)
 
 
 def test_recommend_s0_excludes_latent_coordinate_file() -> None:

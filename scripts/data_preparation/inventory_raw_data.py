@@ -21,8 +21,10 @@ Assumptions
   inspected via ZIP/XML (no openpyxl/pandas required).
 * Very large FASTQ / EMBL files are streamed; some QC metrics are sample-based
   and flagged as such in ``notes`` / ``possible_issue_flags``.
-* ``.DS_Store`` and macOS resource-fork files are inventoried but not deeply
-  content-inspected.
+* Explicit transient filesystem artefacts (``.DS_Store``, ``.Rhistory``, Excel
+  ``~$`` lock files, ``Thumbs.db``, ``desktop.ini``) are excluded from the
+  authoritative inventory and hash-comparison denominator; they are reported
+  separately in the summary and are never deleted or modified.
 * Exact duplicate detection uses SHA-256 of full file bytes.
 * Sequence-alphabet checks treat IUPAC nucleotide codes as valid; unusual
   composition is reported, not rejected as biologically invalid.
@@ -222,12 +224,38 @@ def join_flags(flags: Iterable[str]) -> str:
     return "|".join(sorted(dict.fromkeys(f for f in flags if f)))
 
 
+# Explicit transient filesystem artefacts. Basenames not on this list — including
+# other hidden files — remain inventoried. Matching is deterministic and
+# operating-system independent (case-insensitive for known Windows names;
+# Excel locks match the ``~$`` basename prefix).
+_TRANSIENT_EXACT_LOWER = frozenset(
+    {
+        ".ds_store",
+        ".rhistory",
+        "thumbs.db",
+        "desktop.ini",
+    }
+)
+
+
+def is_transient_raw_file(path: Path | str) -> bool:
+    """Return True if ``path`` is an explicit transient filesystem artefact.
+
+    Transient files are not scientific source inputs. They are excluded from the
+    authoritative inventory rows and from substantive hash-comparison results.
+    """
+    name = Path(path).name
+    if name.startswith("~$"):
+        return True
+    return name.lower() in _TRANSIENT_EXACT_LOWER
+
+
 def classify_role(rel_posix: str, file_name: str) -> str:
     blob = f"{rel_posix}/{file_name}"
     for pat, role in ROLE_HINTS:
         if pat.search(blob):
             return role
-    if file_name == ".DS_Store":
+    if is_transient_raw_file(file_name):
         return "os_metadata"
     ext = Path(file_name).suffix.lower()
     if ext in {".csv", ".tsv", ".xlsx", ".xls"}:
@@ -1534,7 +1562,12 @@ def source_rollups(rows: list[FileInspection]) -> dict[str, Any]:
 def write_inventory_csv(path: Path, rows: list[FileInspection]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=INVENTORY_COLUMNS, extrasaction="ignore")
+        w = csv.DictWriter(
+            f,
+            fieldnames=INVENTORY_COLUMNS,
+            extrasaction="ignore",
+            lineterminator="\n",
+        )
         w.writeheader()
         for r in rows:
             d = asdict(r)
@@ -1553,7 +1586,9 @@ def write_workbook_sheets_csv(path: Path, rows: list[FileInspection]) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     n = 0
     with path.open("w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=WORKBOOK_SHEET_COLUMNS)
+        w = csv.DictWriter(
+            f, fieldnames=WORKBOOK_SHEET_COLUMNS, lineterminator="\n"
+        )
         w.writeheader()
         for r in rows:
             for sheet in r._workbook_sheets:
@@ -1611,7 +1646,7 @@ def extract_readme_snippet(path: Path, limit: int = 400) -> str:
 def recommend_s0_status(insp: FileInspection) -> str:
     rel = insp.relative_path
     name = insp.file_name.lower()
-    if name == ".ds_store" or name.startswith("~$"):
+    if is_transient_raw_file(insp.file_name) or is_transient_raw_file(rel):
         return "not_relevant_to_protein_aptamer_corpus"
     if LATENT_COORDINATE_NAME_RE.search(name) or insp.apparent_role == "latent_coordinate_or_embedding":
         return "not_relevant_to_protein_aptamer_corpus"
@@ -1686,11 +1721,22 @@ def enrich_inventory_rows(
     docs_by_source: dict[str, list[str]],
     repo_root: Path,
 ) -> dict[str, Any]:
-    """Populate extended fields and compute change summary vs previous inventory."""
+    """Populate extended fields and compute change summary vs previous inventory.
+
+    ``previous`` should already exclude transient filesystem artefacts. Any
+    transient keys that remain are ignored for scientific change accounting.
+    """
+    previous_substantive = {
+        key: value
+        for key, value in previous.items()
+        if not is_transient_raw_file(key)
+    }
     added: list[str] = []
     modified: list[str] = []
     unchanged: list[str] = []
-    removed = sorted(set(previous) - {r.relative_path for r in rows})
+    removed = sorted(
+        set(previous_substantive) - {r.relative_path for r in rows}
+    )
 
     # Known supersession relationships (documented / observed)
     superseded_map = {
@@ -1707,7 +1753,7 @@ def enrich_inventory_rows(
 
     for r in rows:
         r.current_hash = r.sha256
-        prev = previous.get(r.relative_path)
+        prev = previous_substantive.get(r.relative_path)
         if prev is None:
             r.change_since_previous_inventory = "added"
             r.last_inventory_hash = ""
@@ -1927,13 +1973,34 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     all_paths = sorted(p for p in raw_dir.rglob("*") if p.is_file())
     dir_count = sum(1 for p in raw_dir.rglob("*") if p.is_dir()) + 1  # include raw itself
+    ignored_transient_on_disk = sorted(
+        p.relative_to(repo_root).as_posix()
+        for p in all_paths
+        if is_transient_raw_file(p)
+    )
+    substantive_paths = sorted(
+        p for p in all_paths if not is_transient_raw_file(p)
+    )
+    previous_transient_paths = sorted(
+        key for key in previous if is_transient_raw_file(key)
+    )
+    previous_substantive = {
+        key: value
+        for key, value in previous.items()
+        if not is_transient_raw_file(key)
+    }
     log.info("Found %d files in %d directories", len(all_paths), dir_count)
+    log.info(
+        "Ignoring %d transient filesystem artefact(s); inventoring %d substantive file(s)",
+        len(ignored_transient_on_disk),
+        len(substantive_paths),
+    )
 
     rows: list[FileInspection] = []
     unreadable: list[str] = []
-    for i, path in enumerate(all_paths, 1):
+    for i, path in enumerate(substantive_paths, 1):
         rel = path.relative_to(repo_root).as_posix()
-        log.info("[%d/%d] %s", i, len(all_paths), rel)
+        log.info("[%d/%d] %s", i, len(substantive_paths), rel)
         insp = inspect_file(path, repo_root)
         rows.append(insp)
         if insp.readable != "yes":
@@ -1944,16 +2011,20 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     changes = enrich_inventory_rows(
         rows,
-        previous=previous,
+        previous=previous_substantive,
         docs_by_source=docs_by_source,
         repo_root=repo_root,
     )
     log.info(
-        "Change summary vs previous: added=%d modified=%d removed=%d unchanged=%d",
+        "Change summary vs previous substantive inventory: "
+        "added=%d modified=%d removed=%d unchanged=%d "
+        "(ignored_transient_on_disk=%d previous_inventory_transient=%d)",
         changes["n_added"],
         changes["n_modified"],
         changes["n_removed"],
         changes["n_unchanged"],
+        len(ignored_transient_on_disk),
+        len(previous_transient_paths),
     )
 
     write_inventory_csv(out_csv, rows)
@@ -1998,10 +2069,29 @@ def main(argv: Optional[list[str]] = None) -> int:
         "previous_inventory": str(previous_path),
         "n_directories": dir_count,
         "n_files": len(rows),
+        "n_files_on_disk": len(all_paths),
         "total_bytes": sum(r.file_size_bytes for r in rows),
         "unreadable_or_partial": unreadable,
         "documentation_files_by_source": docs_by_source,
         "changes_since_previous_inventory": changes,
+        "ignored_transient_files": {
+            "n_ignored_on_disk": len(ignored_transient_on_disk),
+            "paths_on_disk": ignored_transient_on_disk,
+            "n_previous_inventory_transient_paths": len(previous_transient_paths),
+            "previous_inventory_transient_paths": previous_transient_paths,
+            "note": (
+                "Transient filesystem artefacts are excluded from the "
+                "authoritative source-file inventory and from the substantive "
+                "hash-comparison denominator. They are never deleted or modified."
+            ),
+        },
+        "substantive_integrity": {
+            "previous_substantive_files": len(previous_substantive),
+            "previous_substantive_unchanged": changes["n_unchanged"],
+            "previous_substantive_modified": changes["n_modified"],
+            "previous_substantive_removed": changes["n_removed"],
+            "new_substantive_files": changes["n_added"],
+        },
         "extension_counts": dict(
             Counter(r.extension or "(none)" for r in rows).most_common()
         ),
@@ -2025,6 +2115,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             "Change detection uses prior inventory SHA-256/row_count/column_names when available",
             "README snippets are truncated extracts for inventory notes, not full documents",
             "AptaDiff *_x_z.csv files are latent-coordinate inputs, not corpus sequence tables",
+            (
+                "Transient artefacts (.DS_Store, .Rhistory, ~$*, Thumbs.db, "
+                "desktop.ini) are excluded from authoritative inventory rows"
+            ),
         ],
         "checks_not_feasibly_complete": [
             "All-against-all sequence similarity clustering",
@@ -2038,9 +2132,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     out_json.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     log.info("Wrote summary JSON: %s", out_json)
 
-    # Coverage check
+    # Coverage check against substantive files only.
     inventored = {r.relative_path for r in rows}
-    expected = {p.relative_to(repo_root).as_posix() for p in all_paths}
+    expected = {p.relative_to(repo_root).as_posix() for p in substantive_paths}
     missing = sorted(expected - inventored)
     extra = sorted(inventored - expected)
     if missing or extra:
@@ -2048,13 +2142,15 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 1
 
     log.info(
-        "SUMMARY files=%d dirs=%d unreadable_or_partial=%d exact_dup_groups=%d added=%d removed=%d",
+        "SUMMARY substantive_files=%d dirs=%d unreadable_or_partial=%d "
+        "exact_dup_groups=%d added=%d removed=%d ignored_transient=%d",
         len(rows),
         dir_count,
         len(unreadable),
         overlap["n_exact_duplicate_groups"],
         changes["n_added"],
         changes["n_removed"],
+        len(ignored_transient_on_disk),
     )
     return 0
 

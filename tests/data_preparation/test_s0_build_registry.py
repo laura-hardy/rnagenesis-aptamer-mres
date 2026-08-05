@@ -17,6 +17,7 @@ if str(SCRIPT_DIR) not in sys.path:
 from s0_build_registry import (  # noqa: E402
     REQUIRED_COLUMNS,
     RegistryError,
+    RegistrySpecRow,
     build_registry,
     count_csv_data_rows,
     load_registry_spec,
@@ -679,3 +680,229 @@ def test_cli_resolves_relative_to_repo_root(demo_repo: Path, monkeypatch, capsys
     assert "registered_sources=1" in captured.out
     assert "AAAA" not in captured.out  # synthetic payload must not be dumped
     assert (demo_repo / "data" / "interim" / "registry" / "source_registry.csv").is_file()
+
+
+def _write_minimal_xlsx(path: Path, rows: list[list[object]]) -> None:
+    """Write a minimal OOXML workbook via ZIP/XML (no openpyxl dependency)."""
+    import zipfile
+    from xml.etree.ElementTree import Element, SubElement, tostring
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    shared: list[str] = []
+
+    def share(text: str) -> int:
+        shared.append(text)
+        return len(shared) - 1
+
+    sheet = Element(
+        "worksheet",
+        {
+            "xmlns": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+        },
+    )
+    sheet_data = SubElement(sheet, "sheetData")
+    for r_idx, row_vals in enumerate(rows, start=1):
+        row_el = SubElement(sheet_data, "row", {"r": str(r_idx)})
+        for c_idx, value in enumerate(row_vals):
+            if value is None or value == "":
+                continue
+            col = chr(ord("A") + c_idx)
+            cell_ref = f"{col}{r_idx}"
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                c_el = SubElement(row_el, "c", {"r": cell_ref})
+                v_el = SubElement(c_el, "v")
+                v_el.text = str(value)
+            else:
+                idx = share(str(value))
+                c_el = SubElement(row_el, "c", {"r": cell_ref, "t": "s"})
+                v_el = SubElement(c_el, "v")
+                v_el.text = str(idx)
+
+    ss_root = Element(
+        "sst",
+        {
+            "xmlns": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            "count": str(len(shared)),
+            "uniqueCount": str(len(shared)),
+        },
+    )
+    for text in shared:
+        si = SubElement(ss_root, "si")
+        t = SubElement(si, "t")
+        t.text = text
+
+    wb = Element(
+        "workbook",
+        {"xmlns": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"},
+    )
+    wb.set(
+        "xmlns:r",
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+    )
+    sheets = SubElement(wb, "sheets")
+    SubElement(
+        sheets,
+        "sheet",
+        {
+            "name": "Sheet1",
+            "sheetId": "1",
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id": "rId1",
+        },
+    )
+    rels = Element(
+        "Relationships",
+        {
+            "xmlns": "http://schemas.openxmlformats.org/package/2006/relationships",
+        },
+    )
+    SubElement(
+        rels,
+        "Relationship",
+        {
+            "Id": "rId1",
+            "Type": (
+                "http://schemas.openxmlformats.org/officeDocument/2006/"
+                "relationships/officeDocument"
+            ),
+            "Target": "xl/workbook.xml",
+        },
+    )
+    wb_rels = Element(
+        "Relationships",
+        {
+            "xmlns": "http://schemas.openxmlformats.org/package/2006/relationships",
+        },
+    )
+    SubElement(
+        wb_rels,
+        "Relationship",
+        {
+            "Id": "rId1",
+            "Type": (
+                "http://schemas.openxmlformats.org/officeDocument/2006/"
+                "relationships/worksheet"
+            ),
+            "Target": "worksheets/sheet1.xml",
+        },
+    )
+    content_types = Element(
+        "Types",
+        {"xmlns": "http://schemas.openxmlformats.org/package/2006/content-types"},
+    )
+    SubElement(
+        content_types,
+        "Default",
+        {
+            "Extension": "rels",
+            "ContentType": (
+                "application/vnd.openxmlformats-package.relationships+xml"
+            ),
+        },
+    )
+    SubElement(
+        content_types,
+        "Default",
+        {"Extension": "xml", "ContentType": "application/xml"},
+    )
+    SubElement(
+        content_types,
+        "Override",
+        {
+            "PartName": "/xl/workbook.xml",
+            "ContentType": (
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet.main+xml"
+            ),
+        },
+    )
+    SubElement(
+        content_types,
+        "Override",
+        {
+            "PartName": "/xl/worksheets/sheet1.xml",
+            "ContentType": (
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.worksheet+xml"
+            ),
+        },
+    )
+    SubElement(
+        content_types,
+        "Override",
+        {
+            "PartName": "/xl/sharedStrings.xml",
+            "ContentType": (
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sharedStrings+xml"
+            ),
+        },
+    )
+
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("[Content_Types].xml", tostring(content_types))
+        zf.writestr("_rels/.rels", tostring(rels))
+        zf.writestr("xl/workbook.xml", tostring(wb))
+        zf.writestr("xl/_rels/workbook.xml.rels", tostring(wb_rels))
+        zf.writestr("xl/sharedStrings.xml", tostring(ss_root))
+        zf.writestr("xl/worksheets/sheet1.xml", tostring(sheet))
+
+
+def test_xlsx_registry_validation_success(tmp_path: Path) -> None:
+    from s0_build_registry import count_xlsx_physical_data_rows, validate_registered_file
+
+    repo = _make_repo_tree(tmp_path)
+    xlsx = repo / "data" / "raw" / "demo" / "demo.xlsx"
+    _write_minimal_xlsx(
+        xlsx,
+        [
+            ["id", "payload"],
+            ["a", "token-1"],
+            ["b", "token-2"],
+            ["c", "token-3"],
+        ],
+    )
+    assert count_xlsx_physical_data_rows(xlsx) == 3
+    row = RegistrySpecRow(
+        source_key="xlsx_demo",
+        source_dataset="xlsx_demo_v1",
+        path="data/raw/demo/demo.xlsx",
+        sha256=_hash_path(xlsx),
+        n_rows_expected=3,
+        snapshot_date="2026-08-05",
+        tier="eval",
+        redistribution_status="unknown",
+        notes="physical worksheet layout row count",
+    )
+    validate_registered_file(repo, row)
+
+
+def test_xlsx_registry_rejects_lock_file_and_row_mismatch(tmp_path: Path) -> None:
+    from s0_build_registry import (
+        RegistryError,
+        assert_path_allowed,
+        count_xlsx_physical_data_rows,
+        validate_registered_file,
+    )
+
+    repo = _make_repo_tree(tmp_path)
+    lock = repo / "data" / "raw" / "demo" / "~$demo.xlsx"
+    lock.write_bytes(b"lock")
+    with pytest.raises(RegistryError):
+        assert_path_allowed(repo, "data/raw/demo/~$demo.xlsx")
+
+    xlsx = repo / "data" / "raw" / "demo" / "demo.xlsx"
+    _write_minimal_xlsx(xlsx, [["h"], ["1"], ["2"]])
+    assert count_xlsx_physical_data_rows(xlsx) == 2
+    row = RegistrySpecRow(
+        source_key="xlsx_demo",
+        source_dataset="xlsx_demo_v1",
+        path="data/raw/demo/demo.xlsx",
+        sha256=_hash_path(xlsx),
+        n_rows_expected=99,
+        snapshot_date="2026-08-05",
+        tier="eval",
+        redistribution_status="unknown",
+        notes="mismatch",
+    )
+    with pytest.raises(RegistryError, match="Row-count mismatch"):
+        validate_registered_file(repo, row)
