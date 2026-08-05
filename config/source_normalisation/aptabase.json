@@ -1,0 +1,38 @@
+{
+  "source_key": "aptabase",
+  "contract_version": "1.0",
+  "molecule_evidence_precedence": [
+    "aptamer_name",
+    "reference",
+    "sequence_alphabet"
+  ],
+  "rna_terms": [
+    "rna aptamer",
+    "rna oligonucleotide",
+    "ribonucleic acid aptamer",
+    "ribonucleotide aptamer"
+  ],
+  "dna_terms": [
+    "ssdna",
+    "ss dna",
+    "dna aptamer",
+    "dna oligonucleotide",
+    "deoxyribonucleic acid aptamer"
+  ],
+  "text_fields_for_molecule_evidence": [
+    "aptabase_aptamer_name",
+    "aptabase_reference"
+  ],
+  "forbidden_molecule_evidence_fields": [
+    "aptabase_target_general",
+    "aptabase_target_specific"
+  ],
+  "t_only_without_explicit_molecule_evidence": "unknown",
+  "u_only_without_explicit_molecule_evidence": "RNA",
+  "conflicting_text_evidence": "unknown",
+  "legacy_sequence_clean_is_canonical": false,
+  "legacy_molecule_inference_is_canonical": false,
+  "legacy_fields_are_diagnostics_only": true,
+  "reported_length_integer_tolerance": 0.000001,
+  "gc_difference_review_threshold_percentage_points": 1.0
+}

@@ -1542,3 +1542,109 @@ No shared registry-module refactor was required: S1 reuses `validate_registered_
 - No sequence has been trimmed
 - No record has been filtered or parked
 - No CHECKPOINT-1 artefact exists yet
+
+## 2026-08-05 — AptaBase S2 sequence normalisation and QC
+
+### Stage
+
+All 610 AptaBase records passed through S2 normalisation only. No S3 inclusion, parking or rejection rules were applied. CHECKPOINT-1 was not created.
+
+### What was done
+
+- Shared sequence normaliser applied to S1 `sequence_raw` (never to legacy `sequence_clean`)
+- AptaBase-specific preprocessing for corrupted terminal 5′/3′ display labels (`U+FFFD` / `?`) before shared display cleaning
+- Source-specific conservative molecule-evidence policy (aptamer name → reference → alphabet)
+- Display-only cleaning with auditable transformations
+- Full/core preservation without approved trimming (`full_equals_core_untrimmed`)
+- T→U conversion only for independently classified RNA
+- Reported-length and GC diagnostics in an ignored QC sidecar
+- Semantic comparison against legacy molecule labels (diagnostics only; literal vocabulary differences are not disagreements)
+- Row-level review-candidate generation from operational QC flags
+- Constant-region inference boundary demonstrated: no pooling under missing `experiment_group_id`
+
+### Decisions
+
+- Target fields are not evidence of aptamer molecule type
+- Prior AptaBase molecule inference and `sequence_clean` are diagnostic only
+- T-only sequences without explicit RNA/DNA text evidence remain `unknown`
+- No motif authorises automatic trimming
+- No AptaBase records are grouped for constant-region inference
+- No records are filtered at S2
+- Compatible/unresolved legacy molecule comparisons are sidecar diagnostics only and are not alone sufficient for the review-candidate file
+- Corrupted AptaBase terminal-label cleanup is source-specific and tightly anchored; chemical-modification notation is retained
+
+### Reconciliation
+
+An initial audit found that many surprising invalid/length tallies came from corrupted AptaBase terminal prime notation (`5`/`3` plus `U+FFFD` or `?`) being conservatively retained, and that `legacy_molecule_type_disagreement` compared incompatible label vocabularies literally. Bounded AptaBase-specific terminal-label cleanup was added before the shared normaliser; no generic biological characters are dropped. Legacy molecule comparisons now use semantic categories rather than literal label strings. Canonical molecule classifications remain conservative and independent of the legacy cleaner.
+
+### Inputs
+
+- `data/interim/extracted/aptabase_extracted.csv`
+- `data/interim/extracted/aptabase_source_metadata.csv`
+- `config/sequence_normalisation_rules.json`
+- `config/source_normalisation/aptabase.json`
+
+### Outputs
+
+Ignored under `/data/`:
+
+- `data/interim/normalised/aptabase_normalised.csv`
+- `data/interim/normalised/aptabase_s2_qc.csv`
+- `data/interim/normalised/aptabase_s2_review_candidates.csv`
+- `data/interim/normalised/aptabase_constant_region_proposals.csv`
+- `data/interim/normalised/aptabase_s2_report.md`
+- `data/interim/normalised/audit/` (reconciliation artefacts)
+
+Tracked code, tests and configuration:
+
+- `config/source_normalisation/aptabase.json`
+- `scripts/data_preparation/common/corpus_schema.py`
+- `scripts/data_preparation/adapters/aptabase_s2.py`
+- `scripts/data_preparation/s2_normalise.py`
+- `tests/data_preparation/test_corpus_schema.py`
+- `tests/data_preparation/test_adapter_aptabase_s2.py`
+- `tests/data_preparation/test_s2_normalise.py`
+- this log entry
+
+### Numbers
+
+- S1/S2 rows: 610 / 610 (unique `record_id` 610; order and provenance preserved)
+- Missing / nonempty sequences: 54 / 556
+- Display transformations: AptaBase corrupted 5p 64; AptaBase corrupted 3p 89; five-prime label 442; three-prime label 420; display separators 51; whitespace 15; uppercase 3; textual null 54; t_to_u 1
+- Alphabet: DNA_T 283; RNA 200; invalid 68; missing 54; mixed_T_U 3; ambiguous 2
+- Molecule type: unknown 364; RNA 201; ssDNA 45
+- Molecule evidence: sequence_alphabet 404; none 112; reference 90; aptamer_name 4
+- T→U conversions: 1
+- Invalid / ambiguous / mixed T/U: 68 / 2 / 3
+- Known motif detections (configured five_prime): 1
+- Trim-review rows: 4
+- Core below / above 20–100: 8 / 34
+- Reported-length mismatch: 71; reported GC mismatch: 13; GC unparseable: 1
+- Legacy sequence_clean disagreement: 12; length 11; alphabet 291; GC 11
+- Legacy molecule comparison: literal vocabulary mismatch 610; semantic agreement 245; substantive disagreement 1; compatible difference 120; unresolved 244; unrecognised 0; empty legacy 0
+- Review candidates: 408
+- Constant-region proposals: 0 (`records_with_experiment_group_id=0`; reason `no_experiment_group_id`)
+- Shared S2-related tests: 173 passed
+- Full curation suite: 288 passed
+- Legacy AptaBase regression: 25 passed
+- Deterministic rerun: all five S2 outputs byte-identical across two runs
+- Integrity: registered AptaBase raw hash unchanged (`649ca9c2…430e`); S1 canonical and sidecar hashes unchanged; nothing written under `data/raw/`; nothing under `data/` tracked
+
+### Comparison with earlier preprocessing
+
+- Missing-sequence count agrees (54)
+- Invalid rows fell from 156 to 68 after bounded corrupted-terminal cleanup; residual invalids are dominated by chemical-modification and malformed letters, not terminal-label leftovers
+- Alphabet DNA_T/RNA tallies moved toward the legacy DNA/RNA band without forcing letter-stripping
+- Molecule-type distribution remains more unknown than legacy because T-only without explicit evidence stays unknown
+- Promoter detections rose only to 1: most residual T7 hits still sit after non-label prefixes, so the shared five_prime position rule correctly withholds them
+- Length mismatches fell (150 → 71); GC mismatches rose (5 → 13) because more rows become GC-eligible after cleanup
+- Semantic molecule disagreements are 1 (legacy `mixed_or_uncertain` versus new RNA), not the defective literal 610
+
+### Open work
+
+- S3 inclusion/parking/rejection rules have not been applied
+- Molecule-type unknowns require policy-based handling at S3
+- Trim-review candidates remain untrimmed
+- Target types and evidence remain unresolved
+- CHECKPOINT-1 has not been created
+- Unrelated unstaged S1 forbidden-companion case-insensitive edits remain outside this S2 milestone

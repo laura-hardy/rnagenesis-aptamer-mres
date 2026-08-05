@@ -17,11 +17,14 @@ if str(SCRIPT_DIR) not in sys.path:
 from common.corpus_schema import (  # noqa: E402
     CORPUS_COLUMNS,
     S1_FORBIDDEN_FIELDS,
+    S2_FORBIDDEN_FIELDS,
     CorpusSchemaError,
     empty_corpus_record,
+    format_qc_flags,
     normalise_csv_value,
     validate_column_order,
     validate_s1_record,
+    validate_s2_record,
     write_corpus_csv_atomic,
 )
 
@@ -202,6 +205,62 @@ def test_atomic_deterministic_csv_writing(tmp_path: Path) -> None:
     assert "None" not in loaded[0].values()
     assert "null" not in loaded[0].values()
     assert "<NA>" not in loaded[0].values()
+
+
+def _s2_populated() -> dict[str, str]:
+    record = _s1_populated()
+    record.update(
+        {
+            "sequence_full": "ACGU",
+            "sequence_core": "ACGU",
+            "sequence_length_full": "4",
+            "sequence_length_core": "4",
+            "construct_scope": "full_equals_core_untrimmed",
+            "trim_status": "not_trimmed",
+            "molecule_type": "RNA",
+            "alphabet_as_reported": "RNA",
+            "t_to_u_applied": "false",
+            "qc_flags": "core_below_min_length",
+        }
+    )
+    return record
+
+
+def test_s2_validator_accepts_populated_s2_fields() -> None:
+    s1 = _s1_populated()
+    s2 = _s2_populated()
+    validated = validate_s2_record(s2, s1_record=s1)
+    assert validated["sequence_full"] == "ACGU"
+    assert validated["t_to_u_applied"] == "false"
+
+
+def test_s2_validator_rejects_later_stage_fields() -> None:
+    for field in sorted(S2_FORBIDDEN_FIELDS):
+        record = _s2_populated()
+        record[field] = "premature"
+        with pytest.raises(CorpusSchemaError, match="later-stage"):
+            validate_s2_record(record, s1_record=_s1_populated())
+
+
+def test_s2_validator_rejects_provenance_change() -> None:
+    s1 = _s1_populated()
+    s2 = _s2_populated()
+    s2["publication"] = "changed"
+    with pytest.raises(CorpusSchemaError, match="provenance"):
+        validate_s2_record(s2, s1_record=s1)
+
+
+def test_s2_validator_rejects_invalid_boolean() -> None:
+    s2 = _s2_populated()
+    s2["t_to_u_applied"] = "True"
+    with pytest.raises(CorpusSchemaError, match="t_to_u_applied"):
+        validate_s2_record(s2)
+
+
+def test_format_qc_flags_sorted_pipe_delimited() -> None:
+    assert format_qc_flags(["mixed_t_u", "ambiguous_base", "mixed_t_u"]) == (
+        "ambiguous_base|mixed_t_u"
+    )
 
 
 def test_atomic_write_failure_leaves_no_partial_final(tmp_path: Path) -> None:

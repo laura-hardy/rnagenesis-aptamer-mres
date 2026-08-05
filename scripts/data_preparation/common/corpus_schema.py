@@ -95,8 +95,83 @@ S1_FORBIDDEN_FIELDS: Final[frozenset[str]] = frozenset(
     set(CORPUS_COLUMNS) - S1_REQUIRED_FIELDS - S1_OPTIONAL_FIELDS
 )
 
+# Fields that S1 provenance must preserve unchanged into S2.
+S1_PROVENANCE_FIELDS: Final[frozenset[str]] = frozenset(
+    {
+        "record_id",
+        "sequence_raw",
+        "target_name_raw",
+        "source_db",
+        "source_dataset",
+        "contributing_sources",
+        "contributing_datasets",
+        "corroboration_count",
+        "redistribution_status",
+        "independently_attested_by_permissive_source",
+        "native_id",
+        "publication",
+        "doi",
+        "pubmed_id",
+        "notes",
+    }
+)
+
+# Canonical fields that may become nonempty at S2.
+S2_ALLOWED_NEW_FIELDS: Final[frozenset[str]] = frozenset(
+    {
+        "sequence_full",
+        "sequence_core",
+        "sequence_length_full",
+        "sequence_length_core",
+        "construct_scope",
+        "trim_status",
+        "trim_confidence",
+        "detected_constant_5p",
+        "detected_constant_3p",
+        "molecule_type",
+        "alphabet_as_reported",
+        "t_to_u_applied",
+        "qc_flags",
+    }
+)
+
+# Later-stage fields that must remain empty through S2.
+S2_FORBIDDEN_FIELDS: Final[frozenset[str]] = frozenset(
+    {
+        "chemistry",
+        "target_name",
+        "target_uniprot",
+        "target_type",
+        "target_type_source",
+        "target_family",
+        "target_pfam",
+        "pdb_id",
+        "binding_evidence_type",
+        "binding_evidence_score",
+        "affinity_value",
+        "affinity_unit",
+        "affinity_type",
+        "accession",
+        "experiment_group_id",
+        "near_duplicate_family_id",
+        "cluster_id",
+        "is_cluster_representative",
+        "partition",
+    }
+)
+
+QC_FLAG_DELIMITER: Final[str] = "|"
+
+BOOLEAN_TRUE_FALSE: Final[frozenset[str]] = frozenset({"true", "false"})
+
+
 class CorpusSchemaError(ValueError):
-    """Invalid corpus schema usage or S1 validation failure."""
+    """Invalid corpus schema usage or S1/S2 validation failure."""
+
+
+def format_qc_flags(flags: Iterable[str]) -> str:
+    """Join QC flags with the canonical delimiter in alphabetical order."""
+    return QC_FLAG_DELIMITER.join(sorted({flag for flag in flags if flag}))
 
 
 def empty_corpus_record() -> dict[str, str]:
@@ -182,6 +257,77 @@ def validate_s1_record(record: Mapping[str, Any]) -> dict[str, str]:
             "independently_attested_by_permissive_source must be lowercase "
             f"true/false at S1; got {attested!r}"
         )
+
+    return normalised
+
+
+def validate_s2_record(
+    record: Mapping[str, Any],
+    *,
+    s1_record: Mapping[str, Any] | None = None,
+) -> dict[str, str]:
+    """Validate and normalise one S2-stage canonical record.
+
+    S1 provenance fields must remain unchanged when ``s1_record`` is supplied.
+    Target, evidence, cluster and partition fields must stay empty. Boolean
+    fields must be lowercase ``true`` / ``false``.
+    """
+    if set(record.keys()) != set(CORPUS_COLUMNS):
+        missing = [c for c in CORPUS_COLUMNS if c not in record]
+        extra = [k for k in record if k not in CORPUS_COLUMNS]
+        parts: list[str] = []
+        if missing:
+            parts.append(f"missing={missing}")
+        if extra:
+            parts.append(f"extra={extra}")
+        raise CorpusSchemaError(
+            "S2 record keys must exactly match CORPUS_COLUMNS; " + "; ".join(parts)
+        )
+
+    normalised = {
+        column: normalise_csv_value(record[column]) for column in CORPUS_COLUMNS
+    }
+
+    for field in S1_REQUIRED_FIELDS:
+        if field == "sequence_raw":
+            continue
+        if normalised[field] == "":
+            raise CorpusSchemaError(
+                f"S2 required provenance field {field!r} must be nonempty"
+            )
+
+    for field in S2_FORBIDDEN_FIELDS:
+        if normalised[field] != "":
+            raise CorpusSchemaError(
+                f"S2 record must not populate later-stage field {field!r}"
+            )
+
+    attested = normalised["independently_attested_by_permissive_source"]
+    if attested not in BOOLEAN_TRUE_FALSE:
+        raise CorpusSchemaError(
+            "independently_attested_by_permissive_source must be lowercase "
+            f"true/false at S2; got {attested!r}"
+        )
+
+    t_to_u = normalised["t_to_u_applied"]
+    if t_to_u not in BOOLEAN_TRUE_FALSE:
+        raise CorpusSchemaError(
+            f"t_to_u_applied must be lowercase true/false at S2; got {t_to_u!r}"
+        )
+
+    if s1_record is not None:
+        if set(s1_record.keys()) != set(CORPUS_COLUMNS):
+            raise CorpusSchemaError(
+                "S1 comparison record keys must exactly match CORPUS_COLUMNS"
+            )
+        s1_normalised = {
+            column: normalise_csv_value(s1_record[column]) for column in CORPUS_COLUMNS
+        }
+        for field in S1_PROVENANCE_FIELDS:
+            if normalised[field] != s1_normalised[field]:
+                raise CorpusSchemaError(
+                    f"S2 must not alter S1 provenance field {field!r}"
+                )
 
     return normalised
 
