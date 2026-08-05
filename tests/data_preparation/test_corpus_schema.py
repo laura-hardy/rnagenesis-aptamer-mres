@@ -18,6 +18,7 @@ from common.corpus_schema import (  # noqa: E402
     CORPUS_COLUMNS,
     S1_FORBIDDEN_FIELDS,
     S2_FORBIDDEN_FIELDS,
+    S3_FORBIDDEN_FIELDS,
     CorpusSchemaError,
     empty_corpus_record,
     format_qc_flags,
@@ -25,6 +26,7 @@ from common.corpus_schema import (  # noqa: E402
     validate_column_order,
     validate_s1_record,
     validate_s2_record,
+    validate_s3_record,
     write_corpus_csv_atomic,
 )
 
@@ -279,3 +281,26 @@ def test_atomic_write_failure_leaves_no_partial_final(tmp_path: Path) -> None:
     assert path.read_text(encoding="utf-8") == "prior\n"
     leftovers = list(tmp_path.glob(".final.csv.*.tmp"))
     assert leftovers == []
+
+
+def test_s3_validator_accepts_unchanged_s2_record() -> None:
+    s2 = _s2_populated()
+    validated = validate_s3_record(s2, s2_record=s2)
+    assert validated["qc_flags"] == "core_below_min_length"
+    assert validated["sequence_full"] == "ACGU"
+
+
+def test_s3_validator_rejects_later_stage_fields() -> None:
+    for field in sorted(S3_FORBIDDEN_FIELDS):
+        record = _s2_populated()
+        record[field] = "premature"
+        with pytest.raises(CorpusSchemaError, match="later-stage"):
+            validate_s3_record(record, s2_record=_s2_populated())
+
+
+def test_s3_validator_rejects_canonical_mutation() -> None:
+    s2 = _s2_populated()
+    mutated = dict(s2)
+    mutated["notes"] = "changed-by-s3"
+    with pytest.raises(CorpusSchemaError, match="must not alter S2"):
+        validate_s3_record(mutated, s2_record=s2)

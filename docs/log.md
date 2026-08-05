@@ -1648,3 +1648,92 @@ Tracked code, tests and configuration:
 - Target types and evidence remain unresolved
 - CHECKPOINT-1 has not been created
 - Unrelated unstaged S1 forbidden-companion case-insensitive edits remain outside this S2 milestone
+
+## 2026-08-05 — AptaBase S3 eligibility classification and CHECKPOINT-1
+
+### Stage
+
+S3 provisional eligibility decisions have been generated for AptaBase. The pipeline has stopped at CHECKPOINT-1 pending manual review. No record is authorised to proceed to S4.
+
+### What was done
+
+- Added a generic eligibility and decision framework (`EligibilityDecision`, reason codes, review priorities, checkpoint status)
+- Implemented sequence-level evaluation-leakage matching against the S0b exclusion set (U→T comparison form; identity ≥ 0.90)
+- Implemented raw-target leakage matching against tracked aliases (exact, normalised, bounded family patterns)
+- Implemented the AptaBase S3 decision policy with deterministic precedence
+- Classified all 610 records into proposed accept / park / reject
+- Emitted sequence-free CHECKPOINT-1 review artefacts and an aggregate summary
+- Reconciliation audit validated all 610 proposed decisions and their precedence assignments; zero sequence leakage and zero target leakage remain valid; all 173 proposed accepts satisfy the technical S4-entry conditions
+- Confirmed the S2/S3 short-core count difference is definitional rather than a bug (S3 `core_below_minimum` uses nonempty-sequence policy length; S2 QC flag tally is broader)
+- Usability revision: mechanical missing-sequence rejects are excluded from the manual-review queue (`manual_review_required=false`, priority `none`) even when secondary reasons such as unresolved molecule type or missing target remain for provenance
+- Added a deterministic ignored local-detail scientific review table that may contain source and canonical sequences and must never be staged or tracked
+
+### Decisions encoded
+
+- Technically valid RNA may be proposed for acceptance
+- ssDNA and unknown molecule types are parked
+- Invalid, ambiguous, mixed-T/U and unresolved trimming/construct cases are parked
+- Missing sequences, explicit source-invalid records, cores below 20 nt and evaluation leakage matches are rejected
+- Cores above 100 nt are parked rather than rejected (possible fixed regions / full constructs)
+- Missing targets are parked for later source review during S4 preparation
+- Missing-sequence rejects remain proposed_reject but are not queued for manual scientific review
+- All decisions remain provisional until manual CHECKPOINT-1 approval
+
+### Inputs
+
+- `data/interim/normalised/aptabase_normalised.csv`
+- `data/interim/normalised/aptabase_s2_qc.csv`
+- `data/interim/extracted/aptabase_source_metadata.csv`
+- `data/interim/leakage_exclusion_set.csv`
+- `config/leakage_target_aliases.csv`
+- `config/source_eligibility/aptabase.json`
+
+### Outputs
+
+Ignored under `/data/`:
+
+- `data/interim/checkpoints/aptabase_cp1/aptabase_s3_canonical.csv`
+- `data/interim/checkpoints/aptabase_cp1/aptabase_s3_decisions.csv`
+- `data/interim/checkpoints/aptabase_cp1/aptabase_checkpoint1_review.csv`
+- `data/interim/checkpoints/aptabase_cp1/aptabase_checkpoint1_local_detail.csv`
+- `data/interim/checkpoints/aptabase_cp1/aptabase_checkpoint1_summary.md`
+- `data/interim/checkpoints/aptabase_cp1/aptabase_checkpoint1_reason_counts.csv`
+- `data/interim/checkpoints/aptabase_cp1/aptabase_leakage_matches.csv`
+
+Tracked code, tests and configuration:
+
+- `config/source_eligibility/aptabase.json`
+- `scripts/data_preparation/common/corpus_schema.py` (`validate_s3_record`)
+- `scripts/data_preparation/common/eligibility.py`
+- `scripts/data_preparation/adapters/aptabase_s3.py`
+- `scripts/data_preparation/s3_classify.py`
+- `tests/data_preparation/test_corpus_schema.py`
+- `tests/data_preparation/test_eligibility.py`
+- `tests/data_preparation/test_adapter_aptabase_s3.py`
+- `tests/data_preparation/test_s3_classify.py`
+- this log entry
+
+### Numbers
+
+- S2/S3 rows: 610 / 610 (unique `record_id` 610; S2 order preserved; canonical byte-identical to S2)
+- Proposed decisions: accept 173; park 343; reject 94 (unchanged by usability revision)
+- Primary reasons: molecule_type_unresolved 227; technically_eligible_rna 173; missing_sequence 54; ssdna_not_eligible_for_rna_training 41; core_below_minimum 39; invalid_sequence_requires_review 36; core_above_maximum_requires_review 34; mixed_t_u_requires_review 3; trim_or_construct_requires_review 1; ambiguous_sequence_requires_review 1; source_record_invalid 1 (unchanged)
+- Review priorities after usability revision: medium 315; none 179; high 73; low 43
+- `manual_review_required`: true 431; false 179
+- Mechanical missing-sequence rejects excluded from manual review: 54 (all priority `none`, `manual_review_required=false`)
+- Sequence leakage / target leakage / both: 0 / 0 / 0
+- Condition tallies (any reason): missing_sequence 54; source_invalid 1; core_below_minimum 40; invalid 68; ambiguous 2; mixed_T/U 3; trim/construct 4; core_above_maximum 37; ssDNA 45; unknown molecule 364; missing_target 23; technically_eligible_rna 173
+- Records with multiple eligibility reasons: 156
+- Accepted-record invariants: all RNA; no invalid/ambiguous/mixed/trim-review flags; all cores 20–100 nt; no leakage; no ssDNA/unknown
+- Local-detail rows: 610 (same review ordering as sequence-free checkpoint review; sequence-bearing; ignored under `data/`)
+- New S3-focused tests: 89 passed (`test_eligibility` + `test_adapter_aptabase_s3` + `test_s3_classify` + S3 validators in `test_corpus_schema`)
+- Full curation suite: 376 passed
+- Legacy AptaBase regression: 25 passed
+- Deterministic rerun: all seven CHECKPOINT-1 outputs byte-identical across two runs (including local-detail)
+- Integrity: registered AptaBase raw hash unchanged (`649ca9c2…430e`); S1 and S2 inputs unchanged during S3; S3 canonical hash equals S2 normalised hash; nothing written under `data/raw/`; nothing under `data/` tracked; checkpoint outputs gitignored; local-detail must never be tracked
+
+### Pipeline stop
+
+- CHECKPOINT-1 remains pending manual review and is unapproved
+- No record has proceeded to S4
+- No target normalisation, UniProt mapping, evidence scoring, affinity interpretation, deduplication, clustering, balancing or partitioning has occurred

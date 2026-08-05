@@ -1,0 +1,40 @@
+{
+  "source_key": "aptabase",
+  "contract_version": "1.0",
+  "decision_values": [
+    "proposed_accept",
+    "proposed_park",
+    "proposed_reject"
+  ],
+  "decision_precedence": [
+    "evaluation_leakage",
+    "missing_sequence",
+    "source_record_invalid",
+    "core_below_minimum",
+    "unresolved_sequence_validity",
+    "unresolved_trim_or_construct",
+    "core_above_maximum",
+    "non_rna_molecule",
+    "missing_target",
+    "eligible_rna"
+  ],
+  "core_length_min": 20,
+  "core_length_max": 100,
+  "missing_sequence_decision": "proposed_reject",
+  "source_record_invalid_decision": "proposed_reject",
+  "core_below_minimum_decision": "proposed_reject",
+  "evaluation_leakage_decision": "proposed_reject",
+  "invalid_sequence_decision": "proposed_park",
+  "ambiguous_sequence_decision": "proposed_park",
+  "mixed_t_u_decision": "proposed_park",
+  "trim_review_decision": "proposed_park",
+  "core_above_maximum_decision": "proposed_park",
+  "ssdna_decision": "proposed_park",
+  "unknown_molecule_decision": "proposed_park",
+  "missing_target_decision": "proposed_park",
+  "eligible_rna_decision": "proposed_accept",
+  "sequence_identity_threshold": 0.9,
+  "target_leakage_matching_enabled": true,
+  "legacy_fields_are_diagnostic_only": true,
+  "checkpoint_requires_manual_approval": true
+}
