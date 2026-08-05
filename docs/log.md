@@ -1404,3 +1404,59 @@ Intentional evaluation-reference raw additions under `data/raw/evaluation_refere
 ### Status and next step
 
 S0 is complete: the source registry and carbapenemase leakage-exclusion controls are operational and all required evaluation-reference sequences have been resolved. S1 must still not begin until the first source adapter is selected with Laura. Shared S2 normalisation, corpus merge (≥90% identity using the shared leakage matcher), target balancing and FT/REF/EVAL partitioning remain ahead.
+
+## 2026-08-05 — Shared sequence-normalisation and constant-region foundation
+
+### Stage
+
+Implementation infrastructure for S2. This milestone does not constitute execution of S1, S2 or S3 on any source. No source adapter was written.
+
+### What was done
+
+- Shared display cleaning (whitespace, 5′/3′ labels, separators, case)
+- Conservative alphabet and molecule handling with explicit QC flags
+- Explicit T→U provenance (`t_to_u_applied`) only for independently established RNA
+- Full/core sequence preservation (`sequence_raw` immutable; `sequence_full` retained after trim)
+- Approved trim application with exact prefix/suffix match and hard failure on mismatch
+- Known motif detection (including minimal T7) without automatic trimming
+- Group-level constant-region proposal logic (proposal only; application requires approval)
+- Deterministic unit tests using synthetic non-biological fixtures only
+
+### Decisions
+
+- Source adapters preserve `sequence_raw`; shared normalisation is authoritative from S2 onward
+- Genuine DNA is never relabelled RNA; T-only values remain ambiguous without experimental molecule evidence
+- Motif detection does not automatically authorise trimming
+- Inferred constants require explicit approval before application; non-matching records stay untrimmed and flagged
+- Training core length policy is 20–100 nt (evaluated after core determination; no silent truncation)
+- Invalid or ambiguous records are flagged rather than silently repaired
+- Constant-region inference is a technical aid, not biological proof of nonfunctionality
+
+### Inputs
+
+Only the tracked configuration file and synthetic test fixtures were used. No raw source table was processed.
+
+### Outputs
+
+```text
+config/sequence_normalisation_rules.json
+docs/data_curation/sequence_normalisation_contract.md
+scripts/data_preparation/common/sequence_normalisation.py
+scripts/data_preparation/common/constant_region_inference.py
+tests/data_preparation/test_sequence_normalisation.py
+tests/data_preparation/test_constant_region_inference.py
+```
+
+### Results
+
+- New + leakage suite: 63 passed (`test_sequence_normalisation.py` 38; `test_constant_region_inference.py` 18; `test_leakage_matching.py` 7)
+- Full curation foundation suite: 121 passed (inventory, S0 registry, leakage matching, S0b leakage exclusion, sequence normalisation, constant-region inference)
+- Offline AptaBase regression: 25 passed (`test_aptabase_cleaning.py`, `test_aptabase_parser.py`)
+- Tracked-file sequence safety scan: no contiguous A/C/G/T/U strings of length ≥20 in the new artefacts or this log section
+
+### Open work
+
+- AptaBase S1 adapter not yet implemented
+- No real records have passed through S2
+- Source-specific constant-region evidence remains to be supplied by adapters
+- CHECKPOINT-1 has not been reached
