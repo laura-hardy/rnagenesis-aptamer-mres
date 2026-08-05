@@ -227,6 +227,114 @@ def test_forbidden_companion_cannot_be_substituted(
         )
 
 
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "data/raw/aptabase/APTABASE_RAW.CSV",
+        "data/raw/aptabase/Aptabase_Raw.Csv",
+        "data/raw/aptabase/aptamer search page 1.html",
+        "data/raw/aptabase/APTAMER SEARCH PAGE 37.HTML",
+    ],
+)
+def test_forbidden_companion_basename_check_is_case_insensitive(
+    relative_path: str,
+) -> None:
+    from s1_extract import _assert_not_forbidden_companion
+
+    with pytest.raises(S1ExtractError, match="[Ff]orbidden"):
+        _assert_not_forbidden_companion(relative_path)
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "data/raw/aptabase/html/page_001.html",
+        "data/raw/aptabase/HTML/page_001.html",
+        "data/raw/aptabase/Html/page_001.html",
+        "data/raw/APTABASE/hTmL/cache.html",
+    ],
+)
+def test_forbidden_html_directory_check_is_case_insensitive(
+    relative_path: str,
+) -> None:
+    from s1_extract import _assert_not_forbidden_companion
+
+    with pytest.raises(S1ExtractError, match="HTML cache"):
+        _assert_not_forbidden_companion(relative_path)
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "data/raw/aptabase/fixtures/sample.csv",
+        "data/raw/aptabase/FIXTURES/sample.csv",
+        "data/raw/aptabase/Fixtures/sample.csv",
+        "data/raw/APTABASE/fIxTuReS/sample.csv",
+    ],
+)
+def test_forbidden_fixtures_directory_check_is_case_insensitive(
+    relative_path: str,
+) -> None:
+    from s1_extract import _assert_not_forbidden_companion
+
+    with pytest.raises(S1ExtractError, match="Fixture paths"):
+        _assert_not_forbidden_companion(relative_path)
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "data/raw/aptabase/not_aptabase_raw.csv",
+        "data/raw/aptabase/aptabase_raw_backup.csv",
+        "data/raw/aptabase/htmlish_notes.csv",
+        "data/raw/aptabase/my_fixtures_notes.csv",
+        "data/raw/aptabase/Aptamer Search Page Notes.html",
+    ],
+)
+def test_similar_filename_not_falsely_rejected_as_forbidden_companion(
+    relative_path: str,
+) -> None:
+    """Basename equality only — similar spellings must not be rejected."""
+    from s1_extract import _assert_not_forbidden_companion
+
+    _assert_not_forbidden_companion(relative_path)
+
+
+def test_legitimate_registered_input_accepted(synthetic_repo: Path) -> None:
+    from s1_extract import _assert_not_forbidden_companion
+
+    registered = "data/raw/aptabase/aptabase_cleaned.csv"
+    _assert_not_forbidden_companion(registered)
+    result = run_s1_extraction(
+        repo_root=synthetic_repo,
+        source_key="aptabase",
+        registry_spec=synthetic_repo / "config" / "source_registry.csv",
+        output_dir=Path("data/interim/extracted"),
+    )
+    assert result.registered_path == registered
+    assert result.stats.input_rows == 2
+
+
+def test_output_dir_outside_interim_rejected(synthetic_repo: Path) -> None:
+    with pytest.raises(S1ExtractError, match="data/interim"):
+        run_s1_extraction(
+            repo_root=synthetic_repo,
+            source_key="aptabase",
+            registry_spec=synthetic_repo / "config" / "source_registry.csv",
+            output_dir=Path("data/raw/extracted"),
+        )
+
+
+def test_output_dir_path_traversal_rejected(synthetic_repo: Path) -> None:
+    with pytest.raises(S1ExtractError, match="data/interim"):
+        run_s1_extraction(
+            repo_root=synthetic_repo,
+            source_key="aptabase",
+            registry_spec=synthetic_repo / "config" / "source_registry.csv",
+            output_dir=Path("data/interim/extracted/../../raw/oops"),
+        )
+
+
 def test_output_directory_created_beneath_interim(synthetic_repo: Path) -> None:
     out_rel = Path("data/interim/extracted/nested")
     result = run_s1_extraction(

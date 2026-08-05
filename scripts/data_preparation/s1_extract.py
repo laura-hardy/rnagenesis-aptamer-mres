@@ -44,13 +44,15 @@ from s0_build_registry import (  # noqa: E402
     validate_registered_file,
 )
 
+# Lowercase basenames — matching is case-insensitive so forbidden companions
+# cannot be bypassed via case variants on case-insensitive filesystems.
 FORBIDDEN_COMPANION_BASENAMES = frozenset(
     {
         "aptabase_raw.csv",
-        "Aptamer Search Page 1.html",
-        "Aptamer Search Page 2.html",
-        "Aptamer Search Page 37.html",
-        "Aptamer Search Page 61.html",
+        "aptamer search page 1.html",
+        "aptamer search page 2.html",
+        "aptamer search page 37.html",
+        "aptamer search page 61.html",
     }
 )
 
@@ -107,9 +109,9 @@ def _resolve_source_row(
 
 
 def _assert_not_forbidden_companion(relative_path: str) -> None:
-    name = Path(relative_path).name
     lower = relative_path.replace("\\", "/").lower()
-    if name in FORBIDDEN_COMPANION_BASENAMES:
+    name_lower = Path(lower).name
+    if name_lower in FORBIDDEN_COMPANION_BASENAMES:
         raise S1ExtractError(
             f"Forbidden AptaBase companion cannot be used as S1 input: "
             f"{relative_path}"
