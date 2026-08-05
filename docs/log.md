@@ -1460,3 +1460,85 @@ tests/data_preparation/test_constant_region_inference.py
 - No real records have passed through S2
 - Source-specific constant-region evidence remains to be supplied by adapters
 - CHECKPOINT-1 has not been reached
+
+## 2026-08-05 — AptaBase S1 verbatim extraction
+
+### Stage
+
+AptaBase has passed through S1 extraction only. No S2 normalisation, trimming, filtering, parking, deduplication, molecule inference, T→U conversion, affinity interpretation, or CHECKPOINT-1 artefact was produced.
+
+### What was done
+
+- Generic S1 runner (`scripts/data_preparation/s1_extract.py`) resolving inputs from the tracked source registry
+- Central 47-column canonical corpus schema (`scripts/data_preparation/common/corpus_schema.py`)
+- AptaBase source adapter (`scripts/data_preparation/adapters/aptabase.py`) with exact 33-column input validation
+- Registry-gated SHA-256 and row-count validation before adapter execution (reusing S0 helpers; no duplicated hash/row-count logic)
+- Canonical output plus a complete source-metadata sidecar under ignored `data/interim/extracted/`
+- Atomic, deterministic CSV/Markdown writes with aggregate-only reporting
+
+### Decisions
+
+- All 610 AptaBase records are retained at S1
+- `sequence_raw` is copied verbatim (no whitespace strip, case change, label removal, T→U, or use of `sequence_clean`)
+- `sequence_clean` and previous molecule inference remain diagnostic source metadata only
+- `target_specific` is preferred for `target_name_raw`, with `target_general` used only as a fallback when specific is empty or a textual null
+- No target type or protein classification is performed
+- No affinity or evidence interpretation is performed
+- Source-specific fields are preserved exactly in an ignored sidecar
+- No deduplication occurs before S5
+
+### Inputs
+
+- `config/source_registry.csv` (`source_key=aptabase`)
+- `data/raw/aptabase/aptabase_cleaned.csv`
+- Registered dataset: `aptabase_cleaned_scrape_2026-07-20`
+- Registered SHA-256: `649ca9c2db37743917fc611eb2154ebaf7a3aa1a8a729f05c0f9c61fc376430e`
+
+### Outputs
+
+Ignored under `/data/`:
+
+- `data/interim/extracted/aptabase_extracted.csv`
+- `data/interim/extracted/aptabase_source_metadata.csv`
+- `data/interim/extracted/aptabase_s1_report.md`
+
+Tracked scripts and tests:
+
+- `scripts/data_preparation/common/corpus_schema.py`
+- `scripts/data_preparation/adapters/__init__.py`
+- `scripts/data_preparation/adapters/aptabase.py`
+- `scripts/data_preparation/s1_extract.py`
+- `tests/data_preparation/test_corpus_schema.py`
+- `tests/data_preparation/test_s1_extract.py`
+- `tests/data_preparation/test_adapter_aptabase.py`
+- this log entry
+
+No shared registry-module refactor was required: S1 reuses `validate_registered_file`, `load_registry_spec`, `sha256_file`, and related helpers from `s0_build_registry.py`.
+
+### Numbers
+
+- Input rows: 610
+- Canonical output rows: 610
+- Sidecar rows: 610
+- Nonempty `sequence_raw`: 556
+- Missing `sequence_raw`: 54
+- Target mapping: specific 576; general fallback 11; no usable raw target 23
+- Publication fields: nonempty publication 598; DOI 60; PMID 1
+- Source diagnostics (sidecar only): parse-warning rows 304; duplicate-group annotations 4
+- Exact-copy `sequence_raw` validation: pass
+- Source-input pre/post hash: pass (unchanged binding hash)
+- Deterministic rerun: all three output files byte-identical across two runs
+- New S1 tests: 58 passed
+- Complete curation foundation suite: 179 passed
+- Legacy AptaBase regression: 25 passed (`test_aptabase_cleaning.py` + `test_aptabase_parser.py`) after installing undocumented `ftfy` into the active environment (`ftfy==6.3.1`; no tracked dependency manifest changed)
+- S0 registry validation: 6 registered, 6 validated, 2 AptaBase inventory-override warnings, no new warnings
+- Raw-file integrity: all 203 previously inventoried substantive raw files remained byte-identical; registered AptaBase CSV retained binding hash; nothing under `data/` is tracked; S1 outputs are gitignored
+
+### Open work
+
+- No real AptaBase record has yet passed through S2
+- Molecule types remain unresolved
+- No T→U conversion has occurred
+- No sequence has been trimmed
+- No record has been filtered or parked
+- No CHECKPOINT-1 artefact exists yet
