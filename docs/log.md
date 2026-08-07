@@ -1737,3 +1737,55 @@ Tracked code, tests and configuration:
 - CHECKPOINT-1 remains pending manual review and is unapproved
 - No record has proceeded to S4
 - No target normalisation, UniProt mapping, evidence scoring, affinity interpretation, deduplication, clustering, balancing or partitioning has occurred
+
+## 2026-08-05 — AptaBase CHECKPOINT-1 manual-review package
+
+### Stage
+
+The AptaBase CHECKPOINT-1 manual-review package has been generated. Proposed decisions are unchanged. CHECKPOINT-1 remains unapproved. No S4 work has begun.
+
+### What was done
+
+- Added a tracked manual-review protocol describing permitted reviewer actions and completion rules
+- Implemented a deterministic review-package generator that selects only `manual_review_required=true` rows
+- Assigned exactly one review batch to each active row
+- Emitted an ignored sequence-bearing working CSV, a sequence-free safe index, and an aggregate summary
+- Left all `review_action`, `reviewer_note` and `reviewer_initials` fields empty
+
+### Review queue
+
+- Active review rows: 431
+- No-review records: 179
+- Batch counts: `01_reject_review` 40; `02_accept_with_diagnostics` 48; `03_park_unresolved_molecule` 227; `04_park_ssdna` 41; `05_park_invalid_sequence` 36; `06_park_overlength` 34; `07_park_mixed_t_u` 3; `08_park_trim_construct` 1; `09_park_ambiguous` 1
+- Missing-sequence rejects remain outside the active queue
+- Sequence-bearing working CSV remains ignored under `data/`
+- Sequence-free index is available for safe summary and discussion
+- No review action has been recorded
+
+### Outputs
+
+Ignored under `/data/`:
+
+- `data/interim/checkpoints/aptabase_cp1/manual_review/aptabase_checkpoint1_manual_review.csv`
+- `data/interim/checkpoints/aptabase_cp1/manual_review/aptabase_checkpoint1_manual_review_index.csv`
+- `data/interim/checkpoints/aptabase_cp1/manual_review/aptabase_checkpoint1_manual_review_summary.md`
+
+Tracked code, tests and documentation:
+
+- `docs/data_curation/aptabase_checkpoint1_review_protocol.md`
+- `scripts/data_preparation/checkpoint1_prepare_review.py`
+- `tests/data_preparation/test_checkpoint1_prepare_review.py`
+- this log entry
+
+### Verification
+
+- Review-package tests: 28 passed (suite); combined S3 + review prep: 97 passed
+- Full curation suite: 404 passed
+- Legacy AptaBase regression: 25 passed
+- Deterministic rerun: all three manual-review outputs byte-identical across two runs
+- Integrity: raw, S1, S2 and S3 checkpoint inputs unchanged; nothing under `data/` tracked
+
+### Pipeline stop
+
+- CHECKPOINT-1 remains unapproved and pending manual review
+- No record has proceeded to S4
