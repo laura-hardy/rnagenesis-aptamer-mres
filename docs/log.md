@@ -1858,3 +1858,84 @@ Ignored under `data/`:
 - CHECKPOINT-1 is closed
 - Exactly the 162 resolved accepts are authorised for S4
 - S4 target normalisation has not begun
+
+## 2026-08-12 — AptaBase prepared for future global S4
+
+### Stage
+
+The curation-plan architecture was rechecked. Target normalisation is a
+corpus-wide stage after per-source cleaning, not a definitive per-source S4.
+CHECKPOINT-1 remains the authoritative AptaBase endpoint. Exactly 162 records
+are authorised for future global S4. No final AptaBase S4, CHECKPOINT-2 or S5
+work exists.
+
+### Provisional S4 discarded
+
+An exploratory AptaBase-only S4 implementation was useful for inspecting source
+target-metadata fields, but its target decisions were not authoritative. The
+uncommitted provisional implementation and any local experimental commits were
+discarded before this handoff commit. No AptaBase CHECKPOINT-2 exists.
+
+### Meaning of authorised_for_s4
+
+For AptaBase, `authorised_for_s4=true` means technically eligible after
+sequence/molecule CHECKPOINT-1 and eligible to enter future corpus-wide target
+normalisation. It does not mean protein target confirmed, target canonicalised,
+UniProt resolved, evidence threshold passed, leakage check passed globally, or
+CHECKPOINT-2 approved.
+
+### Source target-metadata observations retained
+
+Among the 162 authorised records:
+
+- `aptabase_target_specific` present: 162; missing: 0
+- `aptabase_target_general` is categorical
+- Observed categories: Protein 113; Small Organic 37; Peptide 6; Cells 5;
+  Antibody 1
+- No source UniProt / PDB / Pfam / family columns
+
+These category counts are source observations only. They are not final target
+type, eligibility, UniProt, family or CHECKPOINT-2 decisions.
+
+### What was done
+
+- Added `config/global_s4_sources/aptabase.json`
+- Documented the handoff in `docs/data_curation/aptabase_global_s4_handoff.md`
+- Added reusable `prepare_global_s4_source.py`
+- Materialised the exact 162-record S3 subset for future global merge
+- Ran focused and full curation tests; ran handoff twice for determinism
+
+### Verification
+
+- Focused handoff + CHECKPOINT-1 + S3 tests: 128 passed
+- Full curation suite (excluding legacy cleaner/ENA import-order suite): 483
+  passed
+- Legacy AptaBase regression: 25 passed
+- Deterministic handoff rerun: byte-identical
+- Integrity: raw, S1, S2, S3 and CHECKPOINT-1 artefacts unchanged
+- `git ls-files data` empty; handoff outputs ignored under `/data/`
+
+### Outputs
+
+Tracked:
+
+- `config/global_s4_sources/aptabase.json`
+- `docs/data_curation/aptabase_global_s4_handoff.md`
+- `scripts/data_preparation/prepare_global_s4_source.py`
+- `tests/data_preparation/test_prepare_global_s4_source.py`
+- this log entry
+
+Ignored under `data/`:
+
+- `data/interim/global_s4_ready/aptabase_global_s4_input.csv`
+- `data/interim/global_s4_ready/aptabase_global_s4_handoff_summary.md`
+
+### Pipeline stop
+
+- AptaBase S1/S2/S3 complete; CHECKPOINT-1 closed
+- Global-S4 handoff ready: 162 records
+- Final AptaBase S4 not run
+- AptaBase CHECKPOINT-2 does not exist
+- AptaBase S5 not run
+- Future global S4 will merge AptaBase with other cleaned sources before
+  canonical target resolution

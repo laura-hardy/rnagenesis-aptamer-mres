@@ -1,0 +1,43 @@
+{
+  "source_key": "aptabase",
+  "handoff_status": "ready_for_global_s4",
+  "authoritative_stage": "CHECKPOINT-1",
+  "checkpoint_status": "closed",
+  "canonical_input": "data/interim/checkpoints/aptabase_cp1/aptabase_s3_canonical.csv",
+  "resolution_manifest": "config/checkpoint_reviews/aptabase_checkpoint1_resolutions.csv",
+  "authorised_ids_input": "data/interim/checkpoints/aptabase_cp1/resolved/aptabase_s4_authorised_ids.csv",
+  "authorisation_field": "authorised_for_s4",
+  "expected_authorised_records": 162,
+  "global_s4_handoff_output": "data/interim/global_s4_ready/aptabase_global_s4_input.csv",
+  "global_s4_handoff_summary": "data/interim/global_s4_ready/aptabase_global_s4_handoff_summary.md",
+  "authorised_for_s4_meaning": "Technically eligible after sequence/molecule CHECKPOINT-1 and eligible to enter the future corpus-wide target-normalisation stage. Does not mean protein target confirmed, target canonicalised, UniProt resolved, evidence threshold passed, leakage check passed globally, or CHECKPOINT-2 approved.",
+  "target_metadata": {
+    "canonical_raw_field": "target_name_raw",
+    "source_specific_field": "aptabase_target_specific",
+    "source_general_field": "aptabase_target_general",
+    "source_general_is_categorical": true,
+    "specific_target_present_in_authorised_records": 162,
+    "specific_target_missing_in_authorised_records": 0,
+    "source_metadata_path": "data/interim/extracted/aptabase_source_metadata.csv",
+    "uniprot_source_columns_present": false,
+    "pdb_source_columns_present": false,
+    "pfam_source_columns_present": false,
+    "family_source_columns_present": false
+  },
+  "provisional_source_observations": {
+    "Protein": 113,
+    "Small Organic": 37,
+    "Peptide": 6,
+    "Cells": 5,
+    "Antibody": 1
+  },
+  "global_s4_rules": {
+    "final_target_normalisation_performed_here": false,
+    "final_target_type_assignment_performed_here": false,
+    "uniprot_resolution_performed_here": false,
+    "target_family_assignment_performed_here": false,
+    "evidence_threshold_performed_here": false,
+    "global_leakage_application_performed_here": false,
+    "checkpoint2_emitted_here": false
+  }
+}
