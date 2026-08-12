@@ -2075,3 +2075,178 @@ Next step (separate planning milestone): UTexas S2 decisions, especially molecul
 chemistry mapping for FANA and unusual modified chemistries, and whether the
 shared display cleaner should recognise `[3'T]` / `[5'T]` terminal notation.
 Do not begin that work from this S1 milestone.
+
+## 2026-08-12 — UTexas S2 sequence normalisation
+
+### Stage
+
+UTexas S2 sequence normalisation and constant-region detection/proposal only.
+No S3 filtering, parking, rejection, target normalisation, affinity/evidence
+scoring, or CHECKPOINT-1 work was started.
+
+### Input
+
+Registered UTexas S1 outputs:
+
+- `data/interim/extracted/utexas_extracted.csv` (1,894 rows)
+- `data/interim/extracted/utexas_source_metadata.csv` (1,894 rows)
+- `source_key = utexas`
+- `source_dataset = utexas_sept2023_2026-08`
+- Raw workbook SHA-256 unchanged:
+  `b5a66beb58d30c5c3d2f36a29ea2cc3678e7d4a6b1bb1a97efc1e166a49fd15c`
+
+S1 reconciliation before S2: 1,894 rows; 1,894 unique `record_id` /
+`native_id`; 1,495 nonempty / 399 empty `sequence_raw`.
+
+### Shared normalisation
+
+One shared normaliser
+(`scripts/data_preparation/common/sequence_normalisation.py`) was used for all
+display cleaning, alphabet classification, molecule-aware T→U, known-motif
+detection, and length QC. UTexas-specific handling was limited to structured
+source-metadata mapping in `config/source_normalisation/utexas.json` and the
+thin adapter `scripts/data_preparation/adapters/utexas_s2.py`.
+
+### Display-label improvement
+
+Shared terminal-label handling was extended to cover bracketed UTexas notation
+required by the curation plan (`[3'T]`, `[3′T]`, `[5'T]` and Unicode prime
+variants), plus trailing phosphorylation display `p`. Stripping is end-anchored
+only; internal bracketed text is retained and flagged. Focused shared unit
+tests were added; AptaBase normalisation regressions still pass. AptaBase’s
+source-specific corrupted `5?`/`3?` cleaner was not inherited by UTexas.
+
+Real-data display transformations (aggregate):
+
+| Transformation | Count |
+|---|---|
+| `remove_five_prime_label` | 1462 |
+| `remove_three_prime_label` | 1447 |
+| `remove_bracketed_three_prime_label` | 9 |
+| `remove_bracketed_five_prime_label` | 0 |
+| `uppercase` | 26 |
+| `strip_whitespace` | 9 |
+| `remove_whitespace` | 6 |
+| `remove_display_separators` | 2 |
+| `textual_null` | 399 |
+
+### Molecule policy
+
+Experimental `Type of Nucleic Acid` was primary evidence (config map, not
+scattered conditionals):
+
+- RNA forms (ssRNA and modified RNA classes) → `molecule_type = RNA`
+- `ssDNA` → `ssDNA`; `dsDNA` / BNA-LNA-DNA / 5-uracil-modified-DNA → `DNA`
+- `FANA XNA` and blank → `unknown` (not guessed from T/U alphabet)
+- T-only alphabet never established molecule type
+
+| molecule_type | Count |
+|---|---|
+| RNA | 583 |
+| ssDNA | 896 |
+| DNA | 13 |
+| unknown | 402 |
+| **total** | **1894** |
+
+### Chemistry
+
+Canonical `chemistry` was populated at S2 per the curation plan closed
+vocabulary. This also corrected the prior AptaBase-era stage-guard divergence
+in which `chemistry` was blocked until after S3 (`S2_FORBIDDEN_FIELDS` /
+`S3_FORBIDDEN_FIELDS`). Historical AptaBase interim outputs were **not**
+re-curated; AptaBase S2 still leaves `chemistry` empty because that source has
+no chemistry map.
+
+Unsupported specialised UTexas chemistries map to canonical `unknown` while
+retaining the exact source value in `utexas_type_of_nucleic_acid`, with QC flag
+`chemistry_not_in_canonical_vocab` (15 rows). `FANA XNA` additionally carries
+`molecule_type_requires_review` (3 rows).
+
+| chemistry | Count |
+|---|---|
+| RNA | 438 |
+| DNA | 897 |
+| 2F-RNA | 108 |
+| 2NH2-RNA | 23 |
+| 2OMe-RNA | 6 |
+| mixed | 5 |
+| unknown | 417 |
+| **total** | **1894** |
+
+### Alphabet / T→U
+
+After display cleaning: DNA_T 878, RNA 552, invalid 57, ambiguous 8,
+missing 399. T→U applied = **0** (no established-RNA record reported a pure
+T alphabet after cleaning; RNA sources already used U). Mixed T/U unresolved
+after cleaning = 0. Post-SELEX modification text was retained in the sidecar
+only and did not alter `sequence_full` / `sequence_core`.
+
+### Constant regions
+
+UTexas `Pool Type` was parsed only with a deterministic single-`N##`
+construct pattern for detection/proposal. Group consensus used pool-type hash
+groups only (never empty `target_name`). Known motifs from the shared library
+were flagged. **No newly inferred UTexas trim was applied**
+(`apply_approved_trims = false`; no approved UTexas trim rules exist).
+
+| Metric | Value |
+|---|---|
+| Constant-region proposals | 1653 |
+| — pool_type | 816 |
+| — group_consensus | 816 |
+| — known_motif | 21 |
+| Applied trims | 0 |
+| `sequence_core != sequence_full` | 0 |
+| `trim_status = constants_suspected_unresolved` | 1287 |
+| `trim_status = no_constants_detected` | 208 |
+| `trim_status = not_applicable` (missing) | 399 |
+
+Proposals remain pending Laura review before any can be used as trims.
+
+### Length / QC (diagnostic only; no S3 filtering)
+
+| Core/full length bucket | Count |
+|---|---|
+| missing | 399 |
+| <20 | 15 |
+| 20–100 | 1287 |
+| 101–200 | 191 |
+| >200 | 2 |
+
+Notable QC: missing_sequence 399; invalid_character 57; ambiguous_base 8;
+molecule_type_unknown 402; chemistry_not_in_canonical_vocab 15;
+core_below_min_length 13; core_above_max_length 178; review candidates 1730.
+
+### Outputs (gitignored under `data/`)
+
+- `data/interim/normalised/utexas_normalised.csv`
+- `data/interim/normalised/utexas_s2_qc.csv`
+- `data/interim/normalised/utexas_s2_review_candidates.csv`
+- `data/interim/normalised/utexas_constant_region_proposals.csv`
+- `data/interim/normalised/utexas_s2_report.md`
+
+### Verification
+
+- Targeted shared normaliser + UTexas S2 + AptaBase S2 + corpus schema +
+  constant-region + S2 orchestration tests: **216 passed** (pre-real-data)
+- Broader data-preparation suite excluding hang-prone legacy AptaBase
+  cleaner/parser and ENA legacy tests: **537 passed**
+- Exclusions (same class as S1 log): `test_aptabase_cleaning.py`,
+  `test_aptabase_parser.py`, `test_process_ena_aptamer_candidates.py`,
+  `test_inspect_ena_aptamer_records.py`, `test_refine_ena_manual_review.py`,
+  `test_consolidate_ena_candidate_review.py`,
+  `test_finalize_ena_aptamer_supplement.py`
+- Determinism: `--check-deterministic-rerun` byte-identical for normalised,
+  QC, review-candidate and proposal CSVs
+- S1 provenance: `record_id`, `native_id`, `sequence_raw`, `target_name_raw`
+  preserved for all 1,894 rows
+- Raw workbook SHA unchanged before and after S2
+
+### Pipeline stop
+
+```text
+UTexas S2 complete.
+No records have been filtered, parked or rejected.
+UTexas S3 and CHECKPOINT-1 have not started.
+Any unresolved constant-region proposals remain pending review before they can be used as trims.
+```

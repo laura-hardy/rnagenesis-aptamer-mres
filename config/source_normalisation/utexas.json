@@ -1,0 +1,58 @@
+{
+  "source_key": "utexas",
+  "contract_version": "1.0",
+  "molecule_evidence_field": "utexas_type_of_nucleic_acid",
+  "chemistry_evidence_field": "utexas_type_of_nucleic_acid",
+  "post_selex_field": "utexas_post_selex_modifications",
+  "pool_type_field": "utexas_pool_type",
+  "pool_random_region_field": "utexas_pool_random_region",
+  "reported_length_field": "utexas_sequence_length",
+  "apply_approved_trims": false,
+  "approved_trim_rules": [],
+  "parse_pool_type_for_proposals": true,
+  "group_inference_by_pool_type": true,
+  "molecule_type_map": {
+    "ssRNA": "RNA",
+    "2'-fluoro-RNA": "RNA",
+    "2'-amino-RNA": "RNA",
+    "2'-O-Me-RNA": "RNA",
+    "2'-fluoro/O-Me-RNA": "RNA",
+    "2'-fluoro/amino-RNA": "RNA",
+    "4'-thio-RNA": "RNA",
+    "5-uracil-modified-RNA": "RNA",
+    "ssDNA": "ssDNA",
+    "dsDNA": "DNA",
+    "5-uracil-modified-DNA": "DNA",
+    "2',4'-BNA/LNA-DNA": "DNA",
+    "FANA XNA": "unknown",
+    "": "unknown"
+  },
+  "chemistry_map": {
+    "ssRNA": "RNA",
+    "ssDNA": "DNA",
+    "dsDNA": "DNA",
+    "2'-fluoro-RNA": "2F-RNA",
+    "2'-amino-RNA": "2NH2-RNA",
+    "2'-O-Me-RNA": "2OMe-RNA",
+    "2'-fluoro/O-Me-RNA": "mixed",
+    "2'-fluoro/amino-RNA": "mixed",
+    "": "unknown",
+    "FANA XNA": "unknown",
+    "4'-thio-RNA": "unknown",
+    "5-uracil-modified-RNA": "unknown",
+    "5-uracil-modified-DNA": "unknown",
+    "2',4'-BNA/LNA-DNA": "unknown"
+  },
+  "chemistry_not_in_canonical_vocab_sources": [
+    "4'-thio-RNA",
+    "5-uracil-modified-RNA",
+    "5-uracil-modified-DNA",
+    "2',4'-BNA/LNA-DNA"
+  ],
+  "molecule_type_requires_review_sources": [
+    "FANA XNA"
+  ],
+  "t_only_without_explicit_molecule_evidence": "unknown",
+  "do_not_infer_molecule_from_t_alphabet": true,
+  "do_not_infer_fana_from_alphabet": true
+}

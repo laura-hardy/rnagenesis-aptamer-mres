@@ -345,6 +345,9 @@ def test_25_above_maximum_core_flagged(policy, rules) -> None:
 def test_26_no_target_evidence_field_populated(policy, rules) -> None:
     s1 = _s1(sequence_raw="ACGUAC")
     result = normalise_aptabase_record(s1, _meta(), policy=policy, rules=rules)
+    # AptaBase S2 still leaves chemistry empty (source has no chemistry map).
+    # Schema now permits chemistry at S2 per the curation plan; AptaBase simply
+    # does not populate it.
     for field in (
         "chemistry",
         "target_name",

@@ -244,6 +244,22 @@ def test_s2_validator_rejects_later_stage_fields() -> None:
             validate_s2_record(record, s1_record=_s1_populated())
 
 
+def test_s2_validator_accepts_canonical_chemistry() -> None:
+    """Plan §2.4 authorises chemistry at S2 (closed vocabulary)."""
+    s1 = _s1_populated()
+    s2 = _s2_populated()
+    s2["chemistry"] = "2F-RNA"
+    validated = validate_s2_record(s2, s1_record=s1)
+    assert validated["chemistry"] == "2F-RNA"
+
+
+def test_s2_validator_rejects_invalid_chemistry() -> None:
+    s2 = _s2_populated()
+    s2["chemistry"] = "not-a-vocab-label"
+    with pytest.raises(CorpusSchemaError, match="chemistry"):
+        validate_s2_record(s2)
+
+
 def test_s2_validator_rejects_provenance_change() -> None:
     s1 = _s1_populated()
     s2 = _s2_populated()

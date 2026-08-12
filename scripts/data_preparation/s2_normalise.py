@@ -33,6 +33,18 @@ from adapters.aptabase_s2 import (  # noqa: E402
     normalise_aptabase_record,
     update_stats_from_row,
 )
+from adapters.utexas_s2 import (  # noqa: E402
+    CONSTANT_PROPOSAL_COLUMNS as UTEXAS_CONSTANT_PROPOSAL_COLUMNS,
+    QC_DELIMITER as UTEXAS_QC_DELIMITER,
+    S2_QC_COLUMNS as UTEXAS_S2_QC_COLUMNS,
+    UTexasS2Error,
+    UTexasS2Stats,
+    build_pool_type_proposals,
+    is_review_candidate as utexas_is_review_candidate,
+    load_utexas_policy,
+    normalise_utexas_record,
+    update_stats_from_row as update_utexas_stats_from_row,
+)
 from common.constant_region_inference import (  # noqa: E402
     infer_group_constant_regions,
 )
@@ -51,6 +63,23 @@ EXPECTED_APTABASE_ROWS = 610
 EXPECTED_APTABASE_MISSING = 54
 EXPECTED_APTABASE_NONEMPTY = 556
 
+EXPECTED_UTEXAS_ROWS = 1894
+EXPECTED_UTEXAS_MISSING = 399
+EXPECTED_UTEXAS_NONEMPTY = 1495
+EXPECTED_UTEXAS_MOLECULE = {"RNA": 583, "ssDNA": 896, "DNA": 13, "unknown": 402}
+EXPECTED_UTEXAS_CHEMISTRY = {
+    "RNA": 438,
+    "DNA": 897,
+    "2F-RNA": 108,
+    "2NH2-RNA": 23,
+    "2OMe-RNA": 6,
+    "mixed": 5,
+    "unknown": 417,
+}
+EXPECTED_RAW_SHA256 = (
+    "b5a66beb58d30c5c3d2f36a29ea2cc3678e7d4a6b1bb1a97efc1e166a49fd15c"
+)
+
 
 class S2NormaliseError(ValueError):
     """Hard failure during S2 normalisation orchestration."""
@@ -61,7 +90,7 @@ class S2RunResult:
     """Aggregate outcome of one S2 normalisation run."""
 
     source_key: str
-    stats: AptaBaseS2Stats
+    stats: AptaBaseS2Stats | UTexasS2Stats
     output_normalised: Path
     output_qc: Path
     output_review: Path
@@ -73,6 +102,8 @@ class S2RunResult:
     sidecar_hash_after: str
     inputs_unchanged: bool
     deterministic_rerun_ok: bool | None
+    raw_sha256: str | None = None
+    raw_sha_unchanged: bool | None = None
 
 
 def _sha256_file(path: Path) -> str:
@@ -637,6 +668,526 @@ def run_aptabase_s2(
     return run_result
 
 
+def build_utexas_s2_report(
+    *,
+    repo_root: Path,
+    result: S2RunResult,
+    rules_path: Path,
+    policy_path: Path,
+) -> str:
+    """Build an aggregate-only Markdown UTexas S2 report (no sequences or IDs)."""
+    stats = result.stats
+    if not isinstance(stats, UTexasS2Stats):
+        raise S2NormaliseError("UTexas report requires UTexasS2Stats")
+    lines = [
+        "# UTexas S2 normalisation report",
+        "",
+        "## Input / reconciliation",
+        "",
+        f"- Source key: `utexas`",
+        f"- Source dataset: `utexas_sept2023_2026-08`",
+        f"- S1 canonical rows: `{stats.s1_rows}`",
+        f"- Source-metadata rows: `{stats.source_metadata_rows}`",
+        f"- S2 output rows: `{stats.s2_rows}`",
+        f"- Unique record_id values: `{stats.unique_record_ids}`",
+        f"- Unique native_id values: `{stats.unique_native_ids}`",
+        f"- S1 row order preserved: `{'pass' if stats.order_preserved else 'fail'}`",
+        f"- S1 provenance preserved: "
+        f"`{'pass' if stats.provenance_preserved else 'fail'}`",
+        f"- sequence_raw unchanged: "
+        f"`{'pass' if stats.sequence_raw_unchanged else 'fail'}`",
+        f"- Missing sequence rows: `{stats.missing_sequence_rows}`",
+        f"- Nonempty sequence rows: `{stats.nonempty_sequence_rows}`",
+        f"- Shared rules: `{_relative_display(rules_path, repo_root)}`",
+        f"- Source policy: `{_relative_display(policy_path, repo_root)}`",
+        "",
+        "## Display cleaning",
+        "",
+    ]
+    if stats.transformation_counts:
+        for name, count in _count_sorted(stats.transformation_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+    lines.extend(
+        [
+            "",
+            f"- Bracketed `[3'T]`-style labels stripped: "
+            f"`{stats.bracketed_three_prime_stripped}`",
+            f"- Bracketed `[5'T]`-style labels stripped: "
+            f"`{stats.bracketed_five_prime_stripped}`",
+            "",
+            "## Molecule and transcription provenance",
+            "",
+            "### Source Type of Nucleic Acid",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.source_nucleic_acid_type_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Canonical molecule_type", ""])
+    for name, count in _count_sorted(stats.molecule_type_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### alphabet_as_reported", ""])
+    for name, count in _count_sorted(stats.alphabet_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            f"- T→U conversions: `{stats.t_to_u_count}`",
+            "",
+            "## Chemistry",
+            "",
+            "Canonical `chemistry` is an abstraction over the closed plan",
+            "vocabulary. Exact UTexas `Type of Nucleic Acid` values remain in",
+            "the source-metadata sidecar (`utexas_type_of_nucleic_acid`).",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.chemistry_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Sequence quality",
+            "",
+            f"- Invalid character rows: `{stats.invalid_character_count}`",
+            f"- Ambiguous base rows: `{stats.ambiguous_base_count}`",
+            f"- Mixed T/U rows: `{stats.mixed_t_u_count}`",
+            f"- Core below minimum length: `{stats.core_below_min_count}`",
+            f"- Core above maximum length: `{stats.core_above_max_count}`",
+            "",
+            "### sequence_length_full buckets",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.length_full_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### sequence_length_core buckets", ""])
+    for name, count in _count_sorted(stats.length_core_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## QC flag summary",
+            "",
+            f"- Rows with any QC flag: `{stats.rows_with_any_qc_flag}`",
+            f"- Rows with multiple QC flags: `{stats.rows_with_multiple_qc_flags}`",
+            f"- Review-candidate rows: `{stats.review_candidate_rows}`",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.qc_flag_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Constants / constructs",
+            "",
+            f"- Known motif detections: `{stats.known_motif_detection_count}`",
+            f"- Constant-region proposals: `{stats.constant_region_proposals}`",
+            f"- Parseable pool-type groups: `{stats.pool_type_parseable_groups}`",
+            f"- Applied trims: `{stats.applied_trims}`",
+            f"- Rows where sequence_core != sequence_full: "
+            f"`{stats.core_differs_from_full}`",
+            f"- Reason: `{stats.constant_region_reason}`",
+            "",
+            "No newly inferred UTexas constant was applied as a trim. Detection",
+            "and pool-type parsing produce review proposals only.",
+            "",
+            "### construct_scope",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.construct_scope_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### trim_status", ""])
+    for name, count in _count_sorted(stats.trim_status_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### trim_confidence", ""])
+    for name, count in _count_sorted(stats.trim_confidence_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### proposal sources", ""])
+    if stats.proposal_source_counts:
+        for name, count in _count_sorted(stats.proposal_source_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+    lines.extend(
+        [
+            "",
+            "## Integrity",
+            "",
+            f"- S1 canonical hash before: `{result.s1_hash_before}`",
+            f"- S1 canonical hash after: `{result.s1_hash_after}`",
+            f"- Source-metadata hash before: `{result.sidecar_hash_before}`",
+            f"- Source-metadata hash after: `{result.sidecar_hash_after}`",
+            f"- S1 inputs unchanged: "
+            f"`{'pass' if result.inputs_unchanged else 'fail'}`",
+            (
+                f"- Raw workbook SHA-256: `{result.raw_sha256}`"
+                if result.raw_sha256
+                else "- Raw workbook SHA-256: `not_checked`"
+            ),
+            (
+                f"- Raw workbook SHA unchanged: "
+                f"`{'pass' if result.raw_sha_unchanged else 'fail'}`"
+                if result.raw_sha_unchanged is not None
+                else "- Raw workbook SHA unchanged: `not_checked`"
+            ),
+            (
+                f"- Deterministic rerun result: "
+                f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+                if result.deterministic_rerun_ok is not None
+                else "- Deterministic rerun result: `not_checked`"
+            ),
+            "",
+            "## Outputs",
+            "",
+            f"- Normalised: "
+            f"`{_relative_display(result.output_normalised, repo_root)}`",
+            f"- QC: `{_relative_display(result.output_qc, repo_root)}`",
+            f"- Review candidates: "
+            f"`{_relative_display(result.output_review, repo_root)}`",
+            f"- Constant-region proposals: "
+            f"`{_relative_display(result.output_proposals, repo_root)}`",
+            f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+            "",
+            "## Stage boundary",
+            "",
+            "- S2 normalises and diagnoses only.",
+            "- No record was rejected or parked.",
+            "- No target normalisation was performed.",
+            "- No affinity/evidence decision was performed.",
+            "- CHECKPOINT-1 was not started.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_utexas_s2(
+    *,
+    repo_root: Path,
+    input_dir: Path,
+    output_dir: Path,
+    rules_path: Path,
+    policy_path: Path,
+    expected_rows: int | None = EXPECTED_UTEXAS_ROWS,
+    check_deterministic_rerun: bool = False,
+) -> S2RunResult:
+    """Execute UTexas S2 normalisation."""
+    repo_root = repo_root.resolve()
+    input_dir = input_dir if input_dir.is_absolute() else (repo_root / input_dir)
+    input_dir = input_dir.resolve()
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    rules_path = (
+        rules_path if rules_path.is_absolute() else (repo_root / rules_path)
+    ).resolve()
+    policy_path = (
+        policy_path if policy_path.is_absolute() else (repo_root / policy_path)
+    ).resolve()
+
+    canonical_path = input_dir / "utexas_extracted.csv"
+    sidecar_path = input_dir / "utexas_source_metadata.csv"
+    if not canonical_path.is_file():
+        raise S2NormaliseError(f"Missing S1 canonical input: {canonical_path.name}")
+    if not sidecar_path.is_file():
+        raise S2NormaliseError(f"Missing S1 sidecar input: {sidecar_path.name}")
+
+    raw_path = (
+        repo_root
+        / "data"
+        / "raw"
+        / "UTexas_aptamer_dataset"
+        / "UTexas Aptamer Database dataset_Sept2023.xlsx"
+    )
+    if not raw_path.is_file():
+        raise S2NormaliseError("Missing registered UTexas raw workbook")
+    raw_sha_before = _sha256_file(raw_path)
+    if raw_sha_before != EXPECTED_RAW_SHA256:
+        raise S2NormaliseError(
+            "UTexas raw workbook SHA-256 does not match registry expectation"
+        )
+
+    s1_hash_before = _sha256_file(canonical_path)
+    sidecar_hash_before = _sha256_file(sidecar_path)
+
+    rules = load_normalisation_rules(rules_path)
+    policy = load_utexas_policy(policy_path)
+    if policy.apply_approved_trims or policy.approved_trim_rules:
+        raise S2NormaliseError(
+            "UTexas S2 expected no approved trim rules in this milestone"
+        )
+
+    canonical_rows = _read_corpus_csv(canonical_path)
+    sidecar_rows = _read_sidecar_csv(sidecar_path)
+    aligned_sidecar = _match_sidecar_one_to_one(canonical_rows, sidecar_rows)
+
+    if expected_rows is not None and len(canonical_rows) != expected_rows:
+        raise S2NormaliseError(
+            f"S1 row count must be {expected_rows}; got {len(canonical_rows)}"
+        )
+
+    # Registry provenance hard checks.
+    for index, row in enumerate(canonical_rows, start=1):
+        if row["source_db"] != "utexas":
+            raise S2NormaliseError(f"row {index}: source_db must be utexas")
+        if row["source_dataset"] != "utexas_sept2023_2026-08":
+            raise S2NormaliseError(
+                f"row {index}: source_dataset must be utexas_sept2023_2026-08"
+            )
+
+    stats = UTexasS2Stats()
+    stats.s1_rows = len(canonical_rows)
+    stats.source_metadata_rows = len(aligned_sidecar)
+    stats.order_preserved = True
+    stats.provenance_preserved = True
+    stats.sequence_raw_unchanged = True
+
+    normalised_rows: list[dict[str, str]] = []
+    qc_rows: list[dict[str, str]] = []
+    review_rows: list[dict[str, str]] = []
+    row_results: list = []
+
+    for s1_row, meta_row in zip(canonical_rows, aligned_sidecar, strict=True):
+        result = normalise_utexas_record(
+            s1_row,
+            meta_row,
+            policy=policy,
+            rules=rules,
+        )
+        if result.canonical["record_id"] != s1_row["record_id"]:
+            stats.order_preserved = False
+            raise S2NormaliseError("S2 altered record_id or row identity")
+        if result.canonical["native_id"] != s1_row["native_id"]:
+            raise S2NormaliseError("S2 altered native_id")
+        if result.canonical["sequence_raw"] != s1_row["sequence_raw"]:
+            stats.sequence_raw_unchanged = False
+            raise S2NormaliseError("S2 must not alter sequence_raw")
+        if result.canonical["target_name_raw"] != s1_row["target_name_raw"]:
+            raise S2NormaliseError("S2 must not alter target_name_raw")
+        normalised_rows.append(result.canonical)
+        qc_rows.append(result.qc)
+        row_results.append(result)
+        if utexas_is_review_candidate(result.canonical["qc_flags"]):
+            review_rows.append(result.qc)
+        update_utexas_stats_from_row(stats, result)
+
+    stats.s2_rows = len(normalised_rows)
+    stats.unique_record_ids = len({row["record_id"] for row in normalised_rows})
+    stats.unique_native_ids = len({row["native_id"] for row in normalised_rows})
+
+    if expected_rows == EXPECTED_UTEXAS_ROWS:
+        if stats.s2_rows != EXPECTED_UTEXAS_ROWS:
+            raise S2NormaliseError(
+                f"S2 must preserve {EXPECTED_UTEXAS_ROWS} rows; got {stats.s2_rows}"
+            )
+        if stats.unique_record_ids != EXPECTED_UTEXAS_ROWS:
+            raise S2NormaliseError("S2 record_id values are not unique")
+        if stats.unique_native_ids != EXPECTED_UTEXAS_ROWS:
+            raise S2NormaliseError("S2 native_id values are not unique")
+        if stats.missing_sequence_rows != EXPECTED_UTEXAS_MISSING:
+            raise S2NormaliseError(
+                "missing_sequence_rows must be "
+                f"{EXPECTED_UTEXAS_MISSING}; got {stats.missing_sequence_rows}"
+            )
+        if stats.nonempty_sequence_rows != EXPECTED_UTEXAS_NONEMPTY:
+            raise S2NormaliseError(
+                "nonempty_sequence_rows must be "
+                f"{EXPECTED_UTEXAS_NONEMPTY}; got {stats.nonempty_sequence_rows}"
+            )
+        for key, expected in EXPECTED_UTEXAS_MOLECULE.items():
+            got = stats.molecule_type_counts.get(key, 0)
+            if got != expected:
+                raise S2NormaliseError(
+                    f"molecule_type {key} expected {expected}; got {got}"
+                )
+        for key, expected in EXPECTED_UTEXAS_CHEMISTRY.items():
+            got = stats.chemistry_counts.get(key, 0)
+            if got != expected:
+                raise S2NormaliseError(
+                    f"chemistry {key} expected {expected}; got {got}"
+                )
+
+    # Pool-type proposals only (no sequence-bearing group consensus applied).
+    pool_proposals = build_pool_type_proposals(row_results)
+    # Optional known-motif informational proposals without applying trims.
+    known_motif_proposals: list[dict[str, str]] = []
+    for row in normalised_rows:
+        motifs = []
+        if row["detected_constant_5p"]:
+            for name in row["detected_constant_5p"].split(UTEXAS_QC_DELIMITER):
+                if name:
+                    motifs.append(("five_prime", name))
+        if row["detected_constant_3p"]:
+            for name in row["detected_constant_3p"].split(UTEXAS_QC_DELIMITER):
+                if name:
+                    motifs.append(("three_prime", name))
+        for side, name in motifs:
+            known_motif_proposals.append(
+                {
+                    "proposal_id": f"{row['record_id']}:known_motif:{side}:{name}",
+                    "experiment_group_id": row["record_id"],
+                    "proposal_source": "known_motif",
+                    "side": side,
+                    "proposed_sequence": "",
+                    "motif_length": "",
+                    "support": "",
+                    "records_considered": "1",
+                    "records_matching_exactly": "1",
+                    "confidence": "configured_motif_library",
+                    "status": "proposed_for_review",
+                    "applied": "false",
+                    "reason_not_applied": "no_approved_utexas_trim_rule",
+                    "reason": f"known_motif:{name}",
+                }
+            )
+
+    # Group inference uses pool-type hash groups only (never empty target_name).
+    inference_inputs = []
+    for row, result in zip(normalised_rows, row_results, strict=True):
+        group_id = ""
+        if policy.group_inference_by_pool_type and result.pool_parse is not None:
+            group_id = result.pool_parse.group_id
+        inference_inputs.append(
+            {
+                "record_id": row["record_id"],
+                "experiment_group_id": group_id,
+                "sequence_full": row["sequence_full"] or None,
+            }
+        )
+    group_proposals_raw = infer_group_constant_regions(inference_inputs, rules=rules)
+    group_proposal_rows: list[dict[str, str]] = []
+    for proposal in group_proposals_raw:
+        group_proposal_rows.append(
+            {
+                "proposal_id": (
+                    f"{proposal.experiment_group_id}:{proposal.side}:"
+                    f"group_consensus"
+                ),
+                "experiment_group_id": proposal.experiment_group_id,
+                "proposal_source": "group_consensus",
+                "side": proposal.side,
+                "proposed_sequence": proposal.proposed_sequence or "",
+                "motif_length": str(proposal.length),
+                "support": f"{proposal.support:.6f}".rstrip("0").rstrip("."),
+                "records_considered": str(proposal.records_considered),
+                "records_matching_exactly": str(proposal.records_matching_exactly),
+                "confidence": f"{proposal.confidence:.6f}".rstrip("0").rstrip("."),
+                "status": proposal.status,
+                "applied": "false",
+                "reason_not_applied": "no_approved_utexas_trim_rule",
+                "reason": proposal.reason,
+            }
+        )
+
+    all_proposals = pool_proposals + known_motif_proposals + group_proposal_rows
+    all_proposals.sort(key=lambda item: item["proposal_id"])
+    stats.constant_region_proposals = len(all_proposals)
+    stats.pool_type_parseable_groups = len(
+        {row["experiment_group_id"] for row in pool_proposals}
+    )
+    for row in all_proposals:
+        source = row["proposal_source"]
+        stats.proposal_source_counts[source] = (
+            stats.proposal_source_counts.get(source, 0) + 1
+        )
+    stats.applied_trims = 0
+    stats.constant_region_reason = (
+        "proposals_only_no_approved_utexas_trim_rules"
+    )
+
+    for row in normalised_rows:
+        if row["sequence_full"] != row["sequence_core"]:
+            raise S2NormaliseError(
+                "UTexas S2 requires sequence_full == sequence_core "
+                "(no approved trim)"
+            )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_normalised = output_dir / "utexas_normalised.csv"
+    out_qc = output_dir / "utexas_s2_qc.csv"
+    out_review = output_dir / "utexas_s2_review_candidates.csv"
+    out_proposals = output_dir / "utexas_constant_region_proposals.csv"
+    out_report = output_dir / "utexas_s2_report.md"
+
+    write_corpus_csv_atomic(out_normalised, normalised_rows)
+    write_csv_atomic(out_qc, UTEXAS_S2_QC_COLUMNS, qc_rows)
+    write_csv_atomic(out_review, UTEXAS_S2_QC_COLUMNS, review_rows)
+    write_csv_atomic(out_proposals, UTEXAS_CONSTANT_PROPOSAL_COLUMNS, all_proposals)
+
+    s1_hash_after = _sha256_file(canonical_path)
+    sidecar_hash_after = _sha256_file(sidecar_path)
+    inputs_unchanged = (
+        s1_hash_before == s1_hash_after
+        and sidecar_hash_before == sidecar_hash_after
+    )
+    if not inputs_unchanged:
+        raise S2NormaliseError("S1 inputs were modified during S2 execution")
+
+    raw_sha_after = _sha256_file(raw_path)
+    if raw_sha_after != EXPECTED_RAW_SHA256:
+        raise S2NormaliseError("UTexas raw workbook SHA changed during S2")
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        first_hashes = {
+            "normalised": _sha256_file(out_normalised),
+            "qc": _sha256_file(out_qc),
+            "review": _sha256_file(out_review),
+            "proposals": _sha256_file(out_proposals),
+        }
+        second = run_utexas_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=policy_path,
+            expected_rows=expected_rows,
+            check_deterministic_rerun=False,
+        )
+        deterministic_ok = (
+            first_hashes["normalised"] == _sha256_file(second.output_normalised)
+            and first_hashes["qc"] == _sha256_file(second.output_qc)
+            and first_hashes["review"] == _sha256_file(second.output_review)
+            and first_hashes["proposals"] == _sha256_file(second.output_proposals)
+        )
+        if not deterministic_ok:
+            raise S2NormaliseError(
+                "S2 outputs were not byte-identical across deterministic rerun"
+            )
+
+    run_result = S2RunResult(
+        source_key="utexas",
+        stats=stats,
+        output_normalised=out_normalised,
+        output_qc=out_qc,
+        output_review=out_review,
+        output_proposals=out_proposals,
+        output_report=out_report,
+        s1_hash_before=s1_hash_before,
+        s1_hash_after=s1_hash_after,
+        sidecar_hash_before=sidecar_hash_before,
+        sidecar_hash_after=sidecar_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        deterministic_rerun_ok=deterministic_ok,
+        raw_sha256=raw_sha_after,
+        raw_sha_unchanged=True,
+    )
+    report_text = build_utexas_s2_report(
+        repo_root=repo_root,
+        result=run_result,
+        rules_path=rules_path,
+        policy_path=policy_path,
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in report_text:
+        raise S2NormaliseError("S2 report must not contain absolute repository paths")
+    _write_text_atomic(out_report, report_text)
+    return run_result
+
+
 def run_s2_normalisation(
     *,
     repo_root: Path,
@@ -658,6 +1209,18 @@ def run_s2_normalisation(
             policy_path=source_policy,
             expected_rows=(
                 EXPECTED_APTABASE_ROWS if expected_rows is None else expected_rows
+            ),
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key == "utexas":
+        return run_utexas_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=source_policy,
+            expected_rows=(
+                EXPECTED_UTEXAS_ROWS if expected_rows is None else expected_rows
             ),
             check_deterministic_rerun=check_deterministic_rerun,
         )
@@ -755,9 +1318,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_path = args.source_policy
         elif args.source == "aptabase":
             policy_path = Path("config/source_normalisation/aptabase.json")
+        elif args.source == "utexas":
+            policy_path = Path("config/source_normalisation/utexas.json")
         else:
             raise S2NormaliseError(
-                "--source-policy is required for non-aptabase sources"
+                "--source-policy is required for unrecognised sources"
             )
 
         result = run_s2_normalisation(
@@ -773,6 +1338,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (
         S2NormaliseError,
         AptaBaseS2Error,
+        UTexasS2Error,
         CorpusSchemaError,
     ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -780,6 +1346,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     stats = result.stats
     # Aggregate counts only — never print sequence values.
+    extra = ""
+    if isinstance(stats, UTexasS2Stats):
+        extra = (
+            f"\nmolecule_type_counts={dict(sorted(stats.molecule_type_counts.items()))}"
+            f"\nchemistry_counts={dict(sorted(stats.chemistry_counts.items()))}"
+            f"\ncore_differs_from_full={stats.core_differs_from_full}"
+            f"\napplied_trims={stats.applied_trims}"
+        )
     print(
         f"source={result.source_key}\n"
         f"s1_rows={stats.s1_rows}\n"
@@ -791,6 +1365,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"t_to_u_count={stats.t_to_u_count}\n"
         f"review_candidate_rows={stats.review_candidate_rows}\n"
         f"constant_region_proposals={stats.constant_region_proposals}"
+        f"{extra}"
     )
     return 0
 

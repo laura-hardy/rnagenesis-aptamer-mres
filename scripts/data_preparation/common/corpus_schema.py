@@ -116,7 +116,23 @@ S1_PROVENANCE_FIELDS: Final[frozenset[str]] = frozenset(
     }
 )
 
+# Canonical chemistry vocabulary (plan §2.4). Populated from S2 onward.
+CHEMISTRY_VOCABULARY: Final[frozenset[str]] = frozenset(
+    {
+        "RNA",
+        "2F-RNA",
+        "2NH2-RNA",
+        "2OMe-RNA",
+        "DNA",
+        "mixed",
+        "unknown",
+    }
+)
+
 # Canonical fields that may become nonempty at S2.
+# ``chemistry`` is authorised at S2 by the curation plan (molecule/chemistry
+# classification before constant-region handling). Earlier AptaBase-era stage
+# guards deferred chemistry until after S3; that divergence is corrected here.
 S2_ALLOWED_NEW_FIELDS: Final[frozenset[str]] = frozenset(
     {
         "sequence_full",
@@ -131,6 +147,7 @@ S2_ALLOWED_NEW_FIELDS: Final[frozenset[str]] = frozenset(
         "molecule_type",
         "alphabet_as_reported",
         "t_to_u_applied",
+        "chemistry",
         "qc_flags",
     }
 )
@@ -138,7 +155,6 @@ S2_ALLOWED_NEW_FIELDS: Final[frozenset[str]] = frozenset(
 # Later-stage fields that must remain empty through S2.
 S2_FORBIDDEN_FIELDS: Final[frozenset[str]] = frozenset(
     {
-        "chemistry",
         "target_name",
         "target_uniprot",
         "target_type",
@@ -161,9 +177,9 @@ S2_FORBIDDEN_FIELDS: Final[frozenset[str]] = frozenset(
 )
 
 # Later-stage fields that must remain empty through S3 (decisions live in sidecar).
+# ``chemistry`` may already be set at S2 and must be preserved unchanged through S3.
 S3_FORBIDDEN_FIELDS: Final[frozenset[str]] = frozenset(
     {
-        "chemistry",
         "target_name",
         "target_uniprot",
         "target_type",
@@ -340,6 +356,13 @@ def validate_s2_record(
             f"t_to_u_applied must be lowercase true/false at S2; got {t_to_u!r}"
         )
 
+    chemistry = normalised["chemistry"]
+    if chemistry != "" and chemistry not in CHEMISTRY_VOCABULARY:
+        raise CorpusSchemaError(
+            f"chemistry must be empty or one of {sorted(CHEMISTRY_VOCABULARY)}; "
+            f"got {chemistry!r}"
+        )
+
     if s1_record is not None:
         if set(s1_record.keys()) != set(CORPUS_COLUMNS):
             raise CorpusSchemaError(
@@ -410,6 +433,13 @@ def validate_s3_record(
     if t_to_u not in BOOLEAN_TRUE_FALSE:
         raise CorpusSchemaError(
             f"t_to_u_applied must be lowercase true/false at S3; got {t_to_u!r}"
+        )
+
+    chemistry = normalised["chemistry"]
+    if chemistry != "" and chemistry not in CHEMISTRY_VOCABULARY:
+        raise CorpusSchemaError(
+            f"chemistry must be empty or one of {sorted(CHEMISTRY_VOCABULARY)}; "
+            f"got {chemistry!r}"
         )
 
     if s2_record is not None:

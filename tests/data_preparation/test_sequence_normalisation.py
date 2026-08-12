@@ -412,3 +412,44 @@ def test_detect_motifs_flag_only(rules) -> None:
     hits = detect_known_non_core_motifs(motif + "GG", rules)
     assert hits[0].action == "flag_only"
     assert hits[0].name == "t7_promoter_minimal"
+
+
+def test_bracketed_three_prime_ascii_label(rules) -> None:
+    result = normalise_sequence("5'-ACGU-[3'T]", molecule_type="RNA", rules=rules)
+    assert result.sequence_full == "ACGU"
+    assert "remove_bracketed_three_prime_label" in result.transformations
+    assert result.sequence_raw == "5'-ACGU-[3'T]"
+
+
+def test_bracketed_three_prime_unicode_label(rules) -> None:
+    result = normalise_sequence("5′-ACGU-[3′T]", molecule_type="RNA", rules=rules)
+    assert result.sequence_full == "ACGU"
+    assert "remove_bracketed_three_prime_label" in result.transformations
+
+
+def test_bracketed_five_prime_label(rules) -> None:
+    result = normalise_sequence("[5'T]-ACGU-3'", molecule_type="RNA", rules=rules)
+    assert result.sequence_full == "ACGU"
+    assert "remove_bracketed_five_prime_label" in result.transformations
+
+
+def test_internal_brackets_not_stripped(rules) -> None:
+    result = normalise_sequence("AC[foo]GU", molecule_type="RNA", rules=rules)
+    assert result.sequence_full == "AC[FOO]GU"
+    assert "invalid_character" in result.qc_flags
+    assert "remove_bracketed_three_prime_label" not in result.transformations
+    assert "remove_bracketed_five_prime_label" not in result.transformations
+
+
+def test_trailing_phosphate_display_label(rules) -> None:
+    result = normalise_sequence("ACGUp", molecule_type="RNA", rules=rules)
+    assert result.sequence_full == "ACGU"
+    assert "remove_trailing_phosphate_label" in result.transformations
+
+
+def test_unexpected_character_retained_and_flagged(rules) -> None:
+    raw = "5'-ACGX-3'"
+    result = normalise_sequence(raw, molecule_type="RNA", rules=rules)
+    assert result.sequence_raw == raw
+    assert "X" in (result.sequence_full or "")
+    assert "invalid_character" in result.qc_flags

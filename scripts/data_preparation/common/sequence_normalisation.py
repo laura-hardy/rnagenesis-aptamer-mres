@@ -43,6 +43,18 @@ _TRAILING_TERMINAL_RE = re.compile(
     r"\s*[-–—:]?\s*(?:3[\s]*[′'ʹ΄]|3\s*['′])\s*$",
     re.IGNORECASE,
 )
+# Bracketed terminal display labels observed in UTexas and related sources
+# (e.g. ``[3'T]``, ``[3′T]``, ``[5'T]``). Anchored at sequence ends only.
+_LEADING_BRACKET_TERMINAL_RE = re.compile(
+    r"^\[\s*5\s*[′'’`´ʹ΄]?\s*T\s*\]\s*[-–—:]?\s*",
+    re.IGNORECASE,
+)
+_TRAILING_BRACKET_TERMINAL_RE = re.compile(
+    r"\s*[-–—:]?\s*\[\s*3\s*[′'’`´ʹ΄]?\s*T\s*\]\s*$",
+    re.IGNORECASE,
+)
+# Trailing phosphorylation display marker attached to a nucleotide (plan §2.4).
+_TRAILING_PHOSPHATE_RE = re.compile(r"(?<=[ACGTUNacgtun])p\s*$", re.IGNORECASE)
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
@@ -426,6 +438,21 @@ def clean_display_sequence(
     text = _TRAILING_TERMINAL_RE.sub("", text)
     if text != before:
         transformations.append("remove_three_prime_label")
+
+    before = text
+    text = _LEADING_BRACKET_TERMINAL_RE.sub("", text)
+    if text != before:
+        transformations.append("remove_bracketed_five_prime_label")
+
+    before = text
+    text = _TRAILING_BRACKET_TERMINAL_RE.sub("", text)
+    if text != before:
+        transformations.append("remove_bracketed_three_prime_label")
+
+    before = text
+    text = _TRAILING_PHOSPHATE_RE.sub("", text)
+    if text != before:
+        transformations.append("remove_trailing_phosphate_label")
 
     before = text
     text = _WHITESPACE_RE.sub("", text)
