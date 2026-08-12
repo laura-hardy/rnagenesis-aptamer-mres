@@ -15,7 +15,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence
+from typing import Any, Callable, Sequence
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -24,13 +24,16 @@ if str(SCRIPT_DIR) not in sys.path:
 from adapters.aptabase import (  # noqa: E402
     AptaBaseAdapterError,
     AptaBaseExtractionResult,
-    AptaBaseExtractionStats,
-    SIDECAR_COLUMNS,
     extract_aptabase,
-    write_sidecar_csv_atomic,
+    write_sidecar_csv_atomic as write_aptabase_sidecar_csv_atomic,
+)
+from adapters.utexas import (  # noqa: E402
+    UTexasAdapterError,
+    UTexasExtractionResult,
+    extract_utexas,
+    write_sidecar_csv_atomic as write_utexas_sidecar_csv_atomic,
 )
 from common.corpus_schema import (  # noqa: E402
-    CORPUS_COLUMNS,
     CorpusSchemaError,
     write_corpus_csv_atomic,
 )
@@ -75,18 +78,20 @@ class S1RunResult:
     input_hash_after: str
     input_hash_unchanged: bool
     deterministic_rerun_ok: bool | None
-    stats: AptaBaseExtractionStats
+    stats: Any
     output_canonical: Path
     output_sidecar: Path
     output_report: Path
 
 
-AdapterFn = Callable[..., AptaBaseExtractionResult]
+AdapterFn = Callable[..., AptaBaseExtractionResult | UTexasExtractionResult]
 
 
 def _get_adapter(source_key: str) -> AdapterFn:
     if source_key == "aptabase":
         return extract_aptabase
+    if source_key == "utexas":
+        return extract_utexas
     raise S1ExtractError(f"Unknown S1 adapter for source_key={source_key!r}")
 
 
@@ -264,6 +269,144 @@ def build_aptabase_s1_report(
     return "\n".join(lines)
 
 
+def build_utexas_s1_report(
+    *,
+    repo_root: Path,
+    registry_row: RegistrySpecRow,
+    result: S1RunResult,
+) -> str:
+    """Build an aggregate-only Markdown UTexas S1 report (no sequences)."""
+    stats = result.stats
+    lines = [
+        "# UTexas S1 extraction report",
+        "",
+        "## Registered source",
+        "",
+        f"- Registered path: `{registry_row.path}`",
+        f"- Registered source dataset: `{registry_row.source_dataset}`",
+        f"- Workbook sheet: `{stats.sheet_name}`",
+        f"- Registered SHA-256: `{registry_row.sha256}`",
+        f"- Observed SHA-256: `{result.observed_sha256}`",
+        f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+        f"- Registered n_rows_expected: `{registry_row.n_rows_expected}`",
+        f"- Redistribution status: `{registry_row.redistribution_status}`",
+        "",
+        "## Row counts",
+        "",
+        f"- Expected physical source rows: `{registry_row.n_rows_expected}`",
+        f"- Extracted rows (canonical): `{stats.canonical_rows}`",
+        f"- Sidecar rows: `{stats.sidecar_rows}`",
+        f"- Unique native IDs: `{stats.unique_native_ids}`",
+        f"- Unique canonical record IDs: `{stats.unique_record_ids}`",
+        f"- Nonempty source records (nonempty sequence_raw): "
+        f"`{stats.nonempty_sequences}`",
+        f"- Blank source records (empty sequence_raw): "
+        f"`{stats.missing_sequences}`",
+        "",
+        "## Native-ID strategy",
+        "",
+        f"- Strategy: `{stats.native_id_strategy}`",
+        "- Source `Serial Number` is preserved only in the sidecar; it is not",
+        "  used as `native_id` because it is duplicated and absent on blank",
+        "  physical rows.",
+        "",
+        "## Source Serial Number statistics",
+        "",
+        f"- Populated Serial Number values: `{stats.populated_serials}`",
+        f"- Unique Serial Number values: `{stats.unique_serials}`",
+        f"- Duplicate Serial Number keys: `{stats.duplicate_serial_keys}`",
+        f"- Rows participating in duplicated keys: "
+        f"`{stats.rows_in_duplicate_serial_groups}`",
+        f"- Blank Serial Number values: `{stats.blank_serials}`",
+        "",
+        "## Canonical mapping summary",
+        "",
+        "- `Aptamer Sequence` → `sequence_raw` (verbatim; no cleaning)",
+        "- `Target ` (trailing space retained in source header) → "
+        "`target_name_raw` (verbatim)",
+        "- `Citation` → `publication`",
+        "- `Journal DOI` → `doi` (verbatim source value)",
+        "- `Link to PubMed Entry` → `pubmed_id` only when a numeric PMID can be",
+        "  extracted deterministically from the source string; otherwise empty",
+        "- `Name of Aptamer` → optional JSON `notes` when nonempty",
+        "- All 28 original UTexas columns + worksheet row → source-metadata",
+        "  sidecar",
+        "",
+        "## Sequence and target retention (verbatim; no cleaning)",
+        "",
+        f"- Records with nonempty sequence_raw: `{stats.nonempty_sequences}`",
+        f"- Records with empty sequence_raw: `{stats.missing_sequences}`",
+        f"- Exact-copy validation for sequence_raw: "
+        f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+        f"- Records with nonempty target_name_raw: `{stats.nonempty_targets}`",
+        f"- Records with empty target_name_raw: `{stats.missing_targets}`",
+        f"- Exact-copy validation for target_name_raw: "
+        f"`{'pass' if stats.target_exact_copy_ok else 'fail'}`",
+        "",
+        "## Publication fields",
+        "",
+        f"- Nonempty publication: `{stats.nonempty_publication}`",
+        f"- Nonempty DOI: `{stats.nonempty_doi}`",
+        f"- Nonempty PMID (deterministically extracted): "
+        f"`{stats.nonempty_pmid}`",
+        "",
+        "## Source-metadata sidecar",
+        "",
+        f"- Sidecar rows: `{stats.sidecar_rows}`",
+        "- Sidecar retains worksheet row number and all original UTexas",
+        "  columns, including Serial Number, molecule/chemistry text,",
+        "  affinity/Kd fields, pool metadata, buffer conditions, citations,",
+        "  and currently unused source fields.",
+        "",
+        "## Validation results",
+        "",
+        f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+        f"- Row retention (rows_in == rows_out == "
+        f"{registry_row.n_rows_expected}): "
+        f"`{'pass' if stats.canonical_rows == registry_row.n_rows_expected else 'fail'}`",
+        f"- Unique native/record IDs: "
+        f"`{'pass' if stats.unique_native_ids == stats.canonical_rows and stats.unique_record_ids == stats.canonical_rows else 'fail'}`",
+        f"- Sequence exact-copy: "
+        f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+        f"- Target exact-copy: "
+        f"`{'pass' if stats.target_exact_copy_ok else 'fail'}`",
+        "",
+        "## Integrity / raw-data immutability",
+        "",
+        f"- Source-input hash before: `{result.input_hash_before}`",
+        f"- Source-input hash after: `{result.input_hash_after}`",
+        f"- Source-input pre/post hash result: "
+        f"`{'pass' if result.input_hash_unchanged else 'fail'}`",
+        (
+            f"- Deterministic rerun result: "
+            f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+            if result.deterministic_rerun_ok is not None
+            else "- Deterministic rerun result: `not_checked`"
+        ),
+        "",
+        "## Outputs",
+        "",
+        f"- Canonical: `{_relative_display(result.output_canonical, repo_root)}`",
+        f"- Sidecar: `{_relative_display(result.output_sidecar, repo_root)}`",
+        f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+        "",
+        "## Stage boundary",
+        "",
+        "- S1 only: no sequence cleaning, alphabet conversion, molecule",
+        "  classification, length filtering, trimming, target normalisation,",
+        "  evidence scoring, parking, or deduplication was performed.",
+        "- No S2 normalisation was started.",
+        "",
+        "## Pipeline status",
+        "",
+        "- UTexas S1 complete.",
+        "- UTexas S2 has not started.",
+        "- No UTexas records are yet authorised for global S4.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def run_s1_extraction(
     *,
     repo_root: Path,
@@ -299,7 +442,7 @@ def run_s1_extraction(
             f"SHA-256 mismatch before adapter execution for {source_key!r}"
         )
 
-    if source_key == "aptabase":
+    if source_key in {"aptabase", "utexas"}:
         extraction = adapter(
             input_path,
             source_dataset=row.source_dataset,
@@ -321,7 +464,14 @@ def run_s1_extraction(
     report_path = output_dir / f"{source_key}_s1_report.md"
 
     write_corpus_csv_atomic(canonical_path, extraction.canonical_rows)
-    write_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
+    if source_key == "aptabase":
+        write_aptabase_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
+        report_builder = build_aptabase_s1_report
+    elif source_key == "utexas":
+        write_utexas_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
+        report_builder = build_utexas_s1_report
+    else:
+        raise S1ExtractError(f"No sidecar writer for source_key={source_key!r}")
 
     deterministic_ok: bool | None = None
     if check_deterministic_rerun:
@@ -348,7 +498,10 @@ def run_s1_extraction(
                 expected_rows=row.n_rows_expected,
             )
             write_corpus_csv_atomic(tmp_c, second.canonical_rows)
-            write_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
+            if source_key == "aptabase":
+                write_aptabase_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
+            else:
+                write_utexas_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
             deterministic_ok = (
                 tmp_c.read_bytes() == canonical_path.read_bytes()
                 and tmp_s.read_bytes() == sidecar_path.read_bytes()
@@ -380,7 +533,7 @@ def run_s1_extraction(
         output_report=report_path,
     )
 
-    report_text = build_aptabase_s1_report(
+    report_text = report_builder(
         repo_root=repo_root,
         registry_row=row,
         result=run_result,
@@ -407,7 +560,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Registry source_key to extract (e.g. aptabase)",
+        help="Registry source_key to extract (e.g. aptabase, utexas)",
     )
     parser.add_argument(
         "--registry-spec",
@@ -469,7 +622,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_dir=output_dir,
             check_deterministic_rerun=args.check_deterministic_rerun,
         )
-    except (S1ExtractError, RegistryError, AptaBaseAdapterError, CorpusSchemaError) as exc:
+    except (
+        S1ExtractError,
+        RegistryError,
+        AptaBaseAdapterError,
+        UTexasAdapterError,
+        CorpusSchemaError,
+    ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 

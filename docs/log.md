@@ -1939,3 +1939,139 @@ Ignored under `data/`:
 - AptaBase S5 not run
 - Future global S4 will merge AptaBase with other cleaned sources before
   canonical target resolution
+
+## 2026-08-12 — UTexas registration and S1 verbatim extraction
+
+### Stage
+
+UTexas source registration (S0 registry update) and S1 extraction only. No S2
+normalisation, molecule classification, target normalisation, evidence scoring,
+filtering, parking, deduplication or CHECKPOINT-1 work was started for UTexas.
+
+### Source
+
+Authoritative workbook:
+
+`data/raw/UTexas_aptamer_dataset/UTexas Aptamer Database dataset_Sept2023.xlsx`
+
+- Sheet: `Dataset`
+- Registered `source_key`: `utexas`
+- Registered `source_dataset`: `utexas_sept2023_2026-08`
+- Registered SHA-256:
+  `b5a66beb58d30c5c3d2f36a29ea2cc3678e7d4a6b1bb1a97efc1e166a49fd15c`
+- Registered / validated physical row count: **1894**
+  (`sheetData` rows minus header; project physical-workbook-row convention)
+- Of those 1,894 physical source records: **1,495** nonempty and **399** blank
+  trailing rows that are physically represented in the workbook XML
+- `redistribution_status`: `unknown`
+- Snapshot date in registry: `2026-08-04` (inventory-refresh campaign date)
+
+The workbook was added to tracked `config/source_registry.csv` and the
+operational registry was rebuilt with the existing S0a builder
+(`scripts/data_preparation/s0_build_registry.py`). Validation result:
+7 registered sources, 7 validated, unchanged AptaBase inventory-override
+warnings only. Nothing under `data/raw/` was written.
+
+### Identifier decision
+
+UTexas `Serial Number` is unsuitable as the corpus `native_id`:
+
+| Metric | Count |
+|---|---|
+| Populated Serial Number values | 1,495 |
+| Unique Serial Number values | 1,444 |
+| Duplicate Serial Number keys | 45 |
+| Rows participating in duplicated keys | 96 |
+| Physical source rows without a Serial Number | 399 |
+
+Because every one of the 1,894 registered physical rows must retain an identity,
+and because duplicate serials must not be collapsed, S1 adopts the **actual Excel
+worksheet row number** from each `sheetData` row `@r` attribute:
+
+- `native_id = row_{NNNN}` (4-digit zero padding)
+- `record_id = utexas:row_{NNNN}`
+
+This identity is auditable against the SHA-pinned workbook snapshot. Completely
+absent worksheet row numbers (the registered workbook skips rows 1497–1504 in
+`sheetData`) are not fabricated. Original `Serial Number` values are preserved
+verbatim in the source-metadata sidecar and are never used as the corpus key.
+`{serial}:{occurrence}` was not used.
+
+### Extraction methodology
+
+Implemented under the existing S1 architecture:
+
+- Adapter: `scripts/data_preparation/adapters/utexas.py`
+- Runner dispatch: `scripts/data_preparation/s1_extract.py --source utexas`
+- Reader: stdlib ZIP/OOXML (same physical-row philosophy as S0 XLSX counting),
+  so trailing blank `sheetData` rows are retained rather than dropped by a
+  dataframe reader
+
+Canonical mapping at S1 (format/provenance only):
+
+- `Aptamer Sequence` → `sequence_raw` (verbatim; no cleaning)
+- `Target ` (source header includes the trailing space) → `target_name_raw`
+  (verbatim)
+- `Citation` → `publication`
+- `Journal DOI` → `doi` (verbatim source string)
+- `Link to PubMed Entry` → `pubmed_id` only when a numeric PMID can be extracted
+  deterministically from the source string (PubMed URL or bare digits);
+  otherwise left empty, with the raw link retained in the sidecar
+- `Name of Aptamer` → optional JSON `notes` when nonempty
+- Provenance fields: `source_db=utexas`, contributing sources/datasets,
+  `corroboration_count=1`, `independently_attested_by_permissive_source=false`,
+  registry `redistribution_status`
+
+All 28 original UTexas columns plus the worksheet row number are written to the
+source-metadata sidecar. No sequence normalisation, T→U conversion, molecule or
+chemistry classification, length filtering, constant-region trimming, target
+normalisation, affinity/evidence interpretation, DNA parking, missing-sequence
+rejection, or Serial Number deduplication occurred. Later-stage canonical fields
+remain empty.
+
+Ignored outputs:
+
+- `data/interim/extracted/utexas_extracted.csv` (47-column canonical schema;
+  1,894 rows)
+- `data/interim/extracted/utexas_source_metadata.csv` (1,894 rows)
+- `data/interim/extracted/utexas_s1_report.md`
+
+### Verification
+
+- Targeted UTexas S1 tests (`test_adapter_utexas.py`): **14 passed**
+  (synthetic fixtures only; no real aptamer sequences committed)
+- Core S0/S1 regression files (UTexas + AptaBase S1 + registry + corpus schema):
+  **125 passed**
+- Broader data-preparation suite excluding known hang-prone legacy AptaBase
+  cleaner/parser and ENA legacy tests: **497 passed**
+- Real extraction counts:
+
+  | Check | Value |
+  |---|---|
+  | Registered SHA = actual SHA | pass |
+  | Expected / extracted / sidecar rows | 1894 / 1894 / 1894 |
+  | Unique `record_id` / `native_id` | 1894 / 1894 |
+  | Nonempty / empty `sequence_raw` | 1495 / 399 |
+  | Nonempty / empty `target_name_raw` | 1495 / 399 |
+  | Populated / unique / duplicate-key / blank Serial Number | 1495 / 1444 / 45 keys (96 rows) / 399 |
+  | S2/S3 scientific fields populated | 0 |
+
+- Determinism: two runs with identical flags produced byte-identical
+  `utexas_extracted.csv` and `utexas_source_metadata.csv`; the S1 report is also
+  byte-identical when the deterministic-rerun flag state matches
+- Raw-data immutability: workbook SHA-256 unchanged before and after
+  (`b5a66beb…fd15c`); no files under `data/raw/UTexas_aptamer_dataset/` were
+  written or modified
+
+### Pipeline stop
+
+```text
+UTexas S1 complete.
+UTexas S2 has not started.
+No UTexas records are yet authorised for global S4.
+```
+
+Next step (separate planning milestone): UTexas S2 decisions, especially molecule /
+chemistry mapping for FANA and unusual modified chemistries, and whether the
+shared display cleaner should recognise `[3'T]` / `[5'T]` terminal notation.
+Do not begin that work from this S1 milestone.
