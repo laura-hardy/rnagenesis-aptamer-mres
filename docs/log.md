@@ -1789,3 +1789,72 @@ Tracked code, tests and documentation:
 
 - CHECKPOINT-1 remains unapproved and pending manual review
 - No record has proceeded to S4
+
+## 2026-08-12 — AptaBase CHECKPOINT-1 review applied and closed
+
+### Stage
+
+AptaBase CHECKPOINT-1 human review has been applied and closed. Only resolved
+accepts are authorised for S4. S4 target normalisation has not been run.
+
+### Review conventions
+
+- Active rows reviewed: 431 (all with explicit valid `review_action`)
+- No-review rows resolved automatically: 179
+- Single-reviewer convention (`review_model=single_reviewer`)
+- Reviewer initials optional and intentionally omitted on all 431 rows
+- Reviewer notes optional (`reviewer_notes_required=false`); notes present 207;
+  notes absent 224
+- Human `review_action` is the authoritative judgement; blank notes do not
+  invalidate overrides
+
+### Validation
+
+- Completed review compared to a pristine reconstructed baseline
+- Only permitted review fields differed (plus spreadsheet-semantic boolean /
+  numeric coercions)
+- Sequences, proposed decisions, reasons, targets and review order unchanged
+- Review-file SHA-256:
+  `1591663fd525860a59df1110129b6998f9d70e5906d2e42c47278449e8cc84f4`
+- Raw / S1 / S2 / S3 integrity: pass
+- Deterministic rerun: pass
+
+### Action distribution
+
+- `confirm_current`: 122
+- `override_to_accept`: 23
+- `override_to_park`: 0
+- `override_to_reject`: 286
+- `needs_source_review`: 0
+- `not_required`: 179
+
+### Final resolutions
+
+- Proposed: accept 173; park 343; reject 94
+- Resolved: accept 162; park 68; reject 380
+- `approved_for_s4` / S4-authorised: 162
+- `parked_after_checkpoint1`: 68
+- `rejected_after_checkpoint1`: 380
+- `needs_source_review`: 0
+- Override transitions: park → accept 23; park → reject 252; accept → reject 34
+
+### Outputs
+
+Tracked:
+
+- `config/checkpoint_reviews/aptabase_checkpoint1_resolutions.csv`
+- `config/checkpoint_reviews/aptabase_checkpoint1_metadata.json`
+
+Ignored under `data/`:
+
+- `data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_resolution.csv`
+- `data/interim/checkpoints/aptabase_cp1/resolved/aptabase_s4_authorised_ids.csv`
+- `data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_parked_ids.csv`
+- `data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_rejected_ids.csv`
+- `data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_resolution_summary.md`
+
+### Pipeline stop
+
+- CHECKPOINT-1 is closed
+- Exactly the 162 resolved accepts are authorised for S4
+- S4 target normalisation has not begun
