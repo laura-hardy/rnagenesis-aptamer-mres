@@ -35,6 +35,22 @@ from adapters.aptabase_s3 import (  # noqa: E402
     classify_aptabase_record,
     update_stats_from_row,
 )
+from adapters.utexas_s3 import (  # noqa: E402
+    DECISION_COLUMNS as UTEXAS_DECISION_COLUMNS,
+    LOCAL_DETAIL_COLUMNS as UTEXAS_LOCAL_DETAIL_COLUMNS,
+    PARK_COLUMNS as UTEXAS_PARK_COLUMNS,
+    REASON_COUNT_COLUMNS as UTEXAS_REASON_COUNT_COLUMNS,
+    REJECTION_COLUMNS as UTEXAS_REJECTION_COLUMNS,
+    UTexasS3Error,
+    UTexasS3Stats,
+    apply_random_accept_audit,
+    assert_utexas_accept_invariants,
+    assert_utexas_reject_park_invariants,
+    build_local_detail_row as build_utexas_local_detail_row,
+    classify_utexas_record,
+    refresh_stats_after_audit,
+    update_stats_from_row as update_utexas_stats_from_row,
+)
 from common.corpus_schema import (  # noqa: E402
     CORPUS_COLUMNS,
     CorpusSchemaError,
@@ -51,10 +67,38 @@ from common.eligibility import (  # noqa: E402
 from s0_build_registry import find_repo_root  # noqa: E402
 
 EXPECTED_APTABASE_ROWS = 610
+EXPECTED_UTEXAS_ROWS = 1894
+EXPECTED_UTEXAS_MISSING = 399
+EXPECTED_UTEXAS_NONEMPTY = 1495
+EXPECTED_UTEXAS_MOLECULE = {"RNA": 583, "ssDNA": 896, "DNA": 13, "unknown": 402}
+EXPECTED_UTEXAS_CORE_LENGTH = {
+    "missing": 399,
+    "below_20": 15,
+    "20_to_100": 1318,
+    "101_to_200": 160,
+    "above_200": 2,
+}
+EXPECTED_UTEXAS_INVALID = 57
+EXPECTED_UTEXAS_AMBIGUOUS = 8
+EXPECTED_UTEXAS_MEDIUM_TRIM = 299
+EXPECTED_UTEXAS_TRIM_REVIEW = 1278
+EXPECTED_UTEXAS_CONSTRUCT_SCOPE = {
+    "full_construct": 8,
+    "partial_construct": 291,
+    "unknown": 1595,
+}
+EXPECTED_RAW_SHA256 = (
+    "b5a66beb58d30c5c3d2f36a29ea2cc3678e7d4a6b1bb1a97efc1e166a49fd15c"
+)
 
 PIPELINE_STOP_STATEMENT = (
     "PIPELINE STOP: AptaBase CHECKPOINT-1 is awaiting manual review.\n"
     "No record is authorised to proceed to S4."
+)
+UTEXAS_PIPELINE_STOP_STATEMENT = (
+    "CHECKPOINT-1 package generated.\n"
+    "No human decisions applied.\n"
+    "No record authorised for S4 yet."
 )
 
 
@@ -67,14 +111,14 @@ class S3RunResult:
     """Aggregate outcome of one S3 classification run."""
 
     source_key: str
-    stats: AptaBaseS3Stats
+    stats: AptaBaseS3Stats | UTexasS3Stats
     output_canonical: Path
     output_decisions: Path
     output_review: Path
     output_local_detail: Path
     output_summary: Path
     output_reason_counts: Path
-    output_leakage_matches: Path
+    output_leakage_matches: Path | None
     s2_hash_before: str
     s2_hash_after: str
     qc_hash_before: str
@@ -84,6 +128,10 @@ class S3RunResult:
     inputs_unchanged: bool
     deterministic_rerun_ok: bool | None
     s2_integrity_ok: bool
+    output_rejected: Path | None = None
+    output_parks: Path | None = None
+    raw_sha_before: str = ""
+    raw_sha_after: str = ""
 
 
 def _sha256_file(path: Path) -> str:
@@ -826,6 +874,700 @@ def run_aptabase_s3(
     return run_result
 
 
+def _core_length_bucket_from_raw(raw: str) -> str:
+    text = (raw or "").strip()
+    if text == "":
+        return "missing"
+    length = int(text)
+    if length < 20:
+        return "below_20"
+    if length <= 100:
+        return "20_to_100"
+    if length <= 200:
+        return "101_to_200"
+    return "above_200"
+
+
+def _assert_utexas_s2_invariants(canonical_rows: Sequence[dict[str, str]]) -> None:
+    """Hard-fail if the UTexas S2 starting invariants no longer reconcile."""
+    if len(canonical_rows) != EXPECTED_UTEXAS_ROWS:
+        raise S3ClassifyError(
+            f"S3 input rows must be {EXPECTED_UTEXAS_ROWS}; got {len(canonical_rows)}"
+        )
+    record_ids = [row["record_id"] for row in canonical_rows]
+    native_ids = [row["native_id"] for row in canonical_rows]
+    if len(set(record_ids)) != EXPECTED_UTEXAS_ROWS:
+        raise S3ClassifyError("S2 record_id values are not unique")
+    if len(set(native_ids)) != EXPECTED_UTEXAS_ROWS:
+        raise S3ClassifyError("S2 native_id values are not unique")
+
+    missing = sum(1 for row in canonical_rows if row.get("sequence_core", "") == "")
+    nonempty = len(canonical_rows) - missing
+    if missing != EXPECTED_UTEXAS_MISSING or nonempty != EXPECTED_UTEXAS_NONEMPTY:
+        raise S3ClassifyError(
+            "S2 missing/nonempty sequence counts drifted: "
+            f"missing={missing} nonempty={nonempty}"
+        )
+
+    molecule_counts: dict[str, int] = {}
+    core_buckets: dict[str, int] = {}
+    construct_counts: dict[str, int] = {}
+    invalid = 0
+    ambiguous = 0
+    medium_trim = 0
+    trim_review = 0
+    for row in canonical_rows:
+        molecule = row.get("molecule_type") or ""
+        molecule_counts[molecule] = molecule_counts.get(molecule, 0) + 1
+        bucket = _core_length_bucket_from_raw(row.get("sequence_length_core", ""))
+        core_buckets[bucket] = core_buckets.get(bucket, 0) + 1
+        scope = row.get("construct_scope") or ""
+        construct_counts[scope] = construct_counts.get(scope, 0) + 1
+        flags = {part for part in (row.get("qc_flags") or "").split("|") if part}
+        if "invalid_character" in flags:
+            invalid += 1
+        if "ambiguous_base" in flags:
+            ambiguous += 1
+        if (row.get("trim_confidence") or "") == "medium":
+            medium_trim += 1
+        if "trim_requires_review" in flags:
+            trim_review += 1
+        for field_name in (
+            "target_name",
+            "target_type",
+            "binding_evidence_score",
+            "affinity_value",
+            "cluster_id",
+            "partition",
+        ):
+            if row.get(field_name):
+                raise S3ClassifyError(
+                    f"S2 canonical unexpectedly populated {field_name}"
+                )
+
+    if molecule_counts != EXPECTED_UTEXAS_MOLECULE:
+        raise S3ClassifyError(
+            f"S2 molecule_type counts drifted: {molecule_counts}"
+        )
+    if core_buckets != EXPECTED_UTEXAS_CORE_LENGTH:
+        raise S3ClassifyError(
+            f"S2 sequence_length_core buckets drifted: {core_buckets}"
+        )
+    if invalid != EXPECTED_UTEXAS_INVALID:
+        raise S3ClassifyError(f"S2 invalid_character count drifted: {invalid}")
+    if ambiguous != EXPECTED_UTEXAS_AMBIGUOUS:
+        raise S3ClassifyError(f"S2 ambiguous_base count drifted: {ambiguous}")
+    if medium_trim != EXPECTED_UTEXAS_MEDIUM_TRIM:
+        raise S3ClassifyError(f"S2 medium-trim count drifted: {medium_trim}")
+    if trim_review != EXPECTED_UTEXAS_TRIM_REVIEW:
+        raise S3ClassifyError(
+            f"S2 trim_requires_review count drifted: {trim_review}"
+        )
+    if construct_counts != EXPECTED_UTEXAS_CONSTRUCT_SCOPE:
+        raise S3ClassifyError(
+            f"S2 construct_scope counts drifted: {construct_counts}"
+        )
+
+
+def build_utexas_checkpoint1_summary(
+    *,
+    repo_root: Path,
+    result: S3RunResult,
+    policy_path: Path,
+) -> str:
+    """Build an aggregate-only Markdown CHECKPOINT-1 summary (no sequences)."""
+    stats = result.stats
+    if not isinstance(stats, UTexasS3Stats):
+        raise S3ClassifyError("UTexas summary requires UTexasS3Stats")
+
+    def _count(mapping: Mapping[str, int], key: str) -> int:
+        return int(mapping.get(key, 0))
+
+    lines = [
+        "# UTexas CHECKPOINT-1 summary",
+        "",
+        "## Input",
+        "",
+        f"- S3 input rows = `{stats.s2_rows}`",
+        f"- Unique record IDs: `{stats.unique_record_ids}`",
+        f"- Unique native IDs: `{stats.unique_native_ids}`",
+        f"- S2 order preserved: `{'pass' if stats.order_preserved else 'fail'}`",
+        "",
+        "## Primary decisions",
+        "",
+        f"- `proposed_accept` = `{_count(stats.decision_counts, 'proposed_accept')}`",
+        f"- `proposed_park` = `{_count(stats.decision_counts, 'proposed_park')}`",
+        f"- `proposed_reject` = `{_count(stats.decision_counts, 'proposed_reject')}`",
+        f"- Reconciliation: `"
+        f"{sum(stats.decision_counts.values())} = "
+        f"{stats.s3_rows}`",
+        "",
+        "## Reject counts by reason",
+        "",
+        f"- `missing_sequence`: `{_count(stats.primary_reason_counts, 'missing_sequence')}`",
+        f"- `mixed_T_and_U`: `{_count(stats.primary_reason_counts, 'mixed_T_and_U')}`",
+        f"- `ambiguous_bases`: `{_count(stats.primary_reason_counts, 'ambiguous_bases')}`",
+        f"- `invalid_alphabet`: `{_count(stats.primary_reason_counts, 'invalid_alphabet')}`",
+        f"- `alignment_gaps`: `{_count(stats.primary_reason_counts, 'alignment_gaps')}`",
+        f"- `length_out_of_range`: `{_count(stats.primary_reason_counts, 'length_out_of_range')}`",
+        "",
+        "Condition tallies (a record may contribute to more than one):",
+        "",
+        f"- missing-sequence condition: `{stats.missing_sequence_count}`",
+        f"- mixed T/U condition: `{stats.mixed_t_u_count}`",
+        f"- ambiguous-bases condition: `{stats.ambiguous_bases_count}`",
+        f"- invalid-alphabet condition: `{stats.invalid_alphabet_count}`",
+        f"- alignment-gaps condition: `{stats.alignment_gaps_count}`",
+        f"- length-out-of-range condition: `{stats.length_out_of_range_count}`",
+        "",
+        "## Park counts",
+        "",
+        f"- explicit DNA/ssDNA (`non_rna_molecule` primary): "
+        f"`{_count(stats.primary_reason_counts, 'non_rna_molecule')}`",
+        f"- unresolved molecule (`molecule_type_unresolved` primary): "
+        f"`{_count(stats.primary_reason_counts, 'molecule_type_unresolved')}`",
+        f"- trim/construct unresolved (`trim_construct_unresolved` primary): "
+        f"`{_count(stats.primary_reason_counts, 'trim_construct_unresolved')}`",
+        "",
+        "Condition tallies (a record may contribute to more than one):",
+        "",
+        f"- explicit DNA/ssDNA condition: `{stats.non_rna_molecule_count}`",
+        f"- unresolved-molecule condition: `{stats.unknown_molecule_count}`",
+        f"- trim/construct-unresolved condition: "
+        f"`{stats.trim_construct_unresolved_count}`",
+        "",
+        "## Proposed accepts",
+        "",
+        f"- `technically_eligible_rna` primary: "
+        f"`{_count(stats.primary_reason_counts, 'technically_eligible_rna')}`",
+        f"- technically eligible RNA condition: "
+        f"`{stats.technically_eligible_rna_count}`",
+        "",
+        "## Review queue",
+        "",
+        f"- `manual_review_required=true`: "
+        f"`{stats.manual_review_required_true_count}`",
+        f"- `manual_review_required=false` (mechanical / no-review): "
+        f"`{stats.manual_review_required_false_count}`",
+        f"- Mechanical missing-sequence rejects excluded from manual review: "
+        f"`{stats.missing_sequence_excluded_from_review_count}`",
+        "",
+        "### Counts by review batch",
+        "",
+    ]
+    for batch in (
+        "01_reject_review",
+        "02_accept_with_diagnostics",
+        "03_park_unresolved_molecule",
+        "04_park_trim_construct",
+        "05_repair_alignment_gaps",
+    ):
+        lines.append(f"- `{batch}`: `{_count(stats.review_batch_counts, batch)}`")
+    extra_batches = sorted(
+        name
+        for name in stats.review_batch_counts
+        if name
+        not in {
+            "01_reject_review",
+            "02_accept_with_diagnostics",
+            "03_park_unresolved_molecule",
+            "04_park_trim_construct",
+            "05_repair_alignment_gaps",
+        }
+    )
+    for batch in extra_batches:
+        lines.append(f"- `{batch}`: `{stats.review_batch_counts[batch]}`")
+
+    lines.extend(
+        [
+            "",
+            "## Trim context",
+            "",
+            "- S2 applied medium-confidence trims: `299`",
+            "- S2 records still requiring trim review before S3: `1278`",
+            "- S2 >40% blocked trim records: `230`",
+            "",
+            "After S3 precedence:",
+            "",
+            f"- medium-confidence trim condition: `{stats.medium_trim_count}`",
+            f"- medium-trim rows in the active review queue: "
+            f"`{stats.medium_trim_review_count}`",
+            f"- trim/construct-unresolved condition: "
+            f"`{stats.trim_construct_unresolved_count}`",
+            f"- trim/construct unresolved primary parks: "
+            f"`{_count(stats.primary_reason_counts, 'trim_construct_unresolved')}`",
+            f"- `trim_combined_exceeds_40pct` condition: "
+            f"`{stats.trim_combined_exceeds_40pct_count}`",
+            "",
+            "Explicit DNA/ssDNA records remain mechanical parks even when they "
+            "also carry a medium-confidence trim diagnostic. Those diagnostics "
+            "are retained on the decision sidecar; they are not queued as "
+            "ssDNA confirmation reviews.",
+            "",
+            "## Length",
+            "",
+            f"- length-out-of-range primary rejects: "
+            f"`{_count(stats.primary_reason_counts, 'length_out_of_range')}`",
+            f"- full-passed / core-failed (`trim_pushed_length_out_of_range`): "
+            f"`{stats.trim_pushed_length_count}`",
+            f"- lower-boundary (20–25 nt) condition: `{stats.boundary_low_count}`",
+            f"- upper-boundary (90–100 nt) condition: `{stats.boundary_high_count}`",
+            f"- boundary-length rows in the active review queue: "
+            f"`{stats.boundary_review_count}`",
+            "",
+            "### Core-length bucket by decision",
+            "",
+        ]
+    )
+    lines.extend(_nested_count_lines(stats.core_length_bucket_by_decision))
+
+    lines.extend(
+        [
+            "",
+            "## Random accept audit",
+            "",
+            f"- requested sample size: `30`",
+            f"- clean non-review accept pool: "
+            f"`{stats.random_accept_audit_pool_size}`",
+            f"- sampled: `{stats.random_accept_audit_count}`",
+            f"- shortfall: `{stats.random_accept_audit_shortfall}`",
+            "",
+            "## Primary reasons (all)",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.primary_reason_counts):
+        lines.append(f"- `{name}`: `{count}`")
+
+    lines.extend(["", "## Molecule type by decision", ""])
+    lines.extend(_nested_count_lines(stats.molecule_type_by_decision))
+    lines.extend(["", "## Chemistry by decision", ""])
+    lines.extend(_nested_count_lines(stats.chemistry_by_decision))
+    lines.extend(["", "## Alphabet by decision", ""])
+    lines.extend(_nested_count_lines(stats.alphabet_by_decision))
+
+    lines.extend(
+        [
+            "",
+            "## Target/evidence boundary",
+            "",
+            "UTexas target type was not inferred in S3 because the source "
+            "provides free-text target names only.",
+            "Target normalisation, protein/non-protein classification and "
+            "evidence eligibility are deferred to global S4.",
+            "",
+            "- Target type inferred: `no`",
+            "- Evidence scored: `no`",
+            "- Kd / Affinity parsed: `no`",
+            "- Leakage exclusions applied: `no`",
+            "- S4 started: `no`",
+            "",
+            "## Integrity",
+            "",
+            f"- S2 canonical hash before: `{result.s2_hash_before}`",
+            f"- S2 canonical hash after: `{result.s2_hash_after}`",
+            f"- S2 QC hash before: `{result.qc_hash_before}`",
+            f"- S2 QC hash after: `{result.qc_hash_after}`",
+            f"- Source-metadata hash before: `{result.sidecar_hash_before}`",
+            f"- Source-metadata hash after: `{result.sidecar_hash_after}`",
+            f"- S2 input integrity: "
+            f"`{'pass' if result.s2_integrity_ok else 'fail'}`",
+            f"- Inputs unchanged: "
+            f"`{'pass' if result.inputs_unchanged else 'fail'}`",
+            (
+                f"- Deterministic rerun result: "
+                f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+                if result.deterministic_rerun_ok is not None
+                else "- Deterministic rerun result: `not_checked`"
+            ),
+            f"- Raw workbook SHA-256 before: `{result.raw_sha_before or 'not_checked'}`",
+            f"- Raw workbook SHA-256 after: `{result.raw_sha_after or 'not_checked'}`",
+            "",
+            "## Inputs",
+            "",
+            f"- Eligibility policy: `{_relative_display(policy_path, repo_root)}`",
+            "",
+            "## Outputs",
+            "",
+            f"- Canonical: `{_relative_display(result.output_canonical, repo_root)}`",
+            f"- Decisions: `{_relative_display(result.output_decisions, repo_root)}`",
+            f"- Checkpoint review (sequence-free index of all rows): "
+            f"`{_relative_display(result.output_review, repo_root)}`",
+            f"- Checkpoint local detail (sequence-bearing scientific review): "
+            f"`{_relative_display(result.output_local_detail, repo_root)}`",
+            f"- Reason counts: "
+            f"`{_relative_display(result.output_reason_counts, repo_root)}`",
+        ]
+    )
+    if result.output_rejected is not None:
+        lines.append(
+            f"- Rejection log: `{_relative_display(result.output_rejected, repo_root)}`"
+        )
+    if result.output_parks is not None:
+        lines.append(
+            f"- Park sidecar: `{_relative_display(result.output_parks, repo_root)}`"
+        )
+    lines.extend(
+        [
+            f"- Summary: `{_relative_display(result.output_summary, repo_root)}`",
+            "",
+            "## Local-detail warning",
+            "",
+            "WARNING: `utexas_checkpoint1_local_detail.csv` and "
+            "`rejected_utexas.csv` contain source sequences. They must remain "
+            "beneath ignored `data/` and must never be staged or tracked.",
+            "",
+            "## Pipeline stop",
+            "",
+            UTEXAS_PIPELINE_STOP_STATEMENT,
+            "",
+            "CHECKPOINT-1 generated = yes",
+            "CHECKPOINT-1 human decisions applied = no",
+            "records authorised_for_s4 = 0",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_utexas_s3(
+    *,
+    repo_root: Path,
+    input_dir: Path,
+    source_metadata_dir: Path,
+    eligibility_policy: Path,
+    output_dir: Path,
+    expected_rows: int | None = EXPECTED_UTEXAS_ROWS,
+    check_deterministic_rerun: bool = False,
+) -> S3RunResult:
+    """Execute UTexas S3 technical eligibility classification and CHECKPOINT-1."""
+    repo_root = repo_root.resolve()
+    input_dir = (
+        input_dir if input_dir.is_absolute() else (repo_root / input_dir)
+    ).resolve()
+    source_metadata_dir = (
+        source_metadata_dir
+        if source_metadata_dir.is_absolute()
+        else (repo_root / source_metadata_dir)
+    ).resolve()
+    eligibility_policy = (
+        eligibility_policy
+        if eligibility_policy.is_absolute()
+        else (repo_root / eligibility_policy)
+    ).resolve()
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+
+    canonical_path = input_dir / "utexas_normalised.csv"
+    qc_path = input_dir / "utexas_s2_qc.csv"
+    sidecar_path = source_metadata_dir / "utexas_source_metadata.csv"
+    for path, label in (
+        (canonical_path, "S2 canonical"),
+        (qc_path, "S2 QC"),
+        (sidecar_path, "source-metadata"),
+    ):
+        if not path.is_file():
+            raise S3ClassifyError(f"Missing {label} input: {path.name}")
+
+    raw_path = (
+        repo_root
+        / "data"
+        / "raw"
+        / "UTexas_aptamer_dataset"
+        / "UTexas Aptamer Database dataset_Sept2023.xlsx"
+    )
+    raw_sha_before = ""
+    check_raw = expected_rows == EXPECTED_UTEXAS_ROWS and raw_path.is_file()
+    if expected_rows == EXPECTED_UTEXAS_ROWS:
+        if not raw_path.is_file():
+            raise S3ClassifyError("Missing registered UTexas raw workbook")
+        raw_sha_before = _sha256_file(raw_path)
+        if raw_sha_before != EXPECTED_RAW_SHA256:
+            raise S3ClassifyError(
+                "UTexas raw workbook SHA-256 does not match registry expectation"
+            )
+
+    s2_hash_before = _sha256_file(canonical_path)
+    qc_hash_before = _sha256_file(qc_path)
+    sidecar_hash_before = _sha256_file(sidecar_path)
+
+    policy = load_eligibility_policy(eligibility_policy)
+    if policy.source_key != "utexas":
+        raise S3ClassifyError(
+            f"Eligibility policy source_key must be utexas; got {policy.source_key!r}"
+        )
+    if not policy.defer_target_classification or not policy.defer_evidence_scoring:
+        raise S3ClassifyError(
+            "UTexas S3 policy must defer target classification and evidence scoring"
+        )
+    if (
+        policy.sequence_leakage_matching_enabled
+        or policy.target_leakage_matching_enabled
+        or not policy.defer_leakage_exclusion
+    ):
+        raise S3ClassifyError("UTexas S3 must not apply leakage exclusions")
+
+    canonical_rows = _read_corpus_csv(canonical_path)
+    qc_rows = _read_sidecar_csv(qc_path, label="S2 QC")
+    sidecar_rows = _read_sidecar_csv(sidecar_path, label="source-metadata")
+    aligned_qc = _match_sidecar_one_to_one(
+        canonical_rows, qc_rows, label="S2 QC"
+    )
+    aligned_sidecar = _match_sidecar_one_to_one(
+        canonical_rows, sidecar_rows, label="source-metadata"
+    )
+
+    if expected_rows is not None and len(canonical_rows) != expected_rows:
+        raise S3ClassifyError(
+            f"S2 row count must be {expected_rows}; got {len(canonical_rows)}"
+        )
+    if expected_rows == EXPECTED_UTEXAS_ROWS:
+        _assert_utexas_s2_invariants(canonical_rows)
+
+    stats = UTexasS3Stats()
+    stats.s2_rows = len(canonical_rows)
+    stats.order_preserved = True
+
+    s3_canonical: list[dict[str, str]] = []
+    decision_rows: list[dict[str, str]] = []
+    rejection_rows: list[dict[str, str]] = []
+    park_rows: list[dict[str, str]] = []
+    local_detail_by_id: dict[str, dict[str, str]] = {}
+
+    for s2_row, qc_row, meta_row in zip(
+        canonical_rows, aligned_qc, aligned_sidecar, strict=True
+    ):
+        classified = classify_utexas_record(
+            s2_row,
+            qc_row,
+            meta_row,
+            policy=policy,
+        )
+        if classified.canonical["record_id"] != s2_row["record_id"]:
+            stats.order_preserved = False
+            raise S3ClassifyError("S3 altered record_id or row identity")
+        for column in CORPUS_COLUMNS:
+            if classified.canonical[column] != s2_row[column]:
+                raise S3ClassifyError(
+                    f"S3 altered S2 canonical field {column!r}"
+                )
+        s3_canonical.append(classified.canonical)
+        decision_rows.append(classified.decision)
+        if classified.rejection_row is not None:
+            rejection_rows.append(classified.rejection_row)
+        if classified.park_row is not None:
+            park_rows.append(classified.park_row)
+        local_detail_by_id[classified.canonical["record_id"]] = (
+            build_utexas_local_detail_row(
+                canonical=classified.canonical,
+                s2_qc=qc_row,
+                decision=classified.decision,
+            )
+        )
+        update_utexas_stats_from_row(stats, classified)
+
+    sampled, pool, shortfall = apply_random_accept_audit(
+        decision_rows,
+        local_detail_by_id,
+        seed=policy.random_seed,
+        sample_size=policy.random_accept_audit_size,
+    )
+    stats.random_accept_audit_pool_size = pool
+    stats.random_accept_audit_shortfall = shortfall
+    refresh_stats_after_audit(stats, decision_rows)
+
+    stats.s3_rows = len(s3_canonical)
+    stats.unique_record_ids = len({row["record_id"] for row in s3_canonical})
+    stats.unique_native_ids = len({row["native_id"] for row in s3_canonical})
+
+    if stats.s3_rows != len(canonical_rows):
+        raise S3ClassifyError("S3 must preserve every S2 row")
+    if stats.unique_record_ids != len(s3_canonical):
+        raise S3ClassifyError("S3 record_id values are not unique")
+    if len({row["record_id"] for row in decision_rows}) != len(decision_rows):
+        raise S3ClassifyError("Decision sidecar contains duplicate record_id values")
+    accept_n = stats.decision_counts.get("proposed_accept", 0)
+    park_n = stats.decision_counts.get("proposed_park", 0)
+    reject_n = stats.decision_counts.get("proposed_reject", 0)
+    if accept_n + park_n + reject_n != stats.s3_rows:
+        raise S3ClassifyError("accept + park + reject does not equal S3 rows")
+    if len(rejection_rows) != reject_n:
+        raise S3ClassifyError("Rejection log count does not match proposed_reject")
+    if len(park_rows) != park_n:
+        raise S3ClassifyError("Park sidecar count does not match proposed_park")
+    if sampled != stats.random_accept_audit_count:
+        raise S3ClassifyError("Random-accept audit count mismatch")
+
+    for row in decision_rows:
+        if not row["primary_reason"]:
+            raise S3ClassifyError("Decision row missing primary_reason")
+
+    assert_utexas_accept_invariants(decision_rows)
+    assert_utexas_reject_park_invariants(decision_rows)
+
+    reason_count_rows: list[dict[str, str]] = []
+    combo_counts: dict[tuple[str, str], int] = {}
+    for row in decision_rows:
+        key = (row["proposed_decision"], row["primary_reason"])
+        combo_counts[key] = combo_counts.get(key, 0) + 1
+    for (decision, reason), count in sorted(combo_counts.items()):
+        reason_count_rows.append(
+            {
+                "proposed_decision": decision,
+                "primary_reason": reason,
+                "record_count": str(count),
+            }
+        )
+    if sum(int(row["record_count"]) for row in reason_count_rows) != len(decision_rows):
+        raise S3ClassifyError("Reason counts do not reconcile to decision rows")
+
+    review_rows = sorted(decision_rows, key=review_sort_key)
+    local_detail_rows: list[dict[str, str]] = []
+    for review_row in review_rows:
+        record_id = review_row["record_id"]
+        if record_id not in local_detail_by_id:
+            raise S3ClassifyError(
+                f"Missing local-detail row for record_id={record_id!r}"
+            )
+        local_detail_rows.append(local_detail_by_id[record_id])
+    for review_row, detail_row in zip(review_rows, local_detail_rows, strict=True):
+        if review_row["record_id"] != detail_row["record_id"]:
+            raise S3ClassifyError(
+                "Local-detail ordering does not match sequence-free review"
+            )
+        if review_row["review_batch"] != detail_row.get("review_batch", ""):
+            raise S3ClassifyError("Local-detail review_batch mismatch")
+
+    forbidden_seq_cols = {"sequence_raw", "sequence_full", "sequence_core"}
+    for col in forbidden_seq_cols:
+        if col in UTEXAS_DECISION_COLUMNS or col in UTEXAS_PARK_COLUMNS:
+            raise S3ClassifyError(f"Sequence column leaked into sidecar schema: {col}")
+    for col in ("sequence_raw", "sequence_full", "sequence_core"):
+        if col not in UTEXAS_LOCAL_DETAIL_COLUMNS:
+            raise S3ClassifyError(
+                f"Local-detail schema missing required sequence column: {col}"
+            )
+        if col not in UTEXAS_REJECTION_COLUMNS and col != "sequence_raw":
+            continue
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_canonical = output_dir / "utexas_s3_canonical.csv"
+    out_decisions = output_dir / "utexas_s3_decisions.csv"
+    out_review = output_dir / "utexas_checkpoint1_review.csv"
+    out_local_detail = output_dir / "utexas_checkpoint1_local_detail.csv"
+    out_reason_counts = output_dir / "utexas_checkpoint1_reason_counts.csv"
+    out_rejected = output_dir / "rejected_utexas.csv"
+    out_parks = output_dir / "utexas_s3_parks.csv"
+    out_summary = output_dir / "utexas_checkpoint1_summary.md"
+
+    write_corpus_csv_atomic(out_canonical, s3_canonical)
+    write_csv_atomic(out_decisions, UTEXAS_DECISION_COLUMNS, decision_rows)
+    write_csv_atomic(out_review, UTEXAS_DECISION_COLUMNS, review_rows)
+    write_csv_atomic(out_local_detail, UTEXAS_LOCAL_DETAIL_COLUMNS, local_detail_rows)
+    write_csv_atomic(out_reason_counts, UTEXAS_REASON_COUNT_COLUMNS, reason_count_rows)
+    write_csv_atomic(out_rejected, UTEXAS_REJECTION_COLUMNS, rejection_rows)
+    write_csv_atomic(out_parks, UTEXAS_PARK_COLUMNS, park_rows)
+
+    s2_hash_after = _sha256_file(canonical_path)
+    qc_hash_after = _sha256_file(qc_path)
+    sidecar_hash_after = _sha256_file(sidecar_path)
+    raw_sha_after = raw_sha_before
+    if check_raw:
+        raw_sha_after = _sha256_file(raw_path)
+        if raw_sha_after != EXPECTED_RAW_SHA256:
+            raise S3ClassifyError("UTexas raw workbook SHA-256 changed during S3")
+    inputs_unchanged = (
+        s2_hash_before == s2_hash_after
+        and qc_hash_before == qc_hash_after
+        and sidecar_hash_before == sidecar_hash_after
+        and (not check_raw or raw_sha_before == raw_sha_after)
+    )
+    if not inputs_unchanged:
+        raise S3ClassifyError("S2/source inputs were modified during S3 execution")
+
+    s2_integrity_ok = True
+    if _sha256_file(out_canonical) != s2_hash_before:
+        raise S3ClassifyError(
+            "S3 canonical output is not byte-identical to S2 normalised input"
+        )
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        first_hashes = {
+            "canonical": _sha256_file(out_canonical),
+            "decisions": _sha256_file(out_decisions),
+            "review": _sha256_file(out_review),
+            "local_detail": _sha256_file(out_local_detail),
+            "reason_counts": _sha256_file(out_reason_counts),
+            "rejected": _sha256_file(out_rejected),
+            "parks": _sha256_file(out_parks),
+        }
+        second = run_utexas_s3(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            source_metadata_dir=source_metadata_dir,
+            eligibility_policy=eligibility_policy,
+            output_dir=output_dir,
+            expected_rows=expected_rows,
+            check_deterministic_rerun=False,
+        )
+        deterministic_ok = (
+            first_hashes["canonical"] == _sha256_file(second.output_canonical)
+            and first_hashes["decisions"] == _sha256_file(second.output_decisions)
+            and first_hashes["review"] == _sha256_file(second.output_review)
+            and first_hashes["local_detail"]
+            == _sha256_file(second.output_local_detail)
+            and first_hashes["reason_counts"]
+            == _sha256_file(second.output_reason_counts)
+            and first_hashes["rejected"] == _sha256_file(second.output_rejected)
+            and first_hashes["parks"] == _sha256_file(second.output_parks)
+        )
+        if not deterministic_ok:
+            raise S3ClassifyError(
+                "S3 outputs were not byte-identical across deterministic rerun"
+            )
+
+    run_result = S3RunResult(
+        source_key="utexas",
+        stats=stats,
+        output_canonical=out_canonical,
+        output_decisions=out_decisions,
+        output_review=out_review,
+        output_local_detail=out_local_detail,
+        output_summary=out_summary,
+        output_reason_counts=out_reason_counts,
+        output_leakage_matches=None,
+        s2_hash_before=s2_hash_before,
+        s2_hash_after=s2_hash_after,
+        qc_hash_before=qc_hash_before,
+        qc_hash_after=qc_hash_after,
+        sidecar_hash_before=sidecar_hash_before,
+        sidecar_hash_after=sidecar_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        deterministic_rerun_ok=deterministic_ok,
+        s2_integrity_ok=s2_integrity_ok,
+        output_rejected=out_rejected,
+        output_parks=out_parks,
+        raw_sha_before=raw_sha_before,
+        raw_sha_after=raw_sha_after,
+    )
+    summary_text = build_utexas_checkpoint1_summary(
+        repo_root=repo_root,
+        result=run_result,
+        policy_path=eligibility_policy,
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in summary_text:
+        raise S3ClassifyError(
+            "CHECKPOINT-1 summary must not contain absolute repository paths"
+        )
+    if UTEXAS_PIPELINE_STOP_STATEMENT not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary missing pipeline stop statement")
+    if "UTexas target type was not inferred in S3" not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary missing target-type deferral")
+    _write_text_atomic(out_summary, summary_text)
+    return run_result
+
+
 def run_s3_classification(
     *,
     repo_root: Path,
@@ -851,6 +1593,18 @@ def run_s3_classification(
             output_dir=output_dir,
             expected_rows=(
                 EXPECTED_APTABASE_ROWS if expected_rows is None else expected_rows
+            ),
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key == "utexas":
+        return run_utexas_s3(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            source_metadata_dir=source_metadata_dir,
+            eligibility_policy=eligibility_policy,
+            output_dir=output_dir,
+            expected_rows=(
+                EXPECTED_UTEXAS_ROWS if expected_rows is None else expected_rows
             ),
             check_deterministic_rerun=check_deterministic_rerun,
         )
@@ -968,15 +1722,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_path = args.eligibility_policy
         elif args.source == "aptabase":
             policy_path = Path("config/source_eligibility/aptabase.json")
+        elif args.source == "utexas":
+            policy_path = Path("config/source_eligibility/utexas.json")
         else:
             raise S3ClassifyError(
-                "--eligibility-policy is required for non-aptabase sources"
+                "--eligibility-policy is required for unknown sources"
             )
-        output_dir = (
-            args.output_dir
-            if args.output_dir is not None
-            else Path("data/interim/checkpoints/aptabase_cp1")
-        )
+        if args.output_dir is not None:
+            output_dir = args.output_dir
+        elif args.source == "utexas":
+            output_dir = Path("data/interim/checkpoints/utexas_cp1")
+        else:
+            output_dir = Path("data/interim/checkpoints/aptabase_cp1")
 
         result = run_s3_classification(
             repo_root=repo_root,
@@ -993,6 +1750,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (
         S3ClassifyError,
         AptaBaseS3Error,
+        UTexasS3Error,
         EligibilityError,
         CorpusSchemaError,
     ) as exc:
@@ -1009,10 +1767,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"proposed_accept={stats.decision_counts.get('proposed_accept', 0)}\n"
         f"proposed_park={stats.decision_counts.get('proposed_park', 0)}\n"
         f"proposed_reject={stats.decision_counts.get('proposed_reject', 0)}\n"
-        f"sequence_leakage={stats.sequence_leakage_count}\n"
-        f"target_leakage={stats.target_leakage_count}\n"
-        f"both_leakage={stats.both_leakage_count}\n"
-        f"multiple_reasons={stats.multiple_reasons_count}\n"
+        f"sequence_leakage={getattr(stats, 'sequence_leakage_count', 0)}\n"
+        f"target_leakage={getattr(stats, 'target_leakage_count', 0)}\n"
+        f"both_leakage={getattr(stats, 'both_leakage_count', 0)}\n"
+        f"manual_review_required={getattr(stats, 'manual_review_required_true_count', 0)}\n"
+        f"multiple_reasons={getattr(stats, 'multiple_reasons_count', 0)}\n"
         f"inputs_unchanged={'pass' if result.inputs_unchanged else 'fail'}\n"
         f"s2_integrity={'pass' if result.s2_integrity_ok else 'fail'}"
     )

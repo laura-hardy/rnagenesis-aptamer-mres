@@ -83,6 +83,21 @@ class EligibilityReason(str, Enum):
     MOLECULE_TYPE_UNRESOLVED = "molecule_type_unresolved"
     MISSING_TARGET_REQUIRES_SOURCE_REVIEW = "missing_target_requires_source_review"
     TECHNICALLY_ELIGIBLE_RNA = "technically_eligible_rna"
+    # Plan-aligned technical-eligibility reasons used by UTexas S3.
+    # AptaBase continues to use the *_requires_review / ssdna_* names above.
+    NON_RNA_MOLECULE = "non_rna_molecule"
+    MIXED_T_AND_U = "mixed_T_and_U"
+    AMBIGUOUS_BASES = "ambiguous_bases"
+    INVALID_ALPHABET = "invalid_alphabet"
+    ALIGNMENT_GAPS = "alignment_gaps"
+    LENGTH_OUT_OF_RANGE = "length_out_of_range"
+    TRIM_CONSTRUCT_UNRESOLVED = "trim_construct_unresolved"
+    TRIM_PUSHED_LENGTH_OUT_OF_RANGE = "trim_pushed_length_out_of_range"
+    TRIM_COMBINED_EXCEEDS_40PCT = "trim_combined_exceeds_40pct"
+    MEDIUM_CONFIDENCE_TRIM = "medium_confidence_trim"
+    LOWER_LENGTH_BOUNDARY = "lower_length_boundary"
+    UPPER_LENGTH_BOUNDARY = "upper_length_boundary"
+    RANDOM_ACCEPT_AUDIT = "random_accept_audit"
 
 
 class ManualReviewPriority(str, Enum):
@@ -162,6 +177,23 @@ class EligibilityPolicy:
     target_leakage_matching_enabled: bool
     legacy_fields_are_diagnostic_only: bool
     checkpoint_requires_manual_approval: bool
+    sequence_leakage_matching_enabled: bool = True
+    explicit_non_rna_requires_manual_review: bool = True
+    defer_target_classification: bool = False
+    defer_evidence_scoring: bool = False
+    defer_leakage_exclusion: bool = False
+    use_plan_reason_vocabulary: bool = False
+    length_out_of_range_decision: str = "proposed_reject"
+    alignment_gaps_decision: str = "proposed_reject"
+    non_rna_molecule_decision: str = "proposed_park"
+    length_boundary_low_max: int = 25
+    length_boundary_high_min: int = 90
+    random_accept_audit_size: int = 0
+    random_seed: int = 42
+    review_model: str = "single_reviewer"
+    reviewer_initials_required: bool = True
+    reviewer_notes_required: bool = True
+    active_review_batches: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -280,6 +312,41 @@ def _require_int(value: Any, name: str) -> int:
     return value
 
 
+def _optional_bool(data: Mapping[str, Any], name: str, default: bool) -> bool:
+    if name not in data:
+        return default
+    return _require_bool(data.get(name), name)
+
+
+def _optional_int(data: Mapping[str, Any], name: str, default: int) -> int:
+    if name not in data:
+        return default
+    return _require_int(data.get(name), name)
+
+
+def _optional_str(data: Mapping[str, Any], name: str, default: str) -> str:
+    if name not in data:
+        return default
+    value = data.get(name)
+    if not isinstance(value, str) or not value.strip():
+        raise EligibilityError(f"{name} must be a non-empty string")
+    return value.strip()
+
+
+def _optional_decision(data: Mapping[str, Any], name: str, default: str) -> str:
+    if name not in data:
+        return default
+    return _require_decision(data.get(name), name)
+
+
+def _optional_str_list(
+    data: Mapping[str, Any], name: str, default: tuple[str, ...]
+) -> tuple[str, ...]:
+    if name not in data:
+        return default
+    return _require_str_list(data.get(name), name)
+
+
 def _require_decision(value: Any, name: str) -> str:
     text = str(value)
     if text not in ALLOWED_DECISIONS:
@@ -385,6 +452,47 @@ def load_eligibility_policy(path: str | Path) -> EligibilityPolicy:
         checkpoint_requires_manual_approval=_require_bool(
             data.get("checkpoint_requires_manual_approval"),
             "checkpoint_requires_manual_approval",
+        ),
+        sequence_leakage_matching_enabled=_optional_bool(
+            data, "sequence_leakage_matching_enabled", True
+        ),
+        explicit_non_rna_requires_manual_review=_optional_bool(
+            data, "explicit_non_rna_requires_manual_review", True
+        ),
+        defer_target_classification=_optional_bool(
+            data, "defer_target_classification", False
+        ),
+        defer_evidence_scoring=_optional_bool(
+            data, "defer_evidence_scoring", False
+        ),
+        defer_leakage_exclusion=_optional_bool(
+            data, "defer_leakage_exclusion", False
+        ),
+        use_plan_reason_vocabulary=_optional_bool(
+            data, "use_plan_reason_vocabulary", False
+        ),
+        length_out_of_range_decision=_optional_decision(
+            data, "length_out_of_range_decision", "proposed_reject"
+        ),
+        alignment_gaps_decision=_optional_decision(
+            data, "alignment_gaps_decision", "proposed_reject"
+        ),
+        non_rna_molecule_decision=_optional_decision(
+            data, "non_rna_molecule_decision", "proposed_park"
+        ),
+        length_boundary_low_max=_optional_int(data, "length_boundary_low_max", 25),
+        length_boundary_high_min=_optional_int(data, "length_boundary_high_min", 90),
+        random_accept_audit_size=_optional_int(data, "random_accept_audit_size", 0),
+        random_seed=_optional_int(data, "random_seed", 42),
+        review_model=_optional_str(data, "review_model", "single_reviewer"),
+        reviewer_initials_required=_optional_bool(
+            data, "reviewer_initials_required", True
+        ),
+        reviewer_notes_required=_optional_bool(
+            data, "reviewer_notes_required", True
+        ),
+        active_review_batches=_optional_str_list(
+            data, "active_review_batches", ()
         ),
     )
 

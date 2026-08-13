@@ -1,0 +1,7 @@
+# Corpus-wide curation parameters. Source-specific eligibility still lives in
+# config/source_eligibility/*.json; this file holds shared seeds and later-stage
+# defaults referenced by the curation plan.
+seed: 42
+MAX_TARGET_FRACTION: 0.05
+TRAINING_SEQUENCE_COLUMN: sequence_core
+checkpoint1_random_sample_size: 30

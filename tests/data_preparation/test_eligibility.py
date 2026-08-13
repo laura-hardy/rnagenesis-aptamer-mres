@@ -76,6 +76,30 @@ def test_load_aptabase_eligibility_policy() -> None:
     assert policy.core_length_max == 100
     assert policy.sequence_identity_threshold == 0.9
     assert policy.checkpoint_requires_manual_approval is True
+    assert policy.sequence_leakage_matching_enabled is True
+    assert policy.defer_target_classification is False
+
+
+def test_load_utexas_eligibility_policy() -> None:
+    policy = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "utexas.json"
+    )
+    assert policy.source_key == "utexas"
+    assert policy.defer_target_classification is True
+    assert policy.defer_evidence_scoring is True
+    assert policy.defer_leakage_exclusion is True
+    assert policy.sequence_leakage_matching_enabled is False
+    assert policy.target_leakage_matching_enabled is False
+    assert policy.explicit_non_rna_requires_manual_review is False
+    assert policy.use_plan_reason_vocabulary is True
+    assert policy.random_accept_audit_size == 30
+    assert policy.random_seed == 42
+    assert policy.reviewer_initials_required is False
+    assert policy.reviewer_notes_required is False
+    assert policy.invalid_sequence_decision == "proposed_reject"
+    assert policy.ssdna_decision == "proposed_park"
+    assert policy.decision_precedence[0] == "missing_sequence"
+    assert policy.decision_precedence[1] == "non_rna_molecule"
 
 
 def test_60_unknown_decision_value_fails(tmp_path: Path) -> None:

@@ -25,6 +25,10 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from s0_build_registry import find_repo_root  # noqa: E402
+from adapters.utexas_s3 import (  # noqa: E402
+    DEFAULT_UTEXAS_BATCHES,
+    LOCAL_DETAIL_COLUMNS as UTEXAS_LOCAL_DETAIL_COLUMNS,
+)
 
 EXPECTED_ACTIVE_ROWS = 431
 EXPECTED_TOTAL_ROWS = 610
@@ -66,6 +70,84 @@ EXPECTED_BATCH_COUNTS: Mapping[str, int] = {
     "08_park_trim_construct": 1,
     "09_park_ambiguous": 1,
 }
+
+UTEXAS_EXPECTED_TOTAL_ROWS = 1894
+UTEXAS_BATCH_ORDER: tuple[str, ...] = DEFAULT_UTEXAS_BATCHES
+UTEXAS_PIPELINE_STOP_STATEMENT = (
+    "CHECKPOINT-1 package generated.\n"
+    "No human decisions applied.\n"
+    "No record authorised for S4 yet."
+)
+
+UTEXAS_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
+    "review_batch",
+    "review_order",
+    "record_id",
+    "native_id",
+    "aptamer_name",
+    "target_name_raw",
+    "publication",
+    "proposed_decision",
+    "primary_reason",
+    "secondary_reasons",
+    "manual_review_priority",
+    "sequence_raw",
+    "sequence_full",
+    "sequence_core",
+    "sequence_length_full",
+    "sequence_length_core",
+    "molecule_type",
+    "chemistry",
+    "alphabet_as_reported",
+    "t_to_u_applied",
+    "construct_scope",
+    "trim_status",
+    "trim_confidence",
+    "detected_constant_5p",
+    "detected_constant_3p",
+    "qc_flags",
+    "review_action",
+    "reviewer_note",
+    "reviewer_initials",
+)
+
+UTEXAS_SEQUENCE_COLUMNS: tuple[str, ...] = (
+    "sequence_raw",
+    "sequence_full",
+    "sequence_core",
+)
+
+UTEXAS_INDEX_COLUMNS: tuple[str, ...] = tuple(
+    column
+    for column in UTEXAS_MANUAL_REVIEW_COLUMNS
+    if column not in UTEXAS_SEQUENCE_COLUMNS
+)
+
+UTEXAS_LOCAL_DETAIL_JOIN_FIELDS: tuple[str, ...] = (
+    "native_id",
+    "aptamer_name",
+    "target_name_raw",
+    "publication",
+    "proposed_decision",
+    "primary_reason",
+    "secondary_reasons",
+    "manual_review_priority",
+    "sequence_raw",
+    "sequence_full",
+    "sequence_core",
+    "sequence_length_full",
+    "sequence_length_core",
+    "molecule_type",
+    "chemistry",
+    "alphabet_as_reported",
+    "t_to_u_applied",
+    "construct_scope",
+    "trim_status",
+    "trim_confidence",
+    "detected_constant_5p",
+    "detected_constant_3p",
+    "qc_flags",
+)
 
 PRIORITY_ORDER: tuple[str, ...] = ("high", "medium", "low", "none")
 
@@ -723,17 +805,355 @@ def prepare_aptabase_checkpoint1_review(
     return result
 
 
+def build_utexas_manual_review_row(
+    *,
+    review_row: Mapping[str, str],
+    local_detail: Mapping[str, str],
+    review_batch: str,
+    review_order: int,
+) -> dict[str, str]:
+    """Build one UTexas sequence-bearing active-review row."""
+    if review_row["record_id"] != local_detail["record_id"]:
+        raise Checkpoint1ReviewError("Joined record_id mismatch")
+    for field_name in (
+        "proposed_decision",
+        "primary_reason",
+        "secondary_reasons",
+        "manual_review_priority",
+    ):
+        if review_row.get(field_name, "") != local_detail.get(field_name, ""):
+            raise Checkpoint1ReviewError(
+                f"Checkpoint field mismatch for {field_name!r} on "
+                f"{review_row['record_id']!r}"
+            )
+    row = {column: "" for column in UTEXAS_MANUAL_REVIEW_COLUMNS}
+    row["review_batch"] = review_batch
+    row["review_order"] = str(review_order)
+    row["record_id"] = review_row["record_id"]
+    for field_name in UTEXAS_LOCAL_DETAIL_JOIN_FIELDS:
+        row[field_name] = local_detail.get(field_name, "")
+    row["review_action"] = ""
+    row["reviewer_note"] = ""
+    row["reviewer_initials"] = ""
+    return row
+
+
+def build_utexas_index_row(queue_row: Mapping[str, str]) -> dict[str, str]:
+    return {column: queue_row.get(column, "") for column in UTEXAS_INDEX_COLUMNS}
+
+
+def utexas_review_package_sort_key(
+    row: Mapping[str, str],
+) -> tuple[int, int, str, str]:
+    batch = row.get("review_batch", "")
+    try:
+        batch_rank = UTEXAS_BATCH_ORDER.index(batch)
+    except ValueError:
+        batch_rank = len(UTEXAS_BATCH_ORDER)
+    return (
+        batch_rank,
+        _priority_rank(row.get("manual_review_priority", "none")),
+        row.get("primary_reason", ""),
+        row.get("record_id", ""),
+    )
+
+
+def build_utexas_review_summary(
+    *,
+    repo_root: Path,
+    result: ReviewPackageResult,
+) -> str:
+    stats = result.stats
+    lines = [
+        "# UTexas CHECKPOINT-1 manual-review package",
+        "",
+        "## Totals",
+        "",
+        f"- Total checkpoint records: `{stats.total_checkpoint_records}`",
+        f"- Active review rows: `{stats.active_review_rows}`",
+        f"- No-review records: `{stats.no_review_records}`",
+        f"- Review actions recorded: `0`",
+        "",
+        "## Review model",
+        "",
+        "- `review_model` = `single_reviewer`",
+        "- `reviewer_initials_required` = `false`",
+        "- `reviewer_notes_required` = `false`",
+        "",
+        "## Counts by review batch",
+        "",
+    ]
+    for batch in UTEXAS_BATCH_ORDER:
+        count = stats.batch_counts.get(batch, 0)
+        lines.append(f"- `{batch}`: `{count}`")
+
+    lines.extend(["", "## Counts by proposed decision", ""])
+    for name, count in sorted(stats.decision_counts.items()):
+        lines.append(f"- `{name}`: `{count}`")
+
+    lines.extend(["", "## Counts by primary reason", ""])
+    for name, count in sorted(stats.primary_reason_counts.items()):
+        lines.append(f"- `{name}`: `{count}`")
+
+    lines.extend(["", "## Counts by review priority", ""])
+    for name in PRIORITY_ORDER:
+        if name in stats.priority_counts:
+            lines.append(f"- `{name}`: `{stats.priority_counts[name]}`")
+
+    lines.extend(
+        [
+            "",
+            "## Permitted reviewer actions",
+            "",
+        ]
+    )
+    for action in PERMITTED_REVIEW_ACTIONS:
+        lines.append(f"- `{action}`")
+
+    lines.extend(
+        [
+            "",
+            "## Completion requirements",
+            "",
+            "- `review_action` must be nonempty for every active row.",
+            "- `reviewer_note` and `reviewer_initials` may remain blank.",
+            "- No review action has yet been recorded.",
+            "- Do not infer target type or score evidence during this review.",
+            "",
+            "## Outputs",
+            "",
+            f"- Sequence-bearing review queue: "
+            f"`{_relative_display(result.output_queue, repo_root)}`",
+            f"- Sequence-free review index: "
+            f"`{_relative_display(result.output_index, repo_root)}`",
+            f"- Summary: `{_relative_display(result.output_summary, repo_root)}`",
+            "",
+            "## Local sequence warning",
+            "",
+            "WARNING: `utexas_checkpoint1_manual_review.csv` contains source "
+            "and canonical sequences for manual scientific review. It must "
+            "remain beneath ignored `data/` and must never be staged or tracked.",
+            "",
+            "## Pipeline stop",
+            "",
+            UTEXAS_PIPELINE_STOP_STATEMENT,
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def prepare_utexas_checkpoint1_review(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    expected_active_rows: int | None = None,
+    expected_total_rows: int | None = UTEXAS_EXPECTED_TOTAL_ROWS,
+) -> ReviewPackageResult:
+    """Build the UTexas CHECKPOINT-1 active manual-review package."""
+    repo_root = repo_root.resolve()
+    checkpoint_dir = _resolve_under_repo(repo_root, checkpoint_dir)
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+
+    review_path = checkpoint_dir / "utexas_checkpoint1_review.csv"
+    local_detail_path = checkpoint_dir / "utexas_checkpoint1_local_detail.csv"
+    for path, label in (
+        (review_path, "checkpoint review"),
+        (local_detail_path, "local-detail"),
+    ):
+        if not path.is_file():
+            raise Checkpoint1ReviewError(f"Missing {label} input: {path.name}")
+
+    review_hash_before = _sha256_file(review_path)
+    local_detail_hash_before = _sha256_file(local_detail_path)
+
+    review_rows = _read_csv(review_path, label="checkpoint review")
+    local_detail_rows = _read_csv(local_detail_path, label="local-detail")
+    paired = _join_review_and_local_detail(review_rows, local_detail_rows)
+
+    if expected_total_rows is not None and len(paired) != expected_total_rows:
+        raise Checkpoint1ReviewError(
+            f"Checkpoint row count must be {expected_total_rows}; got {len(paired)}"
+        )
+
+    stats = ReviewPackageStats()
+    stats.total_checkpoint_records = len(paired)
+
+    active_pairs: list[tuple[dict[str, str], dict[str, str], str]] = []
+    for review_row, detail_row in paired:
+        required = (review_row.get("manual_review_required") or "").strip()
+        if required not in {"true", "false"}:
+            raise Checkpoint1ReviewError(
+                "manual_review_required must be lowercase true/false; "
+                f"got {required!r} for {review_row['record_id']!r}"
+            )
+        if required == "false":
+            stats.no_review_records += 1
+            if review_row.get("review_batch"):
+                raise Checkpoint1ReviewError(
+                    "No-review UTexas row must not carry review_batch: "
+                    f"{review_row['record_id']!r}"
+                )
+            continue
+        if (
+            review_row.get("proposed_decision") == "proposed_reject"
+            and review_row.get("primary_reason") == "missing_sequence"
+        ):
+            raise Checkpoint1ReviewError(
+                "Missing-sequence reject must not enter the active review queue: "
+                f"{review_row['record_id']!r}"
+            )
+        if (
+            review_row.get("primary_reason") == "non_rna_molecule"
+            and review_row.get("manual_review_required") == "true"
+        ):
+            raise Checkpoint1ReviewError(
+                "Explicit DNA/ssDNA must not enter an active UTexas review batch: "
+                f"{review_row['record_id']!r}"
+            )
+        batch = (review_row.get("review_batch") or "").strip()
+        if not batch:
+            raise Checkpoint1ReviewError(
+                "Review-required UTexas row missing review_batch: "
+                f"{review_row['record_id']!r}"
+            )
+        if batch not in UTEXAS_BATCH_ORDER:
+            raise Checkpoint1ReviewError(
+                f"Unknown UTexas review_batch {batch!r} for "
+                f"{review_row['record_id']!r}"
+            )
+        detail_batch = (detail_row.get("review_batch") or "").strip()
+        if detail_batch and detail_batch != batch:
+            raise Checkpoint1ReviewError(
+                f"review_batch mismatch for {review_row['record_id']!r}"
+            )
+        active_pairs.append((review_row, detail_row, batch))
+
+    if expected_active_rows is not None and len(active_pairs) != expected_active_rows:
+        raise Checkpoint1ReviewError(
+            f"Active review row count must be {expected_active_rows}; "
+            f"got {len(active_pairs)}"
+        )
+
+    draft_rows: list[dict[str, str]] = []
+    for review_row, detail_row, batch in active_pairs:
+        draft_rows.append(
+            build_utexas_manual_review_row(
+                review_row=review_row,
+                local_detail=detail_row,
+                review_batch=batch,
+                review_order=0,
+            )
+        )
+
+    draft_rows.sort(key=utexas_review_package_sort_key)
+    queue_rows: list[dict[str, str]] = []
+    for index, row in enumerate(draft_rows, start=1):
+        ordered = dict(row)
+        ordered["review_order"] = str(index)
+        if (
+            ordered["review_action"]
+            or ordered["reviewer_note"]
+            or ordered["reviewer_initials"]
+        ):
+            raise Checkpoint1ReviewError(
+                "Reviewer fields must be empty in the prepared package"
+            )
+        queue_rows.append(ordered)
+        batch = ordered["review_batch"]
+        stats.batch_counts[batch] = stats.batch_counts.get(batch, 0) + 1
+        decision = ordered["proposed_decision"]
+        stats.decision_counts[decision] = stats.decision_counts.get(decision, 0) + 1
+        primary = ordered["primary_reason"]
+        stats.primary_reason_counts[primary] = (
+            stats.primary_reason_counts.get(primary, 0) + 1
+        )
+        priority = ordered["manual_review_priority"]
+        stats.priority_counts[priority] = stats.priority_counts.get(priority, 0) + 1
+
+    stats.active_review_rows = len(queue_rows)
+    if len({row["record_id"] for row in queue_rows}) != len(queue_rows):
+        raise Checkpoint1ReviewError("Active review queue has duplicate record_id")
+    if sum(stats.batch_counts.values()) != stats.active_review_rows:
+        raise Checkpoint1ReviewError("Batch counts do not reconcile to active rows")
+
+    index_rows = [build_utexas_index_row(row) for row in queue_rows]
+    if any(column in UTEXAS_INDEX_COLUMNS for column in UTEXAS_SEQUENCE_COLUMNS):
+        raise Checkpoint1ReviewError("Sequence columns leaked into index schema")
+    for column in UTEXAS_SEQUENCE_COLUMNS:
+        if column not in UTEXAS_MANUAL_REVIEW_COLUMNS:
+            raise Checkpoint1ReviewError(
+                f"Queue schema missing sequence column {column!r}"
+            )
+    missing_detail = [
+        column
+        for column in UTEXAS_LOCAL_DETAIL_JOIN_FIELDS
+        if column not in UTEXAS_LOCAL_DETAIL_COLUMNS
+    ]
+    if missing_detail:
+        raise Checkpoint1ReviewError(
+            f"UTexas local-detail schema missing join fields: {missing_detail}"
+        )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_queue = output_dir / "utexas_checkpoint1_manual_review.csv"
+    out_index = output_dir / "utexas_checkpoint1_manual_review_index.csv"
+    out_summary = output_dir / "utexas_checkpoint1_manual_review_summary.md"
+
+    write_csv_atomic(out_queue, UTEXAS_MANUAL_REVIEW_COLUMNS, queue_rows)
+    write_csv_atomic(out_index, UTEXAS_INDEX_COLUMNS, index_rows)
+
+    review_hash_after = _sha256_file(review_path)
+    local_detail_hash_after = _sha256_file(local_detail_path)
+    inputs_unchanged = (
+        review_hash_before == review_hash_after
+        and local_detail_hash_before == local_detail_hash_after
+    )
+    if not inputs_unchanged:
+        raise Checkpoint1ReviewError(
+            "CHECKPOINT-1 inputs were modified during review-package preparation"
+        )
+
+    result = ReviewPackageResult(
+        source_key="utexas",
+        stats=stats,
+        output_queue=out_queue,
+        output_index=out_index,
+        output_summary=out_summary,
+        review_hash_before=review_hash_before,
+        review_hash_after=review_hash_after,
+        local_detail_hash_before=local_detail_hash_before,
+        local_detail_hash_after=local_detail_hash_after,
+        inputs_unchanged=inputs_unchanged,
+    )
+    summary_text = build_utexas_review_summary(repo_root=repo_root, result=result)
+    abs_root = str(repo_root.resolve())
+    if abs_root in summary_text:
+        raise Checkpoint1ReviewError(
+            "Review summary must not contain absolute repository paths"
+        )
+    if UTEXAS_PIPELINE_STOP_STATEMENT not in summary_text:
+        raise Checkpoint1ReviewError("Review summary missing pipeline stop statement")
+    if "No review action has yet been recorded." not in summary_text:
+        raise Checkpoint1ReviewError(
+            "Review summary must state that no review action has been recorded"
+        )
+    _write_text_atomic(out_summary, summary_text)
+    return result
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Prepare the AptaBase CHECKPOINT-1 manual-review package from "
-            "existing checkpoint review and local-detail artefacts."
+            "Prepare a CHECKPOINT-1 manual-review package from existing "
+            "checkpoint review and local-detail artefacts."
         )
     )
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (currently only aptabase)",
+        help="Source key (aptabase or utexas)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -781,9 +1201,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     try:
-        if args.source != "aptabase":
+        if args.source not in {"aptabase", "utexas"}:
             raise Checkpoint1ReviewError(
-                f"Unsupported source_key={args.source!r}; only aptabase is implemented"
+                f"Unsupported source_key={args.source!r}; "
+                "supported: aptabase, utexas"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -793,32 +1214,50 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not repo_root.is_dir():
             raise Checkpoint1ReviewError(f"Repository root does not exist: {repo_root}")
 
+        default_checkpoint = (
+            Path("data/interim/checkpoints/utexas_cp1")
+            if args.source == "utexas"
+            else Path("data/interim/checkpoints/aptabase_cp1")
+        )
         checkpoint_dir = (
             args.checkpoint_dir
             if args.checkpoint_dir is not None
-            else Path("data/interim/checkpoints/aptabase_cp1")
+            else default_checkpoint
         )
         output_dir = (
             args.output_dir
             if args.output_dir is not None
             else Path(checkpoint_dir) / "manual_review"
         )
-        result = prepare_aptabase_checkpoint1_review(
-            repo_root=repo_root,
-            checkpoint_dir=checkpoint_dir,
-            output_dir=output_dir,
-            expected_active_rows=(
-                EXPECTED_ACTIVE_ROWS
-                if args.expected_active_rows is None
-                else args.expected_active_rows
-            ),
-            expected_total_rows=(
-                EXPECTED_TOTAL_ROWS
-                if args.expected_total_rows is None
-                else args.expected_total_rows
-            ),
-            enforce_expected_batch_counts=not args.skip_expected_batch_counts,
-        )
+        if args.source == "utexas":
+            result = prepare_utexas_checkpoint1_review(
+                repo_root=repo_root,
+                checkpoint_dir=checkpoint_dir,
+                output_dir=output_dir,
+                expected_active_rows=args.expected_active_rows,
+                expected_total_rows=(
+                    UTEXAS_EXPECTED_TOTAL_ROWS
+                    if args.expected_total_rows is None
+                    else args.expected_total_rows
+                ),
+            )
+        else:
+            result = prepare_aptabase_checkpoint1_review(
+                repo_root=repo_root,
+                checkpoint_dir=checkpoint_dir,
+                output_dir=output_dir,
+                expected_active_rows=(
+                    EXPECTED_ACTIVE_ROWS
+                    if args.expected_active_rows is None
+                    else args.expected_active_rows
+                ),
+                expected_total_rows=(
+                    EXPECTED_TOTAL_ROWS
+                    if args.expected_total_rows is None
+                    else args.expected_total_rows
+                ),
+                enforce_expected_batch_counts=not args.skip_expected_batch_counts,
+            )
     except Checkpoint1ReviewError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -832,7 +1271,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"no_review_records={stats.no_review_records}\n"
         f"inputs_unchanged={'pass' if result.inputs_unchanged else 'fail'}"
     )
-    for batch in BATCH_ORDER:
+    batch_order = UTEXAS_BATCH_ORDER if result.source_key == "utexas" else BATCH_ORDER
+    for batch in batch_order:
         print(f"{batch}={stats.batch_counts.get(batch, 0)}")
     return 0
 

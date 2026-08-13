@@ -2455,3 +2455,213 @@ S3 has not started.
 CHECKPOINT-1 record eligibility review has not started.
 Unresolved constant/construct cases remain flagged for S3 CHECKPOINT-1.
 ```
+
+## 2026-08-13 — UTexas S3 technical eligibility and CHECKPOINT-1 package
+
+### Stage
+
+UTexas **S3 technical sequence/molecule eligibility** and generation of the
+record-level **CHECKPOINT-1** review package. Human review decisions were not
+applied. CHECKPOINT-1 was not closed. Global S4 was not started. Target
+normalisation, evidence scoring, leakage exclusion, deduplication, clustering,
+balancing and partitioning were not performed.
+
+### S3 policy
+
+Tracked policy: `config/source_eligibility/utexas.json`. Shared seed
+`42` is recorded in that policy and in `config/curation_config.yaml`.
+AptaBase S3/CHECKPOINT-1 behaviour was not rewritten.
+
+S3 assigns exactly one provisional primary state per record
+(`proposed_accept` / `proposed_park` / `proposed_reject`) plus secondary
+reason codes. No record disappears.
+
+Deterministic precedence:
+
+1. missing sequence
+2. explicit non-RNA experimental molecule (`ssDNA` / `DNA`)
+3. unresolved molecule type
+4. mixed T/U, ambiguous bases, alignment gaps, invalid alphabet
+5. `sequence_length_core` outside 20–100 nt
+6. unresolved trim/construct
+7. otherwise technically acceptable RNA
+
+### Source-specific scientific rules
+
+- Missing `sequence_core` (399 blank physical workbook rows) →
+  `proposed_reject` / `missing_sequence`, excluded from the active review
+  queue, retained in the rejection log.
+- Explicit `ssDNA`/`DNA` → mechanical `proposed_park` /
+  `non_rna_molecule` (`manual_review_required=false`). T is retained. No
+  active ssDNA confirmation batch.
+- Non-missing `molecule_type=unknown` (the three `FANA XNA` records) →
+  `proposed_park` / `molecule_type_unresolved` with active review batch
+  `03_park_unresolved_molecule`. FANA is not inferred as RNA or DNA from
+  alphabet.
+- Mixed T/U, IUPAC ambiguity and remaining invalid alphabet → reject
+  (`mixed_T_and_U`, `ambiguous_bases`, `invalid_alphabet`). Alignment-gap
+  invalidity would reject as `alignment_gaps` with repair-review batch
+  `05_repair_alignment_gaps`; none were present.
+- Length is evaluated on `sequence_length_core` only (20–100 nt). Out of
+  range → `length_out_of_range`. If unresolved trim evidence remains, the
+  provisional reject stays but enters `04_park_trim_construct` so
+  CHECKPOINT-1 can override. Full-passed / core-failed cases would also
+  require review; the S2 assertion of zero such cases remains true.
+- Otherwise acceptable records at 20–25 nt or 90–100 nt stay
+  `proposed_accept` but enter `02_accept_with_diagnostics`.
+- All 299 medium-confidence applied trims keep their S2 trim. Otherwise
+  acceptable medium-trim RNA records are `proposed_accept` with review
+  reason `medium_confidence_trim`. If a stronger rule parks or rejects,
+  the medium-trim diagnostic is retained as secondary.
+- Unresolved trim/construct after alphabet/length checks →
+  `proposed_park` / `trim_construct_unresolved` / batch
+  `04_park_trim_construct`, including the 230 S2-blocked >40% combined
+  trims. Unresolved full constructs are not sent to S4 merely because the
+  current core is 20–100 nt.
+- Modified RNA chemistries (`2F-RNA`, `2NH2-RNA`, `2OMe-RNA`, `mixed`,
+  unknown specialised chemistry) are not rejected for chemistry alone.
+- `construct_scope` is preserved from S2 (`full_construct` 8 /
+  `partial_construct` 291 / `unknown` 1595).
+
+### Target/evidence deferral
+
+UTexas target type was not inferred in S3 because the source provides
+free-text `target_name_raw` only. Target normalisation,
+protein/non-protein classification, UniProt mapping, Kd/Affinity parsing,
+evidence eligibility and leakage exclusion are deferred to global S4.
+CHECKPOINT-1 authorisation, when it later happens, will mean only
+technical eligibility to enter that future global stage.
+
+### S3 reconciliation
+
+```text
+S3 input rows = 1894
+proposed_accept = 109
+proposed_park = 1264
+proposed_reject = 521
+1894 = 109 + 1264 + 521
+
+manual_review_required = 468
+mechanical/no-review = 1426
+record_id unique = 1894
+S2 canonical fields mutated = no
+```
+
+Proposed rejects by primary reason:
+
+```text
+missing_sequence = 399
+ambiguous_bases = 8
+invalid_alphabet = 23
+alignment_gaps = 0
+length_out_of_range = 91
+mixed_T_and_U = 0
+```
+
+The 34 DNA/ssDNA rows with invalid characters are parked as
+`non_rna_molecule` (invalid alphabet retained as a secondary diagnostic)
+because explicit experimental molecule type outranks alphabet under the
+UTexas precedence. Invalid-alphabet primary rejects are therefore the 23
+RNA cases.
+
+Proposed parks by primary reason:
+
+```text
+non_rna_molecule (DNA/ssDNA) = 909
+molecule_type_unresolved = 3
+trim_construct_unresolved = 352
+```
+
+Proposed accepts: `109` technically eligible RNA records.
+
+### Review queue
+
+```text
+active review rows = 468
+01_reject_review = 0
+02_accept_with_diagnostics = 45
+03_park_unresolved_molecule = 3
+04_park_trim_construct = 420
+05_repair_alignment_gaps = 0
+```
+
+`01_reject_review` is empty because judgement-dependent rejects in this
+source are the 68 overlength records that still have unresolved trim
+evidence; those were routed to `04_park_trim_construct` as specified.
+Mechanical missing-sequence, invalid-alphabet, ambiguous-base and
+plain length rejects stay out of the active queue.
+
+Trim mapping after precedence:
+
+```text
+299 applied medium-confidence trims → 97 in the active queue
+  (7 otherwise-acceptable RNA accepts in batch 02; 88 RNA trim/construct
+  parks in batch 04; 2 RNA length-out-of-range rows in batch 04).
+  The remaining 202 medium trims stay out of the active queue:
+  198 mechanically parked ssDNA, 3 RNA ambiguous-base rejects, and
+  1 mechanical RNA length reject. The medium-trim diagnostic is
+  retained; they are not queued as ssDNA confirmations.
+1278 still trim_requires_review before S3 → 352 primary trim/construct
+  parks; 68 additional length-out-of-range rows keep that diagnostic and
+  enter batch 04; DNA/ssDNA cases keep it as secondary only.
+230 >40% blocked trims → 29 RNA rows in the active trim/construct queue;
+  201 are mechanical ssDNA parks with the diagnostic retained.
+```
+
+Length/boundary/audit:
+
+```text
+full-passed / core-failed = 0
+lower-boundary (20–25 nt) condition = 12
+upper-boundary (90–100 nt) condition = 127
+boundary-length rows in active review = 65
+random clean-accept sample = 30 (pool 94, seed 42, shortfall 0)
+```
+
+Reviewer fields (`review_action`, `reviewer_note`, `reviewer_initials`)
+are blank. Review model: `single_reviewer`; initials and notes are not
+required.
+
+### Verification
+
+- Targeted UTexas S3 + CHECKPOINT-1 + AptaBase S3/CHECKPOINT-1 +
+  eligibility tests: **127 passed**
+- Broader data-preparation suite (same hang-prone legacy AptaBase
+  cleaner/parser and ENA exclusions as before): **593 passed**
+- Deterministic rerun: byte-identical S3 canonical, decisions, review,
+  local-detail, reason counts, rejection log, park sidecar, and the
+  CHECKPOINT-1 queue/index/summary
+- S2 canonical SHA unchanged
+  (`588498eaeeacb1f7d7349ef1f0f30ef46ba2e64d873416439ed62df614e50c7e`)
+- Raw workbook SHA unchanged =
+  `b5a66beb58d30c5c3d2f36a29ea2cc3678e7d4a6b1bb1a97efc1e166a49fd15c`
+- AptaBase scientific interim outputs were not rewritten
+
+### Outputs (gitignored under `data/interim/checkpoints/utexas_cp1/`)
+
+- `utexas_s3_canonical.csv` / `utexas_s3_decisions.csv` /
+  `utexas_s3_parks.csv`
+- `rejected_utexas.csv` (sequence-bearing rejection log)
+- `utexas_checkpoint1_review.csv` (sequence-free, all 1894 rows)
+- `utexas_checkpoint1_local_detail.csv` (sequence-bearing, all rows)
+- `utexas_checkpoint1_reason_counts.csv` /
+  `utexas_checkpoint1_summary.md`
+- `manual_review/utexas_checkpoint1_manual_review.csv` (active queue)
+- `manual_review/utexas_checkpoint1_manual_review_index.csv`
+- `manual_review/utexas_checkpoint1_manual_review_summary.md`
+
+### Pipeline stop
+
+```text
+CHECKPOINT-1 package generated.
+No human decisions applied.
+No record authorised for S4 yet.
+target type inferred = no
+evidence scored = no
+S4 started = no
+records authorised_for_s4 = 0
+```
+
+Laura/ChatGPT should inspect the sequence-safe summary and index, then
+decide how to review and close CHECKPOINT-1. Do not populate review
+decisions in this milestone.
