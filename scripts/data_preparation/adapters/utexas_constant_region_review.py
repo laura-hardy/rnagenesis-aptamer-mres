@@ -7,6 +7,7 @@ a sequence-safe review summary. Never mutates canonical sequences.
 from __future__ import annotations
 
 import hashlib
+import json
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -64,6 +65,62 @@ REVIEW_DECISION_COLUMNS: tuple[str, ...] = (
 
 ALLOWED_REVIEW_DECISIONS: frozenset[str] = frozenset(
     {"approve", "reject", "needs_source_review", ""}
+)
+
+REVIEW_POLICY_VERSION: str = "utexas_constant_region_rules_v1"
+REVIEW_DECISION_DATE: str = "2026-08-13"
+REVIEW_SCOPE: str = "constant_region_rules"
+
+EXPECTED_CANDIDATE_RULES: int = 569
+EXPECTED_APPROVE: int = 47
+EXPECTED_NEEDS_SOURCE_REVIEW: int = 522
+EXPECTED_REJECT: int = 0
+EXPECTED_AGREEMENT_COUNTS: dict[str, int] = {
+    "pool_type_only": 464,
+    "conflicting_evidence": 56,
+    "pool_type_plus_consensus_agree": 47,
+    "known_motif_only": 1,
+    "consensus_only": 1,
+}
+
+RESOLUTION_MANIFEST_COLUMNS: tuple[str, ...] = (
+    "candidate_rule_id",
+    "side",
+    "motif_length",
+    "evidence_sources",
+    "agreement_category",
+    "conflict_status",
+    "decision",
+    "reviewer_note_present",
+    "reviewer_note_sha256",
+)
+
+NOTE_APPROVE_AGREE = (
+    "Approved: source-documented Pool Type and qualifying target+publication "
+    "consensus agree; no rule-level trim guard-rail violation."
+)
+NOTE_APPROVE_CONSENSUS = (
+    "Approved: Tier-2 target+publication consensus satisfies the plan "
+    "thresholds and has no rule-level guard-rail violation."
+)
+NOTE_POOL_ONLY = (
+    "Needs source review: source-documented Pool Type evidence is not "
+    "independently confirmed by qualifying Tier-2 consensus."
+)
+NOTE_CONFLICT = (
+    "Needs source review: constant-region evidence channels conflict."
+)
+NOTE_KNOWN = (
+    "Needs source review: known-motif detection conflicts with other "
+    "construct evidence; do not choose a trim extent automatically."
+)
+NOTE_GUARD40 = (
+    "Needs source review: otherwise supported rule has a hypothetical "
+    "application exceeding the 40% trim guard rail."
+)
+NOTE_DEFAULT_UNRESOLVED = (
+    "Needs source review: trim rule remains unresolved pending source "
+    "or CHECKPOINT-1 review."
 )
 
 
@@ -204,6 +261,243 @@ def _priority(
     return "medium"
 
 
+def _as_int(value: str | None, default: int = 0) -> int:
+    text = (value or "").strip()
+    if not text:
+        return default
+    return int(text)
+
+
+def _as_float(value: str | None, default: float = 0.0) -> float:
+    text = (value or "").strip()
+    if not text:
+        return default
+    return float(text)
+
+
+def _note_sha256(note: str) -> str:
+    if not note:
+        return ""
+    return hashlib.sha256(note.encode("utf-8")).hexdigest()
+
+
+def validate_reviewed_candidate_package(
+    candidates: Sequence[Mapping[str, str]],
+    *,
+    decisions: Sequence[Mapping[str, str]] | None = None,
+) -> None:
+    """Hard-fail if the review package differs from the reviewed 569-rule set."""
+    if len(candidates) != EXPECTED_CANDIDATE_RULES:
+        raise ValueError(
+            f"candidate rules must be {EXPECTED_CANDIDATE_RULES}; got {len(candidates)}"
+        )
+    cand_ids = [row["candidate_rule_id"] for row in candidates]
+    if len(set(cand_ids)) != EXPECTED_CANDIDATE_RULES:
+        raise ValueError("candidate_rule_id values are not unique in candidates")
+    agreement = {}
+    for row in candidates:
+        key = row.get("agreement_category") or ""
+        agreement[key] = agreement.get(key, 0) + 1
+    if agreement != EXPECTED_AGREEMENT_COUNTS:
+        raise ValueError(
+            f"agreement_category counts differ from reviewed inputs: {agreement}"
+        )
+    if decisions is None:
+        return
+    if len(decisions) != EXPECTED_CANDIDATE_RULES:
+        raise ValueError(
+            f"decision-template rows must be {EXPECTED_CANDIDATE_RULES}; "
+            f"got {len(decisions)}"
+        )
+    dec_ids = [row["candidate_rule_id"] for row in decisions]
+    if len(set(dec_ids)) != EXPECTED_CANDIDATE_RULES:
+        raise ValueError("candidate_rule_id values are not unique in decisions")
+    if set(cand_ids) != set(dec_ids):
+        raise ValueError("candidate ID sets in candidates and decisions are not equal")
+
+
+def _is_safe_agreement_approve(row: Mapping[str, str]) -> bool:
+    return (
+        row.get("agreement_category") == "pool_type_plus_consensus_agree"
+        and (row.get("conflict_status") or "none") == "none"
+        and _as_float(row.get("group_consensus_support")) >= 0.80
+        and _as_int(row.get("motif_length")) >= 12
+        and _as_int(row.get("n_would_fail_min_length")) == 0
+        and _as_int(row.get("n_would_exceed_40pct_trim")) == 0
+    )
+
+
+def _is_safe_consensus_only_approve(row: Mapping[str, str]) -> bool:
+    return (
+        row.get("agreement_category") == "consensus_only"
+        and (row.get("conflict_status") or "none") == "none"
+        and _as_float(row.get("group_consensus_support")) >= 0.80
+        and _as_int(row.get("motif_length")) >= 12
+        and _as_int(row.get("n_would_fail_min_length")) == 0
+        and _as_int(row.get("n_would_exceed_40pct_trim")) == 0
+    )
+
+
+def apply_explicit_review_decisions(
+    candidates: Sequence[Mapping[str, str]],
+) -> list[dict[str, str]]:
+    """Fill the human-reviewed UTexas constant-region decision policy."""
+    validate_reviewed_candidate_package(candidates)
+    decisions: list[dict[str, str]] = []
+    for row in candidates:
+        if _is_safe_agreement_approve(row):
+            decision = "approve"
+            note = NOTE_APPROVE_AGREE
+        elif _is_safe_consensus_only_approve(row):
+            decision = "approve"
+            note = NOTE_APPROVE_CONSENSUS
+        else:
+            decision = "needs_source_review"
+            category = row.get("agreement_category") or ""
+            if category == "pool_type_only":
+                note = NOTE_POOL_ONLY
+            elif category == "conflicting_evidence":
+                note = NOTE_CONFLICT
+            elif category == "known_motif_only":
+                note = NOTE_KNOWN
+            elif (
+                category == "pool_type_plus_consensus_agree"
+                and _as_int(row.get("n_would_exceed_40pct_trim")) > 0
+            ):
+                note = NOTE_GUARD40
+            else:
+                note = NOTE_DEFAULT_UNRESOLVED
+        decisions.append(
+            {
+                "candidate_rule_id": row["candidate_rule_id"],
+                "decision": decision,
+                "review_note": note,
+                "reviewer_initials": "",
+            }
+        )
+    decisions.sort(key=lambda item: item["candidate_rule_id"])
+    counts = {}
+    for row in decisions:
+        counts[row["decision"]] = counts.get(row["decision"], 0) + 1
+    if counts.get("approve", 0) != EXPECTED_APPROVE:
+        raise ValueError(
+            f"approve count must be {EXPECTED_APPROVE}; got {counts.get('approve', 0)}"
+        )
+    if counts.get("needs_source_review", 0) != EXPECTED_NEEDS_SOURCE_REVIEW:
+        raise ValueError(
+            "needs_source_review count must be "
+            f"{EXPECTED_NEEDS_SOURCE_REVIEW}; got {counts.get('needs_source_review', 0)}"
+        )
+    if counts.get("reject", 0) != EXPECTED_REJECT:
+        raise ValueError(
+            f"reject count must be {EXPECTED_REJECT}; got {counts.get('reject', 0)}"
+        )
+    if any(not row["decision"] for row in decisions):
+        raise ValueError("blank decisions remain after explicit review policy")
+    if len(decisions) != EXPECTED_CANDIDATE_RULES:
+        raise ValueError(
+            f"decision total must be {EXPECTED_CANDIDATE_RULES}; got {len(decisions)}"
+        )
+    return decisions
+
+
+def build_resolution_manifest_rows(
+    candidates: Sequence[Mapping[str, str]],
+    decisions: Sequence[Mapping[str, str]],
+) -> list[dict[str, str]]:
+    """Sequence-safe tracked resolution rows (no aptamer records)."""
+    notes = {row["candidate_rule_id"]: row for row in decisions}
+    manifest: list[dict[str, str]] = []
+    for row in candidates:
+        rule_id = row["candidate_rule_id"]
+        decision_row = notes[rule_id]
+        note = decision_row.get("review_note") or ""
+        manifest.append(
+            {
+                "candidate_rule_id": rule_id,
+                "side": row.get("side") or "",
+                "motif_length": row.get("motif_length") or "",
+                "evidence_sources": row.get("evidence_sources") or "",
+                "agreement_category": row.get("agreement_category") or "",
+                "conflict_status": row.get("conflict_status") or "",
+                "decision": decision_row.get("decision") or "",
+                "reviewer_note_present": "true" if note else "false",
+                "reviewer_note_sha256": _note_sha256(note),
+            }
+        )
+    manifest.sort(key=lambda item: item["candidate_rule_id"])
+    return manifest
+
+
+def build_approved_trim_rules_payload(
+    candidates: Sequence[Mapping[str, str]],
+    decisions: Sequence[Mapping[str, str]],
+) -> dict[str, Any]:
+    """Build the tracked approved-trim-rule config (source-scoped motifs)."""
+    decision_by_id = {row["candidate_rule_id"]: row["decision"] for row in decisions}
+    rules: list[dict[str, Any]] = []
+    for row in candidates:
+        if decision_by_id.get(row["candidate_rule_id"]) != "approve":
+            continue
+        motif = (row.get("motif_or_motif_id") or "").strip()
+        if not motif or not all(ch in "ACGTUacgtu" for ch in motif):
+            raise ValueError(
+                "approved rule must have a nucleotide motif for exact matching"
+            )
+        rules.append(
+            {
+                "candidate_rule_id": row["candidate_rule_id"],
+                "side": row["side"],
+                "motif": motif.upper(),
+                "motif_length": _as_int(row.get("motif_length")),
+                "evidence_sources": row.get("evidence_sources") or "",
+                "agreement_category": row.get("agreement_category") or "",
+                "group_consensus_support": row.get("group_consensus_support") or "",
+                "confidence": "medium",
+            }
+        )
+    rules.sort(key=lambda item: item["candidate_rule_id"])
+    if len(rules) != EXPECTED_APPROVE:
+        raise ValueError(
+            f"approved trim rule count must be {EXPECTED_APPROVE}; got {len(rules)}"
+        )
+    return {
+        "source_key": "utexas",
+        "review_scope": REVIEW_SCOPE,
+        "review_policy_version": REVIEW_POLICY_VERSION,
+        "trim_confidence": "medium",
+        "apply_approved_trims": True,
+        "rules": rules,
+    }
+
+
+def build_review_metadata(
+    *,
+    candidate_sha256: str,
+    decision_sha256: str,
+    approved_count: int = EXPECTED_APPROVE,
+    needs_source_review_count: int = EXPECTED_NEEDS_SOURCE_REVIEW,
+    rejected_count: int = EXPECTED_REJECT,
+) -> dict[str, Any]:
+    """Tracked sequence-safe review metadata."""
+    return {
+        "source_key": "utexas",
+        "review_scope": REVIEW_SCOPE,
+        "review_policy_version": REVIEW_POLICY_VERSION,
+        "review_model": "single_reviewer",
+        "reviewer_initials_required": False,
+        "decision_date": REVIEW_DECISION_DATE,
+        "candidate_count": EXPECTED_CANDIDATE_RULES,
+        "approved_count": approved_count,
+        "needs_source_review_count": needs_source_review_count,
+        "rejected_count": rejected_count,
+        "candidate_file_sha256": candidate_sha256,
+        "decision_file_sha256": decision_sha256,
+        "checkpoint_status": "constant_region_rules_closed",
+        "next_stage": "S3_not_started",
+    }
+
+
 def build_constant_region_review_package(
     *,
     proposals: Sequence[Mapping[str, str]],
@@ -216,6 +510,7 @@ def build_constant_region_review_package(
     old_group_consensus: int = 816,
     old_known_motif: int = 21,
     old_zero_length: int = 717,
+    apply_reviewed_policy: bool = False,
 ) -> ConstantRegionReviewPackage:
     """Collapse row/group proposals into unique candidate trim rules."""
     by_record = {row["record_id"]: row for row in normalised_rows}
@@ -506,15 +801,23 @@ def build_constant_region_review_package(
     rule_membership.sort(
         key=lambda row: (row["candidate_rule_id"], row["record_id"], row["proposal_source"])
     )
-    review_decisions = [
-        {
-            "candidate_rule_id": row["candidate_rule_id"],
-            "decision": "",
-            "review_note": "",
-            "reviewer_initials": "",
-        }
-        for row in rule_candidates
-    ]
+    if apply_reviewed_policy:
+        validate_reviewed_candidate_package(rule_candidates)
+        review_decisions = apply_explicit_review_decisions(rule_candidates)
+    else:
+        review_decisions = [
+            {
+                "candidate_rule_id": row["candidate_rule_id"],
+                "decision": "",
+                "review_note": "",
+                "reviewer_initials": "",
+            }
+            for row in rule_candidates
+        ]
+    decision_counts: dict[str, int] = defaultdict(int)
+    for row in review_decisions:
+        key = row["decision"] or "blank"
+        decision_counts[key] += 1
 
     source_counts: dict[str, int] = defaultdict(int)
     for proposal in proposals:
@@ -670,14 +973,22 @@ def build_constant_region_review_package(
             f"- known-motif proposals = `{source_counts.get('known_motif', 0)}`",
             "- new zero-length proposals = `0`",
             "",
+            "## Human-reviewed rule decisions",
+            "",
+            f"- approve = `{decision_counts.get('approve', 0)}`",
+            f"- needs_source_review = `{decision_counts.get('needs_source_review', 0)}`",
+            f"- reject = `{decision_counts.get('reject', 0)}`",
+            f"- blank = `{decision_counts.get('blank', 0)}`",
+            "",
+            "Unresolved `needs_source_review` rules are not applied.",
+            "",
             "## Pipeline state",
             "",
             "```text",
-            "No trim has been approved.",
-            "No trim has been applied.",
-            "sequence_core remains unchanged.",
+            "Constant-region rule review recorded.",
+            "Unresolved rules remain pending source/CHECKPOINT-1 review.",
             "S3 has not started.",
-            "CHECKPOINT-1 has not started.",
+            "CHECKPOINT-1 record eligibility review has not started.",
             "```",
             "",
         ]
@@ -696,6 +1007,11 @@ def build_constant_region_review_package(
         "pool_exact_perfect": perfect,
         "pool_exact_partial": partial,
         "pool_exact_poor": poor,
+        "decision_counts": dict(decision_counts),
+        "approved_count": int(decision_counts.get("approve", 0)),
+        "needs_source_review_count": int(
+            decision_counts.get("needs_source_review", 0)
+        ),
     }
     return ConstantRegionReviewPackage(
         proposals=list(proposals),
@@ -730,3 +1046,75 @@ def write_review_package_files(
     )
     paths["review_summary"].write_text(package.summary_markdown, encoding="utf-8")
     return paths
+
+
+def write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
+    """Atomically write pretty-printed JSON with a trailing newline."""
+    import os
+    import tempfile
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    fd, temp_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=str(path.parent),
+    )
+    temp_path = Path(temp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+        temp_path.replace(path)
+    except Exception:
+        if temp_path.exists():
+            temp_path.unlink()
+        raise
+
+
+def write_tracked_review_artefacts(
+    *,
+    repo_root: Path,
+    candidates: Sequence[Mapping[str, str]],
+    decisions: Sequence[Mapping[str, str]],
+    candidate_sha256: str,
+    decision_sha256: str,
+    write_csv_atomic,
+) -> dict[str, Path]:
+    """Write sequence-safe tracked review provenance and approved-rule config."""
+    repo_root = Path(repo_root)
+    manifest_path = (
+        repo_root / "config" / "checkpoint_reviews" / "utexas_constant_region_resolutions.csv"
+    )
+    metadata_path = (
+        repo_root
+        / "config"
+        / "checkpoint_reviews"
+        / "utexas_constant_region_review_metadata.json"
+    )
+    rules_path = (
+        repo_root
+        / "config"
+        / "source_normalisation"
+        / "utexas_approved_trim_rules.json"
+    )
+    write_csv_atomic(
+        manifest_path,
+        RESOLUTION_MANIFEST_COLUMNS,
+        build_resolution_manifest_rows(candidates, decisions),
+    )
+    write_json_atomic(
+        metadata_path,
+        build_review_metadata(
+            candidate_sha256=candidate_sha256,
+            decision_sha256=decision_sha256,
+        ),
+    )
+    write_json_atomic(
+        rules_path, build_approved_trim_rules_payload(candidates, decisions)
+    )
+    return {
+        "resolutions": manifest_path,
+        "metadata": metadata_path,
+        "approved_trim_rules": rules_path,
+    }

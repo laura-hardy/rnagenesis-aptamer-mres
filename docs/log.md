@@ -2356,3 +2356,102 @@ S3 has not started.
 CHECKPOINT-1 has not started.
 Laura/ChatGPT must review rule-level candidates before any UTexas trim approval.
 ```
+
+## 2026-08-13 — UTexas S2 approved constant-region trimming
+
+### Stage
+
+Human-reviewed rule-level trim policy was recorded and applied. S3 and
+record-level CHECKPOINT-1 were not started. Target normalisation, evidence
+scoring, deduplication, clustering and global S4 were not performed.
+
+### Review decisions
+
+569 candidate constant-region rules were reviewed as a package:
+
+| Decision | Count | Policy |
+|---|---|---|
+| `approve` | 47 | 46 `pool_type_plus_consensus_agree` (no conflict, support ≥0.80, motif ≥12, no rule-level guard-rail violation) plus 1 `consensus_only` rule (5 records, support 1.0, motif 22 nt) |
+| `needs_source_review` | 522 | 464 `pool_type_only` + 56 `conflicting_evidence` + 1 `known_motif_only` + 1 otherwise-supported rule with a >40% hypothetical trim |
+| `reject` | 0 | Unresolved rules are not scientifically disproven |
+
+The conservative approval policy requires independent Pool Type documentation
+and qualifying target+publication consensus (or, for the single consensus-only
+rule, plan-threshold consensus with perfect exact match). Pool Type alone,
+conflicts, known-motif-only detections, and the >40% rule remain for later
+source/CHECKPOINT review.
+
+Review model: `single_reviewer` (initials blank). Decision date: 2026-08-13.
+
+### Application safeguards
+
+- Exact terminal match only (T/U-collapsed comparison). No fuzzy matching.
+- Same-side competing approved motifs: do not trim; flag for review.
+- Combined per-record 5′+3′ simulation: if resulting core <20 nt or combined
+  trim fraction >40%, apply neither side.
+- Unresolved rules are never applied.
+- `trim_confidence = medium` for all applied Tier-2 rules.
+
+### Applied-trim results
+
+```text
+approved rules = 47 (all matched ≥1 record)
+unresolved rules = 522
+records safely trimmed = 299
+5′ only = 199
+3′ only = 92
+both ends = 8
+same-side ambiguities = 0
+combined <20 prevented = 0
+combined >40% prevented = 230
+total bases removed = 5978
+resolved_by_approved_trim = 27
+still_trim_requires_review = 1278
+```
+
+Core-length buckets after trimming:
+
+| Bucket | Full (unchanged) | Core after trim |
+|---|---|---|
+| missing | 399 | 399 |
+| <20 | 15 | 15 |
+| 20–100 | 1287 | 1318 |
+| 101–200 | 191 | 160 |
+| >200 | 2 | 2 |
+
+31 records moved from `sequence_full` >100 into `sequence_core` 20–100.
+No record that was 20–100 nt full became out of range after trimming.
+
+### Invariants
+
+```text
+rows in/out = 1894
+sequence_raw changed = no
+sequence_full changed = no
+molecule_type unchanged (RNA 583 / ssDNA 896 / DNA 13 / unknown 402)
+T→U = 0
+raw workbook SHA unchanged =
+b5a66beb58d30c5c3d2f36a29ea2cc3678e7d4a6b1bb1a97efc1e166a49fd15c
+AptaBase normalised SHA unchanged
+```
+
+### Tracked provenance
+
+- `config/checkpoint_reviews/utexas_constant_region_review_metadata.json`
+- `config/checkpoint_reviews/utexas_constant_region_resolutions.csv`
+- `config/source_normalisation/utexas_approved_trim_rules.json` (47 source-scoped motifs)
+
+### Verification
+
+- Broader data-preparation suite (same legacy exclusions as before): **563 passed**
+- Deterministic rerun: byte-identical for normalised, QC, review candidates,
+  proposals, trim audit, ambiguity sidecar and S2 report
+
+### Pipeline stop
+
+```text
+UTexas S2 sequence normalisation and approved constant-region trimming complete.
+S3 has not started.
+CHECKPOINT-1 record eligibility review has not started.
+Unresolved constant/construct cases remain flagged for S3 CHECKPOINT-1.
+```

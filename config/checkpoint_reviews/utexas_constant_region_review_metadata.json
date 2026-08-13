@@ -1,0 +1,16 @@
+{
+  "approved_count": 47,
+  "candidate_count": 569,
+  "candidate_file_sha256": "504ed3a93a8fac31e557386ff88343320c6a1ff5cc4c20ddec2463348dbc4752",
+  "checkpoint_status": "constant_region_rules_closed",
+  "decision_date": "2026-08-13",
+  "decision_file_sha256": "0efedc25cc85d7bbe3f2aab126a19794382bd5b1b1c1df8816a268edfd90a8f4",
+  "needs_source_review_count": 522,
+  "next_stage": "S3_not_started",
+  "rejected_count": 0,
+  "review_model": "single_reviewer",
+  "review_policy_version": "utexas_constant_region_rules_v1",
+  "review_scope": "constant_region_rules",
+  "reviewer_initials_required": false,
+  "source_key": "utexas"
+}

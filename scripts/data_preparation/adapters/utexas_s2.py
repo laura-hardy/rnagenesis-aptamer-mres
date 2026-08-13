@@ -94,6 +94,9 @@ REVIEW_RELEVANT_FLAGS: Final[frozenset[str]] = frozenset(
         "core_above_max_length",
         "constants_suspected_unresolved",
         "pool_type_constants_proposed",
+        "trim_same_side_ambiguous",
+        "trim_combined_core_below_min",
+        "trim_combined_exceeds_40pct",
     }
 )
 
@@ -137,6 +140,7 @@ class UtexasNormalisationPolicy:
     reported_length_field: str
     apply_approved_trims: bool
     approved_trim_rules: tuple[str, ...]
+    approved_trim_rules_path: str
     parse_pool_type_for_proposals: bool
     group_inference_key: str
     molecule_type_map: Mapping[str, str]
@@ -226,6 +230,23 @@ class UTexasS2Stats:
     constant_region_reason: str = (
         "proposals_only_no_approved_utexas_trim_rules"
     )
+    records_trimmed: int = 0
+    trim_five_prime_only: int = 0
+    trim_three_prime_only: int = 0
+    trim_both_ends: int = 0
+    trim_same_side_ambiguities: int = 0
+    trim_skipped_combined_below_20: int = 0
+    trim_skipped_combined_over_40: int = 0
+    trim_total_bases_removed: int = 0
+    approved_rules: int = 0
+    unresolved_rules: int = 0
+    approved_rules_matching_ge1: int = 0
+    approved_rules_matching_none: int = 0
+    resolved_by_approved_trim: int = 0
+    still_trim_requires_review: int = 0
+    rescued_overlength_to_20_100: int = 0
+    core_became_out_of_range: int = 0
+    same_motif_multi_rule_applications: int = 0
 
 
 def _require_mapping(value: Any, name: str) -> Mapping[str, Any]:
@@ -269,6 +290,38 @@ def _load_group_inference_key(data: Mapping[str, Any]) -> str:
     return key
 
 
+def _load_approved_trim_rule_ids(
+    data: Mapping[str, Any], policy_path: Path
+) -> tuple[str, ...]:
+    """Load approved rule IDs from inline list and/or dedicated rules file."""
+    inline = data.get("approved_trim_rules", [])
+    inline_ids = _require_str_list(inline, "approved_trim_rules") if inline else ()
+    rel = data.get("approved_trim_rules_path")
+    if not rel:
+        return inline_ids
+    if not isinstance(rel, str) or not rel.strip():
+        raise UTexasS2Error("approved_trim_rules_path must be a string")
+    path = Path(rel.strip())
+    if not path.is_absolute():
+        path = (policy_path.parent / path).resolve()
+    if not path.is_file():
+        return inline_ids
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    rules = payload.get("rules")
+    if not isinstance(rules, list):
+        raise UTexasS2Error("approved trim rules file must contain a rules list")
+    file_ids = tuple(
+        str(item["candidate_rule_id"])
+        for item in rules
+        if isinstance(item, Mapping) and item.get("candidate_rule_id")
+    )
+    if inline_ids and tuple(inline_ids) != file_ids:
+        raise UTexasS2Error(
+            "approved_trim_rules and approved_trim_rules_path IDs do not match"
+        )
+    return file_ids
+
+
 def _require_str_map(value: Any, name: str) -> dict[str, str]:
     data = _require_mapping(value, name)
     out: dict[str, str] = {}
@@ -309,9 +362,8 @@ def load_utexas_policy(path: str | Path) -> UtexasNormalisationPolicy:
         apply_approved_trims=_require_bool(
             data.get("apply_approved_trims"), "apply_approved_trims"
         ),
-        approved_trim_rules=_require_str_list(
-            data.get("approved_trim_rules", []), "approved_trim_rules"
-        ),
+        approved_trim_rules=_load_approved_trim_rule_ids(data, policy_path),
+        approved_trim_rules_path=str(data.get("approved_trim_rules_path") or ""),
         parse_pool_type_for_proposals=_require_bool(
             data.get("parse_pool_type_for_proposals"),
             "parse_pool_type_for_proposals",
@@ -499,10 +551,8 @@ def normalise_utexas_record(
             qc_flags.append("molecule_type_unknown")
 
     sequence_full = norm.sequence_full or ""
-    if policy.apply_approved_trims and policy.approved_trim_rules:
-        raise UTexasS2Error(
-            "UTexas approved trim application is not implemented in this milestone"
-        )
+    # Approved trims are applied in a second pass by the S2 runner after all
+    # records and membership are known. This function never trims.
     sequence_core = sequence_full
 
     five_motifs, three_motifs = _motif_names_by_side(norm.detected_motifs)

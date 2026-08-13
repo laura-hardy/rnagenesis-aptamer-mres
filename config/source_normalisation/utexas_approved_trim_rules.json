@@ -1,0 +1,479 @@
+{
+  "apply_approved_trims": true,
+  "review_policy_version": "utexas_constant_region_rules_v1",
+  "review_scope": "constant_region_rules",
+  "rules": [
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:01db859cc8fb",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "CAGCTCAGAAGCTTGATCCTGTG",
+      "motif_length": 23,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:035837396988",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GACCCGTAGGGCAGTGAATTCAG",
+      "motif_length": 23,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:184db07aba58",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GGGAGCUCAGAAUAAACGCUCAA",
+      "motif_length": 23,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:1b825af7b7c1",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "CATCTGCAGTGTGGCACCATG",
+      "motif_length": 21,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:21a9c7759242",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "AGCAGCACAGAGGTCAGATG",
+      "motif_length": 20,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:2951473aa123",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "0.923077",
+      "motif": "GGGAGATACCAGCTTATTCAATT",
+      "motif_length": 23,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:348efba53068",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "CGTACGGAATTCGCTAGC",
+      "motif_length": 18,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:4b9bfbd3b000",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "ATCCAGAGTGACGCAGCA",
+      "motif_length": 18,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:4e7b71182a97",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "TAGGGAATTCGTCGACGGATCC",
+      "motif_length": 22,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:59611522b403",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GGGAGGACGATGTTA",
+      "motif_length": 15,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:6d0244317c12",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GTACGAATTCACGAGGTTGCC",
+      "motif_length": 21,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:9334df21a6b5",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "TAGCTCACTCATTAGGCAC",
+      "motif_length": 19,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:95b5658547f5",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "ATACCAGCTTATTCAATT",
+      "motif_length": 18,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:988f9095e418",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "0.857143",
+      "motif": "CATGCTTACCTATAGTGAACTTT",
+      "motif_length": 23,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:a9ba6cfa3eb5",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "CTCCTCTGACTGTAACCACG",
+      "motif_length": 20,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:aaccdfaa747f",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GGGAATTCCGCGTGTGC",
+      "motif_length": 17,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:aeb3756935e3",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GACACCTGCGGATCCAAAGCGATGGC",
+      "motif_length": 26,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:b68e6ff109be",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GGGAGGACGATGCGG",
+      "motif_length": 15,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:d44f64e1511d",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GGGAGACAAGAATAAAACGCTCAA",
+      "motif_length": 24,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:d69731e7684e",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GGTATTGAGGGTCGCATC",
+      "motif_length": 18,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:e5caa0154fff",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "AAGGAGCAGCGTGGAGGATA",
+      "motif_length": 20,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:e74f4f5703c4",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GTGACGCGACTAGTTACGGA",
+      "motif_length": 20,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:f27ec4a8c486",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GACGCTTACTCAGGTGTGACTCG",
+      "motif_length": 23,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:five_prime:f65841d45442",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "AGTATACGTATTACCTGCAGC",
+      "motif_length": 21,
+      "side": "five_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:0f5facf3c076",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "0.818182",
+      "motif": "CTGCAGGTCGACGCATGCGCCG",
+      "motif_length": 22,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:11276d40de49",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "CCCATCGCAGCCCTGCAGGCTCTTCAG",
+      "motif_length": 27,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:2cbac4e0d911",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GCAAGCTTGGACGTGTGTGCG",
+      "motif_length": 21,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:47eabdfb7fb5",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "AGCATGGAGTCGGATCCTCTA",
+      "motif_length": 21,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:5d3d1b10590b",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "CGAAGGACGCAGAGAAGTCTC",
+      "motif_length": 21,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:60890c49c549",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "TTGATTGTGGTGTTGGCTCCCAAGCTTCGG",
+      "motif_length": 30,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:641f417594f5",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "CAATTTGTTGCAACGAACAGGTCACTA",
+      "motif_length": 27,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:6f6c430af07e",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GACTCGAAGTCGTGCATCTGCA",
+      "motif_length": 22,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:72760436ba3d",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "CCTATGCGTGCTACCGTGAA",
+      "motif_length": 20,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:7bd082500634",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GTCCGTTCGGGATCCTC",
+      "motif_length": 17,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:8e0ae84960be",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "AAGAAGACTCGCAAGA",
+      "motif_length": 16,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:8fc45e8d558d",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "AGATCGGAAGAGCTC",
+      "motif_length": 15,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:924e34f2fe87",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GGATCCGAGCTCCACGTG",
+      "motif_length": 18,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:983eb478e32d",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "0.888889",
+      "motif": "AGTATCGCTAATCAGGCGGAT",
+      "motif_length": 21,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:a654ea80918b",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GCTAGTAAGCTTGCCGT",
+      "motif_length": 17,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:b319ac4904ce",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GCATAGGTAGTCCAGAAGCC",
+      "motif_length": 20,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:baa95bc4d211",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "0.857143",
+      "motif": "TTAGGGTGTGTCGTCGTGGT",
+      "motif_length": 20,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:c733275a8dd6",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "GATGGCTCTAACTCTCCTCT",
+      "motif_length": 20,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "consensus_only",
+      "candidate_rule_id": "utexas_rule:three_prime:d0a30e53fa66",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus",
+      "group_consensus_support": "1",
+      "motif": "CTCCAGGTCGACGCATGCGCCG",
+      "motif_length": 22,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:da643a6e2b5e",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "TTCGACAGGAGGCTCACAACAGGC",
+      "motif_length": 24,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:dc15482ad9f6",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "UUCACUGCAGACUUGACGAAGCUU",
+      "motif_length": 24,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:edc44aaa7026",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "0.846154",
+      "motif": "TTCGACATGAGGCCCGGATC",
+      "motif_length": 20,
+      "side": "three_prime"
+    },
+    {
+      "agreement_category": "pool_type_plus_consensus_agree",
+      "candidate_rule_id": "utexas_rule:three_prime:f110fd4370b1",
+      "confidence": "medium",
+      "evidence_sources": "group_consensus|pool_type",
+      "group_consensus_support": "1",
+      "motif": "TTCGCACACACGGACTTACG",
+      "motif_length": 20,
+      "side": "three_prime"
+    }
+  ],
+  "source_key": "utexas",
+  "trim_confidence": "medium"
+}

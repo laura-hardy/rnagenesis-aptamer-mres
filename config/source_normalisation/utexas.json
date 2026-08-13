@@ -7,8 +7,9 @@
   "pool_type_field": "utexas_pool_type",
   "pool_random_region_field": "utexas_pool_random_region",
   "reported_length_field": "utexas_sequence_length",
-  "apply_approved_trims": false,
+  "apply_approved_trims": true,
   "approved_trim_rules": [],
+  "approved_trim_rules_path": "utexas_approved_trim_rules.json",
   "parse_pool_type_for_proposals": true,
   "group_inference_key": "target_name_raw_plus_publication",
   "molecule_type_map": {

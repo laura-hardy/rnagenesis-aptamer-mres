@@ -47,8 +47,18 @@ from adapters.utexas_s2 import (  # noqa: E402
     update_stats_from_row as update_utexas_stats_from_row,
 )
 from adapters.utexas_constant_region_review import (  # noqa: E402
+    EXPECTED_APPROVE,
+    EXPECTED_CANDIDATE_RULES,
+    EXPECTED_NEEDS_SOURCE_REVIEW,
     build_constant_region_review_package,
     write_review_package_files,
+    write_tracked_review_artefacts,
+)
+from adapters.utexas_approved_trims import (  # noqa: E402
+    AMBIGUITY_COLUMNS,
+    TRIM_AUDIT_COLUMNS,
+    apply_approved_trims_to_rows,
+    load_approved_trim_rules,
 )
 from common.constant_region_inference import (  # noqa: E402
     build_group_inference_key,
@@ -115,6 +125,8 @@ class S2RunResult:
     output_rule_membership: Path | None = None
     output_review_decisions: Path | None = None
     output_review_summary: Path | None = None
+    output_trim_audit: Path | None = None
+    output_trim_ambiguity: Path | None = None
 
 
 def _sha256_file(path: Path) -> str:
@@ -808,7 +820,30 @@ def build_utexas_s2_report(
             "Tier-2 consensus groups by `(source_db, target_name_raw, publication)`.",
             "Pool Type is independent source-documented evidence only.",
             "Failed consensus attempts are diagnostics, not proposal rows.",
-            "No newly inferred UTexas constant was applied as a trim.",
+            "",
+            "### Human-reviewed trim policy",
+            "",
+            f"- Candidate constant rules: `{stats.approved_rules + stats.unresolved_rules}`",
+            f"- Human-approved rules: `{stats.approved_rules}`",
+            f"- Rules still needing source review: `{stats.unresolved_rules}`",
+            f"- Approved rules matching ≥1 record: `{stats.approved_rules_matching_ge1}`",
+            f"- Approved rules matching no records: `{stats.approved_rules_matching_none}`",
+            f"- Records with a safe approved trim applied: `{stats.records_trimmed}`",
+            f"- 5′ only: `{stats.trim_five_prime_only}`",
+            f"- 3′ only: `{stats.trim_three_prime_only}`",
+            f"- both ends: `{stats.trim_both_ends}`",
+            f"- Same-side approved-rule ambiguities: `{stats.trim_same_side_ambiguities}`",
+            f"- Combined core <20 blocked: `{stats.trim_skipped_combined_below_20}`",
+            f"- Combined trim >40% blocked: `{stats.trim_skipped_combined_over_40}`",
+            f"- Total bases removed: `{stats.trim_total_bases_removed}`",
+            f"- Resolved by approved trim: `{stats.resolved_by_approved_trim}`",
+            f"- Still trim_requires_review: `{stats.still_trim_requires_review}`",
+            f"- Full >100 rescued into core 20–100: `{stats.rescued_overlength_to_20_100}`",
+            f"- Core became out of 20–100 after trim: `{stats.core_became_out_of_range}`",
+            f"- Same motif, multiple rule IDs: `{stats.same_motif_multi_rule_applications}`",
+            "",
+            "Approved application requires an unambiguous exact terminal match.",
+            "Combined per-record <20 nt or >40% trims are not applied.",
             "",
             "### construct_scope",
             "",
@@ -918,23 +953,70 @@ def build_utexas_s2_report(
             f"- Review summary: "
             f"`{_relative_display(result.output_review_summary, repo_root)}`"
         )
+    if result.output_trim_audit is not None:
+        lines.append(
+            f"- Trim application audit: "
+            f"`{_relative_display(result.output_trim_audit, repo_root)}`"
+        )
+    if result.output_trim_ambiguity is not None:
+        lines.append(
+            f"- Trim ambiguity sidecar: "
+            f"`{_relative_display(result.output_trim_ambiguity, repo_root)}`"
+        )
     lines.extend(
         [
             f"- Report: `{_relative_display(result.output_report, repo_root)}`",
             "",
             "## Stage boundary",
             "",
-            "- S2 normalises and diagnoses only.",
+            "UTexas S2 sequence normalisation and approved constant-region trimming complete.",
+            "",
             "- No record was rejected or parked.",
             "- No target normalisation was performed.",
             "- No affinity/evidence decision was performed.",
-            "- No trim was approved or applied.",
-            "- CHECKPOINT-1 was not started.",
-            "- S3 was not started.",
+            "- S3 has not started.",
+            "- CHECKPOINT-1 record eligibility review has not started.",
+            "- Unresolved constant/construct cases remain flagged for S3 CHECKPOINT-1.",
             "",
         ]
     )
     return "\n".join(lines)
+
+
+def _recompute_utexas_row_stats(stats: UTexasS2Stats, row_results: list) -> None:
+    """Rebuild row-derived S2 stats after approved-trim application."""
+    stats.missing_sequence_rows = 0
+    stats.nonempty_sequence_rows = 0
+    stats.transformation_counts = {}
+    stats.alphabet_counts = {}
+    stats.molecule_type_counts = {}
+    stats.chemistry_counts = {}
+    stats.source_nucleic_acid_type_counts = {}
+    stats.t_to_u_count = 0
+    stats.invalid_character_count = 0
+    stats.ambiguous_base_count = 0
+    stats.mixed_t_u_count = 0
+    stats.known_motif_detection_count = 0
+    stats.trim_review_count = 0
+    stats.core_below_min_count = 0
+    stats.core_above_max_count = 0
+    stats.rows_with_any_qc_flag = 0
+    stats.rows_with_multiple_qc_flags = 0
+    stats.review_candidate_rows = 0
+    stats.bracketed_three_prime_stripped = 0
+    stats.bracketed_five_prime_stripped = 0
+    stats.core_differs_from_full = 0
+    stats.construct_scope_counts = {}
+    stats.trim_status_counts = {}
+    stats.trim_confidence_counts = {}
+    stats.length_full_buckets = {}
+    stats.length_core_buckets = {}
+    stats.qc_flag_counts = {}
+    for row in row_results:
+        update_utexas_stats_from_row(stats, row)
+    stats.s2_rows = len(row_results)
+    stats.unique_record_ids = len({row.canonical["record_id"] for row in row_results})
+    stats.unique_native_ids = len({row.canonical["native_id"] for row in row_results})
 
 
 def run_utexas_s2(
@@ -986,10 +1068,6 @@ def run_utexas_s2(
 
     rules = load_normalisation_rules(rules_path)
     policy = load_utexas_policy(policy_path)
-    if policy.apply_approved_trims or policy.approved_trim_rules:
-        raise S2NormaliseError(
-            "UTexas S2 expected no approved trim rules in this milestone"
-        )
 
     canonical_rows = _read_corpus_csv(canonical_path)
     sidecar_rows = _read_sidecar_csv(sidecar_path)
@@ -1180,10 +1258,11 @@ def run_utexas_s2(
         )
     stats.applied_trims = 0
     stats.constant_region_reason = (
-        "proposals_only_no_approved_utexas_trim_rules;"
-        f"tier2_grouping={policy.group_inference_key}"
+        f"tier2_grouping={policy.group_inference_key};"
+        "approved_trims_pending_application"
     )
 
+    apply_reviewed_policy = expected_rows == EXPECTED_UTEXAS_ROWS
     review_package = build_constant_region_review_package(
         proposals=all_proposals,
         normalised_rows=normalised_rows,
@@ -1192,14 +1271,8 @@ def run_utexas_s2(
         },
         pool_type_record_ids=pool_membership,
         diagnostics=inference_result.diagnostics,
+        apply_reviewed_policy=apply_reviewed_policy,
     )
-
-    for row in normalised_rows:
-        if row["sequence_full"] != row["sequence_core"]:
-            raise S2NormaliseError(
-                "UTexas S2 requires sequence_full == sequence_core "
-                "(no approved trim)"
-            )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     out_normalised = output_dir / "utexas_normalised.csv"
@@ -1207,14 +1280,119 @@ def run_utexas_s2(
     out_review = output_dir / "utexas_s2_review_candidates.csv"
     out_proposals = output_dir / "utexas_constant_region_proposals.csv"
     out_report = output_dir / "utexas_s2_report.md"
+    out_trim_audit = output_dir / "utexas_constant_region_trim_audit.csv"
+    out_trim_ambiguity = output_dir / "utexas_constant_region_trim_ambiguity.csv"
 
-    write_corpus_csv_atomic(out_normalised, normalised_rows)
-    write_csv_atomic(out_qc, UTEXAS_S2_QC_COLUMNS, qc_rows)
-    write_csv_atomic(out_review, UTEXAS_S2_QC_COLUMNS, review_rows)
     write_csv_atomic(out_proposals, UTEXAS_CONSTANT_PROPOSAL_COLUMNS, all_proposals)
     review_paths = write_review_package_files(
         review_package, output_dir, write_csv_atomic=write_csv_atomic
     )
+
+    s1_by_id = {row["record_id"]: row for row in canonical_rows}
+    if apply_reviewed_policy:
+        if len(review_package.rule_candidates) != EXPECTED_CANDIDATE_RULES:
+            raise S2NormaliseError(
+                "UTexas candidate rule count drifted from the reviewed package"
+            )
+        candidate_sha = _sha256_file(review_paths["rule_candidates"])
+        decision_sha = _sha256_file(review_paths["review_decisions"])
+        write_tracked_review_artefacts(
+            repo_root=repo_root,
+            candidates=review_package.rule_candidates,
+            decisions=review_package.review_decisions,
+            candidate_sha256=candidate_sha,
+            decision_sha256=decision_sha,
+            write_csv_atomic=write_csv_atomic,
+        )
+
+    trim_audit_rows: list[dict[str, str]] = []
+    ambiguity_rows: list[dict[str, str]] = []
+    if policy.apply_approved_trims:
+        rules_file = policy.approved_trim_rules_path
+        if not rules_file:
+            raise S2NormaliseError("apply_approved_trims requires approved_trim_rules_path")
+        rules_path_resolved = Path(rules_file)
+        if not rules_path_resolved.is_absolute():
+            rules_path_resolved = (policy_path.parent / rules_path_resolved).resolve()
+        approved_defs = load_approved_trim_rules(rules_path_resolved)
+        approved_ids = {rule.candidate_rule_id for rule in approved_defs}
+        decision_approve = {
+            row["candidate_rule_id"]
+            for row in review_package.review_decisions
+            if row["decision"] == "approve"
+        }
+        decision_unresolved = {
+            row["candidate_rule_id"]
+            for row in review_package.review_decisions
+            if row["decision"] == "needs_source_review"
+        }
+        if apply_reviewed_policy:
+            if approved_ids != decision_approve:
+                raise S2NormaliseError(
+                    "approved trim-rule IDs do not match explicit review approvals"
+                )
+            if len(approved_ids) != EXPECTED_APPROVE:
+                raise S2NormaliseError(
+                    f"approved trim rules must be {EXPECTED_APPROVE}"
+                )
+            if len(decision_unresolved) != EXPECTED_NEEDS_SOURCE_REVIEW:
+                raise S2NormaliseError(
+                    "needs_source_review count drifted from the reviewed policy"
+                )
+        trim_result = apply_approved_trims_to_rows(
+            row_results,
+            approved_rules=approved_defs,
+            unresolved_rule_ids=decision_unresolved,
+            membership_rows=review_package.rule_membership,
+            s1_by_id=s1_by_id,
+        )
+        trim_audit_rows = trim_result.audit_rows
+        ambiguity_rows = trim_result.ambiguity_rows
+        normalised_rows = [item.canonical for item in row_results]
+        qc_rows = [item.qc for item in row_results]
+        review_rows = [
+            item.qc
+            for item in row_results
+            if utexas_is_review_candidate(item.canonical["qc_flags"])
+        ]
+        # Rebuild row-derived stats after trim application.
+        _recompute_utexas_row_stats(stats, row_results)
+        tstats = trim_result.stats
+        stats.applied_trims = tstats.records_trimmed
+        stats.records_trimmed = tstats.records_trimmed
+        stats.trim_five_prime_only = tstats.five_prime_only
+        stats.trim_three_prime_only = tstats.three_prime_only
+        stats.trim_both_ends = tstats.both_ends
+        stats.trim_same_side_ambiguities = tstats.same_side_ambiguities
+        stats.trim_skipped_combined_below_20 = tstats.skipped_combined_below_20
+        stats.trim_skipped_combined_over_40 = tstats.skipped_combined_over_40
+        stats.trim_total_bases_removed = tstats.total_bases_removed
+        stats.approved_rules = tstats.approved_rules
+        stats.unresolved_rules = tstats.unresolved_rules
+        stats.approved_rules_matching_ge1 = tstats.approved_rules_matching_ge1
+        stats.approved_rules_matching_none = tstats.approved_rules_matching_none
+        stats.resolved_by_approved_trim = tstats.resolved_by_approved_trim
+        stats.still_trim_requires_review = tstats.still_trim_requires_review
+        stats.rescued_overlength_to_20_100 = tstats.rescued_overlength_to_20_100
+        stats.core_became_out_of_range = tstats.core_became_out_of_range
+        stats.same_motif_multi_rule_applications = (
+            tstats.same_motif_multi_rule_applications
+        )
+        stats.constant_region_reason = (
+            f"tier2_grouping={policy.group_inference_key};"
+            f"approved_rules={tstats.approved_rules};"
+            f"unresolved_rules={tstats.unresolved_rules}"
+        )
+
+    for row in normalised_rows:
+        if row["sequence_raw"] != s1_by_id[row["record_id"]]["sequence_raw"]:
+            raise S2NormaliseError("S2 must not alter sequence_raw after trim application")
+
+    write_corpus_csv_atomic(out_normalised, normalised_rows)
+    write_csv_atomic(out_qc, UTEXAS_S2_QC_COLUMNS, qc_rows)
+    write_csv_atomic(out_review, UTEXAS_S2_QC_COLUMNS, review_rows)
+    write_csv_atomic(out_trim_audit, TRIM_AUDIT_COLUMNS, trim_audit_rows)
+    write_csv_atomic(out_trim_ambiguity, AMBIGUITY_COLUMNS, ambiguity_rows)
 
     s1_hash_after = _sha256_file(canonical_path)
     sidecar_hash_after = _sha256_file(sidecar_path)
@@ -1240,6 +1418,8 @@ def run_utexas_s2(
             "rule_membership": _sha256_file(review_paths["rule_membership"]),
             "review_decisions": _sha256_file(review_paths["review_decisions"]),
             "review_summary": _sha256_file(review_paths["review_summary"]),
+            "trim_audit": _sha256_file(out_trim_audit),
+            "trim_ambiguity": _sha256_file(out_trim_ambiguity),
         }
         second = run_utexas_s2(
             repo_root=repo_root,
@@ -1267,6 +1447,11 @@ def run_utexas_s2(
             and second.output_review_summary is not None
             and first_hashes["review_summary"]
             == _sha256_file(second.output_review_summary)
+            and second.output_trim_audit is not None
+            and first_hashes["trim_audit"] == _sha256_file(second.output_trim_audit)
+            and second.output_trim_ambiguity is not None
+            and first_hashes["trim_ambiguity"]
+            == _sha256_file(second.output_trim_ambiguity)
         )
         if not deterministic_ok:
             raise S2NormaliseError(
@@ -1293,6 +1478,8 @@ def run_utexas_s2(
         output_rule_membership=review_paths["rule_membership"],
         output_review_decisions=review_paths["review_decisions"],
         output_review_summary=review_paths["review_summary"],
+        output_trim_audit=out_trim_audit,
+        output_trim_ambiguity=out_trim_ambiguity,
     )
     report_text = build_utexas_s2_report(
         repo_root=repo_root,
