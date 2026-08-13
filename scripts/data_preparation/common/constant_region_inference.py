@@ -6,12 +6,17 @@ biologically nonfunctional. Application requires an explicit approved trim plan
 and an exact prefix or suffix match per record.
 
 Inference is deterministic regardless of input order.
+
+Tier-2 qualifying proposals use plan semantics:
+``trim_confidence = medium`` / status ``proposed_for_checkpoint1``.
+Failed inference attempts are diagnostics, not scientific proposals.
 """
 
 from __future__ import annotations
 
+import hashlib
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
 from .sequence_normalisation import (
@@ -24,6 +29,13 @@ from .sequence_normalisation import (
     load_normalisation_rules,
     normalise_sequence,
 )
+
+GROUP_INFERENCE_KEY_EXPERIMENT_GROUP: str = "experiment_group_id"
+GROUP_INFERENCE_KEY_TARGET_PUBLICATION: str = "target_name_raw_plus_publication"
+GROUP_INFERENCE_KEY_AUTO: str = "experiment_group_then_target_publication"
+
+QUALIFYING_TIER2_STATUS: str = "proposed_for_checkpoint1"
+TIER2_CONFIDENCE_LABEL: str = "medium"
 
 
 class ConstantRegionInferenceError(SequenceNormalisationError):
@@ -51,9 +63,32 @@ class ConstantRegionProposal:
     records_considered: int
     records_matching_exactly: int
     records_excluded: int
-    confidence: float
+    confidence: str
     status: str
     reason: str
+
+
+@dataclass(frozen=True)
+class GroupInferenceDiagnostics:
+    """Aggregate counts for failed or ineligible Tier-2 inference attempts."""
+
+    skipped_missing_group: int = 0
+    groups_total: int = 0
+    groups_below_min_size: int = 0
+    groups_usable_below_min_size: int = 0
+    groups_no_qualifying_prefix: int = 0
+    groups_no_qualifying_suffix: int = 0
+    groups_qualifying_prefix: int = 0
+    groups_qualifying_suffix: int = 0
+    group_size_histogram: Mapping[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class GroupInferenceResult:
+    """Qualifying proposals plus aggregate diagnostics."""
+
+    proposals: tuple[ConstantRegionProposal, ...]
+    diagnostics: GroupInferenceDiagnostics
 
 
 @dataclass(frozen=True)
@@ -67,6 +102,61 @@ class TrimApplicationResult:
     applied_trims: tuple[AppliedTrim, ...]
     qc_flags: tuple[str, ...]
     normalisation: SequenceNormalisationResult | None = None
+
+
+def _nonempty_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text if text else None
+
+
+def build_group_inference_key(
+    *,
+    source_db: str,
+    grouping_mode: str,
+    experiment_group_id: str | None = None,
+    target_name_raw: str | None = None,
+    publication: str | None = None,
+) -> str | None:
+    """Build a deterministic Tier-2 consensus group key.
+
+    Missing grouping evidence returns ``None`` so unrelated rows are never
+    pooled into a catch-all group.
+
+    Modes:
+    - ``experiment_group_id``: require a nonempty experiment group ID
+    - ``target_name_raw_plus_publication``: require both target and publication
+    - ``experiment_group_then_target_publication``: experiment group if present,
+      otherwise target + publication
+    """
+    source = _nonempty_text(source_db) or "unknown_source"
+    group_id = _nonempty_text(experiment_group_id)
+    target = _nonempty_text(target_name_raw)
+    pub = _nonempty_text(publication)
+
+    if grouping_mode == GROUP_INFERENCE_KEY_EXPERIMENT_GROUP:
+        if group_id is None:
+            return None
+        return f"{source}:experiment_group:{group_id}"
+
+    if grouping_mode == GROUP_INFERENCE_KEY_TARGET_PUBLICATION:
+        if target is None or pub is None:
+            return None
+        digest = hashlib.sha256(f"{target}\0{pub}".encode("utf-8")).hexdigest()[:16]
+        return f"{source}:tgt_pub:{digest}"
+
+    if grouping_mode == GROUP_INFERENCE_KEY_AUTO:
+        if group_id is not None:
+            return f"{source}:experiment_group:{group_id}"
+        if target is None or pub is None:
+            return None
+        digest = hashlib.sha256(f"{target}\0{pub}".encode("utf-8")).hexdigest()[:16]
+        return f"{source}:tgt_pub:{digest}"
+
+    raise ConstantRegionInferenceError(
+        f"unsupported group inference grouping_mode: {grouping_mode!r}"
+    )
 
 
 def _as_inference_record(item: Mapping[str, Any] | InferenceRecord) -> InferenceRecord:
@@ -122,6 +212,18 @@ def _families_compatible(families: set[str]) -> bool:
     # Per-sequence mixed T/U cannot be compared safely. DNA-alphabet and
     # RNA-alphabet group members are compared via ``_comparison_form``.
     return "mixed" not in families
+
+
+def _size_bucket(size: int) -> str:
+    if size < 5:
+        return "1-4"
+    if size < 10:
+        return "5-9"
+    if size < 25:
+        return "10-24"
+    if size < 50:
+        return "25-49"
+    return "50+"
 
 
 def _positional_consensus(
@@ -191,23 +293,35 @@ def _positional_consensus(
     if families == {"rna"} or (families <= {"rna", "neutral"} and "rna" in families):
         proposed = proposed.replace("T", "U")
 
-    return proposed, support, exact, "high_confidence_proposal"
+    return proposed, support, exact, "group_consensus_support_met"
 
 
 def infer_group_constant_regions(
     records: Iterable[Mapping[str, Any] | InferenceRecord],
     *,
     rules: SequenceNormalisationRules | None = None,
+    include_non_qualifying: bool = False,
 ) -> tuple[ConstantRegionProposal, ...]:
-    """Propose 5′/3′ constant regions per experiment group.
+    """Propose qualifying 5′/3′ constant regions per experiment group.
 
-    Missing group IDs are never pooled. Groups smaller than the configured
-    minimum produce an ``insufficient_group_size`` status without a sequence.
-    Invalid or missing sequences are excluded and counted.
-
-    Constant-region inference is a technical aid only; it is not biological
-    proof that a region is nonfunctional.
+    Missing group IDs are never pooled. By default only motifs that meet the
+    configured minimum length and support are returned. Failed attempts are
+    available via :func:`infer_group_constant_regions_with_diagnostics`.
     """
+    return infer_group_constant_regions_with_diagnostics(
+        records,
+        rules=rules,
+        include_non_qualifying=include_non_qualifying,
+    ).proposals
+
+
+def infer_group_constant_regions_with_diagnostics(
+    records: Iterable[Mapping[str, Any] | InferenceRecord],
+    *,
+    rules: SequenceNormalisationRules | None = None,
+    include_non_qualifying: bool = False,
+) -> GroupInferenceResult:
+    """Propose Tier-2 constant regions and return aggregate diagnostics."""
     active_rules = rules if rules is not None else load_normalisation_rules()
     cfg = active_rules.constant_region_inference
 
@@ -224,11 +338,20 @@ def infer_group_constant_regions(
         grouped[item.experiment_group_id].append(item)
 
     proposals: list[ConstantRegionProposal] = []
+    size_histogram: dict[str, int] = defaultdict(int)
+    groups_below_min_size = 0
+    groups_usable_below_min_size = 0
+    groups_no_qualifying_prefix = 0
+    groups_no_qualifying_suffix = 0
+    groups_qualifying_prefix = 0
+    groups_qualifying_suffix = 0
+
     for group_id in sorted(grouped):
         members = grouped[group_id]
         # Stable within-group order by record_id.
         members = sorted(members, key=lambda item: item.record_id)
         total = len(members)
+        size_histogram[_size_bucket(total)] += 1
         usable: list[str] = []
         excluded = 0
         for member in members:
@@ -237,41 +360,42 @@ def infer_group_constant_regions(
             else:
                 excluded += 1
 
+        def _emit_non_qualifying(side: str, *, status: str, reason: str, support: float = 0.0, exact: int = 0) -> None:
+            if not include_non_qualifying:
+                return
+            proposals.append(
+                ConstantRegionProposal(
+                    experiment_group_id=group_id,
+                    side=side,
+                    proposed_sequence=None,
+                    length=0,
+                    support=support,
+                    records_considered=total,
+                    records_matching_exactly=exact,
+                    records_excluded=excluded,
+                    confidence="n/a",
+                    status=status,
+                    reason=reason,
+                )
+            )
+
         if total < cfg.minimum_group_size:
+            groups_below_min_size += 1
             for side in ("five_prime", "three_prime"):
-                proposals.append(
-                    ConstantRegionProposal(
-                        experiment_group_id=group_id,
-                        side=side,
-                        proposed_sequence=None,
-                        length=0,
-                        support=0.0,
-                        records_considered=total,
-                        records_matching_exactly=0,
-                        records_excluded=excluded,
-                        confidence=0.0,
-                        status="insufficient_group_size",
-                        reason="group_smaller_than_minimum",
-                    )
+                _emit_non_qualifying(
+                    side,
+                    status="insufficient_group_size",
+                    reason="group_smaller_than_minimum",
                 )
             continue
 
         if len(usable) < cfg.minimum_group_size:
+            groups_usable_below_min_size += 1
             for side in ("five_prime", "three_prime"):
-                proposals.append(
-                    ConstantRegionProposal(
-                        experiment_group_id=group_id,
-                        side=side,
-                        proposed_sequence=None,
-                        length=0,
-                        support=0.0,
-                        records_considered=total,
-                        records_matching_exactly=0,
-                        records_excluded=excluded,
-                        confidence=0.0,
-                        status="insufficient_group_size",
-                        reason="usable_sequences_below_minimum_group_size",
-                    )
+                _emit_non_qualifying(
+                    side,
+                    status="insufficient_group_size",
+                    reason="usable_sequences_below_minimum_group_size",
                 )
             continue
 
@@ -284,6 +408,10 @@ def infer_group_constant_regions(
                 maximum_region_length=cfg.maximum_region_length,
             )
             if proposed is None:
+                if side == "five_prime":
+                    groups_no_qualifying_prefix += 1
+                else:
+                    groups_no_qualifying_suffix += 1
                 status = (
                     "insufficient_support"
                     if reason == "insufficient_support"
@@ -291,22 +419,18 @@ def infer_group_constant_regions(
                 )
                 if reason == "mixed_alphabets_without_comparison_representation":
                     status = "requires_review"
-                proposals.append(
-                    ConstantRegionProposal(
-                        experiment_group_id=group_id,
-                        side=side,
-                        proposed_sequence=None,
-                        length=0,
-                        support=support,
-                        records_considered=total,
-                        records_matching_exactly=exact,
-                        records_excluded=excluded,
-                        confidence=support,
-                        status=status,
-                        reason=reason,
-                    )
+                _emit_non_qualifying(
+                    side,
+                    status=status,
+                    reason=reason,
+                    support=support,
+                    exact=exact,
                 )
             else:
+                if side == "five_prime":
+                    groups_qualifying_prefix += 1
+                else:
+                    groups_qualifying_suffix += 1
                 proposals.append(
                     ConstantRegionProposal(
                         experiment_group_id=group_id,
@@ -317,14 +441,25 @@ def infer_group_constant_regions(
                         records_considered=total,
                         records_matching_exactly=exact,
                         records_excluded=excluded,
-                        confidence=support,
-                        status="high_confidence_proposal",
+                        confidence=TIER2_CONFIDENCE_LABEL,
+                        status=QUALIFYING_TIER2_STATUS,
                         reason=reason,
                     )
                 )
 
     proposals.sort(key=lambda item: (item.experiment_group_id, item.side))
-    return tuple(proposals)
+    diagnostics = GroupInferenceDiagnostics(
+        skipped_missing_group=skipped_missing_group,
+        groups_total=len(grouped),
+        groups_below_min_size=groups_below_min_size,
+        groups_usable_below_min_size=groups_usable_below_min_size,
+        groups_no_qualifying_prefix=groups_no_qualifying_prefix,
+        groups_no_qualifying_suffix=groups_no_qualifying_suffix,
+        groups_qualifying_prefix=groups_qualifying_prefix,
+        groups_qualifying_suffix=groups_qualifying_suffix,
+        group_size_histogram=dict(sorted(size_histogram.items())),
+    )
+    return GroupInferenceResult(proposals=tuple(proposals), diagnostics=diagnostics)
 
 
 def apply_approved_trim(
@@ -392,22 +527,26 @@ def proposal_to_trim_plan(
     reason: str | None = None,
     confidence: float | None = None,
 ) -> TrimProposal:
-    """Convert a high-confidence proposal into an approved trim plan.
+    """Convert a qualifying proposal into an approved trim plan.
 
     Callers must only invoke this after human or documented approval. The
     returned plan still requires an exact match at application time.
     """
-    if proposal.status != "high_confidence_proposal" or not proposal.proposed_sequence:
+    allowed = {QUALIFYING_TIER2_STATUS, "high_confidence_proposal"}
+    if proposal.status not in allowed or not proposal.proposed_sequence:
         raise ConstantRegionInferenceError(
-            "only high_confidence_proposal with a sequence may become a trim plan"
+            "only a qualifying proposal with a sequence may become a trim plan"
         )
     five = proposal.proposed_sequence if proposal.side == "five_prime" else None
     three = proposal.proposed_sequence if proposal.side == "three_prime" else None
+    numeric_confidence = (
+        confidence if confidence is not None else float(proposal.support)
+    )
     return TrimProposal(
         five_prime=five,
         three_prime=three,
         reason=reason or proposal.reason,
-        confidence=confidence if confidence is not None else proposal.confidence,
+        confidence=numeric_confidence,
         source=f"constant_region_inference:{proposal.experiment_group_id}:{proposal.side}",
         status="approved",
     )

@@ -14,8 +14,8 @@
   "constant_region_inference": {
     "maximum_region_length": 30,
     "minimum_group_size": 5,
-    "minimum_region_length": 4,
-    "minimum_support": 0.9
+    "minimum_region_length": 12,
+    "minimum_support": 0.8
   },
   "contract_version": "1.0",
   "core_length_max": 100,

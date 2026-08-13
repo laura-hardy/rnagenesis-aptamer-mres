@@ -10,7 +10,7 @@
   "apply_approved_trims": false,
   "approved_trim_rules": [],
   "parse_pool_type_for_proposals": true,
-  "group_inference_by_pool_type": true,
+  "group_inference_key": "target_name_raw_plus_publication",
   "molecule_type_map": {
     "ssRNA": "RNA",
     "2'-fluoro-RNA": "RNA",

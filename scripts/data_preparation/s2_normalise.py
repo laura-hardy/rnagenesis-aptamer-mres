@@ -35,18 +35,25 @@ from adapters.aptabase_s2 import (  # noqa: E402
 )
 from adapters.utexas_s2 import (  # noqa: E402
     CONSTANT_PROPOSAL_COLUMNS as UTEXAS_CONSTANT_PROPOSAL_COLUMNS,
-    QC_DELIMITER as UTEXAS_QC_DELIMITER,
     S2_QC_COLUMNS as UTEXAS_S2_QC_COLUMNS,
     UTexasS2Error,
     UTexasS2Stats,
+    assert_genuine_proposals,
+    build_known_motif_proposals,
     build_pool_type_proposals,
     is_review_candidate as utexas_is_review_candidate,
     load_utexas_policy,
     normalise_utexas_record,
     update_stats_from_row as update_utexas_stats_from_row,
 )
+from adapters.utexas_constant_region_review import (  # noqa: E402
+    build_constant_region_review_package,
+    write_review_package_files,
+)
 from common.constant_region_inference import (  # noqa: E402
+    build_group_inference_key,
     infer_group_constant_regions,
+    infer_group_constant_regions_with_diagnostics,
 )
 from common.corpus_schema import (  # noqa: E402
     CORPUS_COLUMNS,
@@ -104,6 +111,10 @@ class S2RunResult:
     deterministic_rerun_ok: bool | None
     raw_sha256: str | None = None
     raw_sha_unchanged: bool | None = None
+    output_rule_candidates: Path | None = None
+    output_rule_membership: Path | None = None
+    output_review_decisions: Path | None = None
+    output_review_summary: Path | None = None
 
 
 def _sha256_file(path: Path) -> str:
@@ -674,6 +685,8 @@ def build_utexas_s2_report(
     result: S2RunResult,
     rules_path: Path,
     policy_path: Path,
+    review_stats: dict | None = None,
+    diagnostics=None,
 ) -> str:
     """Build an aggregate-only Markdown UTexas S2 report (no sequences or IDs)."""
     stats = result.stats
@@ -785,15 +798,17 @@ def build_utexas_s2_report(
             "## Constants / constructs",
             "",
             f"- Known motif detections: `{stats.known_motif_detection_count}`",
-            f"- Constant-region proposals: `{stats.constant_region_proposals}`",
+            f"- Genuine constant-region proposals: `{stats.constant_region_proposals}`",
             f"- Parseable pool-type groups: `{stats.pool_type_parseable_groups}`",
             f"- Applied trims: `{stats.applied_trims}`",
             f"- Rows where sequence_core != sequence_full: "
             f"`{stats.core_differs_from_full}`",
             f"- Reason: `{stats.constant_region_reason}`",
             "",
-            "No newly inferred UTexas constant was applied as a trim. Detection",
-            "and pool-type parsing produce review proposals only.",
+            "Tier-2 consensus groups by `(source_db, target_name_raw, publication)`.",
+            "Pool Type is independent source-documented evidence only.",
+            "Failed consensus attempts are diagnostics, not proposal rows.",
+            "No newly inferred UTexas constant was applied as a trim.",
             "",
             "### construct_scope",
             "",
@@ -813,6 +828,36 @@ def build_utexas_s2_report(
             lines.append(f"- `{name}`: `{count}`")
     else:
         lines.append("- (none)")
+    if diagnostics is not None:
+        lines.extend(
+            [
+                "",
+                "### Tier-2 consensus diagnostics",
+                "",
+                f"- Groups total: `{diagnostics.groups_total}`",
+                f"- Groups below min size: `{diagnostics.groups_below_min_size}`",
+                f"- Qualifying 5′ groups: `{diagnostics.groups_qualifying_prefix}`",
+                f"- Qualifying 3′ groups: `{diagnostics.groups_qualifying_suffix}`",
+                f"- No qualifying 5′: `{diagnostics.groups_no_qualifying_prefix}`",
+                f"- No qualifying 3′: `{diagnostics.groups_no_qualifying_suffix}`",
+                f"- Skipped missing grouping evidence: "
+                f"`{diagnostics.skipped_missing_group}`",
+                f"- Group-size histogram: `{dict(diagnostics.group_size_histogram)}`",
+            ]
+        )
+    if review_stats:
+        lines.extend(
+            [
+                "",
+                "### Rule-level review package",
+                "",
+                f"- Unique candidate rules: `{review_stats.get('unique_candidate_rules', 0)}`",
+                f"- Conflicted rules: `{review_stats.get('conflicted_rules', 0)}`",
+                f"- High-priority rules: `{review_stats.get('high_priority_rules', 0)}`",
+                f"- Records affected (hypothetical): "
+                f"`{review_stats.get('records_affected', 0)}`",
+            ]
+        )
     lines.extend(
         [
             "",
@@ -851,6 +896,30 @@ def build_utexas_s2_report(
             f"`{_relative_display(result.output_review, repo_root)}`",
             f"- Constant-region proposals: "
             f"`{_relative_display(result.output_proposals, repo_root)}`",
+        ]
+    )
+    if result.output_rule_candidates is not None:
+        lines.append(
+            f"- Rule candidates: "
+            f"`{_relative_display(result.output_rule_candidates, repo_root)}`"
+        )
+    if result.output_rule_membership is not None:
+        lines.append(
+            f"- Rule membership: "
+            f"`{_relative_display(result.output_rule_membership, repo_root)}`"
+        )
+    if result.output_review_decisions is not None:
+        lines.append(
+            f"- Review decisions template: "
+            f"`{_relative_display(result.output_review_decisions, repo_root)}`"
+        )
+    if result.output_review_summary is not None:
+        lines.append(
+            f"- Review summary: "
+            f"`{_relative_display(result.output_review_summary, repo_root)}`"
+        )
+    lines.extend(
+        [
             f"- Report: `{_relative_display(result.output_report, repo_root)}`",
             "",
             "## Stage boundary",
@@ -859,7 +928,9 @@ def build_utexas_s2_report(
             "- No record was rejected or parked.",
             "- No target normalisation was performed.",
             "- No affinity/evidence decision was performed.",
+            "- No trim was approved or applied.",
             "- CHECKPOINT-1 was not started.",
+            "- S3 was not started.",
             "",
         ]
     )
@@ -1010,46 +1081,24 @@ def run_utexas_s2(
                     f"chemistry {key} expected {expected}; got {got}"
                 )
 
-    # Pool-type proposals only (no sequence-bearing group consensus applied).
-    pool_proposals = build_pool_type_proposals(row_results)
-    # Optional known-motif informational proposals without applying trims.
-    known_motif_proposals: list[dict[str, str]] = []
-    for row in normalised_rows:
-        motifs = []
-        if row["detected_constant_5p"]:
-            for name in row["detected_constant_5p"].split(UTEXAS_QC_DELIMITER):
-                if name:
-                    motifs.append(("five_prime", name))
-        if row["detected_constant_3p"]:
-            for name in row["detected_constant_3p"].split(UTEXAS_QC_DELIMITER):
-                if name:
-                    motifs.append(("three_prime", name))
-        for side, name in motifs:
-            known_motif_proposals.append(
-                {
-                    "proposal_id": f"{row['record_id']}:known_motif:{side}:{name}",
-                    "experiment_group_id": row["record_id"],
-                    "proposal_source": "known_motif",
-                    "side": side,
-                    "proposed_sequence": "",
-                    "motif_length": "",
-                    "support": "",
-                    "records_considered": "1",
-                    "records_matching_exactly": "1",
-                    "confidence": "configured_motif_library",
-                    "status": "proposed_for_review",
-                    "applied": "false",
-                    "reason_not_applied": "no_approved_utexas_trim_rule",
-                    "reason": f"known_motif:{name}",
-                }
-            )
+    # Pool Type = source-documented evidence (independent of Tier-2 grouping).
+    pool_proposals, pool_membership = build_pool_type_proposals(row_results)
+    known_motif_proposals = build_known_motif_proposals(row_results)
 
-    # Group inference uses pool-type hash groups only (never empty target_name).
+    # Tier-2 consensus uses configured grouping (target_name_raw + publication
+    # for UTexas). Pool Type is never the consensus group key.
     inference_inputs = []
-    for row, result in zip(normalised_rows, row_results, strict=True):
-        group_id = ""
-        if policy.group_inference_by_pool_type and result.pool_parse is not None:
-            group_id = result.pool_parse.group_id
+    group_membership: dict[str, list[str]] = {}
+    for row in normalised_rows:
+        group_id = build_group_inference_key(
+            source_db=row.get("source_db") or "utexas",
+            grouping_mode=policy.group_inference_key,
+            experiment_group_id=row.get("experiment_group_id") or None,
+            target_name_raw=row.get("target_name_raw") or None,
+            publication=row.get("publication") or None,
+        )
+        if group_id is not None:
+            group_membership.setdefault(group_id, []).append(row["record_id"])
         inference_inputs.append(
             {
                 "record_id": row["record_id"],
@@ -1057,37 +1106,73 @@ def run_utexas_s2(
                 "sequence_full": row["sequence_full"] or None,
             }
         )
-    group_proposals_raw = infer_group_constant_regions(inference_inputs, rules=rules)
+    inference_result = infer_group_constant_regions_with_diagnostics(
+        inference_inputs, rules=rules
+    )
+    by_record_id = {row["record_id"]: row for row in normalised_rows}
     group_proposal_rows: list[dict[str, str]] = []
-    for proposal in group_proposals_raw:
+    from adapters.utexas_constant_region_review import simulate_hypothetical_trim
+
+    for proposal in inference_result.proposals:
+        if not proposal.proposed_sequence or proposal.length <= 0:
+            continue
+        # Aggregate hypothetical flags across group members for the proposal row.
+        n_fail_min = 0
+        n_exceed_40 = 0
+        n_unmatched = 0
+        for record_id in group_membership.get(proposal.experiment_group_id, ()):
+            seq = by_record_id.get(record_id, {}).get("sequence_full") or ""
+            effect = simulate_hypothetical_trim(
+                seq,
+                side=proposal.side,
+                motif=proposal.proposed_sequence,
+            )
+            if effect.would_leave_core_below_20:
+                n_fail_min += 1
+            if effect.would_trim_more_than_40_percent:
+                n_exceed_40 += 1
+            if effect.prefix_or_suffix_not_exactly_matched:
+                n_unmatched += 1
         group_proposal_rows.append(
             {
                 "proposal_id": (
-                    f"{proposal.experiment_group_id}:{proposal.side}:"
-                    f"group_consensus"
+                    f"{proposal.experiment_group_id}:{proposal.side}:group_consensus"
                 ),
                 "experiment_group_id": proposal.experiment_group_id,
                 "proposal_source": "group_consensus",
                 "side": proposal.side,
-                "proposed_sequence": proposal.proposed_sequence or "",
+                "proposed_sequence": proposal.proposed_sequence,
+                "motif_id": "",
                 "motif_length": str(proposal.length),
                 "support": f"{proposal.support:.6f}".rstrip("0").rstrip("."),
+                "source_documented": "no",
+                "empirical_exact_match_fraction": (
+                    f"{proposal.support:.6f}".rstrip("0").rstrip(".")
+                ),
                 "records_considered": str(proposal.records_considered),
                 "records_matching_exactly": str(proposal.records_matching_exactly),
-                "confidence": f"{proposal.confidence:.6f}".rstrip("0").rstrip("."),
+                "documented_random_region_length": "",
+                "confidence": proposal.confidence,
                 "status": proposal.status,
                 "applied": "false",
                 "reason_not_applied": "no_approved_utexas_trim_rule",
                 "reason": proposal.reason,
+                "would_leave_core_below_20": "true" if n_fail_min else "false",
+                "would_trim_more_than_40_percent": (
+                    "true" if n_exceed_40 else "false"
+                ),
+                "prefix_or_suffix_not_exactly_matched": (
+                    "true" if n_unmatched else "false"
+                ),
+                "predicted_bases_trimmed": str(proposal.length),
             }
         )
 
     all_proposals = pool_proposals + known_motif_proposals + group_proposal_rows
     all_proposals.sort(key=lambda item: item["proposal_id"])
+    assert_genuine_proposals(all_proposals)
     stats.constant_region_proposals = len(all_proposals)
-    stats.pool_type_parseable_groups = len(
-        {row["experiment_group_id"] for row in pool_proposals}
-    )
+    stats.pool_type_parseable_groups = len(pool_membership)
     for row in all_proposals:
         source = row["proposal_source"]
         stats.proposal_source_counts[source] = (
@@ -1095,7 +1180,18 @@ def run_utexas_s2(
         )
     stats.applied_trims = 0
     stats.constant_region_reason = (
-        "proposals_only_no_approved_utexas_trim_rules"
+        "proposals_only_no_approved_utexas_trim_rules;"
+        f"tier2_grouping={policy.group_inference_key}"
+    )
+
+    review_package = build_constant_region_review_package(
+        proposals=all_proposals,
+        normalised_rows=normalised_rows,
+        group_membership={
+            key: tuple(sorted(set(vals))) for key, vals in group_membership.items()
+        },
+        pool_type_record_ids=pool_membership,
+        diagnostics=inference_result.diagnostics,
     )
 
     for row in normalised_rows:
@@ -1116,6 +1212,9 @@ def run_utexas_s2(
     write_csv_atomic(out_qc, UTEXAS_S2_QC_COLUMNS, qc_rows)
     write_csv_atomic(out_review, UTEXAS_S2_QC_COLUMNS, review_rows)
     write_csv_atomic(out_proposals, UTEXAS_CONSTANT_PROPOSAL_COLUMNS, all_proposals)
+    review_paths = write_review_package_files(
+        review_package, output_dir, write_csv_atomic=write_csv_atomic
+    )
 
     s1_hash_after = _sha256_file(canonical_path)
     sidecar_hash_after = _sha256_file(sidecar_path)
@@ -1137,6 +1236,10 @@ def run_utexas_s2(
             "qc": _sha256_file(out_qc),
             "review": _sha256_file(out_review),
             "proposals": _sha256_file(out_proposals),
+            "rule_candidates": _sha256_file(review_paths["rule_candidates"]),
+            "rule_membership": _sha256_file(review_paths["rule_membership"]),
+            "review_decisions": _sha256_file(review_paths["review_decisions"]),
+            "review_summary": _sha256_file(review_paths["review_summary"]),
         }
         second = run_utexas_s2(
             repo_root=repo_root,
@@ -1152,6 +1255,18 @@ def run_utexas_s2(
             and first_hashes["qc"] == _sha256_file(second.output_qc)
             and first_hashes["review"] == _sha256_file(second.output_review)
             and first_hashes["proposals"] == _sha256_file(second.output_proposals)
+            and second.output_rule_candidates is not None
+            and first_hashes["rule_candidates"]
+            == _sha256_file(second.output_rule_candidates)
+            and second.output_rule_membership is not None
+            and first_hashes["rule_membership"]
+            == _sha256_file(second.output_rule_membership)
+            and second.output_review_decisions is not None
+            and first_hashes["review_decisions"]
+            == _sha256_file(second.output_review_decisions)
+            and second.output_review_summary is not None
+            and first_hashes["review_summary"]
+            == _sha256_file(second.output_review_summary)
         )
         if not deterministic_ok:
             raise S2NormaliseError(
@@ -1174,12 +1289,18 @@ def run_utexas_s2(
         deterministic_rerun_ok=deterministic_ok,
         raw_sha256=raw_sha_after,
         raw_sha_unchanged=True,
+        output_rule_candidates=review_paths["rule_candidates"],
+        output_rule_membership=review_paths["rule_membership"],
+        output_review_decisions=review_paths["review_decisions"],
+        output_review_summary=review_paths["review_summary"],
     )
     report_text = build_utexas_s2_report(
         repo_root=repo_root,
         result=run_result,
         rules_path=rules_path,
         policy_path=policy_path,
+        review_stats=review_package.stats,
+        diagnostics=inference_result.diagnostics,
     )
     abs_root = str(repo_root.resolve())
     if abs_root in report_text:

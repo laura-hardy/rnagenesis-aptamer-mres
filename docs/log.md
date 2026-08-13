@@ -2250,3 +2250,109 @@ No records have been filtered, parked or rejected.
 UTexas S3 and CHECKPOINT-1 have not started.
 Any unresolved constant-region proposals remain pending review before they can be used as trims.
 ```
+
+## 2026-08-13 — UTexas S2 constant-region inference refinement
+
+### Stage
+
+Corrective refinement of the UTexas S2 **constant-region proposal** layer only.
+No sequence trims were approved or applied. S3 and CHECKPOINT-1 were not
+started. Molecule-type / T→U logic was not reopened as a scientific question
+(T→U = 0 remains valid).
+
+### Problem
+
+The initial UTexas S2 pass (commit `0c45d18`) correctly normalised sequences
+with `applied trims = 0` and `sequence_core == sequence_full` for all 1,894
+rows. Review of the proposal artefact found that Tier-2 group consensus had
+been configured with `group_inference_by_pool_type = true`, so consensus was
+grouped by Pool Type rather than the curation plan’s fallback
+`(source_db, target_name, publication)`.
+
+That made `pool_type` and `group_consensus` proposal counts artificially equal
+(816 / 816) and admitted 717 zero-length diagnostic rows
+(`insufficient_group_size` / `insufficient_support`) into the scientific
+proposal table. No sequence damage occurred because no trim was applied.
+
+### Corrections
+
+1. **Tier-2 grouping** now uses configurable
+   `group_inference_key = target_name_raw_plus_publication` (UTexas has no
+   `experiment_group_id`; canonical `target_name` awaits global S4). Missing
+   target/publication values are not pooled into a catch-all group.
+2. **Pool Type** remains an independent source-documented evidence channel
+   with empirical exact-match fractions against `sequence_full` ends;
+   parse success is no longer reported as `support = 1.0`.
+3. **Failed inference** is recorded only in aggregate diagnostics; the
+   proposal CSV contains genuine motifs only (`motif_length > 0`).
+4. Shared inference defaults aligned to the plan: `minimum_support = 0.8`,
+   `minimum_region_length = 12`. Qualifying Tier-2 proposals use
+   `confidence = medium` / `proposed_for_checkpoint1` (never “high” merely
+   because support = 1.0).
+5. A **rule-level review package** was produced for Laura/ChatGPT (candidate
+   rules, membership sidecar, blank decision template, sequence-safe summary).
+
+### Counts (old → corrected)
+
+| Metric | Old (superseded) | Corrected |
+|---|---|---|
+| Proposal rows | 1653 | 927 genuine |
+| pool_type | 816 | 816 |
+| group_consensus | 816 (incl. failures) | 90 qualifying |
+| known_motif | 21 | 21 |
+| Zero-length pseudo-proposals | 717 | 0 |
+| `(target_name_raw, publication)` groups | n/a (was Pool Type) | 591 |
+| Groups ≥5 | n/a | 74 eligible (57 size 5–9; 15 size 10–24; 2 size 25–49) |
+| Qualifying 5′ / 3′ consensus groups | n/a | 47 / 43 |
+| Unique candidate trim rules | n/a | 569 |
+| pool+consensus exact motif agreements | n/a | 47 |
+| Conflicted rules | n/a | 57 |
+| Applied trims | 0 | 0 |
+
+Pool Type empirical exact-match bands: perfect 530; partial 98; poor/zero 188.
+
+### Sequence invariants
+
+```text
+rows in = 1894
+rows out = 1894
+sequence_raw changed = no
+sequence_full unchanged relative to prior S2 core construction
+sequence_core == sequence_full for all rows
+applied trims = 0
+T→U = 0
+molecule_type counts unchanged (RNA 583 / ssDNA 896 / DNA 13 / unknown 402)
+raw workbook SHA unchanged =
+b5a66beb58d30c5c3d2f36a29ea2cc3678e7d4a6b1bb1a97efc1e166a49fd15c
+```
+
+### Outputs (gitignored under `data/interim/normalised/`)
+
+- `utexas_normalised.csv` / `utexas_s2_qc.csv` / `utexas_s2_review_candidates.csv`
+- `utexas_constant_region_proposals.csv` (genuine proposals only)
+- `utexas_constant_region_rule_candidates.csv`
+- `utexas_constant_region_rule_membership.csv`
+- `utexas_constant_region_review_decisions.csv` (blank decisions)
+- `utexas_constant_region_review_summary.md`
+- `utexas_s2_report.md`
+
+### Verification
+
+- Shared constant-region + UTexas S2 + sequence-normalisation + AptaBase S2
+  + broader data-preparation suite (legacy hang-prone exclusions as before):
+  **550 passed**
+- Deterministic rerun: byte-identical for normalised, proposals, rule
+  candidates, membership, decisions template and review summary
+- AptaBase scientific interim outputs were not rewritten
+
+### Pipeline stop
+
+```text
+UTexas S2 constant-region proposal semantics corrected.
+No trim has been approved.
+No trim has been applied.
+sequence_core remains unchanged.
+S3 has not started.
+CHECKPOINT-1 has not started.
+Laura/ChatGPT must review rule-level candidates before any UTexas trim approval.
+```

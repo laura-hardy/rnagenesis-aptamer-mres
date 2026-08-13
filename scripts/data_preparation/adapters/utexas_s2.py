@@ -58,15 +58,23 @@ CONSTANT_PROPOSAL_COLUMNS: Final[tuple[str, ...]] = (
     "proposal_source",
     "side",
     "proposed_sequence",
+    "motif_id",
     "motif_length",
     "support",
+    "source_documented",
+    "empirical_exact_match_fraction",
     "records_considered",
     "records_matching_exactly",
+    "documented_random_region_length",
     "confidence",
     "status",
     "applied",
     "reason_not_applied",
     "reason",
+    "would_leave_core_below_20",
+    "would_trim_more_than_40_percent",
+    "prefix_or_suffix_not_exactly_matched",
+    "predicted_bases_trimmed",
 )
 
 REVIEW_RELEVANT_FLAGS: Final[frozenset[str]] = frozenset(
@@ -130,7 +138,7 @@ class UtexasNormalisationPolicy:
     apply_approved_trims: bool
     approved_trim_rules: tuple[str, ...]
     parse_pool_type_for_proposals: bool
-    group_inference_by_pool_type: bool
+    group_inference_key: str
     molecule_type_map: Mapping[str, str]
     chemistry_map: Mapping[str, str]
     chemistry_not_in_canonical_vocab_sources: frozenset[str]
@@ -238,6 +246,29 @@ def _require_bool(value: Any, name: str) -> bool:
     return value
 
 
+def _load_group_inference_key(data: Mapping[str, Any]) -> str:
+    """Load Tier-2 grouping mode; reject obsolete Pool Type grouping."""
+    if "group_inference_by_pool_type" in data:
+        raise UTexasS2Error(
+            "group_inference_by_pool_type is obsolete; use group_inference_key "
+            "(target_name_raw_plus_publication)"
+        )
+    raw = data.get("group_inference_key")
+    if not isinstance(raw, str) or not raw.strip():
+        raise UTexasS2Error("group_inference_key must be a non-empty string")
+    key = raw.strip()
+    allowed = {
+        "target_name_raw_plus_publication",
+        "experiment_group_id",
+        "experiment_group_then_target_publication",
+    }
+    if key not in allowed:
+        raise UTexasS2Error(
+            f"unsupported group_inference_key: {key!r}; expected one of {sorted(allowed)}"
+        )
+    return key
+
+
 def _require_str_map(value: Any, name: str) -> dict[str, str]:
     data = _require_mapping(value, name)
     out: dict[str, str] = {}
@@ -285,10 +316,7 @@ def load_utexas_policy(path: str | Path) -> UtexasNormalisationPolicy:
             data.get("parse_pool_type_for_proposals"),
             "parse_pool_type_for_proposals",
         ),
-        group_inference_by_pool_type=_require_bool(
-            data.get("group_inference_by_pool_type"),
-            "group_inference_by_pool_type",
-        ),
+        group_inference_key=_load_group_inference_key(data),
         molecule_type_map=_require_str_map(
             data.get("molecule_type_map"), "molecule_type_map"
         ),
@@ -514,8 +542,14 @@ def normalise_utexas_record(
         alphabet = norm.alphabet_as_reported
         t_to_u = "true" if norm.t_to_u_applied else "false"
 
-    if resolved_molecule == "unknown" and "molecule_type_unknown" not in qc_flags:
-        qc_flags.append("molecule_type_unknown")
+    # Final molecule_type is authoritative for the QC flag. Clear any
+    # molecule_type_unknown inherited from an earlier unknown pass through the
+    # shared normaliser (or elsewhere) when source evidence established a type.
+    if resolved_molecule == "unknown":
+        if "molecule_type_unknown" not in qc_flags:
+            qc_flags.append("molecule_type_unknown")
+    else:
+        qc_flags = [flag for flag in qc_flags if flag != "molecule_type_unknown"]
 
     canonical = dict(s1_record)
     canonical["sequence_raw"] = sequence_raw
@@ -682,12 +716,35 @@ def update_stats_from_row(stats: UTexasS2Stats, row: UTexasS2RowResult) -> None:
         stats.core_differs_from_full += 1
 
 
+def _comparison_form(sequence: str) -> str:
+    return sequence.upper().replace("U", "T")
+
+
+def _end_matches(sequence_full: str, *, side: str, motif: str) -> bool:
+    if not sequence_full or not motif:
+        return False
+    full = _comparison_form(sequence_full)
+    needle = _comparison_form(motif)
+    if side == "five_prime":
+        return full.startswith(needle)
+    if side == "three_prime":
+        return full.endswith(needle)
+    return False
+
+
 def build_pool_type_proposals(
     rows: Sequence[UTexasS2RowResult],
-) -> list[dict[str, str]]:
-    """Build deterministic pool-type constant-region proposals (not applied)."""
-    # Group by pool parse group_id; emit one proposal per side per group.
+) -> tuple[list[dict[str, str]], dict[str, tuple[str, ...]]]:
+    """Build Pool Type proposals with empirical exact-match evidence.
+
+    Parse success is recorded as ``source_documented=yes``. Empirical agreement
+    with ``sequence_full`` ends is recorded separately and must not be confused
+    with documentation confidence. No trim is applied.
+    """
+    from adapters.utexas_constant_region_review import simulate_hypothetical_trim
+
     groups: dict[str, dict[str, Any]] = {}
+    membership: dict[str, list[str]] = {}
     for row in rows:
         parsed = row.pool_parse
         if parsed is None:
@@ -698,37 +755,179 @@ def build_pool_type_proposals(
                 "five": parsed.five_prime,
                 "three": parsed.three_prime,
                 "nlen": parsed.documented_n_length,
-                "count": 1,
+                "rows": [row],
             }
+            membership[parsed.group_id] = [row.canonical["record_id"]]
         else:
-            entry["count"] += 1
+            entry["rows"].append(row)
+            membership[parsed.group_id].append(row.canonical["record_id"])
 
     proposals: list[dict[str, str]] = []
     for group_id in sorted(groups):
         entry = groups[group_id]
-        count = int(entry["count"])
+        members: list[UTexasS2RowResult] = entry["rows"]
+        considered = len(members)
         for side, motif in (
             ("five_prime", entry["five"]),
             ("three_prime", entry["three"]),
         ):
+            exact = 0
+            n_fail_min = 0
+            n_exceed_40 = 0
+            n_unmatched = 0
+            for member in members:
+                sequence_full = member.canonical.get("sequence_full") or ""
+                matched = _end_matches(sequence_full, side=side, motif=motif)
+                if matched:
+                    exact += 1
+                effect = simulate_hypothetical_trim(
+                    sequence_full, side=side, motif=motif
+                )
+                if effect.would_leave_core_below_20:
+                    n_fail_min += 1
+                if effect.would_trim_more_than_40_percent:
+                    n_exceed_40 += 1
+                if effect.prefix_or_suffix_not_exactly_matched:
+                    n_unmatched += 1
+            fraction = (exact / considered) if considered else 0.0
             proposals.append(
                 {
-                    "proposal_id": f"{group_id}:{side}",
+                    "proposal_id": f"{group_id}:{side}:pool_type",
                     "experiment_group_id": group_id,
                     "proposal_source": "pool_type",
                     "side": side,
                     "proposed_sequence": motif,
+                    "motif_id": "",
                     "motif_length": str(len(motif)),
-                    "support": "1.0",
-                    "records_considered": str(count),
-                    "records_matching_exactly": "",
+                    "support": "",
+                    "source_documented": "yes",
+                    "empirical_exact_match_fraction": (
+                        f"{fraction:.6f}".rstrip("0").rstrip(".")
+                    ),
+                    "records_considered": str(considered),
+                    "records_matching_exactly": str(exact),
+                    "documented_random_region_length": str(entry["nlen"]),
                     "confidence": "source_documented",
                     "status": "proposed_for_review",
                     "applied": "false",
                     "reason_not_applied": "no_approved_utexas_trim_rule",
                     "reason": (
-                        f"deterministic_pool_type_parse;documented_n={entry['nlen']}"
+                        "deterministic_pool_type_parse;"
+                        f"documented_n={entry['nlen']};"
+                        "exact_match_fraction="
+                        + f"{fraction:.6f}".rstrip("0").rstrip(".")
                     ),
+                    "would_leave_core_below_20": "true" if n_fail_min else "false",
+                    "would_trim_more_than_40_percent": (
+                        "true" if n_exceed_40 else "false"
+                    ),
+                    "prefix_or_suffix_not_exactly_matched": (
+                        "true" if n_unmatched else "false"
+                    ),
+                    "predicted_bases_trimmed": str(len(motif)),
                 }
             )
+    membership_tuples = {
+        group_id: tuple(sorted(set(ids))) for group_id, ids in membership.items()
+    }
+    return proposals, membership_tuples
+
+
+def build_known_motif_proposals(
+    rows: Sequence[UTexasS2RowResult],
+) -> list[dict[str, str]]:
+    """Build auditable known-motif proposals without applying trims."""
+    from adapters.utexas_constant_region_review import simulate_hypothetical_trim
+    from common.sequence_normalisation import detect_known_non_core_motifs
+
+    proposals: list[dict[str, str]] = []
+    for row in rows:
+        sequence_full = row.canonical.get("sequence_full") or ""
+        if not sequence_full:
+            continue
+        detected = detect_known_non_core_motifs(sequence_full)
+        for motif in detected:
+            side = motif.position
+            if side not in {"five_prime", "three_prime"}:
+                continue
+            # Recover matched needle length already on DetectedMotif.
+            motif_len = motif.length
+            # Approximate motif sequence from the matched span for guard-rail sim.
+            if side == "five_prime":
+                matched_seq = sequence_full[:motif_len]
+            else:
+                matched_seq = sequence_full[-motif_len:]
+            effect = simulate_hypothetical_trim(
+                sequence_full, side=side, motif=matched_seq
+            )
+            proposals.append(
+                {
+                    "proposal_id": (
+                        f"{row.canonical['record_id']}:known_motif:{side}:{motif.name}"
+                    ),
+                    "experiment_group_id": row.canonical["record_id"],
+                    "proposal_source": "known_motif",
+                    "side": side,
+                    "proposed_sequence": "",
+                    "motif_id": motif.name,
+                    "motif_length": str(motif_len),
+                    "support": "",
+                    "source_documented": "no",
+                    "empirical_exact_match_fraction": "1" if effect.matched else "0",
+                    "records_considered": "1",
+                    "records_matching_exactly": "1" if effect.matched else "0",
+                    "documented_random_region_length": "",
+                    "confidence": "configured_motif_library",
+                    "status": "proposed_for_review",
+                    "applied": "false",
+                    "reason_not_applied": "no_approved_utexas_trim_rule",
+                    "reason": f"known_motif:{motif.name}",
+                    "would_leave_core_below_20": (
+                        "true" if effect.would_leave_core_below_20 else "false"
+                    ),
+                    "would_trim_more_than_40_percent": (
+                        "true" if effect.would_trim_more_than_40_percent else "false"
+                    ),
+                    "prefix_or_suffix_not_exactly_matched": (
+                        "true"
+                        if effect.prefix_or_suffix_not_exactly_matched
+                        else "false"
+                    ),
+                    "predicted_bases_trimmed": str(motif_len),
+                }
+            )
+    proposals.sort(key=lambda item: item["proposal_id"])
     return proposals
+
+
+def assert_genuine_proposals(proposals: Sequence[Mapping[str, str]]) -> None:
+    """Reject motif-length-zero or otherwise non-scientific proposal rows."""
+    for row in proposals:
+        side = row.get("side", "")
+        if side not in {"five_prime", "three_prime"}:
+            raise UTexasS2Error(f"proposal side must be five_prime/three_prime: {side}")
+        if row.get("applied") != "false":
+            raise UTexasS2Error("UTexas proposals must have applied=false")
+        motif = (row.get("proposed_sequence") or "").strip()
+        motif_id = (row.get("motif_id") or "").strip()
+        if not motif and not motif_id:
+            raise UTexasS2Error("proposal must have motif sequence or motif_id")
+        try:
+            length = int(row.get("motif_length") or "0")
+        except ValueError as exc:
+            raise UTexasS2Error("motif_length must be an integer") from exc
+        if length <= 0:
+            raise UTexasS2Error("proposal motif_length must be > 0")
+        source = row.get("proposal_source", "")
+        if source == "group_consensus":
+            if row.get("confidence") != "medium":
+                raise UTexasS2Error("Tier-2 proposals must use confidence=medium")
+            if length < 12:
+                raise UTexasS2Error("Tier-2 motif_length must be >= 12")
+            support = float(row.get("support") or 0.0)
+            if support < 0.80:
+                raise UTexasS2Error("Tier-2 support must be >= 0.80")
+            considered = int(row.get("records_considered") or 0)
+            if considered < 5:
+                raise UTexasS2Error("Tier-2 group_size must be >= 5")
+

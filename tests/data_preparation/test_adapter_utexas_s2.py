@@ -18,11 +18,16 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from adapters.utexas_s2 import (  # noqa: E402
+    assert_genuine_proposals,
+    build_known_motif_proposals,
     build_pool_type_proposals,
     load_utexas_policy,
     normalise_utexas_record,
     parse_pool_type_constants,
     resolve_utexas_molecule_and_chemistry,
+)
+from adapters.utexas_constant_region_review import (  # noqa: E402
+    simulate_hypothetical_trim,
 )
 from common.corpus_schema import empty_corpus_record  # noqa: E402
 from common.sequence_normalisation import load_normalisation_rules  # noqa: E402
@@ -141,6 +146,7 @@ def test_ssrna_u_no_t_to_u(policy, rules) -> None:
     assert result.canonical["chemistry"] == "RNA"
     assert result.canonical["t_to_u_applied"] == "false"
     assert result.canonical["sequence_full"] == "ACGUAC"
+    assert "molecule_type_unknown" not in result.canonical["qc_flags"]
 
 
 def test_ssrna_t_converted(policy, rules) -> None:
@@ -154,6 +160,7 @@ def test_ssrna_t_converted(policy, rules) -> None:
     assert result.canonical["alphabet_as_reported"] == "DNA_T"
     assert result.canonical["t_to_u_applied"] == "true"
     assert result.canonical["sequence_full"] == "ACGUAC"
+    assert "molecule_type_unknown" not in result.canonical["qc_flags"]
 
 
 def test_ssdna_retains_t(policy, rules) -> None:
@@ -167,6 +174,7 @@ def test_ssdna_retains_t(policy, rules) -> None:
     assert result.canonical["chemistry"] == "DNA"
     assert result.canonical["t_to_u_applied"] == "false"
     assert result.canonical["sequence_full"] == "ACGTAC"
+    assert "molecule_type_unknown" not in result.canonical["qc_flags"]
 
 
 def test_dsdna_retains_t(policy, rules) -> None:
@@ -229,6 +237,40 @@ def test_blank_type_t_stays_unknown(policy, rules) -> None:
     assert result.canonical["chemistry"] == "unknown"
     assert result.canonical["t_to_u_applied"] == "false"
     assert result.canonical["sequence_full"] == "ACGTAC"
+    assert "molecule_type_unknown" in result.canonical["qc_flags"]
+
+
+def test_known_molecule_clears_spurious_unknown_flag(policy, rules, monkeypatch) -> None:
+    """Authoritative source type must drop an inherited molecule_type_unknown flag."""
+    import adapters.utexas_s2 as utexas_s2
+
+    real_resolve = utexas_s2.resolve_utexas_molecule_and_chemistry
+
+    def resolve_with_spurious_flag(source_metadata, active_policy):
+        result = real_resolve(source_metadata, active_policy)
+        return utexas_s2.MoleculeChemistryResult(
+            source_value=result.source_value,
+            molecule_type=result.molecule_type,
+            chemistry=result.chemistry,
+            evidence_source=result.evidence_source,
+            qc_flags=tuple(
+                sorted(set(result.qc_flags) | {"molecule_type_unknown"})
+            ),
+        )
+
+    monkeypatch.setattr(
+        utexas_s2,
+        "resolve_utexas_molecule_and_chemistry",
+        resolve_with_spurious_flag,
+    )
+    result = normalise_utexas_record(
+        _s1(sequence_raw="ACGUAC"),
+        _meta(utexas_type_of_nucleic_acid="ssRNA"),
+        policy=policy,
+        rules=rules,
+    )
+    assert result.canonical["molecule_type"] == "RNA"
+    assert "molecule_type_unknown" not in result.canonical["qc_flags"]
 
 
 def test_mixed_t_u_unrepaired(policy, rules) -> None:
@@ -322,10 +364,82 @@ def test_detection_does_not_trim(policy, rules) -> None:
     assert result.canonical["sequence_core"] == result.canonical["sequence_full"]
     assert result.canonical["trim_status"] == "constants_suspected_unresolved"
     assert result.pool_parse is not None
-    proposals = build_pool_type_proposals([result])
+    proposals, membership = build_pool_type_proposals([result])
     assert len(proposals) == 2
     assert all(p["applied"] == "false" for p in proposals)
     assert all(p["reason_not_applied"] == "no_approved_utexas_trim_rule" for p in proposals)
+    assert all(p["source_documented"] == "yes" for p in proposals)
+    assert all(p["support"] == "" for p in proposals)
+    assert all(p["empirical_exact_match_fraction"] != "" for p in proposals)
+    assert result.canonical["record_id"] in membership[result.pool_parse.group_id]
+
+
+def test_pool_type_empirical_match_distinct_from_documentation(policy, rules) -> None:
+    pool = "5\'-AAAA-N4-CCCC-3\'"
+    matching = normalise_utexas_record(
+        _s1(record_id="utexas:row_0002", native_id="row_0002", sequence_raw="AAAACCCCCCCC"),
+        _meta(record_id="utexas:row_0002", utexas_pool_type=pool, utexas_type_of_nucleic_acid="ssDNA"),
+        policy=policy,
+        rules=rules,
+    )
+    mismatching = normalise_utexas_record(
+        _s1(record_id="utexas:row_0003", native_id="row_0003", sequence_raw="GGGGTTTTTTTT"),
+        _meta(record_id="utexas:row_0003", utexas_pool_type=pool, utexas_type_of_nucleic_acid="ssDNA"),
+        policy=policy,
+        rules=rules,
+    )
+    proposals, _membership = build_pool_type_proposals([matching, mismatching])
+    five = next(p for p in proposals if p["side"] == "five_prime")
+    assert five["source_documented"] == "yes"
+    assert five["records_considered"] == "2"
+    assert five["records_matching_exactly"] == "1"
+    assert five["empirical_exact_match_fraction"] == "0.5"
+    assert five["applied"] == "false"
+    assert_genuine_proposals(proposals)
+
+
+def test_hypothetical_guard_rails() -> None:
+    below = simulate_hypothetical_trim("AAAACCCC", side="five_prime", motif="AAAA")
+    assert below.matched is True
+    assert below.hypothetical_core_length == 4
+    assert below.would_leave_core_below_20 is True
+
+    long_core = "A" * 20 + "C" * 20
+    exceed = simulate_hypothetical_trim(long_core, side="five_prime", motif="A" * 20)
+    assert exceed.matched is True
+    assert exceed.would_trim_more_than_40_percent is True
+
+    unmatched = simulate_hypothetical_trim("GGGGCCCC", side="five_prime", motif="AAAA")
+    assert unmatched.matched is False
+    assert unmatched.prefix_or_suffix_not_exactly_matched is True
+
+
+def test_policy_rejects_pool_type_grouping_flag(tmp_path) -> None:
+    payload = {
+        "source_key": "utexas",
+        "contract_version": "1.0",
+        "molecule_evidence_field": "utexas_type_of_nucleic_acid",
+        "chemistry_evidence_field": "utexas_type_of_nucleic_acid",
+        "post_selex_field": "utexas_post_selex_modifications",
+        "pool_type_field": "utexas_pool_type",
+        "pool_random_region_field": "utexas_pool_random_region",
+        "reported_length_field": "utexas_sequence_length",
+        "apply_approved_trims": False,
+        "approved_trim_rules": [],
+        "parse_pool_type_for_proposals": True,
+        "group_inference_by_pool_type": True,
+        "molecule_type_map": {"": "unknown"},
+        "chemistry_map": {"": "unknown"},
+        "chemistry_not_in_canonical_vocab_sources": [],
+        "molecule_type_requires_review_sources": [],
+        "t_only_without_explicit_molecule_evidence": "unknown",
+        "do_not_infer_molecule_from_t_alphabet": True,
+        "do_not_infer_fana_from_alphabet": True,
+    }
+    path = tmp_path / "bad_policy.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(Exception):
+        load_utexas_policy(path)
 
 
 def test_no_pool_means_no_constants_detected(policy, rules) -> None:
@@ -337,3 +451,5 @@ def test_no_pool_means_no_constants_detected(policy, rules) -> None:
     )
     assert result.canonical["sequence_core"] == result.canonical["sequence_full"]
     assert result.canonical["trim_status"] == "no_constants_detected"
+    known = build_known_motif_proposals([result])
+    assert known == []
