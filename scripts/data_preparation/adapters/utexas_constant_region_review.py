@@ -6,6 +6,7 @@ a sequence-safe review summary. Never mutates canonical sequences.
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import statistics
@@ -314,6 +315,53 @@ def validate_reviewed_candidate_package(
         raise ValueError("candidate_rule_id values are not unique in decisions")
     if set(cand_ids) != set(dec_ids):
         raise ValueError("candidate ID sets in candidates and decisions are not equal")
+
+
+def load_tracked_constant_region_decisions(
+    path: str | Path,
+) -> tuple[frozenset[str], frozenset[str]]:
+    """Load frozen approve / needs_source_review IDs from the tracked manifest."""
+    resolution_path = Path(path)
+    if not resolution_path.is_file():
+        raise ValueError(
+            f"Missing tracked constant-region resolutions: {resolution_path.name}"
+        )
+    with resolution_path.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    if len(rows) != EXPECTED_CANDIDATE_RULES:
+        raise ValueError(
+            f"Tracked constant-region rows must be {EXPECTED_CANDIDATE_RULES}; "
+            f"got {len(rows)}"
+        )
+    approved: set[str] = set()
+    unresolved: set[str] = set()
+    seen: set[str] = set()
+    for row in rows:
+        rule_id = (row.get("candidate_rule_id") or "").strip()
+        decision = (row.get("decision") or "").strip()
+        if not rule_id:
+            raise ValueError("Tracked constant-region row missing candidate_rule_id")
+        if rule_id in seen:
+            raise ValueError("Duplicate candidate_rule_id in tracked resolutions")
+        seen.add(rule_id)
+        if decision == "approve":
+            approved.add(rule_id)
+        elif decision == "needs_source_review":
+            unresolved.add(rule_id)
+        else:
+            raise ValueError(
+                f"Unexpected tracked constant-region decision={decision!r}"
+            )
+    if len(approved) != EXPECTED_APPROVE:
+        raise ValueError(
+            f"Tracked approve count must be {EXPECTED_APPROVE}; got {len(approved)}"
+        )
+    if len(unresolved) != EXPECTED_NEEDS_SOURCE_REVIEW:
+        raise ValueError(
+            "Tracked needs_source_review count must be "
+            f"{EXPECTED_NEEDS_SOURCE_REVIEW}; got {len(unresolved)}"
+        )
+    return frozenset(approved), frozenset(unresolved)
 
 
 def _is_safe_agreement_approve(row: Mapping[str, str]) -> bool:

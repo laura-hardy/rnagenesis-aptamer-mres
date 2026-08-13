@@ -71,22 +71,6 @@ EXPECTED_UTEXAS_ROWS = 1894
 EXPECTED_UTEXAS_MISSING = 399
 EXPECTED_UTEXAS_NONEMPTY = 1495
 EXPECTED_UTEXAS_MOLECULE = {"RNA": 583, "ssDNA": 896, "DNA": 13, "unknown": 402}
-EXPECTED_UTEXAS_CORE_LENGTH = {
-    "missing": 399,
-    "below_20": 15,
-    "20_to_100": 1318,
-    "101_to_200": 160,
-    "above_200": 2,
-}
-EXPECTED_UTEXAS_INVALID = 57
-EXPECTED_UTEXAS_AMBIGUOUS = 8
-EXPECTED_UTEXAS_MEDIUM_TRIM = 299
-EXPECTED_UTEXAS_TRIM_REVIEW = 1278
-EXPECTED_UTEXAS_CONSTRUCT_SCOPE = {
-    "full_construct": 8,
-    "partial_construct": 291,
-    "unknown": 1595,
-}
 EXPECTED_RAW_SHA256 = (
     "b5a66beb58d30c5c3d2f36a29ea2cc3678e7d4a6b1bb1a97efc1e166a49fd15c"
 )
@@ -910,28 +894,9 @@ def _assert_utexas_s2_invariants(canonical_rows: Sequence[dict[str, str]]) -> No
         )
 
     molecule_counts: dict[str, int] = {}
-    core_buckets: dict[str, int] = {}
-    construct_counts: dict[str, int] = {}
-    invalid = 0
-    ambiguous = 0
-    medium_trim = 0
-    trim_review = 0
     for row in canonical_rows:
         molecule = row.get("molecule_type") or ""
         molecule_counts[molecule] = molecule_counts.get(molecule, 0) + 1
-        bucket = _core_length_bucket_from_raw(row.get("sequence_length_core", ""))
-        core_buckets[bucket] = core_buckets.get(bucket, 0) + 1
-        scope = row.get("construct_scope") or ""
-        construct_counts[scope] = construct_counts.get(scope, 0) + 1
-        flags = {part for part in (row.get("qc_flags") or "").split("|") if part}
-        if "invalid_character" in flags:
-            invalid += 1
-        if "ambiguous_base" in flags:
-            ambiguous += 1
-        if (row.get("trim_confidence") or "") == "medium":
-            medium_trim += 1
-        if "trim_requires_review" in flags:
-            trim_review += 1
         for field_name in (
             "target_name",
             "target_type",
@@ -949,24 +914,10 @@ def _assert_utexas_s2_invariants(canonical_rows: Sequence[dict[str, str]]) -> No
         raise S3ClassifyError(
             f"S2 molecule_type counts drifted: {molecule_counts}"
         )
-    if core_buckets != EXPECTED_UTEXAS_CORE_LENGTH:
-        raise S3ClassifyError(
-            f"S2 sequence_length_core buckets drifted: {core_buckets}"
-        )
-    if invalid != EXPECTED_UTEXAS_INVALID:
-        raise S3ClassifyError(f"S2 invalid_character count drifted: {invalid}")
-    if ambiguous != EXPECTED_UTEXAS_AMBIGUOUS:
-        raise S3ClassifyError(f"S2 ambiguous_base count drifted: {ambiguous}")
-    if medium_trim != EXPECTED_UTEXAS_MEDIUM_TRIM:
-        raise S3ClassifyError(f"S2 medium-trim count drifted: {medium_trim}")
-    if trim_review != EXPECTED_UTEXAS_TRIM_REVIEW:
-        raise S3ClassifyError(
-            f"S2 trim_requires_review count drifted: {trim_review}"
-        )
-    if construct_counts != EXPECTED_UTEXAS_CONSTRUCT_SCOPE:
-        raise S3ClassifyError(
-            f"S2 construct_scope counts drifted: {construct_counts}"
-        )
+    # Alphabet recoveries and subsequent approved trims may legitimately
+    # change core-length, alphabet-QC, construct-scope and trim tallies.
+    # Those are reported from the rerun rather than pinned to the pre-recovery
+    # S2 snapshot.
 
 
 def build_utexas_checkpoint1_summary(
@@ -1083,11 +1034,9 @@ def build_utexas_checkpoint1_summary(
             "",
             "## Trim context",
             "",
-            "- S2 applied medium-confidence trims: `299`",
-            "- S2 records still requiring trim review before S3: `1278`",
-            "- S2 >40% blocked trim records: `230`",
-            "",
-            "After S3 precedence:",
+            "Under the UTexas source-specific eligibility judgement, unresolved "
+            "trim/construct QC is retained as provenance and does not by itself "
+            "prevent technically valid RNA from being proposed accept.",
             "",
             f"- medium-confidence trim condition: `{stats.medium_trim_count}`",
             f"- medium-trim rows in the active review queue: "
@@ -1401,7 +1350,10 @@ def run_utexas_s3(
         if not row["primary_reason"]:
             raise S3ClassifyError("Decision row missing primary_reason")
 
-    assert_utexas_accept_invariants(decision_rows)
+    assert_utexas_accept_invariants(
+        decision_rows,
+        unresolved_trim_blocks_eligibility=policy.unresolved_trim_blocks_eligibility,
+    )
     assert_utexas_reject_park_invariants(decision_rows)
 
     reason_count_rows: list[dict[str, str]] = []

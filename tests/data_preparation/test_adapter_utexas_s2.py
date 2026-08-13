@@ -453,3 +453,62 @@ def test_no_pool_means_no_constants_detected(policy, rules) -> None:
     assert result.canonical["trim_status"] == "no_constants_detected"
     known = build_known_motif_proposals([result])
     assert known == []
+
+
+def test_approved_alphabet_recovery_keeps_sequence_raw_immutable(policy, rules) -> None:
+    from adapters.utexas_alphabet_exceptions import (
+        AlphabetResolution,
+        SUGGESTED_ACCEPT_RECOVERED,
+        attempt_recovery,
+    )
+
+    raw = "5'ACGUACGU3'"
+    recovery = attempt_recovery(raw)
+    resolution = AlphabetResolution(
+        record_id="utexas:row_0002",
+        decision=SUGGESTED_ACCEPT_RECOVERED,
+        transformation_profile="|".join(recovery.transformations),
+        expected_recovered_length=len(recovery.sequence),
+        review_note="Approved at the alphabet-normalisation level only",
+    )
+    result = normalise_utexas_record(
+        _s1(sequence_raw=raw),
+        _meta(),
+        policy=policy,
+        rules=rules,
+        alphabet_resolution=resolution,
+    )
+    assert result.canonical["sequence_raw"] == raw
+    assert result.canonical["sequence_full"] == recovery.sequence
+    assert "alphabet_recovery_applied" in result.canonical["qc_flags"]
+
+
+def test_unapproved_record_does_not_receive_alphabet_recovery(policy, rules) -> None:
+    raw = "5'ACGUACGU3'"
+    result = normalise_utexas_record(
+        _s1(sequence_raw=raw),
+        _meta(),
+        policy=policy,
+        rules=rules,
+    )
+    assert result.canonical["sequence_raw"] == raw
+    assert "alphabet_recovery_applied" not in result.canonical["qc_flags"]
+    with pytest.raises(Exception):
+        from adapters.utexas_alphabet_exceptions import (
+            AlphabetResolution,
+            SUGGESTED_CONFIRM_REJECT,
+        )
+
+        normalise_utexas_record(
+            _s1(sequence_raw=raw),
+            _meta(),
+            policy=policy,
+            rules=rules,
+            alphabet_resolution=AlphabetResolution(
+                record_id="utexas:row_0002",
+                decision=SUGGESTED_CONFIRM_REJECT,
+                transformation_profile="",
+                expected_recovered_length=None,
+                review_note="Genuine IUPAC/degenerate sequence",
+            ),
+        )

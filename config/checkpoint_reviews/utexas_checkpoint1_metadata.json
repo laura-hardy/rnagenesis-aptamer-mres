@@ -1,0 +1,17 @@
+{
+  "source_key": "utexas",
+  "checkpoint": "CHECKPOINT-1",
+  "review_model": "single_reviewer",
+  "reviewer_initials_required": false,
+  "reviewer_notes_required": false,
+  "review_rows": 194,
+  "no_review_rows": 1700,
+  "total_records": 1894,
+  "review_file_sha256": "8a97326776efd93699c754484e23842854f1a9bc17755ab0ef46cbb785d78c3d",
+  "checkpoint_status": "closed",
+  "next_stage": "global_S4_handoff",
+  "authorised_for_s4": 468,
+  "resolved_accept": 468,
+  "resolved_park": 916,
+  "resolved_reject": 510
+}

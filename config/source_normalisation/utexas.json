@@ -10,6 +10,7 @@
   "apply_approved_trims": true,
   "approved_trim_rules": [],
   "approved_trim_rules_path": "utexas_approved_trim_rules.json",
+  "alphabet_exception_resolutions_path": "../checkpoint_reviews/utexas_alphabet_exception_resolutions.csv",
   "parse_pool_type_for_proposals": true,
   "group_inference_key": "target_name_raw_plus_publication",
   "molecule_type_map": {

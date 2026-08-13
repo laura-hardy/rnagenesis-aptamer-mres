@@ -221,7 +221,7 @@ def test_gap_sequence_rejects_with_repair_review() -> None:
     assert result.decision["review_batch"] == "05_repair_alignment_gaps"
 
 
-def test_rna_valid_20_100_accepts_unless_unresolved_trim() -> None:
+def test_rna_valid_20_100_accepts_with_unresolved_trim_flag() -> None:
     clean = _classify(
         _s2(sequence=_rna(40), native_id="clean", construct_scope="unknown")
     )
@@ -239,12 +239,18 @@ def test_rna_valid_20_100_accepts_unless_unresolved_trim() -> None:
             native_id="trim_open",
         )
     )
-    assert unresolved.eligibility.proposed_decision == EligibilityDecision.PROPOSED_PARK
+    assert unresolved.eligibility.proposed_decision == EligibilityDecision.PROPOSED_ACCEPT
     assert (
         unresolved.eligibility.primary_reason
-        == EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED
+        == EligibilityReason.TECHNICALLY_ELIGIBLE_RNA
     )
-    assert unresolved.decision["review_batch"] == "04_park_trim_construct"
+    assert (
+        EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED
+        in unresolved.eligibility.all_reasons
+    )
+    assert "trim_requires_review" in unresolved.canonical["qc_flags"]
+    assert unresolved.eligibility.manual_review_required is False
+    assert unresolved.decision["review_batch"] == ""
 
 
 def test_length_below_20_rejects() -> None:
@@ -261,7 +267,7 @@ def test_length_above_100_rejects() -> None:
     assert result.eligibility.manual_review_required is False
 
 
-def test_overlength_with_unresolved_trim_rejects_but_reviews() -> None:
+def test_overlength_with_unresolved_trim_rejects_mechanically() -> None:
     result = _classify(
         _s2(
             sequence=_rna(120),
@@ -275,8 +281,8 @@ def test_overlength_with_unresolved_trim_rejects_but_reviews() -> None:
     assert (
         EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED in result.eligibility.all_reasons
     )
-    assert result.eligibility.manual_review_required is True
-    assert result.decision["review_batch"] == "04_park_trim_construct"
+    assert result.eligibility.manual_review_required is False
+    assert result.decision["review_batch"] == ""
 
 
 def test_boundary_lengths_accept_with_review() -> None:
@@ -322,7 +328,7 @@ def test_medium_applied_trim_accepts_with_review() -> None:
     assert result.decision["review_batch"] == "02_accept_with_diagnostics"
 
 
-def test_blocked_40pct_trim_parks_for_review() -> None:
+def test_blocked_40pct_trim_accepts_with_qc_flag() -> None:
     result = _classify(
         _s2(
             sequence=_rna(40),
@@ -331,15 +337,15 @@ def test_blocked_40pct_trim_parks_for_review() -> None:
             native_id="pct40",
         )
     )
-    assert result.eligibility.proposed_decision == EligibilityDecision.PROPOSED_PARK
+    assert result.eligibility.proposed_decision == EligibilityDecision.PROPOSED_ACCEPT
     assert (
-        result.eligibility.primary_reason
-        == EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED
+        result.eligibility.primary_reason == EligibilityReason.TECHNICALLY_ELIGIBLE_RNA
     )
     assert (
         EligibilityReason.TRIM_COMBINED_EXCEEDS_40PCT in result.eligibility.all_reasons
     )
-    assert result.decision["review_batch"] == "04_park_trim_construct"
+    assert "trim_combined_exceeds_40pct" in result.canonical["qc_flags"]
+    assert result.eligibility.manual_review_required is False
 
 
 def test_high_confidence_or_no_issue_core_may_accept() -> None:
@@ -450,3 +456,24 @@ def test_random_accept_audit_is_deterministic() -> None:
     assert take_b == take_a
     assert pool_b == pool_a
     assert selected_a == selected_b
+
+
+def test_post_recovery_length_rule_still_rejects_short_core() -> None:
+    recovered = _rna(15)
+    result = _classify(
+        _s2(
+            sequence=recovered,
+            qc_flags="alphabet_recovery_applied",
+            native_id="recovered_short",
+        )
+    )
+    assert result.eligibility.proposed_decision == EligibilityDecision.PROPOSED_REJECT
+    assert result.eligibility.primary_reason == EligibilityReason.LENGTH_OUT_OF_RANGE
+
+
+def test_aptabase_policy_still_treats_unresolved_trim_as_blocking() -> None:
+    aptabase_policy = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "aptabase.json"
+    )
+    assert aptabase_policy.unresolved_trim_blocks_eligibility is True
+    assert POLICY.unresolved_trim_blocks_eligibility is False

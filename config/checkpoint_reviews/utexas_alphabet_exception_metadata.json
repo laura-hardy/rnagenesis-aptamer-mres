@@ -1,0 +1,21 @@
+{
+  "source_key": "utexas",
+  "checkpoint": "CHECKPOINT-1",
+  "review_scope": "alphabet_exceptions",
+  "review_policy_version": "utexas_alphabet_exceptions_v1",
+  "review_model": "single_reviewer",
+  "reviewer_initials_required": false,
+  "decision_date": "2026-08-13",
+  "source_review_file": "data/interim/checkpoints/utexas_cp1/exceptions/utexas_alphabet_exception_review.csv",
+  "source_review_file_sha256_before_decision_write": "870b16efd25cb19c5fa71e88ee0a406b1b04d129afb3508edeb6496036878cb1",
+  "source_review_file_sha256": "292b49c2fc1f70e5a2079c6fd1c064c83f9306b1bcdc2e57ef6e944973cf5f9d",
+  "n_rows": 31,
+  "decision_counts": {
+    "accept_recovered_sequence": 17,
+    "confirm_reject": 10,
+    "override_to_park": 4,
+    "needs_source_review": 0
+  },
+  "canonical_sequences_changed_by_this_step": false,
+  "checkpoint1_closed_by_this_step": false
+}

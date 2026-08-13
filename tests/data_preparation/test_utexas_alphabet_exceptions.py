@@ -311,3 +311,54 @@ def test_summary_is_sequence_safe() -> None:
     assert "total exceptions = `31`" in text
     assert "CHECKPOINT-1 closed: `no`" in text
     assert "Canonical sequences changed: `no`" in text
+
+
+def test_apply_approved_recovery_requires_accept_decision() -> None:
+    from adapters.utexas_alphabet_exceptions import (
+        AlphabetResolution,
+        SUGGESTED_CONFIRM_REJECT,
+        apply_approved_recovery,
+    )
+
+    resolution = AlphabetResolution(
+        record_id="utexas:row_0001",
+        decision=SUGGESTED_CONFIRM_REJECT,
+        transformation_profile="",
+        expected_recovered_length=None,
+        review_note="Genuine IUPAC/degenerate sequence",
+    )
+    with pytest.raises(AlphabetExceptionError):
+        apply_approved_recovery("ACGUACGY", resolution)
+
+
+def test_approved_recovery_is_deterministic_and_length_checked() -> None:
+    from adapters.utexas_alphabet_exceptions import (
+        AlphabetResolution,
+        SUGGESTED_ACCEPT_RECOVERED,
+        apply_approved_recovery,
+        attempt_recovery,
+    )
+
+    raw = "5'ACGUACGU3'"
+    first = attempt_recovery(raw)
+    assert first.confidence == "high"
+    assert first.sequence == "ACGUACGU"
+    resolution = AlphabetResolution(
+        record_id="utexas:row_0001",
+        decision=SUGGESTED_ACCEPT_RECOVERED,
+        transformation_profile="|".join(first.transformations),
+        expected_recovered_length=len(first.sequence),
+        review_note="Approved at the alphabet-normalisation level only",
+    )
+    recovered = apply_approved_recovery(raw, resolution)
+    assert recovered.sequence == first.sequence
+    assert recovered.sequence == apply_approved_recovery(raw, resolution).sequence
+    wrong_length = AlphabetResolution(
+        record_id="utexas:row_0001",
+        decision=SUGGESTED_ACCEPT_RECOVERED,
+        transformation_profile="|".join(first.transformations),
+        expected_recovered_length=len(first.sequence) + 1,
+        review_note="Approved at the alphabet-normalisation level only",
+    )
+    with pytest.raises(AlphabetExceptionError):
+        apply_approved_recovery(raw, wrong_length)

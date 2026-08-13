@@ -2776,3 +2776,208 @@ Laura/ChatGPT should review the 31-row exception file and then make the
 final CHECKPOINT-1 closure decisions. Do not apply exception resolutions
 in this milestone.
 
+## 2026-08-13 — Close UTexas CHECKPOINT-1 and prepare global-S4 handoff
+
+### Stage
+
+Final per-source UTexas S1–S3 milestone. Human-reviewed alphabet-exception
+decisions were recorded; 17 approved recoveries were applied through the
+reproducible S2 pathway; S2/S3 were rerun; CHECKPOINT-1 was closed under
+Laura's source-specific eligibility judgement; UTexas was prepared as one
+input to future **global S4**. Global S4 itself was not executed.
+
+### 1. Alphabet-exception review (31 RNA records)
+
+Laura/ChatGPT reviewed the 31 source-reported RNA records previously
+rejected for `ambiguous_bases` or `invalid_alphabet`. Package counts were
+unchanged before decisions were recorded:
+
+```text
+exception rows = 31
+recoverable_modification_notation = 17
+true_iupac_degenerate_sequence = 9
+malformed_or_unrecoverable = 1
+needs_manual_source_review = 4
+molecule_type = RNA for every selected row
+```
+
+All 17 proposed recoveries had `recovery_confidence = high` and a nonempty
+underlying A/C/G/U string (7 recovered lengths in 20–100; 10 outside).
+
+Recorded CHECKPOINT-1 judgements:
+
+```text
+accept_recovered_sequence = 17
+confirm_reject = 10
+override_to_park = 4
+needs_source_review = 0
+blank = 0
+```
+
+- 17 recoverable modification/display-notation records were approved at
+  the alphabet-normalisation level only. They remained subject to approved
+  constant-region processing, core length 20–100, and other S3 rules.
+- 9 genuine IUPAC/degenerate sequences were confirmed reject. No arbitrary
+  nucleotide substitution was applied.
+- 1 malformed/corrupted sequence field was confirmed reject.
+- 4 complex/concatenated constructs (hammerhead-ribozyme, aptamer dimers,
+  aptamer/shRNA composites) were parked. No aptamer component was extracted.
+
+Sequence-bearing decisions remain under ignored `data/`. Tracked
+sequence-safe artefacts:
+
+- `config/checkpoint_reviews/utexas_alphabet_exception_resolutions.csv`
+- `config/checkpoint_reviews/utexas_alphabet_exception_metadata.json`
+
+### 2. Reviewed sequence recoveries in S2
+
+Only the 17 approved record IDs received deterministic recoveries via
+`adapters/utexas_alphabet_exceptions.py`. `sequence_raw` was unchanged for
+all 1,894 rows. Recovered A/C/G/U strings fed `sequence_full`, after which
+the existing 47 approved constant-region rules were applied unchanged.
+
+```text
+rows in = 1894
+rows out = 1894
+reviewed alphabet recoveries applied = 17
+sequence_raw / record_id / native_id / target_name_raw unchanged = 1894
+
+recovered records with core length 20–100 = 7
+recovered records with core length <20 = 2
+recovered records with core length >100 = 8
+recovered records with approved constant trim applied = 0
+recovered records still trim_requires_review = 17
+```
+
+The 47 approved trim-rule IDs were loaded from the tracked constant-region
+review and were not re-derived. Live diagnostic candidate-package agreement
+tallies may differ after recovery; that does not reopen the 47-rule review.
+
+### 3. S3 rerun and source-specific eligibility policy
+
+UTexas S3 was regenerated from the updated S2 output. Unresolved trim is
+not exclusionary for this source: source-reported RNA with a valid
+nondegenerate alphabet and core length 20–100 is technically eligible even
+when `trim_requires_review`, `constants_suspected_unresolved`, or
+`trim_combined_exceeds_40pct` remain as QC/provenance. This is a
+source-specific judgement, not a change to other corpus sources. AptaBase
+policy is unchanged (`unresolved_trim_blocks_eligibility` defaults to
+blocking).
+
+Old vs new proposed decisions:
+
+```text
+                 old     new
+proposed_accept   109     468
+proposed_park    1264     912
+proposed_reject   521     514
+trim_construct_unresolved primary parks  352  →  0
+```
+
+The previous 352 unresolved-trim parks became proposed technical accepts
+where alphabet and core length already passed. Length and alphabet rules
+still applied: 10 recovered records became `length_out_of_range` rejects
+(8 >100, 2 <20). DNA/ssDNA (909), FANA (3), missing sequence (399),
+true IUPAC and malformed alphabet rejects were unchanged at S3; the four
+complex constructs remained available for the human park overlay.
+
+### 4. CHECKPOINT-1 decisions and closure
+
+Active review (194 rows: 191 accept-with-diagnostics including random
+audit and boundary/medium-trim cases, plus 3 FANA parks) was confirmed
+current. Mechanical DNA parks and missing-sequence rejects were not added
+to human review. Alphabet overlays then parked the four complex constructs
+and preserved the 10 IUPAC/malformed rejects.
+
+```text
+final accept = 468
+final park = 916
+final reject = 510
+accept + park + reject = 1894
+
+overrides to accept = 0
+overrides to park = 4
+overrides to reject = 0
+
+alphabet recoveries applied = 17
+true IUPAC final rejects = 9
+malformed final rejects = 1
+complex construct final parks = 4
+FANA parks = 3
+DNA / ssDNA parks = 909
+missing-sequence rejects = 399
+length_out_of_range rejects = 101
+```
+
+Park reasons: 909 `non_rna_molecule` + 3 `molecule_type_unresolved` + 4
+`complex_construct_unresolved` = 916.
+
+Reject reasons: 399 `missing_sequence` + 101 `length_out_of_range` + 9
+IUPAC + 1 malformed = 510.
+
+QC retained on accepted records (provenance, not gates):
+
+```text
+trim_requires_review = 359
+constants_suspected_unresolved = 359
+trim_combined_exceeds_40pct = 29
+medium trim confidence = 95
+```
+
+CHECKPOINT-1 closed = yes.
+`authorised_for_s4 = 468`, meaning technically eligible after UTexas
+sequence/molecule/checkpoint review only.
+
+### 5. Global-S4 handoff (not global S4)
+
+`config/global_s4_sources/utexas.json` selects the 468 authorised
+canonical rows and joins sequence-safe UTexas source-metadata fields
+(`utexas_kd_nm`, `utexas_affinity`, `utexas_type_of_nucleic_acid`,
+`utexas_post_selex_modifications`) for later global target/evidence work.
+Those fields were not scored.
+
+```text
+global-S4 handoff prepared = yes
+global S4 executed = no
+target normalisation performed = no
+protein filtering performed = no
+evidence scoring performed = no
+leakage applied = no
+global dedup performed = no
+balancing performed = no
+partitioning performed = no
+```
+
+Ignored artefacts: `data/interim/global_s4_ready/utexas_global_s4_input.csv`
+and `utexas_global_s4_handoff_summary.md`. Tracked note:
+`docs/data_curation/utexas_global_s4_handoff.md`.
+
+### Verification
+
+- Targeted UTexas S2/S3/CHECKPOINT-1/alphabet/approved-trim + AptaBase
+  checkpoint/handoff tests included in the broader suite
+- Broader data-preparation suite (same hang-prone legacy AptaBase
+  cleaner/parser and ENA exclusions as before): **618 passed**
+- Deterministic rerun: byte-identical final S2 normalised, S3 decisions,
+  CHECKPOINT-1 resolution artefacts, UTexas global-S4 input and handoff
+  summary
+- Raw workbook SHA unchanged =
+  `b5a66beb58d30c5c3d2f36a29ea2cc3678e7d4a6b1bb1a97efc1e166a49fd15c`
+- AptaBase scientific interim outputs were not rewritten
+- The 47 approved UTexas trim-rule decisions were not altered
+
+### Pipeline state
+
+```text
+UTexas S1 complete
+UTexas S2 complete
+UTexas S3 complete
+CHECKPOINT-1 closed
+468 records authorised for future global S4
+global S4 executed = no
+```
+
+Laura/ChatGPT should review the UTexas CHECKPOINT-1 closure summary and
+the global-S4 handoff summary before beginning corpus-wide global S4.
+Do not merge UTexas with AptaBase yet.
+

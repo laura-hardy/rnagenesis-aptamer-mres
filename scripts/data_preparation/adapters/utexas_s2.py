@@ -141,6 +141,7 @@ class UtexasNormalisationPolicy:
     apply_approved_trims: bool
     approved_trim_rules: tuple[str, ...]
     approved_trim_rules_path: str
+    alphabet_exception_resolutions_path: str
     parse_pool_type_for_proposals: bool
     group_inference_key: str
     molecule_type_map: Mapping[str, str]
@@ -247,6 +248,12 @@ class UTexasS2Stats:
     rescued_overlength_to_20_100: int = 0
     core_became_out_of_range: int = 0
     same_motif_multi_rule_applications: int = 0
+    alphabet_recoveries_applied: int = 0
+    recovered_core_in_20_100: int = 0
+    recovered_core_below_20: int = 0
+    recovered_core_above_100: int = 0
+    recovered_approved_trim_applied: int = 0
+    recovered_still_trim_requires_review: int = 0
 
 
 def _require_mapping(value: Any, name: str) -> Mapping[str, Any]:
@@ -364,6 +371,9 @@ def load_utexas_policy(path: str | Path) -> UtexasNormalisationPolicy:
         ),
         approved_trim_rules=_load_approved_trim_rule_ids(data, policy_path),
         approved_trim_rules_path=str(data.get("approved_trim_rules_path") or ""),
+        alphabet_exception_resolutions_path=str(
+            data.get("alphabet_exception_resolutions_path") or ""
+        ),
         parse_pool_type_for_proposals=_require_bool(
             data.get("parse_pool_type_for_proposals"),
             "parse_pool_type_for_proposals",
@@ -513,6 +523,7 @@ def normalise_utexas_record(
     *,
     policy: UtexasNormalisationPolicy,
     rules: SequenceNormalisationRules | None = None,
+    alphabet_resolution=None,
 ) -> UTexasS2RowResult:
     """Normalise one UTexas S1 record into S2 canonical + QC rows."""
     active_rules = rules if rules is not None else load_normalisation_rules()
@@ -530,8 +541,25 @@ def normalise_utexas_record(
         else None
     )
 
+    sequence_input = sequence_raw
+    recovery_transforms: tuple[str, ...] = ()
+    if alphabet_resolution is not None:
+        from adapters.utexas_alphabet_exceptions import (
+            SUGGESTED_ACCEPT_RECOVERED,
+            apply_approved_recovery,
+        )
+
+        if getattr(alphabet_resolution, "decision", "") != SUGGESTED_ACCEPT_RECOVERED:
+            raise UTexasS2Error(
+                "Alphabet resolution supplied for a record not approved for recovery"
+            )
+        recovery = apply_approved_recovery(sequence_raw, alphabet_resolution)
+        sequence_input = recovery.sequence
+        recovery_transforms = recovery.transformations
+        qc_flags.append("alphabet_recovery_applied")
+
     norm = normalise_sequence(
-        sequence_raw,
+        sequence_input,
         molecule_type=molchem.molecule_type,
         trim_plan=None,
         rules=active_rules,
@@ -653,7 +681,7 @@ def normalise_utexas_record(
     return UTexasS2RowResult(
         canonical=validated,
         qc=qc,
-        transformations=tuple(norm.transformations),
+        transformations=recovery_transforms + tuple(norm.transformations),
         pool_parse=pool_parse,
     )
 

@@ -16,7 +16,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -51,6 +51,7 @@ from adapters.utexas_constant_region_review import (  # noqa: E402
     EXPECTED_CANDIDATE_RULES,
     EXPECTED_NEEDS_SOURCE_REVIEW,
     build_constant_region_review_package,
+    load_tracked_constant_region_decisions,
     write_review_package_files,
     write_tracked_review_artefacts,
 )
@@ -59,6 +60,12 @@ from adapters.utexas_approved_trims import (  # noqa: E402
     TRIM_AUDIT_COLUMNS,
     apply_approved_trims_to_rows,
     load_approved_trim_rules,
+)
+from adapters.utexas_alphabet_exceptions import (  # noqa: E402
+    RECOVERY_AUDIT_COLUMNS,
+    AlphabetExceptionError,
+    approved_recovery_ids,
+    load_alphabet_exception_resolutions,
 )
 from common.constant_region_inference import (  # noqa: E402
     build_group_inference_key,
@@ -127,6 +134,7 @@ class S2RunResult:
     output_review_summary: Path | None = None
     output_trim_audit: Path | None = None
     output_trim_ambiguity: Path | None = None
+    output_recovery_audit: Path | None = None
 
 
 def _sha256_file(path: Path) -> str:
@@ -842,6 +850,22 @@ def build_utexas_s2_report(
             f"- Core became out of 20–100 after trim: `{stats.core_became_out_of_range}`",
             f"- Same motif, multiple rule IDs: `{stats.same_motif_multi_rule_applications}`",
             "",
+            "### Reviewed alphabet recoveries",
+            "",
+            f"- Reviewed alphabet recoveries applied: `{stats.alphabet_recoveries_applied}`",
+            "- `sequence_raw` remains the immutable source string.",
+            "- Recovered A/C/G/U strings feed `sequence_full` before approved trims.",
+            f"- Recovered records with core length 20–100: "
+            f"`{stats.recovered_core_in_20_100}`",
+            f"- Recovered records with core length <20: "
+            f"`{stats.recovered_core_below_20}`",
+            f"- Recovered records with core length >100: "
+            f"`{stats.recovered_core_above_100}`",
+            f"- Recovered records with approved constant trim applied: "
+            f"`{stats.recovered_approved_trim_applied}`",
+            f"- Recovered records still `trim_requires_review`: "
+            f"`{stats.recovered_still_trim_requires_review}`",
+            "",
             "Approved application requires an unambiguous exact terminal match.",
             "Combined per-record <20 nt or >40% trims are not applied.",
             "",
@@ -1019,6 +1043,46 @@ def _recompute_utexas_row_stats(stats: UTexasS2Stats, row_results: list) -> None
     stats.unique_native_ids = len({row.canonical["native_id"] for row in row_results})
 
 
+def _record_recovered_core_outcomes(
+    stats: UTexasS2Stats,
+    normalised_rows: Sequence[Mapping[str, str]],
+    recovery_ids: frozenset[str],
+) -> None:
+    """Summarise post-trim core outcomes for reviewed alphabet recoveries."""
+    stats.recovered_core_in_20_100 = 0
+    stats.recovered_core_below_20 = 0
+    stats.recovered_core_above_100 = 0
+    stats.recovered_approved_trim_applied = 0
+    stats.recovered_still_trim_requires_review = 0
+    applied_trim_status = {
+        "primers_removed",
+        "t7_removed",
+        "t7_and_primers_removed",
+        "constants_removed",
+    }
+    for row in normalised_rows:
+        if row.get("record_id") not in recovery_ids:
+            continue
+        core = row.get("sequence_core") or ""
+        length = len(core)
+        if length < 20:
+            stats.recovered_core_below_20 += 1
+        elif length <= 100:
+            stats.recovered_core_in_20_100 += 1
+        else:
+            stats.recovered_core_above_100 += 1
+        full = row.get("sequence_full") or ""
+        trim_status = row.get("trim_status") or ""
+        trim_conf = row.get("trim_confidence") or ""
+        if trim_status in applied_trim_status or (
+            full and core and core != full and trim_conf in {"high", "medium"}
+        ):
+            stats.recovered_approved_trim_applied += 1
+        flags = {part for part in (row.get("qc_flags") or "").split("|") if part}
+        if "trim_requires_review" in flags:
+            stats.recovered_still_trim_requires_review += 1
+
+
 def run_utexas_s2(
     *,
     repo_root: Path,
@@ -1069,6 +1133,25 @@ def run_utexas_s2(
     rules = load_normalisation_rules(rules_path)
     policy = load_utexas_policy(policy_path)
 
+    alphabet_resolutions = {}
+    recovery_ids: frozenset[str] = frozenset()
+    if policy.alphabet_exception_resolutions_path:
+        resolutions_path = Path(policy.alphabet_exception_resolutions_path)
+        if not resolutions_path.is_absolute():
+            resolutions_path = (policy_path.parent / resolutions_path).resolve()
+        if resolutions_path.is_file():
+            try:
+                alphabet_resolutions = load_alphabet_exception_resolutions(
+                    resolutions_path
+                )
+            except AlphabetExceptionError as exc:
+                raise S2NormaliseError(str(exc)) from exc
+            recovery_ids = approved_recovery_ids(alphabet_resolutions)
+        elif expected_rows == EXPECTED_UTEXAS_ROWS:
+            raise S2NormaliseError(
+                "Missing UTexas alphabet-exception resolutions required for S2"
+            )
+
     canonical_rows = _read_corpus_csv(canonical_path)
     sidecar_rows = _read_sidecar_csv(sidecar_path)
     aligned_sidecar = _match_sidecar_one_to_one(canonical_rows, sidecar_rows)
@@ -1100,11 +1183,16 @@ def run_utexas_s2(
     row_results: list = []
 
     for s1_row, meta_row in zip(canonical_rows, aligned_sidecar, strict=True):
+        record_id = s1_row["record_id"]
+        resolution = None
+        if record_id in recovery_ids:
+            resolution = alphabet_resolutions[record_id]
         result = normalise_utexas_record(
             s1_row,
             meta_row,
             policy=policy,
             rules=rules,
+            alphabet_resolution=resolution,
         )
         if result.canonical["record_id"] != s1_row["record_id"]:
             stats.order_preserved = False
@@ -1122,6 +1210,40 @@ def run_utexas_s2(
         if utexas_is_review_candidate(result.canonical["qc_flags"]):
             review_rows.append(result.qc)
         update_utexas_stats_from_row(stats, result)
+
+    recovery_audit_rows: list[dict[str, str]] = []
+    for result in row_results:
+        record_id = result.canonical["record_id"]
+        if record_id not in recovery_ids:
+            continue
+        resolution = alphabet_resolutions[record_id]
+        recovered_full = result.canonical.get("sequence_full") or ""
+        recovery_audit_rows.append(
+            {
+                "record_id": record_id,
+                "native_id": result.canonical.get("native_id") or "",
+                "decision": resolution.decision,
+                "transformation_profile": resolution.transformation_profile,
+                "expected_recovered_length": str(
+                    resolution.expected_recovered_length or ""
+                ),
+                "recovered_length": str(len(recovered_full)) if recovered_full else "",
+                "applied": "true",
+            }
+        )
+    recovery_audit_rows.sort(key=lambda row: row["record_id"])
+    stats.alphabet_recoveries_applied = len(recovery_audit_rows)
+    if expected_rows == EXPECTED_UTEXAS_ROWS:
+        if stats.alphabet_recoveries_applied != 17:
+            raise S2NormaliseError(
+                "Reviewed alphabet recoveries applied must be 17; got "
+                f"{stats.alphabet_recoveries_applied}"
+            )
+        recovered_ids = {row["record_id"] for row in recovery_audit_rows}
+        if recovered_ids != set(recovery_ids):
+            raise S2NormaliseError(
+                "Applied alphabet recoveries do not match the approved ID set"
+            )
 
     stats.s2_rows = len(normalised_rows)
     stats.unique_record_ids = len({row["record_id"] for row in normalised_rows})
@@ -1262,7 +1384,8 @@ def run_utexas_s2(
         "approved_trims_pending_application"
     )
 
-    apply_reviewed_policy = expected_rows == EXPECTED_UTEXAS_ROWS
+    freeze_approved_trims = expected_rows == EXPECTED_UTEXAS_ROWS
+    rebuild_tracked_trim_package = freeze_approved_trims and not recovery_ids
     review_package = build_constant_region_review_package(
         proposals=all_proposals,
         normalised_rows=normalised_rows,
@@ -1271,7 +1394,7 @@ def run_utexas_s2(
         },
         pool_type_record_ids=pool_membership,
         diagnostics=inference_result.diagnostics,
-        apply_reviewed_policy=apply_reviewed_policy,
+        apply_reviewed_policy=rebuild_tracked_trim_package,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1282,6 +1405,7 @@ def run_utexas_s2(
     out_report = output_dir / "utexas_s2_report.md"
     out_trim_audit = output_dir / "utexas_constant_region_trim_audit.csv"
     out_trim_ambiguity = output_dir / "utexas_constant_region_trim_ambiguity.csv"
+    out_recovery_audit = output_dir / "utexas_alphabet_recovery_audit.csv"
 
     write_csv_atomic(out_proposals, UTEXAS_CONSTANT_PROPOSAL_COLUMNS, all_proposals)
     review_paths = write_review_package_files(
@@ -1289,7 +1413,7 @@ def run_utexas_s2(
     )
 
     s1_by_id = {row["record_id"]: row for row in canonical_rows}
-    if apply_reviewed_policy:
+    if rebuild_tracked_trim_package:
         if len(review_package.rule_candidates) != EXPECTED_CANDIDATE_RULES:
             raise S2NormaliseError(
                 "UTexas candidate rule count drifted from the reviewed package"
@@ -1326,7 +1450,7 @@ def run_utexas_s2(
             for row in review_package.review_decisions
             if row["decision"] == "needs_source_review"
         }
-        if apply_reviewed_policy:
+        if rebuild_tracked_trim_package:
             if approved_ids != decision_approve:
                 raise S2NormaliseError(
                     "approved trim-rule IDs do not match explicit review approvals"
@@ -1339,6 +1463,28 @@ def run_utexas_s2(
                 raise S2NormaliseError(
                     "needs_source_review count drifted from the reviewed policy"
                 )
+        elif freeze_approved_trims:
+            tracked_approve, tracked_unresolved = (
+                load_tracked_constant_region_decisions(
+                    repo_root
+                    / "config"
+                    / "checkpoint_reviews"
+                    / "utexas_constant_region_resolutions.csv"
+                )
+            )
+            if approved_ids != set(tracked_approve):
+                raise S2NormaliseError(
+                    "approved trim-rule IDs drifted from the tracked 47-rule review"
+                )
+            if len(approved_ids) != EXPECTED_APPROVE:
+                raise S2NormaliseError(
+                    f"approved trim rules must be {EXPECTED_APPROVE}"
+                )
+            if len(tracked_unresolved) != EXPECTED_NEEDS_SOURCE_REVIEW:
+                raise S2NormaliseError(
+                    "needs_source_review count drifted from the reviewed policy"
+                )
+            decision_unresolved = set(tracked_unresolved)
         trim_result = apply_approved_trims_to_rows(
             row_results,
             approved_rules=approved_defs,
@@ -1384,6 +1530,8 @@ def run_utexas_s2(
             f"unresolved_rules={tstats.unresolved_rules}"
         )
 
+    _record_recovered_core_outcomes(stats, normalised_rows, recovery_ids)
+
     for row in normalised_rows:
         if row["sequence_raw"] != s1_by_id[row["record_id"]]["sequence_raw"]:
             raise S2NormaliseError("S2 must not alter sequence_raw after trim application")
@@ -1393,6 +1541,7 @@ def run_utexas_s2(
     write_csv_atomic(out_review, UTEXAS_S2_QC_COLUMNS, review_rows)
     write_csv_atomic(out_trim_audit, TRIM_AUDIT_COLUMNS, trim_audit_rows)
     write_csv_atomic(out_trim_ambiguity, AMBIGUITY_COLUMNS, ambiguity_rows)
+    write_csv_atomic(out_recovery_audit, RECOVERY_AUDIT_COLUMNS, recovery_audit_rows)
 
     s1_hash_after = _sha256_file(canonical_path)
     sidecar_hash_after = _sha256_file(sidecar_path)
@@ -1420,6 +1569,7 @@ def run_utexas_s2(
             "review_summary": _sha256_file(review_paths["review_summary"]),
             "trim_audit": _sha256_file(out_trim_audit),
             "trim_ambiguity": _sha256_file(out_trim_ambiguity),
+            "recovery_audit": _sha256_file(out_recovery_audit),
         }
         second = run_utexas_s2(
             repo_root=repo_root,
@@ -1452,6 +1602,9 @@ def run_utexas_s2(
             and second.output_trim_ambiguity is not None
             and first_hashes["trim_ambiguity"]
             == _sha256_file(second.output_trim_ambiguity)
+            and second.output_recovery_audit is not None
+            and first_hashes["recovery_audit"]
+            == _sha256_file(second.output_recovery_audit)
         )
         if not deterministic_ok:
             raise S2NormaliseError(
@@ -1480,6 +1633,7 @@ def run_utexas_s2(
         output_review_summary=review_paths["review_summary"],
         output_trim_audit=out_trim_audit,
         output_trim_ambiguity=out_trim_ambiguity,
+        output_recovery_audit=out_recovery_audit,
     )
     report_text = build_utexas_s2_report(
         repo_root=repo_root,

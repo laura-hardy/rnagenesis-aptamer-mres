@@ -194,6 +194,7 @@ class EligibilityPolicy:
     reviewer_initials_required: bool = True
     reviewer_notes_required: bool = True
     active_review_batches: tuple[str, ...] = ()
+    unresolved_trim_blocks_eligibility: bool = True
 
 
 @dataclass(frozen=True)
@@ -493,6 +494,9 @@ def load_eligibility_policy(path: str | Path) -> EligibilityPolicy:
         ),
         active_review_batches=_optional_str_list(
             data, "active_review_batches", ()
+        ),
+        unresolved_trim_blocks_eligibility=_optional_bool(
+            data, "unresolved_trim_blocks_eligibility", True
         ),
     )
 

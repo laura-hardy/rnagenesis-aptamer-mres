@@ -350,13 +350,23 @@ def _collect_reasons(
     return reasons
 
 
+def _diagnostic_reasons(policy: EligibilityPolicy) -> frozenset[EligibilityReason]:
+    """Reasons that never become the primary S3 decision."""
+    reasons = set(DIAGNOSTIC_REASONS)
+    if not policy.unresolved_trim_blocks_eligibility:
+        reasons.add(EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED)
+    return frozenset(reasons)
+
+
 def _select_primary(
     applicable: Sequence[EligibilityReason],
     precedence: Sequence[str],
+    *,
+    diagnostic: frozenset[EligibilityReason],
 ) -> EligibilityReason | None:
     """Select the highest-precedence primary among decision-level reasons."""
     applicable_set = {
-        reason.value for reason in applicable if reason not in DIAGNOSTIC_REASONS
+        reason.value for reason in applicable if reason not in diagnostic
     }
     for code in precedence:
         if code in applicable_set:
@@ -400,8 +410,9 @@ def _is_technically_eligible_rna(
         EligibilityReason.ALIGNMENT_GAPS,
         EligibilityReason.INVALID_ALPHABET,
         EligibilityReason.LENGTH_OUT_OF_RANGE,
-        EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED,
     }
+    if policy.unresolved_trim_blocks_eligibility:
+        blocking.add(EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED)
     if set(applicable) & blocking:
         return False
     if canonical.get("molecule_type") != "RNA":
@@ -449,9 +460,10 @@ def assign_manual_review_priority(
         return ManualReviewPriority.NONE
 
     if primary_reason == EligibilityReason.LENGTH_OUT_OF_RANGE:
-        if reason_set & {
+        if EligibilityReason.TRIM_PUSHED_LENGTH_OUT_OF_RANGE in reason_set:
+            return ManualReviewPriority.HIGH
+        if policy.unresolved_trim_blocks_eligibility and reason_set & {
             EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED,
-            EligibilityReason.TRIM_PUSHED_LENGTH_OUT_OF_RANGE,
             EligibilityReason.TRIM_COMBINED_EXCEEDS_40PCT,
         }:
             return ManualReviewPriority.HIGH
@@ -497,12 +509,18 @@ def assign_utexas_review_batch(
     if primary_reason == EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED:
         return "04_park_trim_construct"
     if primary_reason == EligibilityReason.LENGTH_OUT_OF_RANGE and (
+        EligibilityReason.TRIM_PUSHED_LENGTH_OUT_OF_RANGE in reason_set
+    ):
+        return "01_reject_review"
+    if primary_reason == EligibilityReason.LENGTH_OUT_OF_RANGE and (
         reason_set
         & {
             EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED,
             EligibilityReason.TRIM_COMBINED_EXCEEDS_40PCT,
         }
     ):
+        # Legacy blocking-trim policy only. Under the UTexas source-specific
+        # eligibility judgement, unresolved trim is not a review gate.
         return "04_park_trim_construct"
     if (
         proposed_decision == EligibilityDecision.PROPOSED_REJECT
@@ -547,7 +565,10 @@ def classify_utexas_record(
     if eligible:
         applicable.append(EligibilityReason.TECHNICALLY_ELIGIBLE_RNA)
 
-    primary = _select_primary(applicable, policy.decision_precedence)
+    diagnostic = _diagnostic_reasons(policy)
+    primary = _select_primary(
+        applicable, policy.decision_precedence, diagnostic=diagnostic
+    )
     if primary is None:
         raise UTexasS3Error(
             f"No eligibility reason resolved for record_id={record_id!r}"
@@ -586,7 +607,10 @@ def classify_utexas_record(
             raise UTexasS3Error(f"Non-RNA must not be accepted: {record_id!r}")
         if s2_record.get("sequence_core", "") == "":
             raise UTexasS3Error(f"Missing sequence must not be accepted: {record_id!r}")
-        if EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED in eligibility.all_reasons:
+        if (
+            policy.unresolved_trim_blocks_eligibility
+            and EligibilityReason.TRIM_CONSTRUCT_UNRESOLVED in eligibility.all_reasons
+        ):
             raise UTexasS3Error(
                 f"Unresolved trim/construct must not be accepted: {record_id!r}"
             )
@@ -944,6 +968,8 @@ def refresh_stats_after_audit(
 
 def assert_utexas_accept_invariants(
     decision_rows: Sequence[Mapping[str, str]],
+    *,
+    unresolved_trim_blocks_eligibility: bool = True,
 ) -> None:
     """Hard-fail if any proposed accept violates RNA technical eligibility."""
     for row in decision_rows:
@@ -958,7 +984,7 @@ def assert_utexas_accept_invariants(
         flags = parse_qc_flags(row.get("qc_flags", ""))
         if flags & {"invalid_character", "ambiguous_base", "mixed_t_u"}:
             raise UTexasS3Error("proposed accept has unresolved alphabet QC flags")
-        if "trim_requires_review" in flags:
+        if unresolved_trim_blocks_eligibility and "trim_requires_review" in flags:
             raise UTexasS3Error("proposed accept still has trim_requires_review")
         try:
             core_len = int(row["sequence_length_core"])

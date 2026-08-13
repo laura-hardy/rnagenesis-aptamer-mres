@@ -4,14 +4,17 @@ This module inspects source-reported RNA records that S3 rejected for
 ``ambiguous_bases`` or ``invalid_alphabet``. It proposes a scientific
 exception class and, only when safe, an underlying A/C/G/U sequence.
 
-It does not mutate canonical S2/S3 sequences or CHECKPOINT-1 decisions.
+Canonical S2 sequences are mutated only when a tracked
+``accept_recovered_sequence`` resolution authorises a named recovery.
 """
 
 from __future__ import annotations
 
+import csv
 import re
 from collections import Counter
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final, Mapping, Sequence
 
 CLASS_RECOVERABLE: Final[str] = "recoverable_modification_notation"
@@ -115,6 +118,76 @@ CLASS_TO_SUGGESTED_ACTION: Final[Mapping[str, str]] = {
     CLASS_NEEDS_REVIEW: SUGGESTED_SOURCE_REVIEW,
 }
 
+REVIEW_POLICY_VERSION: Final[str] = "utexas_alphabet_exceptions_v1"
+REVIEW_DECISION_DATE: Final[str] = "2026-08-13"
+
+REASON_ACCEPT_RECOVERED: Final[str] = (
+    "Approved at the alphabet-normalisation level only; remains subject to "
+    "approved constant-region processing, core length 20-100, and other S3 "
+    "technical rules."
+)
+REASON_IUPAC_REJECT: Final[str] = (
+    "Genuine IUPAC/degenerate sequence; no arbitrary nucleotide substitution "
+    "is scientifically justified."
+)
+REASON_MALFORMED_REJECT: Final[str] = (
+    "Sequence field is corrupted/unrecoverable; no deterministic underlying "
+    "RNA sequence can be established."
+)
+REASON_COMPLEX_PARK: Final[str] = (
+    "Complex or concatenated RNA construct; underlying standalone aptamer "
+    "sequence not deterministically recoverable from the database sequence "
+    "field. Retained as parked rather than rejected."
+)
+
+CLASS_TO_HUMAN_ACTION: Final[Mapping[str, str]] = {
+    CLASS_RECOVERABLE: SUGGESTED_ACCEPT_RECOVERED,
+    CLASS_IUPAC: SUGGESTED_CONFIRM_REJECT,
+    CLASS_MALFORMED: SUGGESTED_CONFIRM_REJECT,
+    CLASS_NEEDS_REVIEW: SUGGESTED_OVERRIDE_PARK,
+}
+
+CLASS_TO_HUMAN_REASON: Final[Mapping[str, str]] = {
+    CLASS_RECOVERABLE: REASON_ACCEPT_RECOVERED,
+    CLASS_IUPAC: REASON_IUPAC_REJECT,
+    CLASS_MALFORMED: REASON_MALFORMED_REJECT,
+    CLASS_NEEDS_REVIEW: REASON_COMPLEX_PARK,
+}
+
+EXPECTED_CLASS_COUNTS: Final[Mapping[str, int]] = {
+    CLASS_RECOVERABLE: 17,
+    CLASS_IUPAC: 9,
+    CLASS_UNRESOLVED_MOD: 0,
+    CLASS_MALFORMED: 1,
+    CLASS_NEEDS_REVIEW: 4,
+}
+
+EXPECTED_DECISION_COUNTS: Final[Mapping[str, int]] = {
+    SUGGESTED_ACCEPT_RECOVERED: 17,
+    SUGGESTED_CONFIRM_REJECT: 10,
+    SUGGESTED_OVERRIDE_PARK: 4,
+    SUGGESTED_SOURCE_REVIEW: 0,
+    "": 0,
+}
+
+RESOLUTION_COLUMNS: Final[tuple[str, ...]] = (
+    "record_id",
+    "decision",
+    "transformation_profile",
+    "expected_recovered_length",
+    "review_note",
+)
+
+RECOVERY_AUDIT_COLUMNS: Final[tuple[str, ...]] = (
+    "record_id",
+    "native_id",
+    "decision",
+    "transformation_profile",
+    "expected_recovered_length",
+    "recovered_length",
+    "applied",
+)
+
 REVIEW_COLUMNS: Final[tuple[str, ...]] = (
     "record_id",
     "native_id",
@@ -203,6 +276,17 @@ class RecoveryResult:
     transformations: tuple[str, ...]
     confidence: str
     leftover_characters: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class AlphabetResolution:
+    """Sequence-safe human alphabet-exception resolution for one record."""
+
+    record_id: str
+    decision: str
+    transformation_profile: str
+    expected_recovered_length: int | None
+    review_note: str
 
 
 @dataclass(frozen=True)
@@ -945,3 +1029,245 @@ def build_exception_summary(
         "",
     ]
     return "\n".join(lines)
+
+
+def assert_reviewed_package_counts(rows: Sequence[Mapping[str, str]]) -> None:
+    """Hard-fail if the 31-row reviewed exception package has drifted."""
+    if len(rows) != EXPECTED_EXCEPTION_ROWS:
+        raise AlphabetExceptionError(
+            f"Expected {EXPECTED_EXCEPTION_ROWS} exception rows, found {len(rows)}"
+        )
+    class_counts = Counter((row.get("exception_class") or "") for row in rows)
+    for key, expected in EXPECTED_CLASS_COUNTS.items():
+        got = class_counts.get(key, 0)
+        if got != expected:
+            raise AlphabetExceptionError(
+                f"exception_class {key} expected {expected}; got {got}"
+            )
+    non_rna = [
+        row.get("record_id") or ""
+        for row in rows
+        if (row.get("molecule_type") or "") != "RNA"
+    ]
+    if non_rna:
+        raise AlphabetExceptionError(
+            "Alphabet-exception package contains non-RNA molecule_type"
+        )
+    recoverable = [
+        row for row in rows if row.get("exception_class") == CLASS_RECOVERABLE
+    ]
+    if len(recoverable) != EXPECTED_CLASS_COUNTS[CLASS_RECOVERABLE]:
+        raise AlphabetExceptionError("Recoverable cohort count drifted")
+    for row in recoverable:
+        if (row.get("recovery_confidence") or "") != "high":
+            raise AlphabetExceptionError(
+                "Recoverable exception missing high recovery_confidence"
+            )
+        if not (row.get("proposed_underlying_rna_sequence") or "").strip():
+            raise AlphabetExceptionError(
+                "Recoverable exception missing proposed_underlying_rna_sequence"
+            )
+    in_range = sum(
+        1 for row in recoverable if row.get("recovered_passes_length_policy") == YES
+    )
+    out_range = sum(
+        1 for row in recoverable if row.get("recovered_passes_length_policy") == NO
+    )
+    if in_range != 7 or out_range != 10:
+        raise AlphabetExceptionError(
+            "Recovered length split drifted: "
+            f"in_20_100={in_range} outside={out_range}"
+        )
+
+
+def apply_human_exception_decisions(
+    rows: Sequence[Mapping[str, str]],
+) -> list[dict[str, str]]:
+    """Populate CHECKPOINT-1 alphabet-exception review_action cells."""
+    assert_reviewed_package_counts(rows)
+    updated: list[dict[str, str]] = []
+    for row in rows:
+        exception_class = row.get("exception_class") or ""
+        if exception_class not in CLASS_TO_HUMAN_ACTION:
+            raise AlphabetExceptionError(
+                f"No human action mapping for exception_class={exception_class}"
+            )
+        out = dict(row)
+        out["review_action"] = CLASS_TO_HUMAN_ACTION[exception_class]
+        out["reviewer_note"] = CLASS_TO_HUMAN_REASON[exception_class]
+        out["reviewer_initials"] = ""
+        updated.append(out)
+
+    action_counts = Counter((row.get("review_action") or "") for row in updated)
+    for key, expected in EXPECTED_DECISION_COUNTS.items():
+        got = action_counts.get(key, 0)
+        if got != expected:
+            raise AlphabetExceptionError(
+                f"review_action {key or 'blank'} expected {expected}; got {got}"
+            )
+    if sum(action_counts.values()) != EXPECTED_EXCEPTION_ROWS:
+        raise AlphabetExceptionError("Decision counts do not cover all 31 rows")
+    return updated
+
+
+def build_tracked_resolution_rows(
+    rows: Sequence[Mapping[str, str]],
+) -> list[dict[str, str]]:
+    """Build sequence-safe tracked resolution rows from decided exception rows."""
+    if any(not (row.get("review_action") or "").strip() for row in rows):
+        raise AlphabetExceptionError("Cannot emit resolutions with blank review_action")
+    tracked: list[dict[str, str]] = []
+    for row in sorted(rows, key=lambda item: item.get("record_id") or ""):
+        action = row.get("review_action") or ""
+        profile = ""
+        expected_length = ""
+        if action == SUGGESTED_ACCEPT_RECOVERED:
+            profile = row.get("recovery_transformations") or ""
+            expected_length = row.get("recovered_sequence_length") or ""
+            if not profile or not expected_length:
+                raise AlphabetExceptionError(
+                    "Approved recovery missing transformation profile or length"
+                )
+        tracked.append(
+            {
+                "record_id": row.get("record_id") or "",
+                "decision": action,
+                "transformation_profile": profile,
+                "expected_recovered_length": expected_length,
+                "review_note": row.get("reviewer_note") or "",
+            }
+        )
+    ids = [row["record_id"] for row in tracked]
+    if len(set(ids)) != len(ids):
+        raise AlphabetExceptionError("Duplicate record_id in alphabet resolutions")
+    if any(not record_id for record_id in ids):
+        raise AlphabetExceptionError("Blank record_id in alphabet resolutions")
+    return tracked
+
+
+def load_alphabet_exception_resolutions(
+    path: str | Path,
+) -> dict[str, AlphabetResolution]:
+    """Load the tracked sequence-safe alphabet-exception resolution table."""
+    resolution_path = Path(path)
+    if not resolution_path.is_file():
+        raise AlphabetExceptionError(
+            f"Missing alphabet-exception resolutions: {resolution_path.name}"
+        )
+    with resolution_path.open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    if len(rows) != EXPECTED_EXCEPTION_ROWS:
+        raise AlphabetExceptionError(
+            f"Expected {EXPECTED_EXCEPTION_ROWS} resolution rows, found {len(rows)}"
+        )
+    loaded: dict[str, AlphabetResolution] = {}
+    for row in rows:
+        record_id = (row.get("record_id") or "").strip()
+        decision = (row.get("decision") or "").strip()
+        if not record_id:
+            raise AlphabetExceptionError("Alphabet resolution row missing record_id")
+        if record_id in loaded:
+            raise AlphabetExceptionError("Duplicate alphabet resolution record_id")
+        if decision not in ALLOWED_REVIEW_ACTIONS or not decision:
+            raise AlphabetExceptionError(
+                f"Unknown alphabet resolution decision={decision!r}"
+            )
+        length_raw = (row.get("expected_recovered_length") or "").strip()
+        expected_length: int | None = None
+        if length_raw:
+            try:
+                expected_length = int(length_raw)
+            except ValueError as exc:
+                raise AlphabetExceptionError(
+                    "expected_recovered_length must be an integer"
+                ) from exc
+        if decision == SUGGESTED_ACCEPT_RECOVERED:
+            if not (row.get("transformation_profile") or "").strip():
+                raise AlphabetExceptionError(
+                    "Approved recovery missing transformation_profile"
+                )
+            if expected_length is None:
+                raise AlphabetExceptionError(
+                    "Approved recovery missing expected_recovered_length"
+                )
+        elif (row.get("transformation_profile") or "").strip() or expected_length is not None:
+            raise AlphabetExceptionError(
+                "Non-recovery resolution must not carry recovery fields"
+            )
+        loaded[record_id] = AlphabetResolution(
+            record_id=record_id,
+            decision=decision,
+            transformation_profile=row.get("transformation_profile") or "",
+            expected_recovered_length=expected_length,
+            review_note=row.get("review_note") or "",
+        )
+    action_counts = Counter(item.decision for item in loaded.values())
+    for key, expected in EXPECTED_DECISION_COUNTS.items():
+        if not key:
+            continue
+        got = action_counts.get(key, 0)
+        if got != expected:
+            raise AlphabetExceptionError(
+                f"Tracked decision {key} expected {expected}; got {got}"
+            )
+    return loaded
+
+
+def approved_recovery_ids(
+    resolutions: Mapping[str, AlphabetResolution],
+) -> frozenset[str]:
+    """Return the record IDs approved for deterministic alphabet recovery."""
+    return frozenset(
+        record_id
+        for record_id, item in resolutions.items()
+        if item.decision == SUGGESTED_ACCEPT_RECOVERED
+    )
+
+
+def apply_approved_recovery(
+    sequence_raw: str,
+    resolution: AlphabetResolution,
+) -> RecoveryResult:
+    """Apply a reviewed recovery; never invent a sequence for other decisions."""
+    if resolution.decision != SUGGESTED_ACCEPT_RECOVERED:
+        raise AlphabetExceptionError(
+            "Alphabet recovery requested for a non-approved record"
+        )
+    recovery = attempt_recovery(sequence_raw)
+    if recovery.confidence != "high" or not recovery.sequence:
+        raise AlphabetExceptionError("Approved alphabet recovery failed")
+    if resolution.expected_recovered_length is not None and (
+        len(recovery.sequence) != resolution.expected_recovered_length
+    ):
+        raise AlphabetExceptionError(
+            "Approved recovery length does not match the reviewed expectation"
+        )
+    actual_profile = "|".join(recovery.transformations)
+    if (
+        resolution.transformation_profile
+        and actual_profile != resolution.transformation_profile
+    ):
+        raise AlphabetExceptionError(
+            "Approved recovery transformation profile does not match review"
+        )
+    return recovery
+
+
+def park_override_ids(
+    resolutions: Mapping[str, AlphabetResolution],
+) -> frozenset[str]:
+    return frozenset(
+        record_id
+        for record_id, item in resolutions.items()
+        if item.decision == SUGGESTED_OVERRIDE_PARK
+    )
+
+
+def reject_confirm_ids(
+    resolutions: Mapping[str, AlphabetResolution],
+) -> frozenset[str]:
+    return frozenset(
+        record_id
+        for record_id, item in resolutions.items()
+        if item.decision == SUGGESTED_CONFIRM_REJECT
+    )

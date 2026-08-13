@@ -5,7 +5,6 @@ Synthetic nucleotide strings only. Does not embed real UTexas aptamer sequences.
 
 from __future__ import annotations
 
-import csv
 import sys
 from pathlib import Path
 
@@ -24,16 +23,14 @@ from adapters.utexas_constant_region_review import (  # noqa: E402
     EXPECTED_APPROVE,
     EXPECTED_CANDIDATE_RULES,
     EXPECTED_NEEDS_SOURCE_REVIEW,
-    apply_explicit_review_decisions,
-    validate_reviewed_candidate_package,
+    load_tracked_constant_region_decisions,
 )
 
-CANDIDATE_PATH = (
+TRACKED_RESOLUTIONS = (
     REPO_ROOT
-    / "data"
-    / "interim"
-    / "normalised"
-    / "utexas_constant_region_rule_candidates.csv"
+    / "config"
+    / "checkpoint_reviews"
+    / "utexas_constant_region_resolutions.csv"
 )
 
 
@@ -57,21 +54,13 @@ def _rule(
 
 
 def test_review_decision_reconciliation_on_reviewed_package() -> None:
-    if not CANDIDATE_PATH.is_file():
-        pytest.skip("reviewed UTexas candidate package is not present")
-    with CANDIDATE_PATH.open(encoding="utf-8", newline="") as handle:
-        candidates = list(csv.DictReader(handle))
-    validate_reviewed_candidate_package(candidates)
-    decisions = apply_explicit_review_decisions(candidates)
-    counts = {}
-    for row in decisions:
-        counts[row["decision"]] = counts.get(row["decision"], 0) + 1
-    assert counts.get("approve", 0) == EXPECTED_APPROVE == 47
-    assert counts.get("needs_source_review", 0) == EXPECTED_NEEDS_SOURCE_REVIEW == 522
-    assert counts.get("reject", 0) == 0
-    assert all(row["decision"] for row in decisions)
-    assert len(decisions) == EXPECTED_CANDIDATE_RULES
-    assert all(row["reviewer_initials"] == "" for row in decisions)
+    if not TRACKED_RESOLUTIONS.is_file():
+        pytest.skip("tracked UTexas constant-region resolutions are not present")
+    approved, unresolved = load_tracked_constant_region_decisions(TRACKED_RESOLUTIONS)
+    assert len(approved) == EXPECTED_APPROVE == 47
+    assert len(unresolved) == EXPECTED_NEEDS_SOURCE_REVIEW == 522
+    assert approved.isdisjoint(unresolved)
+    assert len(approved | unresolved) == EXPECTED_CANDIDATE_RULES
 
 
 def test_exact_five_prime_trim_applies() -> None:

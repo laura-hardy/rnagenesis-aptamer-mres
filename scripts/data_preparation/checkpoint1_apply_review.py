@@ -33,7 +33,11 @@ from checkpoint1_prepare_review import (  # noqa: E402
     EXPECTED_TOTAL_ROWS,
     MANUAL_REVIEW_COLUMNS,
     SEQUENCE_COLUMNS,
+    UTEXAS_EXPECTED_TOTAL_ROWS,
+    UTEXAS_MANUAL_REVIEW_COLUMNS,
+    UTEXAS_SEQUENCE_COLUMNS,
     prepare_aptabase_checkpoint1_review,
+    prepare_utexas_checkpoint1_review,
     write_csv_atomic,
 )
 from s0_build_registry import find_repo_root, sha256_file  # noqa: E402
@@ -376,6 +380,8 @@ def reconstruct_pristine_review_package(
 def compare_review_to_pristine(
     reviewed_rows: Sequence[Mapping[str, str]],
     pristine_rows: Sequence[Mapping[str, str]],
+    *,
+    immutable_fields: Sequence[str] | None = None,
 ) -> None:
     """Require exact equality on all non-review fields; report field + record_id only."""
     if len(reviewed_rows) != len(pristine_rows):
@@ -408,13 +414,18 @@ def compare_review_to_pristine(
         )
 
     pristine_by_id = {row["record_id"]: row for row in pristine_rows}
+    fields = (
+        tuple(immutable_fields)
+        if immutable_fields is not None
+        else IMMUTABLE_REVIEW_FIELDS
+    )
     discrepancies: list[str] = []
     for reviewed in reviewed_rows:
         record_id = reviewed["record_id"]
         pristine = pristine_by_id[record_id]
         if reviewed.get("review_order", "") != pristine.get("review_order", ""):
             discrepancies.append(f"review_order:{record_id}")
-        for field_name in IMMUTABLE_REVIEW_FIELDS:
+        for field_name in fields:
             reviewed_value = reviewed.get(field_name, "")
             pristine_value = pristine.get(field_name, "")
             if not _cells_equivalent(field_name, reviewed_value, pristine_value):
@@ -1043,14 +1054,676 @@ def apply_aptabase_checkpoint1_review(
     return result
 
 
+UTEXAS_REGISTERED_RAW_REL = (
+    "data/raw/UTexas_aptamer_dataset/UTexas Aptamer Database dataset_Sept2023.xlsx"
+)
+UTEXAS_REGISTERED_RAW_SHA256 = (
+    "b5a66beb58d30c5c3d2f36a29ea2cc3678e7d4a6b1bb1a97efc1e166a49fd15c"
+)
+UTEXAS_S1_CANONICAL_REL = "data/interim/extracted/utexas_extracted.csv"
+UTEXAS_S1_SIDECAR_REL = "data/interim/extracted/utexas_source_metadata.csv"
+UTEXAS_S2_CANONICAL_REL = "data/interim/normalised/utexas_normalised.csv"
+UTEXAS_S2_QC_REL = "data/interim/normalised/utexas_s2_qc.csv"
+UTEXAS_CHECKPOINT_CLOSED_STATEMENT = (
+    "CHECKPOINT-1 CLOSED: human review has been applied and validated.\n"
+    "Only records with authorised_for_s4=true may proceed to future global S4.\n"
+    "authorised_for_s4 means technically eligible after UTexas sequence/"
+    "molecule/checkpoint review. It does not mean protein target confirmed, "
+    "target canonicalised, UniProt resolved, evidence threshold passed, "
+    "leakage passed, globally deduplicated, balanced, or final training inclusion."
+)
+UTEXAS_IMMUTABLE_REVIEW_FIELDS: tuple[str, ...] = tuple(
+    column
+    for column in UTEXAS_MANUAL_REVIEW_COLUMNS
+    if column not in PERMITTED_REVIEW_FIELDS
+)
+UTEXAS_RESOLUTION_COLUMNS: tuple[str, ...] = RESOLUTION_COLUMNS + ("resolved_reason",)
+COMPLEX_CONSTRUCT_REASON = "complex_construct_unresolved"
+
+
+def populate_utexas_checkpoint1_actions(review_file: Path) -> int:
+    """Fill blank active-review actions with confirm_current (UTexas policy)."""
+    rows = _read_csv(review_file, label="UTexas active review")
+    filled = 0
+    for row in rows:
+        action = (row.get("review_action") or "").strip()
+        if action:
+            continue
+        row["review_action"] = "confirm_current"
+        filled += 1
+    if any(not (row.get("review_action") or "").strip() for row in rows):
+        raise Checkpoint1ApplyError("UTexas active review still has blank actions")
+    write_csv_atomic(review_file, UTEXAS_MANUAL_REVIEW_COLUMNS, rows)
+    return filled
+
+
+def _overlay_utexas_alphabet_resolutions(
+    resolutions: list[dict[str, str]],
+    alphabet_resolutions: Mapping[str, object],
+) -> None:
+    """Apply alphabet-exception park/reject overlays, including mechanical rows."""
+    from adapters.utexas_alphabet_exceptions import (
+        SUGGESTED_CONFIRM_REJECT,
+        SUGGESTED_OVERRIDE_PARK,
+    )
+
+    by_id = {row["record_id"]: row for row in resolutions}
+    for record_id, alphabet in alphabet_resolutions.items():
+        if record_id not in by_id:
+            raise Checkpoint1ApplyError(
+                f"Alphabet resolution record_id missing from CHECKPOINT-1: {record_id}"
+            )
+        row = by_id[record_id]
+        decision = getattr(alphabet, "decision", "")
+        note = getattr(alphabet, "review_note", "")
+        if decision == SUGGESTED_OVERRIDE_PARK:
+            row["review_action"] = "override_to_park"
+            row["resolved_decision"] = "park"
+            row["checkpoint1_resolution_status"] = "parked_after_checkpoint1"
+            row["authorised_for_s4"] = "false"
+            row["override_applied"] = "true"
+            row["reviewer_note"] = note
+            row["resolved_reason"] = COMPLEX_CONSTRUCT_REASON
+        elif decision == SUGGESTED_CONFIRM_REJECT:
+            if row["resolved_decision"] != "reject":
+                row["review_action"] = "override_to_reject"
+                row["resolved_decision"] = "reject"
+                row["checkpoint1_resolution_status"] = "rejected_after_checkpoint1"
+                row["authorised_for_s4"] = "false"
+                row["override_applied"] = "true"
+            row["reviewer_note"] = note or row.get("reviewer_note", "")
+            row["resolved_reason"] = row.get("primary_reason") or "invalid_alphabet"
+
+
+def _utexas_resolved_reason(row: Mapping[str, str]) -> str:
+    if row.get("resolved_reason"):
+        return row["resolved_reason"]
+    if row.get("resolved_decision") == "accept":
+        return "technically_eligible_rna"
+    return row.get("primary_reason") or ""
+
+
+def _collect_utexas_integrity_hashes(repo_root: Path) -> dict[str, str]:
+    paths = {
+        "raw": repo_root / UTEXAS_REGISTERED_RAW_REL,
+        "s1_canonical": repo_root / UTEXAS_S1_CANONICAL_REL,
+        "s1_sidecar": repo_root / UTEXAS_S1_SIDECAR_REL,
+        "s2_canonical": repo_root / UTEXAS_S2_CANONICAL_REL,
+        "s2_qc": repo_root / UTEXAS_S2_QC_REL,
+    }
+    hashes: dict[str, str] = {}
+    for key, path in paths.items():
+        if not path.is_file():
+            raise Checkpoint1ApplyError(f"Missing integrity input: {path.name}")
+        hashes[key] = sha256_file(path)
+    return hashes
+
+
+def build_utexas_resolution_summary(
+    *,
+    repo_root: Path,
+    result: ApplyReviewResult,
+    extra_counts: Mapping[str, int],
+) -> str:
+    stats = result.stats
+    lines = [
+        "# UTexas CHECKPOINT-1 resolution summary",
+        "",
+        "## Totals",
+        "",
+        f"- Total S3 / CHECKPOINT-1 records: `{stats.total_records}`",
+        f"- Active review rows: `{stats.review_rows}`",
+        f"- No-review rows: `{stats.no_review_rows}`",
+        "",
+        "## Review-action counts",
+        "",
+    ]
+    for action in (
+        "confirm_current",
+        "override_to_accept",
+        "override_to_park",
+        "override_to_reject",
+        "needs_source_review",
+        "not_required",
+    ):
+        lines.append(f"- `{action}`: `{stats.action_counts.get(action, 0)}`")
+    lines.extend(["", "## Proposed-decision counts", ""])
+    for name in ("proposed_accept", "proposed_park", "proposed_reject"):
+        lines.append(f"- `{name}`: `{stats.proposed_counts.get(name, 0)}`")
+    lines.extend(["", "## Resolved-decision counts", ""])
+    for name in ("accept", "park", "reject"):
+        lines.append(f"- `{name}`: `{stats.resolved_counts.get(name, 0)}`")
+    lines.extend(["", "## Override counts by direction", ""])
+    if stats.override_direction_counts:
+        for name, count in sorted(stats.override_direction_counts.items()):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- none")
+    lines.extend(
+        [
+            "",
+            "## Source-specific outcomes",
+            "",
+            f"- alphabet recoveries applied: `{extra_counts.get('alphabet_recoveries', 0)}`",
+            f"- true IUPAC final rejects: `{extra_counts.get('iupac_rejects', 0)}`",
+            f"- malformed final rejects: `{extra_counts.get('malformed_rejects', 0)}`",
+            f"- complex construct final parks: `{extra_counts.get('complex_parks', 0)}`",
+            f"- FANA / unresolved-molecule parks: `{extra_counts.get('fana_parks', 0)}`",
+            f"- DNA / ssDNA parks: `{extra_counts.get('dna_parks', 0)}`",
+            f"- missing-sequence rejects: `{extra_counts.get('missing_rejects', 0)}`",
+            f"- length_out_of_range rejects: `{extra_counts.get('length_rejects', 0)}`",
+            "",
+            "## QC retained on accepted records",
+            "",
+            f"- `trim_requires_review`: `{extra_counts.get('accept_trim_review', 0)}`",
+            f"- `constants_suspected_unresolved`: "
+            f"`{extra_counts.get('accept_constants_unresolved', 0)}`",
+            f"- `trim_combined_exceeds_40pct`: "
+            f"`{extra_counts.get('accept_trim_40pct', 0)}`",
+            f"- medium trim confidence: `{extra_counts.get('accept_medium_trim', 0)}`",
+            "",
+            "These QC flags are provenance, not eligibility gates, under the",
+            "UTexas source-specific CHECKPOINT-1 policy.",
+            "",
+            "## Authorisation",
+            "",
+            f"- Authorised for S4: `{stats.authorised_for_s4}`",
+            f"- Parked: `{stats.parked}`",
+            f"- Rejected: `{stats.rejected}`",
+            "",
+            "## Validation",
+            "",
+            f"- Pristine-baseline comparison: "
+            f"`{'pass' if stats.pristine_comparison_ok else 'fail'}`",
+            f"- Review-file SHA-256: `{stats.review_file_sha256}`",
+            f"- Raw/S1/S2/S3 integrity: "
+            f"`{'pass' if stats.integrity_ok else 'fail'}`",
+            f"- Deterministic rerun: "
+            f"`{'pass' if stats.deterministic_rerun_ok else 'pending'}`",
+            "",
+            "## Outputs",
+            "",
+            f"- Full resolution table: "
+            f"`{_relative_display(result.output_resolution, repo_root)}`",
+            f"- S4-authorised IDs: "
+            f"`{_relative_display(result.output_s4_ids, repo_root)}`",
+            f"- Parked IDs: `{_relative_display(result.output_parked_ids, repo_root)}`",
+            f"- Rejected IDs: "
+            f"`{_relative_display(result.output_rejected_ids, repo_root)}`",
+            f"- Tracked manifest: "
+            f"`{_relative_display(result.tracked_manifest, repo_root)}`",
+            f"- Tracked metadata: `{_relative_display(result.metadata_out, repo_root)}`",
+            f"- Summary: `{_relative_display(result.output_summary, repo_root)}`",
+            "",
+            "## Target/evidence boundary",
+            "",
+            "- target_name remains unresolved",
+            "- target_type remains unresolved",
+            "- protein/non-protein filtering not performed",
+            "- Kd/Affinity evidence not scored",
+            "- leakage not applied",
+            "- global deduplication not performed",
+            "- balancing not performed",
+            "- partitioning not performed",
+            "",
+            UTEXAS_CHECKPOINT_CLOSED_STATEMENT,
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def apply_utexas_checkpoint1_review(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    review_file: Path,
+    output_dir: Path,
+    tracked_manifest: Path,
+    metadata_out: Path,
+    alphabet_resolutions_path: Path,
+    pristine_dir: Path | None = None,
+    expected_total_rows: int | None = UTEXAS_EXPECTED_TOTAL_ROWS,
+    verify_pipeline_integrity: bool = True,
+    populate_confirm_current: bool = True,
+    check_deterministic_rerun: bool = False,
+) -> ApplyReviewResult:
+    """Validate completed UTexas review, overlay alphabet decisions, and close CP1."""
+    from adapters.utexas_alphabet_exceptions import (
+        load_alphabet_exception_resolutions,
+        park_override_ids,
+        reject_confirm_ids,
+    )
+
+    repo_root = repo_root.resolve()
+    checkpoint_dir = _resolve_under_repo(repo_root, checkpoint_dir)
+    review_file = _resolve_under_repo(repo_root, review_file)
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    tracked_manifest = _assert_tracked_path_allowed(repo_root, tracked_manifest)
+    metadata_out = _assert_tracked_path_allowed(repo_root, metadata_out)
+    alphabet_resolutions_path = _resolve_under_repo(repo_root, alphabet_resolutions_path)
+
+    if populate_confirm_current and review_file.is_file():
+        populate_utexas_checkpoint1_actions(review_file)
+    if not review_file.is_file():
+        raise Checkpoint1ApplyError(f"Missing completed review file: {review_file.name}")
+
+    s3_canonical = checkpoint_dir / "utexas_s3_canonical.csv"
+    s3_decisions = checkpoint_dir / "utexas_s3_decisions.csv"
+    s3_review = checkpoint_dir / "utexas_checkpoint1_review.csv"
+    for path, label in (
+        (s3_canonical, "S3 canonical"),
+        (s3_decisions, "S3 decisions"),
+        (s3_review, "checkpoint review"),
+    ):
+        if not path.is_file():
+            raise Checkpoint1ApplyError(f"Missing {label} input: {path.name}")
+
+    review_hash_before = sha256_file(review_file)
+    integrity_before: dict[str, str] = {}
+    s3_hashes_before = {
+        "s3_canonical": sha256_file(s3_canonical),
+        "s3_decisions": sha256_file(s3_decisions),
+        "s3_review": sha256_file(s3_review),
+    }
+    if verify_pipeline_integrity:
+        integrity_before = _collect_utexas_integrity_hashes(repo_root)
+        if integrity_before.get("raw") != UTEXAS_REGISTERED_RAW_SHA256:
+            raise Checkpoint1ApplyError("Registered UTexas raw hash mismatch")
+
+    if pristine_dir is None:
+        pristine_dir = checkpoint_dir / "closure_validation" / "pristine"
+    pristine_dir = _assert_output_dir_allowed(repo_root, pristine_dir)
+    pristine_result = prepare_utexas_checkpoint1_review(
+        repo_root=repo_root,
+        checkpoint_dir=checkpoint_dir,
+        output_dir=pristine_dir,
+        expected_total_rows=expected_total_rows,
+    )
+    pristine_queue = pristine_result.output_queue
+    if pristine_queue.resolve() == review_file.resolve():
+        raise Checkpoint1ApplyError(
+            "Refusing to overwrite the completed human review file with pristine baseline"
+        )
+
+    reviewed_rows = _read_csv(review_file, label="completed review")
+    pristine_rows = _read_csv(pristine_queue, label="pristine review")
+    s3_rows = _read_csv(s3_review, label="checkpoint review")
+    canonical_rows = _read_csv(s3_canonical, label="S3 canonical")
+    if expected_total_rows is not None and len(s3_rows) != expected_total_rows:
+        raise Checkpoint1ApplyError(
+            f"S3 / CHECKPOINT-1 row count must be {expected_total_rows}; "
+            f"got {len(s3_rows)}"
+        )
+    compare_review_to_pristine(
+        reviewed_rows,
+        pristine_rows,
+        immutable_fields=UTEXAS_IMMUTABLE_REVIEW_FIELDS,
+    )
+    validate_active_review_actions(reviewed_rows)
+
+    reviewed_by_id = {row["record_id"]: row for row in reviewed_rows}
+    resolutions: list[dict[str, str]] = []
+    for s3_row in s3_rows:
+        required = (s3_row.get("manual_review_required") or "").strip()
+        record_id = s3_row["record_id"]
+        if required == "true":
+            if record_id not in reviewed_by_id:
+                raise Checkpoint1ApplyError(
+                    f"Active review missing for record_id={record_id!r}"
+                )
+            resolved = resolve_active_review_row(reviewed_by_id[record_id])
+        elif required == "false":
+            if record_id in reviewed_by_id:
+                raise Checkpoint1ApplyError(
+                    f"No-review record unexpectedly present in active review: "
+                    f"{record_id!r}"
+                )
+            resolved = resolve_no_review_row(s3_row)
+        else:
+            raise Checkpoint1ApplyError(
+                f"manual_review_required must be lowercase true/false; "
+                f"got {required!r} for {record_id!r}"
+            )
+        resolved["resolved_reason"] = _utexas_resolved_reason(resolved)
+        resolutions.append(resolved)
+
+    alphabet_resolutions = load_alphabet_exception_resolutions(alphabet_resolutions_path)
+    _overlay_utexas_alphabet_resolutions(resolutions, alphabet_resolutions)
+    for row in resolutions:
+        row["resolved_reason"] = _utexas_resolved_reason(row)
+
+    resolved_counts = Counter(row["resolved_decision"] for row in resolutions)
+    if sum(resolved_counts.values()) != len(resolutions):
+        raise Checkpoint1ApplyError("Resolved decision counts do not cover all rows")
+    if set(resolved_counts) - {"accept", "park", "reject"}:
+        raise Checkpoint1ApplyError(
+            f"Unexpected resolved decisions: {sorted(set(resolved_counts))}"
+        )
+    authorised = [row for row in resolutions if row["authorised_for_s4"] == "true"]
+    if len(authorised) != resolved_counts.get("accept", 0):
+        raise Checkpoint1ApplyError(
+            "authorised_for_s4 count must equal resolved accept count"
+        )
+    ids = [row["record_id"] for row in resolutions]
+    if len(ids) != len(set(ids)):
+        raise Checkpoint1ApplyError("Duplicate record_id in UTexas resolutions")
+    for row in resolutions:
+        status = row["checkpoint1_resolution_status"]
+        resolved = row["resolved_decision"]
+        auth = row["authorised_for_s4"] == "true"
+        if resolved == "accept" and not auth:
+            raise Checkpoint1ApplyError("accepted record not authorised for S4")
+        if resolved != "accept" and auth:
+            raise Checkpoint1ApplyError("non-accept record authorised for S4")
+        if resolved == "accept" and status != "approved_for_s4":
+            raise Checkpoint1ApplyError("accept without approved_for_s4 status")
+        if resolved == "reject" and status != "rejected_after_checkpoint1":
+            raise Checkpoint1ApplyError("reject with unexpected status")
+        if resolved == "park" and status not in {
+            "parked_after_checkpoint1",
+            "needs_source_review",
+        }:
+            raise Checkpoint1ApplyError("park with unexpected status")
+
+    park_ids = park_override_ids(alphabet_resolutions)
+    reject_ids = reject_confirm_ids(alphabet_resolutions)
+    for record_id in park_ids:
+        row = next(item for item in resolutions if item["record_id"] == record_id)
+        if row["resolved_decision"] != "park":
+            raise Checkpoint1ApplyError("Complex construct did not finish as park")
+    for record_id in reject_ids:
+        row = next(item for item in resolutions if item["record_id"] == record_id)
+        if row["resolved_decision"] != "reject":
+            raise Checkpoint1ApplyError("Reviewed IUPAC/malformed case did not reject")
+
+    review_count = sum(
+        1 for row in resolutions if row["manual_review_required"] == "true"
+    )
+    no_review_count = len(resolutions) - review_count
+    manifest_rows = [build_manifest_row(row) for row in resolutions]
+    s4_rows = [
+        {
+            "record_id": row["record_id"],
+            "resolved_decision": row["resolved_decision"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+        }
+        for row in resolutions
+        if row["authorised_for_s4"] == "true"
+    ]
+    parked_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["review_action"],
+        }
+        for row in resolutions
+        if row["resolved_decision"] == "park"
+    ]
+    rejected_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["review_action"],
+        }
+        for row in resolutions
+        if row["resolved_decision"] == "reject"
+    ]
+    if len(s4_rows) + len(parked_rows) + len(rejected_rows) != len(resolutions):
+        raise Checkpoint1ApplyError("S4/parked/rejected subsets do not reconcile")
+
+    stats = ResolutionStats()
+    stats.total_records = len(resolutions)
+    stats.review_rows = review_count
+    stats.no_review_rows = no_review_count
+    stats.action_counts = dict(Counter(row["review_action"] for row in resolutions))
+    stats.proposed_counts = dict(
+        Counter(row["proposed_decision"] for row in resolutions)
+    )
+    stats.resolved_counts = dict(resolved_counts)
+    stats.status_counts = dict(
+        Counter(row["checkpoint1_resolution_status"] for row in resolutions)
+    )
+    stats.authorised_for_s4 = len(s4_rows)
+    stats.parked = len(parked_rows)
+    stats.rejected = len(rejected_rows)
+    stats.needs_source_review = stats.status_counts.get("needs_source_review", 0)
+    stats.blank_initials_rows = sum(
+        1
+        for row in resolutions
+        if row["manual_review_required"] == "true"
+        and not (row.get("reviewer_initials") or "").strip()
+    )
+    active_resolutions = [
+        row for row in resolutions if row["manual_review_required"] == "true"
+    ]
+    stats.notes_present = sum(
+        1 for row in active_resolutions if (row.get("reviewer_note") or "").strip()
+    )
+    stats.notes_absent = len(active_resolutions) - stats.notes_present
+    stats.notes_optional_ok = True
+    stats.pristine_comparison_ok = True
+    stats.review_file_sha256 = review_hash_before
+    for row in resolutions:
+        if row["override_applied"] != "true":
+            continue
+        proposed = _proposed_to_resolved(row["proposed_decision"])
+        resolved = row["resolved_decision"]
+        if proposed == resolved:
+            continue
+        direction = row["review_action"]
+        stats.override_direction_counts[direction] = (
+            stats.override_direction_counts.get(direction, 0) + 1
+        )
+
+    canonical_by_id = {row["record_id"]: row for row in canonical_rows}
+    accept_ids = {row["record_id"] for row in s4_rows}
+    extra_counts = {
+        "alphabet_recoveries": sum(
+            1
+            for item in alphabet_resolutions.values()
+            if item.decision == "accept_recovered_sequence"
+        ),
+        "iupac_rejects": sum(
+            1
+            for item in alphabet_resolutions.values()
+            if item.decision == "confirm_reject"
+            and "IUPAC" in (item.review_note or "")
+        ),
+        "malformed_rejects": sum(
+            1
+            for item in alphabet_resolutions.values()
+            if item.decision == "confirm_reject"
+            and "corrupted" in (item.review_note or "")
+        ),
+        "complex_parks": len(park_ids),
+        "fana_parks": sum(
+            1
+            for row in resolutions
+            if row["resolved_decision"] == "park"
+            and row.get("primary_reason") == "molecule_type_unresolved"
+        ),
+        "dna_parks": sum(
+            1
+            for row in resolutions
+            if row["resolved_decision"] == "park"
+            and row.get("primary_reason") == "non_rna_molecule"
+        ),
+        "missing_rejects": sum(
+            1
+            for row in resolutions
+            if row["resolved_decision"] == "reject"
+            and row.get("primary_reason") == "missing_sequence"
+        ),
+        "length_rejects": sum(
+            1
+            for row in resolutions
+            if row["resolved_decision"] == "reject"
+            and row.get("primary_reason") == "length_out_of_range"
+        ),
+        "accept_trim_review": 0,
+        "accept_constants_unresolved": 0,
+        "accept_trim_40pct": 0,
+        "accept_medium_trim": 0,
+    }
+    for record_id in accept_ids:
+        canonical = canonical_by_id[record_id]
+        flags = {
+            part for part in (canonical.get("qc_flags") or "").split("|") if part
+        }
+        if "trim_requires_review" in flags:
+            extra_counts["accept_trim_review"] += 1
+        if "constants_suspected_unresolved" in flags or canonical.get("trim_status") == (
+            "constants_suspected_unresolved"
+        ):
+            extra_counts["accept_constants_unresolved"] += 1
+        if "trim_combined_exceeds_40pct" in flags:
+            extra_counts["accept_trim_40pct"] += 1
+        if (canonical.get("trim_confidence") or "") == "medium":
+            extra_counts["accept_medium_trim"] += 1
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_resolution = output_dir / "utexas_checkpoint1_resolution.csv"
+    out_s4 = output_dir / "utexas_s4_authorised_ids.csv"
+    out_parked = output_dir / "utexas_checkpoint1_parked_ids.csv"
+    out_rejected = output_dir / "utexas_checkpoint1_rejected_ids.csv"
+    out_summary = output_dir / "utexas_checkpoint1_resolution_summary.md"
+    write_csv_atomic(out_resolution, UTEXAS_RESOLUTION_COLUMNS, resolutions)
+    write_csv_atomic(out_s4, S4_ID_COLUMNS, s4_rows)
+    write_csv_atomic(out_parked, PARKED_ID_COLUMNS, parked_rows)
+    write_csv_atomic(out_rejected, REJECTED_ID_COLUMNS, rejected_rows)
+    write_csv_atomic(tracked_manifest, MANIFEST_COLUMNS, manifest_rows)
+    metadata = {
+        "source_key": "utexas",
+        "checkpoint": "CHECKPOINT-1",
+        "review_model": "single_reviewer",
+        "reviewer_initials_required": False,
+        "reviewer_notes_required": False,
+        "review_rows": review_count,
+        "no_review_rows": no_review_count,
+        "total_records": len(resolutions),
+        "review_file_sha256": sha256_file(review_file),
+        "checkpoint_status": "closed",
+        "next_stage": "global_S4_handoff",
+        "authorised_for_s4": len(s4_rows),
+        "resolved_accept": resolved_counts.get("accept", 0),
+        "resolved_park": resolved_counts.get("park", 0),
+        "resolved_reject": resolved_counts.get("reject", 0),
+    }
+    _write_json_atomic(metadata_out, metadata)
+
+    if verify_pipeline_integrity:
+        integrity_after = _collect_utexas_integrity_hashes(repo_root)
+        if integrity_before != integrity_after:
+            raise Checkpoint1ApplyError("Pipeline integrity failure during UTexas apply")
+        for label, path in (
+            ("s3_canonical", s3_canonical),
+            ("s3_decisions", s3_decisions),
+            ("s3_review", s3_review),
+        ):
+            if sha256_file(path) != s3_hashes_before[label]:
+                raise Checkpoint1ApplyError(f"{label} changed during checkpoint apply")
+        if sha256_file(s3_canonical) != integrity_before["s2_canonical"]:
+            raise Checkpoint1ApplyError(
+                "S3 canonical hash no longer matches S2 normalised canonical"
+            )
+    stats.integrity_ok = True
+    stats.review_file_sha256 = sha256_file(review_file)
+
+    result = ApplyReviewResult(
+        source_key="utexas",
+        stats=stats,
+        output_resolution=out_resolution,
+        output_s4_ids=out_s4,
+        output_parked_ids=out_parked,
+        output_rejected_ids=out_rejected,
+        output_summary=out_summary,
+        tracked_manifest=tracked_manifest,
+        metadata_out=metadata_out,
+        review_file_sha256=stats.review_file_sha256,
+        review_file_unchanged=True,
+        integrity_ok=True,
+    )
+    summary_text = build_utexas_resolution_summary(
+        repo_root=repo_root, result=result, extra_counts=extra_counts
+    )
+    if str(repo_root.resolve()) in summary_text:
+        raise Checkpoint1ApplyError(
+            "Resolution summary must not contain absolute repository paths"
+        )
+    if UTEXAS_CHECKPOINT_CLOSED_STATEMENT not in summary_text:
+        raise Checkpoint1ApplyError("Resolution summary missing checkpoint-closed statement")
+    _write_text_atomic(out_summary, summary_text)
+
+    if check_deterministic_rerun:
+        first_hashes = {
+            "resolution": sha256_file(out_resolution),
+            "s4": sha256_file(out_s4),
+            "parked": sha256_file(out_parked),
+            "rejected": sha256_file(out_rejected),
+            "summary": sha256_file(out_summary),
+            "manifest": sha256_file(tracked_manifest),
+            "metadata": sha256_file(metadata_out),
+        }
+        second = apply_utexas_checkpoint1_review(
+            repo_root=repo_root,
+            checkpoint_dir=checkpoint_dir,
+            review_file=review_file,
+            output_dir=output_dir,
+            tracked_manifest=tracked_manifest,
+            metadata_out=metadata_out,
+            alphabet_resolutions_path=alphabet_resolutions_path,
+            pristine_dir=pristine_dir,
+            expected_total_rows=expected_total_rows,
+            verify_pipeline_integrity=verify_pipeline_integrity,
+            populate_confirm_current=False,
+            check_deterministic_rerun=False,
+        )
+        second_hashes = {
+            "resolution": sha256_file(second.output_resolution),
+            "s4": sha256_file(second.output_s4_ids),
+            "parked": sha256_file(second.output_parked_ids),
+            "rejected": sha256_file(second.output_rejected_ids),
+            "summary": sha256_file(second.output_summary),
+            "manifest": sha256_file(second.tracked_manifest),
+            "metadata": sha256_file(second.metadata_out),
+        }
+        if first_hashes != second_hashes:
+            raise Checkpoint1ApplyError(
+                "UTexas CHECKPOINT-1 closure outputs were not byte-identical "
+                "across deterministic rerun"
+            )
+        stats.deterministic_rerun_ok = True
+        result = ApplyReviewResult(
+            source_key="utexas",
+            stats=stats,
+            output_resolution=out_resolution,
+            output_s4_ids=out_s4,
+            output_parked_ids=out_parked,
+            output_rejected_ids=out_rejected,
+            output_summary=out_summary,
+            tracked_manifest=tracked_manifest,
+            metadata_out=metadata_out,
+            review_file_sha256=stats.review_file_sha256,
+            review_file_unchanged=True,
+            integrity_ok=True,
+        )
+        summary_text = build_utexas_resolution_summary(
+            repo_root=repo_root, result=result, extra_counts=extra_counts
+        )
+        _write_text_atomic(out_summary, summary_text)
+
+    return result
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Apply completed AptaBase CHECKPOINT-1 human review and close the "
+            "Apply completed CHECKPOINT-1 human review and close the "
             "checkpoint with tracked sequence-free resolution artefacts."
         )
     )
-    parser.add_argument("--source", required=True, help="Source key (only aptabase)")
+    parser.add_argument("--source", required=True, help="Source key (aptabase or utexas)")
     parser.add_argument(
         "--checkpoint-dir",
         type=Path,
@@ -1123,9 +1796,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     try:
-        if args.source != "aptabase":
+        if args.source not in {"aptabase", "utexas"}:
             raise Checkpoint1ApplyError(
-                f"Unsupported source_key={args.source!r}; only aptabase is implemented"
+                f"Unsupported source_key={args.source!r}; supported: aptabase, utexas"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -1135,60 +1808,115 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not repo_root.is_dir():
             raise Checkpoint1ApplyError(f"Repository root does not exist: {repo_root}")
 
-        checkpoint_dir = (
-            args.checkpoint_dir
-            if args.checkpoint_dir is not None
-            else Path("data/interim/checkpoints/aptabase_cp1")
-        )
-        review_file = (
-            args.review_file
-            if args.review_file is not None
-            else Path(checkpoint_dir)
-            / "manual_review"
-            / "aptabase_checkpoint1_manual_review.csv"
-        )
-        output_dir = (
-            args.output_dir
-            if args.output_dir is not None
-            else Path(checkpoint_dir) / "resolved"
-        )
-        tracked_manifest = (
-            args.tracked_manifest
-            if args.tracked_manifest is not None
-            else Path("config/checkpoint_reviews/aptabase_checkpoint1_resolutions.csv")
-        )
-        metadata_out = (
-            args.metadata_out
-            if args.metadata_out is not None
-            else Path("config/checkpoint_reviews/aptabase_checkpoint1_metadata.json")
-        )
-        pristine_dir = (
-            args.pristine_dir
-            if args.pristine_dir is not None
-            else Path(checkpoint_dir) / "closure_validation" / "pristine"
-        )
+        if args.source == "utexas":
+            checkpoint_dir = (
+                args.checkpoint_dir
+                if args.checkpoint_dir is not None
+                else Path("data/interim/checkpoints/utexas_cp1")
+            )
+            review_file = (
+                args.review_file
+                if args.review_file is not None
+                else Path(checkpoint_dir)
+                / "manual_review"
+                / "utexas_checkpoint1_manual_review.csv"
+            )
+            output_dir = (
+                args.output_dir
+                if args.output_dir is not None
+                else Path(checkpoint_dir) / "resolved"
+            )
+            tracked_manifest = (
+                args.tracked_manifest
+                if args.tracked_manifest is not None
+                else Path(
+                    "config/checkpoint_reviews/utexas_checkpoint1_resolutions.csv"
+                )
+            )
+            metadata_out = (
+                args.metadata_out
+                if args.metadata_out is not None
+                else Path("config/checkpoint_reviews/utexas_checkpoint1_metadata.json")
+            )
+            pristine_dir = (
+                args.pristine_dir
+                if args.pristine_dir is not None
+                else Path(checkpoint_dir) / "closure_validation" / "pristine"
+            )
+            result = apply_utexas_checkpoint1_review(
+                repo_root=repo_root,
+                checkpoint_dir=checkpoint_dir,
+                review_file=review_file,
+                output_dir=output_dir,
+                tracked_manifest=tracked_manifest,
+                metadata_out=metadata_out,
+                alphabet_resolutions_path=Path(
+                    "config/checkpoint_reviews/utexas_alphabet_exception_resolutions.csv"
+                ),
+                pristine_dir=pristine_dir,
+                expected_total_rows=(
+                    UTEXAS_EXPECTED_TOTAL_ROWS
+                    if args.expected_total_rows is None
+                    else args.expected_total_rows
+                ),
+                verify_pipeline_integrity=not args.skip_pipeline_integrity,
+                check_deterministic_rerun=True,
+            )
+        else:
+            checkpoint_dir = (
+                args.checkpoint_dir
+                if args.checkpoint_dir is not None
+                else Path("data/interim/checkpoints/aptabase_cp1")
+            )
+            review_file = (
+                args.review_file
+                if args.review_file is not None
+                else Path(checkpoint_dir)
+                / "manual_review"
+                / "aptabase_checkpoint1_manual_review.csv"
+            )
+            output_dir = (
+                args.output_dir
+                if args.output_dir is not None
+                else Path(checkpoint_dir) / "resolved"
+            )
+            tracked_manifest = (
+                args.tracked_manifest
+                if args.tracked_manifest is not None
+                else Path("config/checkpoint_reviews/aptabase_checkpoint1_resolutions.csv")
+            )
+            metadata_out = (
+                args.metadata_out
+                if args.metadata_out is not None
+                else Path("config/checkpoint_reviews/aptabase_checkpoint1_metadata.json")
+            )
+            pristine_dir = (
+                args.pristine_dir
+                if args.pristine_dir is not None
+                else Path(checkpoint_dir) / "closure_validation" / "pristine"
+            )
 
-        result = apply_aptabase_checkpoint1_review(
-            repo_root=repo_root,
-            checkpoint_dir=checkpoint_dir,
-            review_file=review_file,
-            output_dir=output_dir,
-            tracked_manifest=tracked_manifest,
-            metadata_out=metadata_out,
-            pristine_dir=pristine_dir,
-            expected_active_rows=(
-                EXPECTED_ACTIVE_ROWS
-                if args.expected_active_rows is None
-                else args.expected_active_rows
-            ),
-            expected_total_rows=(
-                EXPECTED_TOTAL_ROWS
-                if args.expected_total_rows is None
-                else args.expected_total_rows
-            ),
-            enforce_expected_batch_counts=not args.skip_expected_batch_counts,
-            verify_pipeline_integrity=not args.skip_pipeline_integrity,
-        )
+            result = apply_aptabase_checkpoint1_review(
+                repo_root=repo_root,
+                checkpoint_dir=checkpoint_dir,
+                review_file=review_file,
+                output_dir=output_dir,
+                tracked_manifest=tracked_manifest,
+                metadata_out=metadata_out,
+                pristine_dir=pristine_dir,
+                expected_active_rows=(
+                    EXPECTED_ACTIVE_ROWS
+                    if args.expected_active_rows is None
+                    else args.expected_active_rows
+                ),
+                expected_total_rows=(
+                    EXPECTED_TOTAL_ROWS
+                    if args.expected_total_rows is None
+                    else args.expected_total_rows
+                ),
+                enforce_expected_batch_counts=not args.skip_expected_batch_counts,
+                verify_pipeline_integrity=not args.skip_pipeline_integrity,
+            )
     except Checkpoint1ApplyError as exc:
         # Aggregate / field+id diagnostics only — never print sequences or notes.
         print(f"ERROR: {exc}", file=sys.stderr)

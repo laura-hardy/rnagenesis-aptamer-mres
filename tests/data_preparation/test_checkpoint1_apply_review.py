@@ -1069,3 +1069,93 @@ def test_input_files_remain_byte_identical(tmp_path: Path) -> None:
     assert _sha256(checkpoint / "aptabase_checkpoint1_local_detail.csv") == hashes["local"]
     assert _sha256(checkpoint / "aptabase_s3_canonical.csv") == hashes["canonical"]
     assert _sha256(checkpoint / "aptabase_s3_decisions.csv") == hashes["decisions"]
+
+
+def test_utexas_overlay_parks_complex_constructs_and_rejects_iupac() -> None:
+    from adapters.utexas_alphabet_exceptions import (
+        AlphabetResolution,
+        SUGGESTED_CONFIRM_REJECT,
+        SUGGESTED_OVERRIDE_PARK,
+        REASON_COMPLEX_PARK,
+        REASON_IUPAC_REJECT,
+    )
+    from checkpoint1_apply_review import (
+        COMPLEX_CONSTRUCT_REASON,
+        _overlay_utexas_alphabet_resolutions,
+        resolve_no_review_row,
+    )
+
+    iupac = resolve_no_review_row(
+        {
+            "record_id": "utexas:iupac",
+            "native_id": "iupac",
+            "proposed_decision": "proposed_reject",
+            "primary_reason": "ambiguous_bases",
+            "secondary_reasons": "",
+        }
+    )
+    malformed = resolve_no_review_row(
+        {
+            "record_id": "utexas:malformed",
+            "native_id": "malformed",
+            "proposed_decision": "proposed_reject",
+            "primary_reason": "invalid_alphabet",
+            "secondary_reasons": "",
+        }
+    )
+    complex_row = resolve_no_review_row(
+        {
+            "record_id": "utexas:complex",
+            "native_id": "complex",
+            "proposed_decision": "proposed_reject",
+            "primary_reason": "invalid_alphabet",
+            "secondary_reasons": "",
+        }
+    )
+    accept = resolve_no_review_row(
+        {
+            "record_id": "utexas:ok",
+            "native_id": "ok",
+            "proposed_decision": "proposed_accept",
+            "primary_reason": "technically_eligible_rna",
+            "secondary_reasons": "trim_construct_unresolved",
+        }
+    )
+    rows = [iupac, malformed, complex_row, accept]
+    alphabet = {
+        "utexas:iupac": AlphabetResolution(
+            record_id="utexas:iupac",
+            decision=SUGGESTED_CONFIRM_REJECT,
+            transformation_profile="",
+            expected_recovered_length=None,
+            review_note=REASON_IUPAC_REJECT,
+        ),
+        "utexas:malformed": AlphabetResolution(
+            record_id="utexas:malformed",
+            decision=SUGGESTED_CONFIRM_REJECT,
+            transformation_profile="",
+            expected_recovered_length=None,
+            review_note="Sequence field is corrupted/unrecoverable",
+        ),
+        "utexas:complex": AlphabetResolution(
+            record_id="utexas:complex",
+            decision=SUGGESTED_OVERRIDE_PARK,
+            transformation_profile="",
+            expected_recovered_length=None,
+            review_note=REASON_COMPLEX_PARK,
+        ),
+    }
+    _overlay_utexas_alphabet_resolutions(rows, alphabet)
+    by_id = {row["record_id"]: row for row in rows}
+    assert by_id["utexas:iupac"]["resolved_decision"] == "reject"
+    assert by_id["utexas:iupac"]["authorised_for_s4"] == "false"
+    assert by_id["utexas:malformed"]["resolved_decision"] == "reject"
+    assert by_id["utexas:complex"]["resolved_decision"] == "park"
+    assert by_id["utexas:complex"]["resolved_reason"] == COMPLEX_CONSTRUCT_REASON
+    assert by_id["utexas:complex"]["authorised_for_s4"] == "false"
+    assert by_id["utexas:ok"]["resolved_decision"] == "accept"
+    assert by_id["utexas:ok"]["authorised_for_s4"] == "true"
+    ids = [row["record_id"] for row in rows]
+    assert len(ids) == len(set(ids))
+    assert {row["resolved_decision"] for row in rows} <= {"accept", "park", "reject"}
+    assert sum(1 for row in rows if row["authorised_for_s4"] == "true") == 1

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import json
 import os
 import sys
 import tempfile
@@ -24,11 +25,18 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from adapters.utexas_alphabet_exceptions import (  # noqa: E402
+    EXPECTED_DECISION_COUNTS,
     EXPECTED_EXCEPTION_ROWS,
+    RESOLUTION_COLUMNS,
     REVIEW_COLUMNS,
+    REVIEW_DECISION_DATE,
+    REVIEW_POLICY_VERSION,
     AlphabetExceptionError,
+    apply_human_exception_decisions,
+    assert_reviewed_package_counts,
     build_exception_summary,
     build_review_row,
+    build_tracked_resolution_rows,
     select_exception_cohort,
 )
 from s0_build_registry import find_repo_root  # noqa: E402
@@ -383,6 +391,88 @@ def generate_exception_review_package(
     )
 
 
+def _assert_tracked_path_allowed(repo_root: Path, path: Path) -> Path:
+    resolved = path if path.is_absolute() else (repo_root / path)
+    resolved = resolved.resolve()
+    data_root = (repo_root / "data").resolve()
+    try:
+        resolved.relative_to(data_root)
+    except ValueError:
+        return resolved
+    raise AlphabetExceptionReviewError(
+        f"Tracked alphabet artefacts must not be written under data/: {path}"
+    )
+
+
+def apply_recorded_exception_decisions(
+    *,
+    repo_root: Path,
+    review_csv: Path,
+    tracked_manifest: Path,
+    metadata_out: Path,
+) -> dict[str, object]:
+    """Record Laura's alphabet-exception decisions and emit sequence-safe artefacts."""
+    review_csv = review_csv if review_csv.is_absolute() else (repo_root / review_csv)
+    tracked_manifest = _assert_tracked_path_allowed(repo_root, tracked_manifest)
+    metadata_out = _assert_tracked_path_allowed(repo_root, metadata_out)
+    if not review_csv.is_file():
+        raise AlphabetExceptionReviewError(
+            f"Missing alphabet-exception review CSV: {review_csv.name}"
+        )
+    rows = _read_csv(review_csv)
+    try:
+        assert_reviewed_package_counts(rows)
+        decided = apply_human_exception_decisions(rows)
+        tracked = build_tracked_resolution_rows(decided)
+    except AlphabetExceptionError as exc:
+        raise AlphabetExceptionReviewError(str(exc)) from exc
+
+    source_sha = _sha256_file(review_csv)
+    write_csv_atomic(review_csv, REVIEW_COLUMNS, decided)
+    write_csv_atomic(tracked_manifest, RESOLUTION_COLUMNS, tracked)
+
+    action_counts = {
+        key: sum(1 for row in decided if (row.get("review_action") or "") == key)
+        for key in (
+            "accept_recovered_sequence",
+            "confirm_reject",
+            "override_to_park",
+            "needs_source_review",
+        )
+    }
+    metadata = {
+        "source_key": "utexas",
+        "checkpoint": "CHECKPOINT-1",
+        "review_scope": "alphabet_exceptions",
+        "review_policy_version": REVIEW_POLICY_VERSION,
+        "review_model": "single_reviewer",
+        "reviewer_initials_required": False,
+        "decision_date": REVIEW_DECISION_DATE,
+        "source_review_file": (
+            "data/interim/checkpoints/utexas_cp1/exceptions/"
+            "utexas_alphabet_exception_review.csv"
+        ),
+        "source_review_file_sha256_before_decision_write": source_sha,
+        "source_review_file_sha256": _sha256_file(review_csv),
+        "n_rows": len(decided),
+        "decision_counts": action_counts,
+        "canonical_sequences_changed_by_this_step": False,
+        "checkpoint1_closed_by_this_step": False,
+    }
+    metadata_text = json.dumps(metadata, indent=2, sort_keys=False, ensure_ascii=False)
+    _write_text_atomic(metadata_out, metadata_text + "\n")
+    if any(count != EXPECTED_DECISION_COUNTS[key] for key, count in action_counts.items()):
+        raise AlphabetExceptionReviewError("Recorded decision counts drifted")
+    return {
+        "n_rows": len(decided),
+        "decision_counts": action_counts,
+        "tracked_manifest": tracked_manifest,
+        "metadata_out": metadata_out,
+        "review_csv": review_csv,
+        "source_review_file_sha256": metadata["source_review_file_sha256"],
+    }
+
+
 def default_paths(repo_root: Path) -> dict[str, Path]:
     return {
         "decisions": repo_root
@@ -448,6 +538,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--checkpoint-review", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument(
+        "--apply-human-decisions",
+        action="store_true",
+        help="Record Laura's alphabet-exception decisions and write tracked resolutions.",
+    )
+    parser.add_argument(
+        "--tracked-manifest",
+        type=Path,
+        default=None,
+        help="Tracked sequence-safe alphabet resolution CSV.",
+    )
+    parser.add_argument(
+        "--metadata-out",
+        type=Path,
+        default=None,
+        help="Tracked alphabet-exception metadata JSON.",
+    )
+    parser.add_argument(
         "--check-deterministic-rerun",
         action="store_true",
         help="Generate the package twice and require byte-identical artefacts.",
@@ -456,6 +563,34 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     repo_root = args.repo_root.resolve() if args.repo_root else find_repo_root()
     paths = default_paths(repo_root)
+    if args.apply_human_decisions:
+        applied = apply_recorded_exception_decisions(
+            repo_root=repo_root,
+            review_csv=paths["output_dir"] / "utexas_alphabet_exception_review.csv",
+            tracked_manifest=(
+                args.tracked_manifest
+                if args.tracked_manifest is not None
+                else Path(
+                    "config/checkpoint_reviews/utexas_alphabet_exception_resolutions.csv"
+                )
+            ),
+            metadata_out=(
+                args.metadata_out
+                if args.metadata_out is not None
+                else Path(
+                    "config/checkpoint_reviews/utexas_alphabet_exception_metadata.json"
+                )
+            ),
+        )
+        counts = applied["decision_counts"]
+        print(f"alphabet_exception_rows={applied['n_rows']}")
+        print(f"accept_recovered_sequence={counts['accept_recovered_sequence']}")
+        print(f"confirm_reject={counts['confirm_reject']}")
+        print(f"override_to_park={counts['override_to_park']}")
+        print(f"needs_source_review={counts['needs_source_review']}")
+        print(f"source_review_file_sha256={applied['source_review_file_sha256']}")
+        print("Alphabet-exception human decisions recorded.")
+        return 0
     result = generate_exception_review_package(
         repo_root=repo_root,
         decisions_path=args.decisions or paths["decisions"],
