@@ -2665,3 +2665,114 @@ records authorised_for_s4 = 0
 Laura/ChatGPT should inspect the sequence-safe summary and index, then
 decide how to review and close CHECKPOINT-1. Do not populate review
 decisions in this milestone.
+
+## 2026-08-13 — UTexas RNA alphabet exception review (CHECKPOINT-1)
+
+### Stage
+
+Human scientific exception review **preparation** for the 31
+source-reported UTexas RNA records currently rejected at S3 for
+`ambiguous_bases` or `invalid_alphabet`. CHECKPOINT-1 was not closed.
+Human checkpoint decisions were not applied. Canonical S2/S3 sequences
+were not edited. Global S4 was not started.
+
+### Scientific context
+
+Laura inspected the active CHECKPOINT-1 queue and judged UTexas a
+high-confidence curated aptamer source whose source-reported RNA records
+generally require minimal additional sequence adjudication. Unresolved
+trim flags will not automatically exclude otherwise acceptable RNA
+records. Target normalisation, protein filtering and balancing remain
+deferred to global S4.
+
+The remaining alphabet concern sat **outside** the 468-row active review
+queue: 8 `ambiguous_bases` and 23 `invalid_alphabet` RNA rejects (31
+total). Non-ACGU characters in this source can represent chemical
+modifications or publication notation rather than degenerate libraries
+or corruption. This package distinguishes those cases without changing
+canonical cleaning behaviour.
+
+### Cohort
+
+```text
+total exception rows = 31
+ambiguous_bases = 8
+invalid_alphabet = 23
+molecule_type = RNA for every selected row
+DNA / ssDNA / FANA / missing-sequence / ordinary length rejects excluded
+```
+
+### Proposed classifications (not applied)
+
+```text
+recoverable_modification_notation = 17
+true_iupac_degenerate_sequence = 9
+modified_rna_underlying_sequence_unresolved = 0
+malformed_or_unrecoverable = 1
+needs_manual_source_review = 4
+
+high-confidence recoverable underlying RNA sequences = 17
+proposed reject cases = 10
+proposed park cases = 0
+needs source-paper review = 4
+```
+
+Recoverable cases are leftover display labels the shared stripper did
+not recognise (curly quotes, reversed `3'`), explicit 2′-fluoro /
+2′-O-methyl tokens with a named underlying base, `Gcon` conserved-G
+annotation, and an inverted terminal cap whose base is written in the
+token. IUPAC/degenerate records were not converted to an arbitrary
+base. Concatenated multi-construct fields were routed to source-paper
+review. One mixed-script corrupted field is proposed malformed.
+
+Ten of the 17 alphabet-recoverable strings remain outside 20–100 nt;
+length policy is not decided by this exception review. Reviewer action
+cells were left blank.
+
+### Integrity
+
+```text
+canonical sequences changed = no
+CHECKPOINT-1 actions applied = no
+CHECKPOINT-1 closed = no
+S4 started = no
+records authorised_for_s4 = 0
+raw workbook SHA unchanged =
+b5a66beb58d30c5c3d2f36a29ea2cc3678e7d4a6b1bb1a97efc1e166a49fd15c
+S2 canonical SHA unchanged =
+588498eaeeacb1f7d7349ef1f0f30ef46ba2e64d873416439ed62df614e50c7e
+S3 canonical SHA unchanged (byte-identical to S2 canonical)
+```
+
+### Verification
+
+- New alphabet-exception tests: **17 passed** (synthetic notation only;
+  no real UTexas sequences)
+- UTexas S2 + S3 + CHECKPOINT-1 + shared sequence-normalisation +
+  eligibility tests: **206 passed**
+- Broader data-preparation suite (same hang-prone legacy AptaBase
+  cleaner/parser and ENA exclusions as before): **610 passed**
+- Deterministic rerun: byte-identical exception CSV and summary
+- Shared normaliser was not modified
+
+### Outputs (gitignored under `data/interim/checkpoints/utexas_cp1/exceptions/`)
+
+- `utexas_alphabet_exception_review.csv` (sequence-bearing; 31 rows)
+- `utexas_alphabet_exception_summary.md` (sequence-safe)
+
+Tracked: diagnostic classifier, synthetic tests, this log entry.
+
+### Pipeline stop
+
+```text
+Alphabet-exception review package generated.
+No canonical sequence was changed.
+No CHECKPOINT-1 decision was applied.
+CHECKPOINT-1 remains open.
+Global S4 has not started.
+```
+
+Laura/ChatGPT should review the 31-row exception file and then make the
+final CHECKPOINT-1 closure decisions. Do not apply exception resolutions
+in this milestone.
+
