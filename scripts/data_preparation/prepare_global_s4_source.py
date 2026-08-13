@@ -67,6 +67,27 @@ HANDOFF_CLOSED_STATEMENT = (
     "S4 merge."
 )
 
+TARGET_EVIDENCE_BOUNDARY_LINES: tuple[str, ...] = (
+    "target_name remains unresolved",
+    "target_type remains unresolved",
+    "protein/non-protein filtering not performed",
+    "Kd/Affinity evidence not scored",
+    "leakage not applied",
+    "global deduplication not performed",
+    "balancing not performed",
+    "partitioning not performed",
+)
+
+SEQUENCE_BEARING_HANDOFF_EXTRAS: frozenset[str] = frozenset(
+    {
+        "utexas_aptamer_sequence",
+        "sequence_raw",
+        "sequence_full",
+        "sequence_core",
+        "aptamer_sequence",
+    }
+)
+
 
 class GlobalS4HandoffError(ValueError):
     """Hard failure while preparing a global-S4 source handoff."""
@@ -339,6 +360,66 @@ def _assert_exact_subset_fields(
                 )
 
 
+def _join_handoff_source_metadata(
+    *,
+    repo_root: Path,
+    config: Mapping[str, Any],
+    handoff_rows: list[dict[str, str]],
+) -> list[str]:
+    """Join configured sequence-safe source-metadata fields onto handoff rows."""
+    extra_raw = config.get("handoff_extra_fields")
+    if extra_raw in (None, [], ()):
+        return []
+    if not isinstance(extra_raw, list) or not all(
+        isinstance(item, str) and item.strip() for item in extra_raw
+    ):
+        raise GlobalS4HandoffError(
+            "handoff_extra_fields must be a list of nonempty strings"
+        )
+    extra_fields = [item.strip() for item in extra_raw]
+    forbidden = [
+        name
+        for name in extra_fields
+        if name in SEQUENCE_BEARING_HANDOFF_EXTRAS or name in CORPUS_COLUMNS
+    ]
+    if forbidden:
+        raise GlobalS4HandoffError(
+            "handoff_extra_fields must not repeat corpus columns or "
+            f"sequence-bearing sidecar fields: {forbidden}"
+        )
+    target_meta = config.get("target_metadata")
+    sidecar_rel = ""
+    if isinstance(target_meta, dict):
+        sidecar_rel = str(target_meta.get("source_metadata_path") or "").strip()
+    if not sidecar_rel:
+        sidecar_rel = str(config.get("source_metadata_path") or "").strip()
+    if not sidecar_rel:
+        raise GlobalS4HandoffError(
+            "handoff_extra_fields requires source_metadata_path"
+        )
+    sidecar_path = _resolve_under_repo(repo_root, sidecar_rel)
+    if not sidecar_path.is_file():
+        raise GlobalS4HandoffError(
+            f"Missing source-metadata sidecar for handoff: {sidecar_path.name}"
+        )
+    sidecar_rows = _read_csv(sidecar_path, label="source-metadata sidecar")
+    sidecar_by_id = {row["record_id"]: row for row in sidecar_rows}
+    for row in handoff_rows:
+        record_id = row["record_id"]
+        if record_id not in sidecar_by_id:
+            raise GlobalS4HandoffError(
+                f"Authorised handoff record missing from source metadata: {record_id}"
+            )
+        meta = sidecar_by_id[record_id]
+        for field_name in extra_fields:
+            if field_name not in meta:
+                raise GlobalS4HandoffError(
+                    f"Source-metadata sidecar missing handoff field {field_name!r}"
+                )
+            row[field_name] = meta.get(field_name) or ""
+    return extra_fields
+
+
 def build_handoff_summary(
     *,
     repo_root: Path,
@@ -380,6 +461,31 @@ def build_handoff_summary(
             "",
         ]
     )
+    emit_boundary = bool(config.get("emit_target_evidence_boundary")) or (
+        stats.source_key == "utexas"
+    )
+    if emit_boundary:
+        lines.extend(["## Target/evidence boundary", ""])
+        for item in TARGET_EVIDENCE_BOUNDARY_LINES:
+            lines.append(f"- {item}")
+        lines.append("")
+    extra_fields = config.get("handoff_extra_fields")
+    if isinstance(extra_fields, list) and extra_fields:
+        lines.extend(
+            [
+                "## Source-metadata fields joined onto the handoff",
+                "",
+            ]
+        )
+        for field_name in extra_fields:
+            lines.append(f"- `{field_name}`")
+        target_meta = config.get("target_metadata")
+        sidecar = ""
+        if isinstance(target_meta, dict):
+            sidecar = str(target_meta.get("source_metadata_path") or "")
+        if sidecar:
+            lines.append(f"- source-metadata linkage: `{sidecar}`")
+        lines.append("")
     statement = config.get("handoff_ready_statement")
     if isinstance(statement, str) and statement.strip():
         lines.append(statement.strip())
@@ -493,6 +599,12 @@ def prepare_global_s4_source(
         )
     _assert_exact_subset_fields(handoff_rows, canonical_rows)
 
+    extra_columns = _join_handoff_source_metadata(
+        repo_root=root,
+        config=config,
+        handoff_rows=handoff_rows,
+    )
+
     # Ensure we did not invent later-stage values.
     for row in handoff_rows:
         for field_name in FORBIDDEN_MUTATION_FIELDS:
@@ -537,7 +649,14 @@ def prepare_global_s4_source(
     )
 
     try:
-        write_corpus_csv_atomic(output_csv, handoff_rows)
+        if extra_columns:
+            write_corpus_csv_atomic(
+                output_csv,
+                handoff_rows,
+                columns=list(CORPUS_COLUMNS) + extra_columns,
+            )
+        else:
+            write_corpus_csv_atomic(output_csv, handoff_rows)
     except CorpusSchemaError as exc:
         raise GlobalS4HandoffError(str(exc)) from exc
 

@@ -1,0 +1,44 @@
+{
+  "source_key": "utexas",
+  "handoff_status": "ready_for_global_s4",
+  "authoritative_stage": "CHECKPOINT-1",
+  "checkpoint_status": "closed",
+  "canonical_input": "data/interim/checkpoints/utexas_cp1/utexas_s3_canonical.csv",
+  "resolution_manifest": "config/checkpoint_reviews/utexas_checkpoint1_resolutions.csv",
+  "authorised_ids_input": "data/interim/checkpoints/utexas_cp1/resolved/utexas_s4_authorised_ids.csv",
+  "authorisation_field": "authorised_for_s4",
+  "expected_authorised_records": 468,
+  "global_s4_handoff_output": "data/interim/global_s4_ready/utexas_global_s4_input.csv",
+  "global_s4_handoff_summary": "data/interim/global_s4_ready/utexas_global_s4_handoff_summary.md",
+  "handoff_ready_statement": "UTexas is ready to be retrieved as one input to the future corpus-wide S4 merge.",
+  "emit_target_evidence_boundary": true,
+  "handoff_extra_fields": [
+    "utexas_kd_nm",
+    "utexas_affinity",
+    "utexas_type_of_nucleic_acid",
+    "utexas_post_selex_modifications"
+  ],
+  "authorised_for_s4_meaning": "Technically eligible after UTexas sequence/molecule CHECKPOINT-1 and eligible to enter the future corpus-wide target-normalisation stage. Does not mean protein target confirmed, target canonicalised, UniProt resolved, evidence threshold passed, leakage check passed globally, globally deduplicated, balanced, or CHECKPOINT-2 approved.",
+  "target_metadata": {
+    "canonical_raw_field": "target_name_raw",
+    "source_specific_field": "utexas_target",
+    "source_general_field": "",
+    "source_general_is_categorical": false,
+    "specific_target_present_in_authorised_records": null,
+    "specific_target_missing_in_authorised_records": null,
+    "source_metadata_path": "data/interim/extracted/utexas_source_metadata.csv",
+    "uniprot_source_columns_present": false,
+    "pdb_source_columns_present": false,
+    "pfam_source_columns_present": false,
+    "family_source_columns_present": false
+  },
+  "global_s4_rules": {
+    "final_target_normalisation_performed_here": false,
+    "final_target_type_assignment_performed_here": false,
+    "uniprot_resolution_performed_here": false,
+    "target_family_assignment_performed_here": false,
+    "evidence_threshold_performed_here": false,
+    "global_leakage_application_performed_here": false,
+    "checkpoint2_emitted_here": false
+  }
+}

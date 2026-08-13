@@ -621,3 +621,72 @@ def test_input_files_remain_byte_identical(tmp_path: Path) -> None:
     _run(repo, config)
     for path in paths:
         assert path.read_bytes() == before[path]
+
+
+def test_handoff_joins_sequence_safe_source_metadata(tmp_path: Path) -> None:
+    repo, config_path = _make_tree(tmp_path, source_key="utexas")
+    sidecar = repo / "data/interim/extracted/utexas_source_metadata.csv"
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    _write_csv(
+        sidecar,
+        ["record_id", "utexas_kd_nm", "utexas_affinity", "utexas_aptamer_sequence"],
+        [
+            {
+                "record_id": "src:a1",
+                "utexas_kd_nm": "12.5",
+                "utexas_affinity": "high",
+                "utexas_aptamer_sequence": "ACGUACGU",
+            },
+            {
+                "record_id": "src:a2",
+                "utexas_kd_nm": "0.4",
+                "utexas_affinity": "nM",
+                "utexas_aptamer_sequence": "UUGGAACC",
+            },
+            {
+                "record_id": "src:r1",
+                "utexas_kd_nm": "",
+                "utexas_affinity": "",
+                "utexas_aptamer_sequence": "GGCCGGCC",
+            },
+            {
+                "record_id": "src:p1",
+                "utexas_kd_nm": "",
+                "utexas_affinity": "",
+                "utexas_aptamer_sequence": "AAUUGGCC",
+            },
+            {
+                "record_id": "src:a3",
+                "utexas_kd_nm": "9",
+                "utexas_affinity": "weak",
+                "utexas_aptamer_sequence": "CCGGAAUU",
+            },
+        ],
+    )
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["emit_target_evidence_boundary"] = True
+    payload["handoff_extra_fields"] = ["utexas_kd_nm", "utexas_affinity"]
+    payload["target_metadata"]["source_metadata_path"] = (
+        "data/interim/extracted/utexas_source_metadata.csv"
+    )
+    payload["handoff_ready_statement"] = (
+        "UTexas is ready to be retrieved as one input to the future "
+        "corpus-wide S4 merge."
+    )
+    config_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    result = _run(repo, config_path)
+    rows = list(csv.DictReader(result.output_csv.open(encoding="utf-8")))
+    assert [r["record_id"] for r in rows] == ["src:a1", "src:a2"]
+    assert rows[0]["utexas_kd_nm"] == "12.5"
+    assert rows[1]["utexas_affinity"] == "nM"
+    assert "utexas_aptamer_sequence" not in rows[0]
+    for row in rows:
+        assert row["target_name"] == ""
+        assert row["binding_evidence_score"] == ""
+    text = result.output_summary.read_text(encoding="utf-8")
+    assert "target_name remains unresolved" in text
+    assert "Kd/Affinity evidence not scored" in text
+    assert SEQ_LEAK_RE.search(text) is None
