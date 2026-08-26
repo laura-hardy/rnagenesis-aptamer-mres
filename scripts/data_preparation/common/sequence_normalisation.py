@@ -35,6 +35,17 @@ ALPHABET_MIXED_T_U: Final[str] = "mixed_T_U"
 ALPHABET_AMBIGUOUS: Final[str] = "ambiguous"
 ALPHABET_INVALID: Final[str] = "invalid"
 
+# Plan §2.4: remaining ``-`` and ``.`` after terminal-label stripping are
+# alignment gaps. They are retained and flagged, never silently deleted.
+ALIGNMENT_GAP_CHARACTERS: Final[frozenset[str]] = frozenset({"-", "."})
+ACG_ONLY: Final[frozenset[str]] = frozenset({"A", "C", "G"})
+
+# Canonical trim_confidence vocabulary (plan §2.2.1). ``n/a`` is the S2
+# default when no approved trim has been applied.
+TRIM_CONFIDENCE_HIGH: Final[str] = "high"
+TRIM_CONFIDENCE_MEDIUM: Final[str] = "medium"
+TRIM_CONFIDENCE_NA: Final[str] = "n/a"
+
 _LEADING_TERMINAL_RE = re.compile(
     r"^(?:5[\s]*[′'ʹ΄]|5\s*['′])\s*[-–—:]?\s*",
     re.IGNORECASE,
@@ -459,7 +470,9 @@ def clean_display_sequence(
     if text != before:
         transformations.append("remove_whitespace")
 
-    separators = active_rules.display_separator_characters
+    # ASCII hyphen and period are alignment gaps (plan §2.4), never display
+    # separators, even if a rules file still lists them as separators.
+    separators = active_rules.display_separator_characters - ALIGNMENT_GAP_CHARACTERS
     if separators:
         before = text
         text = "".join(ch for ch in text if ch not in separators)
@@ -485,7 +498,11 @@ def clean_display_sequence(
         | active_rules.allowed_dna_bases
         | active_rules.supported_ambiguity_codes
     )
-    unexpected = _sorted_unique(ch for ch in text if ch not in allowed)
+    if any(ch in ALIGNMENT_GAP_CHARACTERS for ch in text):
+        qc_flags.append("alignment_gaps")
+    unexpected = _sorted_unique(
+        ch for ch in text if ch not in allowed and ch not in ALIGNMENT_GAP_CHARACTERS
+    )
     if unexpected:
         qc_flags.append("invalid_character")
 
@@ -498,10 +515,30 @@ def clean_display_sequence(
     )
 
 
+def _acg_only_reported_alphabet(molecule_type: str | None) -> str:
+    """Tie-break A/C/G-only alphabet using authoritative molecule type.
+
+    Alphabet alone cannot distinguish DNA from RNA when neither T nor U is
+    present. Source-confirmed DNA/ssDNA maps to ``DNA_T``; RNA (and the
+    historical unknown fallback) maps to ``RNA``. Molecule type is never
+    inferred from the alphabet.
+    """
+    if molecule_type is None:
+        return ALPHABET_RNA
+    try:
+        resolved = _normalise_molecule_type(molecule_type)
+    except SequenceNormalisationError:
+        return ALPHABET_RNA
+    if resolved in {"DNA", "ssDNA"}:
+        return ALPHABET_DNA_T
+    return ALPHABET_RNA
+
+
 def classify_alphabet(
     sequence: str | None,
     *,
     rules: SequenceNormalisationRules | None = None,
+    molecule_type: str | None = None,
 ) -> AlphabetClassification:
     """Classify the alphabet of a cleaned sequence string."""
     active_rules = rules if rules is not None else load_normalisation_rules()
@@ -518,17 +555,21 @@ def classify_alphabet(
 
     text = sequence.upper()
     chars = set(text)
+    nucleotide_chars = chars - ALIGNMENT_GAP_CHARACTERS
     rna = active_rules.allowed_rna_bases
     dna = active_rules.allowed_dna_bases
     ambiguity = active_rules.supported_ambiguity_codes
     canonical = rna | dna
     allowed = canonical | ambiguity
 
-    unexpected = _sorted_unique(ch for ch in chars if ch not in allowed)
-    has_t = "T" in chars
-    has_u = "U" in chars
-    has_ambiguity = bool(chars & ambiguity)
+    unexpected = _sorted_unique(ch for ch in nucleotide_chars if ch not in allowed)
+    has_t = "T" in nucleotide_chars
+    has_u = "U" in nucleotide_chars
+    has_ambiguity = bool(nucleotide_chars & ambiguity)
+    has_gaps = bool(chars & ALIGNMENT_GAP_CHARACTERS)
     qc_flags: list[str] = []
+    if has_gaps:
+        qc_flags.append("alignment_gaps")
 
     if unexpected:
         qc_flags.append("invalid_character")
@@ -538,6 +579,16 @@ def classify_alphabet(
             has_u=has_u,
             has_ambiguity=has_ambiguity,
             unexpected_characters=unexpected,
+            qc_flags=tuple(qc_flags),
+        )
+
+    if not nucleotide_chars:
+        return AlphabetClassification(
+            alphabet=ALPHABET_INVALID,
+            has_t=False,
+            has_u=False,
+            has_ambiguity=False,
+            unexpected_characters=(),
             qc_flags=tuple(qc_flags),
         )
 
@@ -563,35 +614,47 @@ def classify_alphabet(
             qc_flags=tuple(qc_flags),
         )
 
-    # Subset of A/C/G/U with no T → RNA alphabet (includes A/C/G-only and U-bearing).
-    if chars <= rna and not has_t:
+    # A/C/G-only cannot distinguish DNA from RNA; use source molecule type.
+    if nucleotide_chars <= ACG_ONLY:
+        return AlphabetClassification(
+            alphabet=_acg_only_reported_alphabet(molecule_type),
+            has_t=False,
+            has_u=False,
+            has_ambiguity=False,
+            unexpected_characters=(),
+            qc_flags=tuple(qc_flags),
+        )
+
+    # Subset of A/C/G/U with no T → RNA alphabet (U-bearing).
+    if nucleotide_chars <= rna and not has_t:
         return AlphabetClassification(
             alphabet=ALPHABET_RNA,
             has_t=False,
             has_u=has_u,
             has_ambiguity=False,
             unexpected_characters=(),
-            qc_flags=(),
+            qc_flags=tuple(qc_flags),
         )
 
     # Subset of A/C/G/T with no U → DNA_T alphabet.
-    if chars <= dna and not has_u:
+    if nucleotide_chars <= dna and not has_u:
         return AlphabetClassification(
             alphabet=ALPHABET_DNA_T,
             has_t=has_t,
             has_u=False,
             has_ambiguity=False,
             unexpected_characters=(),
-            qc_flags=(),
+            qc_flags=tuple(qc_flags),
         )
 
+    qc_flags.append("invalid_character")
     return AlphabetClassification(
         alphabet=ALPHABET_INVALID,
         has_t=has_t,
         has_u=has_u,
         has_ambiguity=has_ambiguity,
         unexpected_characters=(),
-        qc_flags=("invalid_character",),
+        qc_flags=tuple(qc_flags),
     )
 
 
@@ -797,7 +860,9 @@ def normalise_sequence(
         )
 
     cleaned = display.sequence_display_clean
-    reported = classify_alphabet(cleaned, rules=active_rules)
+    reported = classify_alphabet(
+        cleaned, rules=active_rules, molecule_type=resolved_molecule
+    )
     qc_flags.extend(reported.qc_flags)
     alphabet_as_reported = reported.alphabet
 
@@ -837,7 +902,9 @@ def normalise_sequence(
             t_to_u_applied = "T" in cleaned
             if t_to_u_applied:
                 transformations.append("t_to_u")
-            alphabet_after = classify_alphabet(sequence_full, rules=active_rules).alphabet
+            alphabet_after = classify_alphabet(
+                sequence_full, rules=active_rules, molecule_type=resolved_molecule
+            ).alphabet
         else:
             # Conservative default: leave for review; do not silently repair.
             qc_flags.append("trim_requires_review")
@@ -852,7 +919,9 @@ def normalise_sequence(
             t_to_u_applied = True
             transformations.append("t_to_u")
             qc_flags.append("t_in_reported_rna")
-        alphabet_after = classify_alphabet(sequence_full, rules=active_rules).alphabet
+        alphabet_after = classify_alphabet(
+            sequence_full, rules=active_rules, molecule_type=resolved_molecule
+        ).alphabet
         if alphabet_after == ALPHABET_DNA_T and "T" not in sequence_full:
             # A/C/G-only under explicit RNA is reported as RNA after normalisation.
             alphabet_after = ALPHABET_RNA

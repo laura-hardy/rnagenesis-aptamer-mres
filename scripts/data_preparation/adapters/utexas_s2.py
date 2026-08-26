@@ -21,6 +21,7 @@ from common.corpus_schema import (
 )
 from common.sequence_normalisation import (
     ALPHABET_MISSING,
+    TRIM_CONFIDENCE_NA,
     SequenceNormalisationRules,
     load_normalisation_rules,
     normalise_sequence,
@@ -81,6 +82,7 @@ REVIEW_RELEVANT_FLAGS: Final[frozenset[str]] = frozenset(
     {
         "missing_sequence",
         "invalid_character",
+        "alignment_gaps",
         "ambiguous_base",
         "mixed_t_u",
         "molecule_type_unknown",
@@ -592,7 +594,7 @@ def normalise_utexas_record(
     if norm.sequence_full is None:
         construct_scope = "unknown"
         trim_status = "not_applicable"
-        trim_confidence = ""
+        trim_confidence = TRIM_CONFIDENCE_NA
         if "missing_sequence" not in qc_flags:
             qc_flags.append("missing_sequence")
         sequence_full = ""
@@ -604,7 +606,7 @@ def normalise_utexas_record(
     elif constants_suspected:
         construct_scope = "unknown"
         trim_status = "constants_suspected_unresolved"
-        trim_confidence = ""
+        trim_confidence = TRIM_CONFIDENCE_NA
         qc_flags.append("constants_suspected_unresolved")
         qc_flags.append("trim_requires_review")
         length_full = str(len(sequence_full))
@@ -614,7 +616,7 @@ def normalise_utexas_record(
     else:
         construct_scope = "unknown"
         trim_status = "no_constants_detected"
-        trim_confidence = ""
+        trim_confidence = TRIM_CONFIDENCE_NA
         length_full = str(len(sequence_full))
         length_core = str(len(sequence_core))
         alphabet = norm.alphabet_as_reported

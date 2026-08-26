@@ -34,6 +34,7 @@ from common.constant_region_inference import (  # noqa: E402
     infer_group_constant_regions,
     infer_group_constant_regions_with_diagnostics,
     proposal_to_trim_plan,
+    resolve_publication_identity,
 )
 from common.sequence_normalisation import (  # noqa: E402
     TrimProposal,
@@ -539,3 +540,103 @@ def test_experiment_group_mode_requires_id() -> None:
         )
         is None
     )
+
+
+def test_publication_preferred_over_pubmed_id() -> None:
+    with_pub = build_group_inference_key(
+        source_db="aptadb",
+        grouping_mode=GROUP_INFERENCE_KEY_TARGET_PUBLICATION,
+        target_name_raw="targetA",
+        publication="Paper A",
+        pubmed_id="999",
+    )
+    pub_only = build_group_inference_key(
+        source_db="aptadb",
+        grouping_mode=GROUP_INFERENCE_KEY_TARGET_PUBLICATION,
+        target_name_raw="targetA",
+        publication="Paper A",
+        pubmed_id=None,
+    )
+    pmid_only = build_group_inference_key(
+        source_db="aptadb",
+        grouping_mode=GROUP_INFERENCE_KEY_TARGET_PUBLICATION,
+        target_name_raw="targetA",
+        publication="",
+        pubmed_id="999",
+    )
+    assert with_pub is not None
+    assert with_pub == pub_only
+    assert pmid_only is not None
+    assert with_pub != pmid_only
+
+
+def test_pubmed_id_fallback_when_publication_empty() -> None:
+    key = build_group_inference_key(
+        source_db="aptadb",
+        grouping_mode=GROUP_INFERENCE_KEY_TARGET_PUBLICATION,
+        target_name_raw="targetA",
+        publication="",
+        pubmed_id="12345678",
+    )
+    assert key is not None
+    assert key.startswith("aptadb:tgt_pub:")
+    same = build_group_inference_key(
+        source_db="aptadb",
+        grouping_mode=GROUP_INFERENCE_KEY_TARGET_PUBLICATION,
+        target_name_raw="targetA",
+        publication=None,
+        pubmed_id="12345678",
+    )
+    assert key == same
+
+
+def test_empty_target_prevents_pubmed_grouping() -> None:
+    assert (
+        build_group_inference_key(
+            source_db="aptadb",
+            grouping_mode=GROUP_INFERENCE_KEY_TARGET_PUBLICATION,
+            target_name_raw="",
+            publication="",
+            pubmed_id="12345678",
+        )
+        is None
+    )
+    assert (
+        build_group_inference_key(
+            source_db="aptadb",
+            grouping_mode=GROUP_INFERENCE_KEY_AUTO,
+            experiment_group_id=None,
+            target_name_raw=None,
+            publication=None,
+            pubmed_id="12345678",
+        )
+        is None
+    )
+
+
+def test_publication_identity_helper_does_not_invent_text() -> None:
+    assert resolve_publication_identity(publication="Paper A", pubmed_id="999") == (
+        "Paper A"
+    )
+    assert resolve_publication_identity(publication="", pubmed_id="999") == "999"
+    assert resolve_publication_identity(publication=None, pubmed_id=None) is None
+    assert resolve_publication_identity(publication="  ", pubmed_id="  ") is None
+
+
+def test_utexas_publication_grouping_unchanged_when_publication_present() -> None:
+    original = build_group_inference_key(
+        source_db="utexas",
+        grouping_mode=GROUP_INFERENCE_KEY_TARGET_PUBLICATION,
+        target_name_raw="targetX",
+        publication="paperY",
+    )
+    with_unused_pmid = build_group_inference_key(
+        source_db="utexas",
+        grouping_mode=GROUP_INFERENCE_KEY_TARGET_PUBLICATION,
+        target_name_raw="targetX",
+        publication="paperY",
+        pubmed_id="should_be_ignored",
+    )
+    assert original is not None
+    assert original == with_unused_pmid
+    assert original.startswith("utexas:tgt_pub:")

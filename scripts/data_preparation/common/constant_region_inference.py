@@ -111,6 +111,23 @@ def _nonempty_text(value: Any) -> str | None:
     return text if text else None
 
 
+def resolve_publication_identity(
+    *,
+    publication: str | None = None,
+    pubmed_id: str | None = None,
+) -> str | None:
+    """Resolve publication identity for grouping without mutating canonical fields.
+
+    Prefer a nonempty ``publication`` string. Fall back to nonempty
+    ``pubmed_id`` only when publication text is absent. Callers must not copy
+    the fallback into canonical ``publication``.
+    """
+    pub = _nonempty_text(publication)
+    if pub is not None:
+        return pub
+    return _nonempty_text(pubmed_id)
+
+
 def build_group_inference_key(
     *,
     source_db: str,
@@ -118,22 +135,28 @@ def build_group_inference_key(
     experiment_group_id: str | None = None,
     target_name_raw: str | None = None,
     publication: str | None = None,
+    pubmed_id: str | None = None,
 ) -> str | None:
     """Build a deterministic Tier-2 consensus group key.
 
     Missing grouping evidence returns ``None`` so unrelated rows are never
-    pooled into a catch-all group.
+    pooled into a catch-all group. Target+publication modes require a usable
+    target name; anonymous records that share only a PMID are not grouped.
+
+    Publication identity is ``publication`` when nonempty, otherwise
+    ``pubmed_id``. Canonical ``publication`` is never rewritten.
 
     Modes:
     - ``experiment_group_id``: require a nonempty experiment group ID
     - ``target_name_raw_plus_publication``: require both target and publication
+      identity
     - ``experiment_group_then_target_publication``: experiment group if present,
-      otherwise target + publication
+      otherwise target + publication identity
     """
     source = _nonempty_text(source_db) or "unknown_source"
     group_id = _nonempty_text(experiment_group_id)
     target = _nonempty_text(target_name_raw)
-    pub = _nonempty_text(publication)
+    pub = resolve_publication_identity(publication=publication, pubmed_id=pubmed_id)
 
     if grouping_mode == GROUP_INFERENCE_KEY_EXPERIMENT_GROUP:
         if group_id is None:

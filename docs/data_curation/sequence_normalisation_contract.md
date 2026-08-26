@@ -46,13 +46,20 @@ Deterministic removal of display-only artefacts is allowed:
 
 - leading and trailing whitespace;
 - internal whitespace used only for display;
-- recognised 5′ and 3′ terminal labels (including Unicode prime variants);
-- display hyphens or configured separator characters;
+- recognised 5′ and 3′ terminal labels (including Unicode prime variants and
+  hyphens that are part of those labels, e.g. `5'-`, `-3'`, `[3'T]`);
+- configured typographic separator characters that are **not** alignment-gap
+  characters (en dash, em dash);
 - case differences (normalise to uppercase).
 
 Surrounding quotation marks that clearly wrap the complete value may be
 removed. Textual null tokens (empty string, `NA`, `N/A`, `NULL`, `NONE`, and a
 lone hyphen) are treated as missing.
+
+After terminal-label stripping, remaining `-` and `.` in the sequence body are
+**alignment gaps**. They must be retained, flagged `alignment_gaps`, and left
+for later S3 review. They must not be stripped as ordinary display punctuation
+and must not be reported only as `invalid_character`.
 
 Display cleaning must **not** remove biological characters merely because they
 are unexpected. Unexpected characters are retained in the cleaned string and
@@ -99,8 +106,19 @@ Alphabet categories after display cleaning:
 | `ambiguous`  | Canonical bases plus supported IUPAC ambiguity codes |
 | `invalid`    | Any other character present |
 
+A sequence containing only A/C/G cannot be distinguished by alphabet alone.
+When an authoritative source `molecule_type` is known, use it as a tiebreak
+for `alphabet_as_reported` (`ssDNA`/`DNA` → `DNA_T`; `RNA` → `RNA`). Do not
+change sequence characters and do not infer molecule type from alphabet.
+
+Alignment-gap characters (`-`, `.`) are excluded from alphabet identity and
+are flagged `alignment_gaps` rather than treated as ordinary invalid
+characters. Other unexpected characters remain `invalid` / `invalid_character`.
+
 Supported ambiguity codes must be **retained and flagged**, not silently
 discarded. Invalid sequences must not be “fixed” by dropping characters.
+The current shared token for a U-alphabet report is `RNA`, not the plan’s
+`RNA_U`. Token migration is out of scope for this contract revision.
 
 ## Determinism and provenance
 

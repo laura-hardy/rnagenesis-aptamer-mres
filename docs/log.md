@@ -3161,3 +3161,181 @@ AptaDB S2 has not started
 No AptaDB records are yet authorised for global S4
 ```
 
+## 2026-08-26 — AptaDB S2 normalisation and constant-region proposals
+
+### Stage
+
+AptaDB S2 sequence normalisation, QC and constant-region proposal generation
+only. No S3 filtering, parking, rejection, target canonicalisation, evidence
+scoring, leakage, clustering, balancing, partitioning, or CHECKPOINT-1
+approval of AptaDB motifs was started.
+
+A narrow shared corrective pass was applied before approving this milestone:
+alignment-gap handling, canonical `trim_confidence`, and A/C/G-only alphabet
+provenance. S3 was not started.
+
+### Input
+
+Registered AptaDB S1 outputs:
+
+- `data/interim/extracted/aptadb_extracted.csv` (1,350 interaction records)
+- `data/interim/extracted/aptadb_source_metadata.csv` (1,350 rows)
+- `source_key = aptadb`
+- `source_dataset = aptadb_official_export_2026-08`
+
+Raw SHA-256 values unchanged:
+
+- `interaction.csv` `6dbd97f20fa6f98d359d697713c43032d5a6a3c1a400d80ef28a150d676dff86`
+- `aptamer.csv` `9d3ab029d1de4408d2406051a68bc0e6da347ee1be1838aee9c938ca3f3fb464`
+- `protein.csv` `4de0d8b105b3318c9704ff64819089f5e17b5c735f0730724052f3e808325f79`
+
+### Purpose
+
+Normalise every interaction-grain record with the shared S2 machinery while
+preserving every row. S2 does not reject, park or deduplicate.
+
+### Reconciliation
+
+1,350 in / 1,350 out; 1,350 unique `record_id`; row disappearance = 0.
+`sequence_raw` unchanged. S1 provenance unchanged. S4 target/evidence fields
+remain blank.
+
+### Molecule mapping
+
+Source `aptamer.csv.Aptamer Chemistry` is authoritative. Molecule type is not
+inferred from alphabet. Unexpected or blank chemistry is a hard adapter
+failure.
+
+- `RNA` → `molecule_type=RNA`, `chemistry=RNA` (289)
+- `DNA` → `molecule_type=ssDNA`, `chemistry=DNA` (1,061)
+
+AptaDB `DNA` is treated as DNA aptamers (`ssDNA`), not double-stranded DNA.
+
+### Alphabet and T→U
+
+Shared alphabet vocabulary is `RNA` / `DNA_T` / `mixed_T_U` / `invalid`
+(not a separate `RNA_U` token). That `RNA` versus plan `RNA_U` discrepancy
+is a later global schema-alignment item, not migrated in this pass.
+
+| alphabet_as_reported | Count |
+|---|---:|
+| RNA | 288 |
+| DNA_T | 1,060 |
+| mixed_T_U | 1 |
+| invalid | 1 |
+
+Of the 289 source-RNA records, 288 are U-alphabet and one is mixed T/U.
+No source-RNA record was a clean T-only DNA-alphabet report, so
+`t_to_u_applied=true` is 0. The mixed T/U RNA row was not silently
+transcribed (`mixed_t_u` policy = review). ssDNA retains T.
+
+A/C/G-only sequences cannot be distinguished by alphabet alone. The shared
+classifier now uses authoritative source `molecule_type` as the tiebreak:
+source-confirmed ssDNA → `DNA_T`; source-confirmed RNA → `RNA`. Sequence
+characters are not changed. One source-confirmed ssDNA A/C/G-only row is
+therefore `DNA_T` rather than the previous misleading `RNA` label.
+
+### QC (aggregate)
+
+Display transformations: `uppercase` 3. Internal `-` / `.` are no longer
+stripped as display separators.
+
+| Flag / diagnostic | Count |
+|---|---:|
+| alignment gaps | 2 |
+| mixed T/U | 1 |
+| invalid character | 1 |
+| core below min length (<20) | 25 |
+| core above max length (>100) | 21 |
+| known promoter detected | 1 |
+| trim_requires_review | 2 |
+| rows with any QC flag | 50 |
+
+After terminal-label stripping, remaining `-` and `.` in the sequence body
+are retained, flagged `alignment_gaps`, and left for later S3
+(`alignment_gaps` / `05_repair_alignment_gaps`). They are not silently
+repaired. Genuine `5'-` / `-3'` / `[3'T]` terminal notation continues to be
+stripped. The remaining `invalid_character` row is a non-gap unexpected
+character, not an alignment gap. Both gap rows remain in S2.
+
+Review-candidate rows are 50 (was 49) because the internal-hyphen row is now
+flagged instead of being silently cleaned.
+
+### Length
+
+Computed from the shared normalised representation, not AptaDB source
+`Length`. No trim was applied, so full and core distributions are identical:
+
+- min / median / max: 12 / 50 / 133
+- `<20`: 25; `20–25`: 72; `26–89`: 1,156; `90–100`: 76; `>100`: 21
+
+Out-of-range lengths were retained for S3.
+
+### Construct / trim
+
+`construct_scope=unknown` for all 1,350 (no reliable source construct-scope
+field; absence of a detected primer is not evidence of random-region-only).
+`trim_status`: `no_constants_detected` 1,349; `constants_suspected_unresolved` 1
+(configured T7 motif detection). `trim_confidence = n/a` for all 1,350
+(canonical vocabulary; no approved trim applied; unapplied medium-confidence
+proposals are not written as `medium`). `sequence_core == sequence_full` for
+all 1,350. Records actually trimmed: 0. Previously approved high-confidence
+trims applied: 0.
+
+### Constant-region inference
+
+Shared grouping helper now resolves publication identity as nonempty
+`publication`, else nonempty `pubmed_id`, and still requires a usable
+`target_name_raw`. Canonical `publication` was not rewritten. AptaDB protein
+rows therefore group as `target_name_raw + pubmed_id`. The 711 Molecule/Cell/
+Other rows with empty `target_name_raw` were not grouped by PMID alone
+(diagnostics: 711 skipped missing grouping evidence).
+
+Gapped sequences are excluded from positional consensus. Proposal counts did
+not change.
+
+| Inference statistic | Count |
+|---|---:|
+| Candidate groups considered | 255 |
+| Groups meeting minimum size (≥5) | 28 |
+| 5′ group-consensus proposals | 8 |
+| 3′ group-consensus proposals | 7 |
+| Records associated with medium-confidence proposals | 66 |
+| Known-motif proposal rows | 1 |
+| Genuine proposal rows total | 16 |
+
+Newly inferred medium-confidence motifs were written as proposals
+(`applied=false`) and did **not** mutate `sequence_core`.
+`config/constant_regions.yaml` was not modified.
+
+### Integrity
+
+- S1 canonical SHA-256 before/after: `bee7aebf3fda9164918bf25945fb210eed7f576566881aad35f7d9b17ba1ca0b`
+- Source-metadata SHA-256 before/after: `12e817369c620625c6d9758d88de71b82ca387d7376ca21d4614c4c7343d5465`
+- Raw SHA-256 unchanged (values above)
+- Deterministic rerun: pass
+- No file under `data/` is tracked
+
+### Deferred
+
+- S3: technical eligibility, ssDNA parking, length/invalid/mixed-T/U/
+  alignment-gap rejection logging, and `missing_target` logging for the 37
+  unlinked aptamers. Existing UTexas S3 infers `alignment_gaps` from
+  `invalid_character` plus remaining `-`/`.`; later S3 should also honour
+  the explicit S2 `alignment_gaps` flag.
+- CHECKPOINT-1: human review of AptaDB medium-confidence constant-region
+  proposals before any trim is applied
+- S4: UniProt/PDB/target canonicalisation, evidence scoring, leakage
+- Global schema: migrate shared `alphabet_as_reported` token `RNA` → plan
+  `RNA_U` across sources
+
+### Pipeline status
+
+```text
+AptaDB S0 complete
+AptaDB S1 complete
+AptaDB S2 complete
+AptaDB S3 has not started
+No AptaDB records are yet authorised for global S4
+```
+

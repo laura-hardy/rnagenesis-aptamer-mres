@@ -21,6 +21,7 @@ from common.sequence_normalisation import (
     ALPHABET_DNA_T,
     ALPHABET_MISSING,
     ALPHABET_RNA,
+    TRIM_CONFIDENCE_NA,
     SequenceNormalisationRules,
     classify_alphabet,
     clean_display_sequence,
@@ -79,6 +80,7 @@ REVIEW_RELEVANT_FLAGS: Final[frozenset[str]] = frozenset(
     {
         "missing_sequence",
         "invalid_character",
+        "alignment_gaps",
         "ambiguous_base",
         "mixed_t_u",
         "molecule_type_unknown",
@@ -1005,11 +1007,11 @@ def normalise_aptabase_record(
             "sequence_core",
             "sequence_length_full",
             "sequence_length_core",
-            "trim_confidence",
             "detected_constant_5p",
             "detected_constant_3p",
         ):
             canonical[key] = ""
+        canonical["trim_confidence"] = TRIM_CONFIDENCE_NA
         canonical["construct_scope"] = "missing"
         canonical["trim_status"] = "not_applicable"
         canonical["molecule_type"] = "unknown"
@@ -1121,7 +1123,7 @@ def normalise_aptabase_record(
     canonical["sequence_length_core"] = str(len(sequence_core))
     canonical["construct_scope"] = "full_equals_core_untrimmed"
     canonical["trim_status"] = trim_status
-    canonical["trim_confidence"] = ""
+    canonical["trim_confidence"] = TRIM_CONFIDENCE_NA
     canonical["detected_constant_5p"] = five_motifs
     canonical["detected_constant_3p"] = three_motifs
     canonical["molecule_type"] = resolved_molecule

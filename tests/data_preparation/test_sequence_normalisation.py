@@ -68,10 +68,52 @@ def test_04_terminal_label_removal(rules) -> None:
     assert "remove_three_prime_label" in result.transformations
 
 
-def test_05_hyphen_display_separator_removal(rules) -> None:
-    result = normalise_sequence("AC-GU–AC—GU", molecule_type="RNA", rules=rules)
+def test_04b_ascii_terminal_hyphens_are_display_not_gaps(rules) -> None:
+    result = normalise_sequence("5'-ACGUACGU-3'", molecule_type="RNA", rules=rules)
+    assert result.sequence_full == "ACGUACGU"
+    assert "remove_five_prime_label" in result.transformations
+    assert "remove_three_prime_label" in result.transformations
+    assert "alignment_gaps" not in result.qc_flags
+    assert "remove_display_separators" not in result.transformations
+    assert "-" not in (result.sequence_full or "")
+
+
+def test_05_unicode_dash_display_separator_removal(rules) -> None:
+    result = normalise_sequence("ACGU–AC—GU", molecule_type="RNA", rules=rules)
     assert result.sequence_full == "ACGUACGU"
     assert "remove_display_separators" in result.transformations
+    assert "alignment_gaps" not in result.qc_flags
+
+
+def test_05b_internal_hyphen_is_alignment_gap(rules) -> None:
+    raw = "AC-GUAC"
+    result = normalise_sequence(raw, molecule_type="RNA", rules=rules)
+    assert result.sequence_raw == raw
+    assert result.sequence_full == "AC-GUAC"
+    assert "alignment_gaps" in result.qc_flags
+    assert "remove_display_separators" not in result.transformations
+    assert "invalid_character" not in result.qc_flags
+    assert result.sequence_core == result.sequence_full
+
+
+def test_05c_internal_dot_is_alignment_gap(rules) -> None:
+    raw = "AC.GUAC"
+    result = normalise_sequence(raw, molecule_type="RNA", rules=rules)
+    assert result.sequence_raw == raw
+    assert result.sequence_full == "AC.GUAC"
+    assert "alignment_gaps" in result.qc_flags
+    assert "remove_display_separators" not in result.transformations
+    assert "invalid_character" not in result.qc_flags
+    assert result.sequence_core == result.sequence_full
+
+
+def test_05d_terminal_labels_do_not_hide_internal_hyphen(rules) -> None:
+    result = normalise_sequence("5'-AC-GU-3'", molecule_type="RNA", rules=rules)
+    assert result.sequence_full == "AC-GU"
+    assert "remove_five_prime_label" in result.transformations
+    assert "remove_three_prime_label" in result.transformations
+    assert "alignment_gaps" in result.qc_flags
+    assert "remove_display_separators" not in result.transformations
 
 
 def test_06_u_only_rna_classification(rules) -> None:
@@ -88,6 +130,51 @@ def test_08_mixed_t_u_classification(rules) -> None:
     classification = classify_alphabet("ACGTU", rules=rules)
     assert classification.alphabet == "mixed_T_U"
     assert "mixed_t_u" in classification.qc_flags
+
+
+def test_acg_only_ssdna_reports_dna_t(rules) -> None:
+    result = normalise_sequence("ACGACG", molecule_type="ssDNA", rules=rules)
+    assert result.alphabet_as_reported == "DNA_T"
+    assert result.molecule_type == "ssDNA"
+    assert result.sequence_full == "ACGACG"
+    assert result.t_to_u_applied is False
+    classification = classify_alphabet(
+        "ACGACG", rules=rules, molecule_type="ssDNA"
+    )
+    assert classification.alphabet == "DNA_T"
+
+
+def test_acg_only_rna_reports_rna(rules) -> None:
+    result = normalise_sequence("ACGACG", molecule_type="RNA", rules=rules)
+    assert result.alphabet_as_reported == "RNA"
+    assert result.molecule_type == "RNA"
+    assert result.sequence_full == "ACGACG"
+    assert result.t_to_u_applied is False
+    classification = classify_alphabet("ACGACG", rules=rules, molecule_type="RNA")
+    assert classification.alphabet == "RNA"
+
+
+def test_explicit_t_remains_dna_t(rules) -> None:
+    result = normalise_sequence("ACGTAC", molecule_type="ssDNA", rules=rules)
+    assert result.alphabet_as_reported == "DNA_T"
+    assert result.sequence_full == "ACGTAC"
+    classification = classify_alphabet("ACGTAC", rules=rules, molecule_type="RNA")
+    assert classification.alphabet == "DNA_T"
+
+
+def test_explicit_u_remains_rna(rules) -> None:
+    result = normalise_sequence("ACGUAC", molecule_type="RNA", rules=rules)
+    assert result.alphabet_as_reported == "RNA"
+    assert result.sequence_full == "ACGUAC"
+    classification = classify_alphabet("ACGUAC", rules=rules, molecule_type="ssDNA")
+    assert classification.alphabet == "RNA"
+
+
+def test_mixed_t_u_unaffected_by_molecule_tiebreak(rules) -> None:
+    rna = classify_alphabet("ACGTU", rules=rules, molecule_type="RNA")
+    dna = classify_alphabet("ACGTU", rules=rules, molecule_type="ssDNA")
+    assert rna.alphabet == "mixed_T_U"
+    assert dna.alphabet == "mixed_T_U"
 
 
 def test_09_supported_ambiguity_code_classification(rules) -> None:
@@ -374,7 +461,7 @@ def test_49_no_real_source_files_read_by_test_suite(rules) -> None:
 
 def test_50_repeated_runs_byte_dict_identical(rules) -> None:
     payload = {
-        "raw": "5′-AC-GU-3′",
+        "raw": "5′-ACGU-3′",
         "molecule_type": "RNA",
         "trim": TrimProposal(
             five_prime="AC",

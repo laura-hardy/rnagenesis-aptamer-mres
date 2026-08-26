@@ -1,0 +1,17 @@
+{
+  "source_key": "aptadb",
+  "contract_version": "1.0",
+  "molecule_evidence_field": "aptadb_aptamer_chemistry",
+  "reported_length_field": "aptadb_aptamer_length",
+  "apply_approved_trims": false,
+  "group_inference_key": "target_name_raw_plus_publication",
+  "molecule_type_map": {
+    "RNA": "RNA",
+    "DNA": "ssDNA"
+  },
+  "chemistry_map": {
+    "RNA": "RNA",
+    "DNA": "DNA"
+  },
+  "do_not_infer_molecule_from_alphabet": true
+}

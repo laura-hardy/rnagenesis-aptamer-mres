@@ -21,7 +21,6 @@
   "core_length_max": 100,
   "core_length_min": 20,
   "display_separator_characters": [
-    "-",
     "–",
     "—"
   ],
