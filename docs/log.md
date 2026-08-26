@@ -3339,3 +3339,220 @@ AptaDB S3 has not started
 No AptaDB records are yet authorised for global S4
 ```
 
+## 2026-08-26 — AptaDB S3 technical eligibility and CHECKPOINT-1 package
+
+### Stage
+
+AptaDB **S3 technical sequence eligibility**, ssDNA parking, source-explicit
+non-protein-target parking, rejection logging, and generation of the
+record-level **CHECKPOINT-1** review package. Human review decisions were
+not applied. CHECKPOINT-1 was not closed. Constant-region proposals were
+not applied. Global S4 was not started.
+
+### S3 policy
+
+Tracked policy: `config/source_eligibility/aptadb.json`. Shared seed
+`42` and random-accept audit size `30` are recorded in that policy.
+AptaBase and UTexas S3/CHECKPOINT-1 behaviour was not rewritten.
+
+S3 assigns exactly one primary interaction-stream route per canonical
+row. No interaction row disappears. The 1,350-row interaction spine is
+the denominator; the 37 unlinked aptamers are reconciled separately.
+
+Deterministic precedence:
+
+1. technical rejection
+2. ssDNA park
+3. RNA non-protein-target park
+4. RNA-protein technically eligible
+
+A malformed ssDNA record is therefore rejected, not parked. A
+technically valid ssDNA record is parked as ssDNA regardless of Target
+chemistry. Only technically valid RNA proceeds to target-chemistry
+routing. Canonical S3 CSV remains byte-identical to S2; routing lives in
+the decision sidecar.
+
+### Source-specific scientific rules
+
+- Length is evaluated on `sequence_length_core` (20–100 nt). Out of
+  range → `length_out_of_range`. Because no S2 trim was applied,
+  `sequence_core == sequence_full` for all 1,350 rows, so `<20` and
+  `>100` reject directly. A future full-in-range / core-out-of-range
+  applied-trim case would enter review rather than automatic rejection.
+- Explicit S2 `alignment_gaps` is honoured even without
+  `invalid_character`. Those rows reject as `alignment_gaps` and enter
+  CHECKPOINT-1. Gaps are not silently removed.
+- Mixed T/U is not computationally repaired (`mixed_T_and_U`). The
+  remaining non-gap unexpected character rejects as `invalid_alphabet`.
+  Both enter CHECKPOINT-1 as judgement-dependent technical cases.
+- Surviving `molecule_type=ssDNA` is parked (`ssdna_parked`). T is
+  retained. DNA is not rejected merely for being DNA.
+- Technically valid RNA uses the AptaDB sidecar `Target chemistry`
+  value. `Protein` continues as S3-eligible. `Molecule` / `Cell` /
+  `Other` park as `non_protein_target_parked`. Empty `target_name_raw`
+  is not the parking criterion. Canonical `target_type` /
+  `target_type_source` are not populated.
+- Unlinked aptamer.csv rows (no interaction) receive source-level
+  `missing_target` rejection-log entries with identity
+  `aptadb:unlinked:{Apta_index}` and stage `S3_source_reconciliation`.
+  They are not fake interaction Index IDs and are not parked.
+
+### Target/evidence/leakage deferral
+
+AptaDB S3 does not classify Binding Conditions/Buffer + PMID as E3.
+Evidence mapping and thresholding (`no_binding_evidence`,
+`evidence_below_threshold`) remain deferred to global S4. This is an
+architecture decision, not an accidental omission of the plan wording.
+
+Target canonicalisation, Molecule/Cell/Other name resolution, UniProt
+lookup, target-family assignment, NDM-1/KPC/OXA/HSA leakage exclusion,
+PDB canonical-field population, cross-source deduplication, clustering,
+balancing and FT/REF/EVAL partitioning also remain deferred.
+
+### Interaction reconciliation
+
+```text
+rows in = 1350
+technical rejects = 50
+parked ssDNA = 1035
+parked non-protein RNA = 115
+RNA-protein technically eligible = 150
+1350 = 50 + 1035 + 115 + 150
+```
+
+Technical rejects by primary reason:
+
+```text
+missing_sequence = 0
+length_out_of_range = 46
+mixed_T_and_U = 1
+alignment_gaps = 2
+invalid_alphabet = 1
+ambiguous_bases = 0
+primer_like = 0
+library_template = 0
+truncated_sequence = 0
+```
+
+Parking:
+
+```text
+source ssDNA before technical rejection = 1061
+technically rejected ssDNA = 26
+actually parked ssDNA = 1035
+
+RNA non-protein before technical rejection = 125
+technically rejected RNA non-protein = 10
+actually parked RNA non-protein = 115
+```
+
+Eligible corpus lane:
+
+```text
+RNA Protein before technical rejection = 164
+technically rejected RNA Protein = 14
+final technically eligible RNA Protein = 150
+```
+
+### Source-level unlinked-aptamer reconciliation
+
+```text
+unlinked aptamers = 37
+missing_target rejection entries = 37
+chemistry split: DNA 34 / RNA 3
+```
+
+These 37 are additional to the 1,350-row interaction stream. Rejection
+log total = 87 (50 interaction-spine technical rejects + 37
+`missing_target`).
+
+### CHECKPOINT-1
+
+Unique review records: `238`. Human columns (`manual_decision`,
+`manual_sequence_corrected`, `manual_target_corrected`, `manual_notes`)
+are blank. Permitted decisions: `keep` / `drop` / `edit`. Machine
+`proposed_decision` is not a human decision.
+
+```text
+judgement-dependent technical = 4
+  (alignment_gaps 2, mixed_T_and_U 1, invalid_alphabet 1)
+constant-proposal records in review = 67
+  (group-consensus 66 + known-motif 1; proposals remain applied=false)
+length-boundary records in review = 148
+  (20–25 nt = 72; 90–100 nt = 76)
+random kept audit = 30 (pool 150, seed 42, shortfall 0)
+```
+
+Batch assignment is one primary batch per record (reasons are combined
+when a record qualifies for several categories):
+
+```text
+01_judgement_dependent_technical = 4
+02_constant_region_proposal = 66
+03_length_boundary = 141
+04_random_kept_audit = 27
+238 = 4 + 66 + 141 + 27
+```
+
+The known-motif proposal row is also judgement-dependent, so it occupies
+batch 01 while remaining in the 67 constant-proposal count. Three of the
+30 random-audit rows already had a higher-priority batch, leaving 27
+exclusive batch-04 rows. `<20` and `>100` length rejects are not queued
+as boundary records.
+
+Canonical `trim_confidence` remains `n/a` for all 1,350 rows. No trim
+was applied. `config/sequence_normalisation_rules.json` and
+`config/constant_regions.yaml` were not modified.
+
+### Verification
+
+- AptaDB S3 / CHECKPOINT-1 plus AptaBase/UTexas S3, eligibility and
+  checkpoint regression tests: **156 passed**
+- Additional AptaDB S1/S2, constant-region and checkpoint-apply tests:
+  **126 passed**
+- Deterministic rerun: byte-identical S3 canonical, decisions, review,
+  local-detail, reason counts, rejection log, park sidecars
+- S2 canonical SHA-256 unchanged =
+  `b4075b602a9e569e3e91a66f1437a8939d56432138b8e9fcd2063920b0028aa5`
+- Raw SHA-256 unchanged:
+  `interaction.csv` `6dbd97f20fa6f98d359d697713c43032d5a6a3c1a400d80ef28a150d676dff86`
+  `aptamer.csv` `9d3ab029d1de4408d2406051a68bc0e6da347ee1be1838aee9c938ca3f3fb464`
+  `protein.csv` `4de0d8b105b3318c9704ff64819089f5e17b5c735f0730724052f3e808325f79`
+- No file under `data/` is tracked
+
+### Outputs (gitignored under `data/interim/checkpoints/aptadb_cp1/`)
+
+- `aptadb_s3_canonical.csv` / `aptadb_s3_decisions.csv`
+- `rejected_aptadb.csv` (interaction technical rejects plus 37 unlinked)
+- `aptadb_s3_parked_ssdna.csv` / `aptadb_s3_parked_non_protein.csv`
+- `aptadb_checkpoint1_review.csv` (sequence-free, all 1,350 rows)
+- `aptadb_checkpoint1_local_detail.csv` (sequence-bearing, all rows)
+- `aptadb_checkpoint1_reason_counts.csv` /
+  `aptadb_checkpoint1_summary.md`
+- `manual_review/aptadb_checkpoint1_manual_review.csv` (active queue;
+  this is the file Laura must review)
+- `manual_review/aptadb_checkpoint1_manual_review_index.csv`
+- `manual_review/aptadb_checkpoint1_manual_review_summary.md`
+
+Tracked code, tests and configuration:
+
+- `config/source_eligibility/aptadb.json`
+- `scripts/data_preparation/common/eligibility.py`
+- `scripts/data_preparation/adapters/aptadb_s3.py`
+- `scripts/data_preparation/s3_classify.py`
+- `scripts/data_preparation/checkpoint1_prepare_review.py`
+- `tests/data_preparation/test_eligibility.py`
+- `tests/data_preparation/test_adapter_aptadb_s3.py`
+- `tests/data_preparation/test_aptadb_s3_classify.py`
+- `tests/data_preparation/test_aptadb_checkpoint1_prepare_review.py`
+- this log entry
+
+### Pipeline stop
+
+```text
+CHECKPOINT-1 package generated.
+No human decisions applied.
+No AptaDB record is authorised for S4 yet.
+The pipeline is stopped awaiting Laura CHECKPOINT-1 review.
+```
+

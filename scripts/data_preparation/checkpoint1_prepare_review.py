@@ -25,6 +25,10 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from s0_build_registry import find_repo_root  # noqa: E402
+from adapters.aptadb_s3 import (  # noqa: E402
+    DEFAULT_APTADB_BATCHES,
+    LOCAL_DETAIL_COLUMNS as APTADB_LOCAL_DETAIL_COLUMNS,
+)
 from adapters.utexas_s3 import (  # noqa: E402
     DEFAULT_UTEXAS_BATCHES,
     LOCAL_DETAIL_COLUMNS as UTEXAS_LOCAL_DETAIL_COLUMNS,
@@ -78,6 +82,15 @@ UTEXAS_PIPELINE_STOP_STATEMENT = (
     "No human decisions applied.\n"
     "No record authorised for S4 yet."
 )
+APTADB_EXPECTED_TOTAL_ROWS = 1350
+APTADB_BATCH_ORDER: tuple[str, ...] = DEFAULT_APTADB_BATCHES
+APTADB_PIPELINE_STOP_STATEMENT = (
+    "CHECKPOINT-1 package generated.\n"
+    "No human decisions applied.\n"
+    "No AptaDB record is authorised for S4 yet.\n"
+    "The pipeline is stopped awaiting Laura CHECKPOINT-1 review."
+)
+APTADB_PERMITTED_DECISIONS: tuple[str, ...] = ("keep", "drop", "edit")
 
 UTEXAS_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
     "review_batch",
@@ -115,6 +128,23 @@ UTEXAS_SEQUENCE_COLUMNS: tuple[str, ...] = (
     "sequence_raw",
     "sequence_full",
     "sequence_core",
+)
+
+APTADB_SEQUENCE_COLUMNS: tuple[str, ...] = (
+    "sequence_raw",
+    "sequence_full",
+    "sequence_core",
+    "manual_sequence_corrected",
+)
+
+APTADB_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
+    "review_order",
+) + APTADB_LOCAL_DETAIL_COLUMNS
+
+APTADB_INDEX_COLUMNS: tuple[str, ...] = tuple(
+    column
+    for column in APTADB_MANUAL_REVIEW_COLUMNS
+    if column not in APTADB_SEQUENCE_COLUMNS
 )
 
 UTEXAS_INDEX_COLUMNS: tuple[str, ...] = tuple(
@@ -1143,6 +1173,344 @@ def prepare_utexas_checkpoint1_review(
     return result
 
 
+def build_aptadb_manual_review_row(
+    *,
+    review_row: Mapping[str, str],
+    local_detail: Mapping[str, str],
+    review_batch: str,
+    review_order: int,
+) -> dict[str, str]:
+    """Build one AptaDB sequence-bearing active-review row."""
+    if review_row["record_id"] != local_detail["record_id"]:
+        raise Checkpoint1ReviewError("Joined record_id mismatch")
+    for field_name in (
+        "proposed_decision",
+        "primary_reason",
+        "secondary_reasons",
+        "manual_review_priority",
+        "checkpoint_review_reasons",
+    ):
+        if review_row.get(field_name, "") != local_detail.get(field_name, ""):
+            raise Checkpoint1ReviewError(
+                f"Checkpoint field mismatch for {field_name!r} on "
+                f"{review_row['record_id']!r}"
+            )
+    row = {column: "" for column in APTADB_MANUAL_REVIEW_COLUMNS}
+    for column in APTADB_LOCAL_DETAIL_COLUMNS:
+        row[column] = local_detail.get(column, "")
+    row["review_batch"] = review_batch
+    row["review_order"] = str(review_order)
+    row["record_id"] = review_row["record_id"]
+    row["manual_decision"] = ""
+    row["manual_sequence_corrected"] = ""
+    row["manual_target_corrected"] = ""
+    row["manual_notes"] = ""
+    return row
+
+
+def build_aptadb_index_row(queue_row: Mapping[str, str]) -> dict[str, str]:
+    return {column: queue_row.get(column, "") for column in APTADB_INDEX_COLUMNS}
+
+
+def aptadb_review_package_sort_key(
+    row: Mapping[str, str],
+) -> tuple[int, int, str, str]:
+    batch = row.get("review_batch", "")
+    try:
+        batch_rank = APTADB_BATCH_ORDER.index(batch)
+    except ValueError:
+        batch_rank = len(APTADB_BATCH_ORDER)
+    return (
+        batch_rank,
+        _priority_rank(row.get("manual_review_priority", "none")),
+        row.get("primary_reason", ""),
+        row.get("record_id", ""),
+    )
+
+
+def build_aptadb_review_summary(
+    *,
+    repo_root: Path,
+    result: ReviewPackageResult,
+) -> str:
+    stats = result.stats
+    lines = [
+        "# AptaDB CHECKPOINT-1 manual-review package",
+        "",
+        "## Totals",
+        "",
+        f"- Total checkpoint records: `{stats.total_checkpoint_records}`",
+        f"- Active review rows: `{stats.active_review_rows}`",
+        f"- No-review records: `{stats.no_review_records}`",
+        f"- Human decisions recorded: `0`",
+        "",
+        "## Review model",
+        "",
+        "- `review_model` = `single_reviewer`",
+        "- Permitted `manual_decision` values: `keep` / `drop` / `edit`",
+        "- `manual_decision` is blank until Laura completes review.",
+        "- Machine `proposed_decision` is not a human decision.",
+        "",
+        "## Counts by review batch",
+        "",
+    ]
+    for batch in APTADB_BATCH_ORDER:
+        count = stats.batch_counts.get(batch, 0)
+        lines.append(f"- `{batch}`: `{count}`")
+
+    lines.extend(["", "## Counts by proposed decision", ""])
+    for name, count in sorted(stats.decision_counts.items()):
+        lines.append(f"- `{name}`: `{count}`")
+
+    lines.extend(["", "## Counts by primary reason", ""])
+    for name, count in sorted(stats.primary_reason_counts.items()):
+        lines.append(f"- `{name}`: `{count}`")
+
+    lines.extend(["", "## Counts by review priority", ""])
+    for name in PRIORITY_ORDER:
+        if name in stats.priority_counts:
+            lines.append(f"- `{name}`: `{stats.priority_counts[name]}`")
+
+    lines.extend(
+        [
+            "",
+            "## Permitted reviewer decisions",
+            "",
+        ]
+    )
+    for action in APTADB_PERMITTED_DECISIONS:
+        lines.append(f"- `{action}`")
+
+    lines.extend(
+        [
+            "",
+            "## Completion requirements",
+            "",
+            "- `manual_decision` must be nonempty for every active row.",
+            "- `manual_notes` may remain blank.",
+            "- No human decision has yet been recorded.",
+            "- Do not apply constant-region trims during this review step.",
+            "- Do not infer UniProt, target families, evidence scores or leakage.",
+            "",
+            "## Outputs",
+            "",
+            f"- Sequence-bearing review queue: "
+            f"`{_relative_display(result.output_queue, repo_root)}`",
+            f"- Sequence-free review index: "
+            f"`{_relative_display(result.output_index, repo_root)}`",
+            f"- Summary: `{_relative_display(result.output_summary, repo_root)}`",
+            "",
+            "## Local sequence warning",
+            "",
+            "WARNING: `aptadb_checkpoint1_manual_review.csv` contains source "
+            "and canonical sequences for manual scientific review. It must "
+            "remain beneath ignored `data/` and must never be staged or tracked.",
+            "",
+            "## Pipeline stop",
+            "",
+            APTADB_PIPELINE_STOP_STATEMENT,
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def prepare_aptadb_checkpoint1_review(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    expected_active_rows: int | None = None,
+    expected_total_rows: int | None = APTADB_EXPECTED_TOTAL_ROWS,
+) -> ReviewPackageResult:
+    """Build the AptaDB CHECKPOINT-1 active manual-review package."""
+    repo_root = repo_root.resolve()
+    checkpoint_dir = _resolve_under_repo(repo_root, checkpoint_dir)
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+
+    review_path = checkpoint_dir / "aptadb_checkpoint1_review.csv"
+    local_detail_path = checkpoint_dir / "aptadb_checkpoint1_local_detail.csv"
+    for path, label in (
+        (review_path, "checkpoint review"),
+        (local_detail_path, "local-detail"),
+    ):
+        if not path.is_file():
+            raise Checkpoint1ReviewError(f"Missing {label} input: {path.name}")
+
+    review_hash_before = _sha256_file(review_path)
+    local_detail_hash_before = _sha256_file(local_detail_path)
+
+    review_rows = _read_csv(review_path, label="checkpoint review")
+    local_detail_rows = _read_csv(local_detail_path, label="local-detail")
+    paired = _join_review_and_local_detail(review_rows, local_detail_rows)
+
+    if expected_total_rows is not None and len(paired) != expected_total_rows:
+        raise Checkpoint1ReviewError(
+            f"Checkpoint row count must be {expected_total_rows}; got {len(paired)}"
+        )
+
+    stats = ReviewPackageStats()
+    stats.total_checkpoint_records = len(paired)
+
+    active_pairs: list[tuple[dict[str, str], dict[str, str], str]] = []
+    for review_row, detail_row in paired:
+        required = (review_row.get("manual_review_required") or "").strip()
+        if required not in {"true", "false"}:
+            raise Checkpoint1ReviewError(
+                "manual_review_required must be lowercase true/false; "
+                f"got {required!r} for {review_row['record_id']!r}"
+            )
+        if required == "false":
+            stats.no_review_records += 1
+            if review_row.get("review_batch"):
+                raise Checkpoint1ReviewError(
+                    "No-review AptaDB row must not carry review_batch: "
+                    f"{review_row['record_id']!r}"
+                )
+            continue
+        if (
+            review_row.get("proposed_decision") == "proposed_reject"
+            and review_row.get("primary_reason") == "missing_sequence"
+        ):
+            raise Checkpoint1ReviewError(
+                "Missing-sequence reject must not enter the active review queue: "
+                f"{review_row['record_id']!r}"
+            )
+        if (
+            review_row.get("primary_reason") == "ssdna_parked"
+            and review_row.get("manual_review_required") == "true"
+            and "length_boundary"
+            not in (review_row.get("checkpoint_review_reasons") or "")
+            and "constant_region_proposal"
+            not in (review_row.get("checkpoint_review_reasons") or "")
+            and "judgement_dependent_technical"
+            not in (review_row.get("checkpoint_review_reasons") or "")
+        ):
+            raise Checkpoint1ReviewError(
+                "Technically valid ssDNA parks enter review only for checkpoint "
+                f"categories: {review_row['record_id']!r}"
+            )
+        batch = (review_row.get("review_batch") or "").strip()
+        if not batch:
+            raise Checkpoint1ReviewError(
+                "Review-required AptaDB row missing review_batch: "
+                f"{review_row['record_id']!r}"
+            )
+        if batch not in APTADB_BATCH_ORDER:
+            raise Checkpoint1ReviewError(
+                f"Unknown AptaDB review_batch {batch!r} for "
+                f"{review_row['record_id']!r}"
+            )
+        detail_batch = (detail_row.get("review_batch") or "").strip()
+        if detail_batch and detail_batch != batch:
+            raise Checkpoint1ReviewError(
+                f"review_batch mismatch for {review_row['record_id']!r}"
+            )
+        if detail_row.get("manual_decision"):
+            raise Checkpoint1ReviewError(
+                "Prepared review must not pre-fill manual_decision: "
+                f"{review_row['record_id']!r}"
+            )
+        active_pairs.append((review_row, detail_row, batch))
+
+    if expected_active_rows is not None and len(active_pairs) != expected_active_rows:
+        raise Checkpoint1ReviewError(
+            f"Active review row count must be {expected_active_rows}; "
+            f"got {len(active_pairs)}"
+        )
+
+    draft_rows: list[dict[str, str]] = []
+    for review_row, detail_row, batch in active_pairs:
+        draft_rows.append(
+            build_aptadb_manual_review_row(
+                review_row=review_row,
+                local_detail=detail_row,
+                review_batch=batch,
+                review_order=0,
+            )
+        )
+
+    draft_rows.sort(key=aptadb_review_package_sort_key)
+    queue_rows: list[dict[str, str]] = []
+    for index, row in enumerate(draft_rows, start=1):
+        ordered = dict(row)
+        ordered["review_order"] = str(index)
+        if (
+            ordered["manual_decision"]
+            or ordered["manual_sequence_corrected"]
+            or ordered["manual_target_corrected"]
+            or ordered["manual_notes"]
+        ):
+            raise Checkpoint1ReviewError(
+                "Reviewer fields must be empty in the prepared package"
+            )
+        queue_rows.append(ordered)
+        batch = ordered["review_batch"]
+        stats.batch_counts[batch] = stats.batch_counts.get(batch, 0) + 1
+        decision = ordered["proposed_decision"]
+        stats.decision_counts[decision] = stats.decision_counts.get(decision, 0) + 1
+        primary = ordered["primary_reason"]
+        stats.primary_reason_counts[primary] = (
+            stats.primary_reason_counts.get(primary, 0) + 1
+        )
+        priority = ordered["manual_review_priority"]
+        stats.priority_counts[priority] = stats.priority_counts.get(priority, 0) + 1
+
+    stats.active_review_rows = len(queue_rows)
+    if len({row["record_id"] for row in queue_rows}) != len(queue_rows):
+        raise Checkpoint1ReviewError("Active review queue has duplicate record_id")
+
+    index_rows = [build_aptadb_index_row(row) for row in queue_rows]
+    if any(column in APTADB_INDEX_COLUMNS for column in APTADB_SEQUENCE_COLUMNS):
+        raise Checkpoint1ReviewError("Sequence columns leaked into index schema")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_queue = output_dir / "aptadb_checkpoint1_manual_review.csv"
+    out_index = output_dir / "aptadb_checkpoint1_manual_review_index.csv"
+    out_summary = output_dir / "aptadb_checkpoint1_manual_review_summary.md"
+
+    write_csv_atomic(out_queue, APTADB_MANUAL_REVIEW_COLUMNS, queue_rows)
+    write_csv_atomic(out_index, APTADB_INDEX_COLUMNS, index_rows)
+
+    review_hash_after = _sha256_file(review_path)
+    local_detail_hash_after = _sha256_file(local_detail_path)
+    inputs_unchanged = (
+        review_hash_before == review_hash_after
+        and local_detail_hash_before == local_detail_hash_after
+    )
+    if not inputs_unchanged:
+        raise Checkpoint1ReviewError(
+            "CHECKPOINT-1 inputs were modified during review-package preparation"
+        )
+
+    result = ReviewPackageResult(
+        source_key="aptadb",
+        stats=stats,
+        output_queue=out_queue,
+        output_index=out_index,
+        output_summary=out_summary,
+        review_hash_before=review_hash_before,
+        review_hash_after=review_hash_after,
+        local_detail_hash_before=local_detail_hash_before,
+        local_detail_hash_after=local_detail_hash_after,
+        inputs_unchanged=inputs_unchanged,
+    )
+    summary_text = build_aptadb_review_summary(repo_root=repo_root, result=result)
+    abs_root = str(repo_root.resolve())
+    if abs_root in summary_text:
+        raise Checkpoint1ReviewError(
+            "Review summary must not contain absolute repository paths"
+        )
+    if APTADB_PIPELINE_STOP_STATEMENT not in summary_text:
+        raise Checkpoint1ReviewError("Review summary missing pipeline stop statement")
+    if "No human decision has yet been recorded." not in summary_text:
+        raise Checkpoint1ReviewError(
+            "Review summary must state that no human decision has been recorded"
+        )
+    _write_text_atomic(out_summary, summary_text)
+    return result
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -1153,7 +1521,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptabase or utexas)",
+        help="Source key (aptabase, utexas, or aptadb)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -1201,10 +1569,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     try:
-        if args.source not in {"aptabase", "utexas"}:
+        if args.source not in {"aptabase", "utexas", "aptadb"}:
             raise Checkpoint1ReviewError(
                 f"Unsupported source_key={args.source!r}; "
-                "supported: aptabase, utexas"
+                "supported: aptabase, utexas, aptadb"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -1214,11 +1582,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not repo_root.is_dir():
             raise Checkpoint1ReviewError(f"Repository root does not exist: {repo_root}")
 
-        default_checkpoint = (
-            Path("data/interim/checkpoints/utexas_cp1")
-            if args.source == "utexas"
-            else Path("data/interim/checkpoints/aptabase_cp1")
-        )
+        if args.source == "utexas":
+            default_checkpoint = Path("data/interim/checkpoints/utexas_cp1")
+        elif args.source == "aptadb":
+            default_checkpoint = Path("data/interim/checkpoints/aptadb_cp1")
+        else:
+            default_checkpoint = Path("data/interim/checkpoints/aptabase_cp1")
         checkpoint_dir = (
             args.checkpoint_dir
             if args.checkpoint_dir is not None
@@ -1237,6 +1606,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 expected_active_rows=args.expected_active_rows,
                 expected_total_rows=(
                     UTEXAS_EXPECTED_TOTAL_ROWS
+                    if args.expected_total_rows is None
+                    else args.expected_total_rows
+                ),
+            )
+        elif args.source == "aptadb":
+            result = prepare_aptadb_checkpoint1_review(
+                repo_root=repo_root,
+                checkpoint_dir=checkpoint_dir,
+                output_dir=output_dir,
+                expected_active_rows=args.expected_active_rows,
+                expected_total_rows=(
+                    APTADB_EXPECTED_TOTAL_ROWS
                     if args.expected_total_rows is None
                     else args.expected_total_rows
                 ),
@@ -1271,7 +1652,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"no_review_records={stats.no_review_records}\n"
         f"inputs_unchanged={'pass' if result.inputs_unchanged else 'fail'}"
     )
-    batch_order = UTEXAS_BATCH_ORDER if result.source_key == "utexas" else BATCH_ORDER
+    if result.source_key == "utexas":
+        batch_order = UTEXAS_BATCH_ORDER
+    elif result.source_key == "aptadb":
+        batch_order = APTADB_BATCH_ORDER
+    else:
+        batch_order = BATCH_ORDER
     for batch in batch_order:
         print(f"{batch}={stats.batch_counts.get(batch, 0)}")
     return 0

@@ -98,6 +98,15 @@ class EligibilityReason(str, Enum):
     LOWER_LENGTH_BOUNDARY = "lower_length_boundary"
     UPPER_LENGTH_BOUNDARY = "upper_length_boundary"
     RANDOM_ACCEPT_AUDIT = "random_accept_audit"
+    # Plan-aligned AptaDB S3 parking / source-reconciliation reasons.
+    SSDNA_PARKED = "ssdna_parked"
+    NON_PROTEIN_TARGET_PARKED = "non_protein_target_parked"
+    MISSING_TARGET = "missing_target"
+    PRIMER_LIKE = "primer_like"
+    LIBRARY_TEMPLATE = "library_template"
+    TRUNCATED_SEQUENCE = "truncated_sequence"
+    CONSTANT_REGION_PROPOSAL = "constant_region_proposal"
+    KNOWN_MOTIF_PROPOSAL = "known_motif_proposal"
 
 
 class ManualReviewPriority(str, Enum):
@@ -195,6 +204,7 @@ class EligibilityPolicy:
     reviewer_notes_required: bool = True
     active_review_batches: tuple[str, ...] = ()
     unresolved_trim_blocks_eligibility: bool = True
+    non_protein_target_decision: str = "proposed_park"
 
 
 @dataclass(frozen=True)
@@ -497,6 +507,9 @@ def load_eligibility_policy(path: str | Path) -> EligibilityPolicy:
         ),
         unresolved_trim_blocks_eligibility=_optional_bool(
             data, "unresolved_trim_blocks_eligibility", True
+        ),
+        non_protein_target_decision=_optional_decision(
+            data, "non_protein_target_decision", "proposed_park"
         ),
     )
 
