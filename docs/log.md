@@ -3556,3 +3556,71 @@ No AptaDB record is authorised for S4 yet.
 The pipeline is stopped awaiting Laura CHECKPOINT-1 review.
 ```
 
+## 2026-08-26 — AptaDB CHECKPOINT-1 structured review schema
+
+### Stage
+
+AptaDB CHECKPOINT-1 remains **unapplied**. This pass extends the review
+artefacts and future application logic so human review can record sequence
+corrections, molecule/chemistry overrides, group-wise constant-region
+decisions, numeric trim-boundary corrections, per-record exceptions, and
+bulk audit confirmation without pasting hand-trimmed cores.
+
+No `manual_decision` was entered. No trim was applied. Canonical S2/S3
+outputs were not rewritten. S4 was not started. CHECKPOINT-1 is not complete.
+
+### Why the schema was extended
+
+The previous record-level fields (`manual_decision`,
+`manual_sequence_corrected`, `manual_target_corrected`, `manual_notes`)
+could not express:
+
+- an experimental molecule correction that must re-run shared
+  molecule-aware normalisation while preserving `sequence_raw`;
+- approval, numeric override, rejection or deferral of a proposed
+  constant-region trim;
+- a per-record exception to an otherwise valid group trim.
+
+### Review artefacts
+
+Human fields remain blank. Machine recommendations are stored separately
+(`review_recommendation`, `review_rationale`, `requires_specific_human_decision`,
+and `recommended_*` counterparts) and are not human decisions.
+
+A group-level CSV now carries one row per constant-region proposal group.
+Otherwise-clean `length_boundary` and/or `random_kept_audit` rows are marked
+bulk-eligible with recommendation `keep_current_route`; confirming them still
+requires an explicit later `confirm=true` step.
+
+The validator fails closed: 238 unresolved manual decisions, 9 unresolved
+constant groups, 2 unresolved exceptions, 168 unconfirmed audit-only rows,
+`ready_for_application=0`.
+
+### Future apply semantics (not executed)
+
+Preserved `sequence_raw`; optional reviewed sequence correction; molecule
+override through the shared normaliser; numeric trim of reviewed
+`sequence_full`; re-evaluation under AptaDB S3 technical rules. `defer`
+does not become `keep`. Group decisions propagate unless a record-level
+trim action overrides them. Guard rails: core ≥20 nt, trim not longer than
+the sequence, combined fraction ≤40%.
+
+### Verification
+
+- Structured review/apply tests plus AptaDB/AptaBase/UTexas S3 and
+  checkpoint regressions: **216 passed**
+- Deterministic review-package regeneration: pass
+- Raw SHA-256 unchanged
+- S2/S3 canonical SHA-256 unchanged
+  (`b4075b602a9e569e3e91a66f1437a8939d56432138b8e9fcd2063920b0028aa5`)
+
+### Pipeline stop
+
+```text
+CHECKPOINT-1 structured review package generated.
+No human decisions applied.
+No trims applied.
+No AptaDB record is authorised for S4 yet.
+The pipeline is stopped awaiting Laura CHECKPOINT-1 review.
+```
+

@@ -2138,6 +2138,15 @@ def run_aptadb_s3(
             raise S3ClassifyError("CHECKPOINT-1 must not apply constant-region trims")
         if detail.get("manual_decision"):
             raise S3ClassifyError("Local-detail must not pre-fill manual_decision")
+        for field_name in (
+            "manual_sequence_corrected",
+            "manual_molecule_type_override",
+            "manual_trim_action",
+        ):
+            if detail.get(field_name):
+                raise S3ClassifyError(
+                    f"Local-detail must not pre-fill {field_name}"
+                )
         local_detail_rows.append(detail)
     for review_row, detail_row in zip(review_rows, local_detail_rows, strict=True):
         if review_row["record_id"] != detail_row["record_id"]:

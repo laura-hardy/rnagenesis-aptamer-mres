@@ -1723,7 +1723,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "checkpoint with tracked sequence-free resolution artefacts."
         )
     )
-    parser.add_argument("--source", required=True, help="Source key (aptabase or utexas)")
+    parser.add_argument("--source", required=True, help="Source key (aptabase, utexas, or aptadb)")
     parser.add_argument(
         "--checkpoint-dir",
         type=Path,
@@ -1796,9 +1796,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     try:
-        if args.source not in {"aptabase", "utexas"}:
+        if args.source not in {"aptabase", "utexas", "aptadb"}:
             raise Checkpoint1ApplyError(
-                f"Unsupported source_key={args.source!r}; supported: aptabase, utexas"
+                f"Unsupported source_key={args.source!r}; "
+                "supported: aptabase, utexas, aptadb"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -1808,6 +1809,52 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not repo_root.is_dir():
             raise Checkpoint1ApplyError(f"Repository root does not exist: {repo_root}")
 
+        if args.source == "aptadb":
+            from adapters.aptadb_checkpoint1_review import (
+                apply_aptadb_checkpoint1_package,
+                load_default_policy,
+                read_csv_rows,
+            )
+
+            checkpoint_dir = (
+                args.checkpoint_dir
+                if args.checkpoint_dir is not None
+                else Path("data/interim/checkpoints/aptadb_cp1")
+            )
+            if not Path(checkpoint_dir).is_absolute():
+                checkpoint_dir = repo_root / checkpoint_dir
+            review_file = (
+                args.review_file
+                if args.review_file is not None
+                else Path(checkpoint_dir)
+                / "manual_review"
+                / "aptadb_checkpoint1_manual_review.csv"
+            )
+            if not Path(review_file).is_absolute():
+                review_file = repo_root / review_file
+            group_path = (
+                Path(review_file).parent / "aptadb_checkpoint1_constant_group_review.csv"
+            )
+            bulk_path = (
+                Path(review_file).parent
+                / "aptadb_checkpoint1_bulk_audit_confirmation.csv"
+            )
+            queue_rows = read_csv_rows(Path(review_file))
+            group_rows = read_csv_rows(group_path) if group_path.is_file() else []
+            bulk_rows = read_csv_rows(bulk_path) if bulk_path.is_file() else []
+            apply_aptadb_checkpoint1_package(
+                queue_rows=queue_rows,
+                group_rows=group_rows,
+                canonical_by_id={},
+                source_metadata_by_id={},
+                s2_qc_by_id={},
+                policy=load_default_policy(repo_root),
+                bulk_confirmation=bulk_rows[0] if bulk_rows else None,
+            )
+            raise Checkpoint1ApplyError(
+                "AptaDB CHECKPOINT-1 application reached an unexpected success "
+                "path; live closure is not authorised in this task"
+            )
         if args.source == "utexas":
             checkpoint_dir = (
                 args.checkpoint_dir

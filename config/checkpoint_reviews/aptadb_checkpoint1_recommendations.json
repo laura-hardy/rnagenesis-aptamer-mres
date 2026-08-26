@@ -1,0 +1,141 @@
+{
+  "source_key": "aptadb",
+  "review_plan_version": "aptadb_checkpoint1_structured_review_v1",
+  "notes": "Recommendation/guidance only. Never copy these values into manual_* fields. Contains no sequences.",
+  "records": {
+    "aptadb:230": {
+      "review_recommendation": "edit_remove_internal_hyphens",
+      "recommended_manual_decision": "edit",
+      "sequence_correction_op": "remove_internal_hyphens",
+      "recommended_molecule_type_override": "",
+      "recommended_chemistry_override": "",
+      "requires_specific_human_decision": true,
+      "rationale": "Remove the two internal hyphens from the reviewed sequence. Experimental molecule remains ssDNA. After correction the record should follow the normal ssDNA parking route."
+    },
+    "aptadb:491": {
+      "review_recommendation": "edit_remove_terminal_period",
+      "recommended_manual_decision": "edit",
+      "sequence_correction_op": "remove_terminal_period",
+      "recommended_molecule_type_override": "",
+      "recommended_chemistry_override": "",
+      "requires_specific_human_decision": true,
+      "rationale": "Remove the terminal period. Molecule remains ssDNA. After correction the record should follow the normal ssDNA parking route."
+    },
+    "aptadb:305": {
+      "review_recommendation": "drop_mixed_t_u",
+      "recommended_manual_decision": "drop",
+      "sequence_correction_op": "",
+      "requires_specific_human_decision": true,
+      "rationale": "Mixed T/U source sequence cannot be unambiguously repaired from the current source evidence."
+    },
+    "aptadb:1170": {
+      "review_recommendation": "edit_molecule_terminal_boundary_unresolved",
+      "recommended_manual_decision": "edit",
+      "sequence_correction_op": "remove_trailing_nonbiological_3",
+      "recommended_molecule_type_override": "RNA",
+      "recommended_chemistry_override": "RNA",
+      "requires_specific_human_decision": true,
+      "rationale": "Correct experimental molecule from source-labelled DNA/ssDNA to RNA and chemistry to RNA. Remove the clearly non-biological terminal 3. The T7 promoter is a real construct constant, but the precise final 5-prime core boundary remains deliberately unresolved because the promoter-stripped source and curated mature sequence differ by one leading G. Do not auto-approve the known-motif trim."
+    },
+    "aptadb:459": {
+      "review_recommendation": "exception_reject_3p_trim",
+      "recommended_manual_decision": "edit",
+      "recommended_trim_action": "override",
+      "recommended_trim_5p_nt": 23,
+      "recommended_trim_3p_nt": 0,
+      "recommended_trim_group_override": true,
+      "requires_specific_human_decision": true,
+      "rationale": "AP65_A1 is a per-record exception to the AP65 group 3-prime trim. The group 5-prime length may still apply; the group 3-prime trim must not be forced onto this member."
+    }
+  },
+  "groups": {
+    "aptadb:tgt_pub:058f84bc5a4a1b24": {
+      "label": "HIV_Gag_Pol",
+      "review_recommendation": "approve_group_trim",
+      "recommended_trim_action": "approve",
+      "recommended_trim_5p_nt": 20,
+      "recommended_trim_3p_nt": 20,
+      "requires_specific_human_decision": true,
+      "rationale": "Approve the machine 5-prime and 3-prime group-consensus lengths of 20 nt each."
+    },
+    "aptadb:tgt_pub:0e015a3d17a96ed2": {
+      "label": "AP65",
+      "review_recommendation": "approve_group_trim_with_record_exception",
+      "recommended_trim_action": "approve",
+      "recommended_trim_5p_nt": 23,
+      "recommended_trim_3p_nt": 21,
+      "requires_specific_human_decision": true,
+      "recommended_record_exceptions": "aptadb:459",
+      "rationale": "The S2 proposal artefact already records 5-prime=23 and 3-prime=21, matching the agreed human lengths; recommend approve. AP65_A1 (aptadb:459) must not automatically receive the 3-prime trim."
+    },
+    "aptadb:tgt_pub:2bb8bab6964b2e7f": {
+      "label": "OX40",
+      "review_recommendation": "approve_group_trim",
+      "recommended_trim_action": "approve",
+      "recommended_trim_5p_nt": 15,
+      "recommended_trim_3p_nt": 25,
+      "requires_specific_human_decision": true,
+      "rationale": "Approve the machine 5-prime=15 and 3-prime=25 group-consensus lengths."
+    },
+    "aptadb:tgt_pub:3d967466fe61b791": {
+      "label": "pancreatic_polypeptide",
+      "review_recommendation": "approve_group_trim",
+      "recommended_trim_action": "approve",
+      "recommended_trim_5p_nt": 20,
+      "recommended_trim_3p_nt": 20,
+      "requires_specific_human_decision": true,
+      "rationale": "Approve the machine 5-prime and 3-prime group-consensus lengths of 20 nt each."
+    },
+    "aptadb:tgt_pub:7f55315affd8c4d9": {
+      "label": "CBF1",
+      "review_recommendation": "override_group_trim",
+      "recommended_trim_action": "override",
+      "recommended_trim_5p_nt": 20,
+      "recommended_trim_3p_nt": 20,
+      "requires_specific_human_decision": true,
+      "rationale": "The S2 proposal artefact records 5-prime motif length 21 and 3-prime motif length 20. Agreed human recommendation is 20/20 rather than auto-applying the machine proposal."
+    },
+    "aptadb:tgt_pub:b961ac97a9ec6f3b": {
+      "label": "CD25",
+      "review_recommendation": "override_group_trim",
+      "recommended_trim_action": "override",
+      "recommended_trim_5p_nt": 15,
+      "recommended_trim_3p_nt": 16,
+      "requires_specific_human_decision": true,
+      "rationale": "Override the machine 3-prime motif length to 16 nt. Keep 5-prime=15 nt."
+    },
+    "aptadb:tgt_pub:ecff4d0d20efd9c6": {
+      "label": "albumin_deletion_series",
+      "review_recommendation": "reject_group_trim",
+      "recommended_trim_action": "reject",
+      "recommended_trim_5p_nt": "",
+      "recommended_trim_3p_nt": "",
+      "requires_specific_human_decision": true,
+      "rationale": "Reject the constant-region proposal. The shared prefix appears to be part of the deliberately shortened aptamer construct rather than a removable primer constant."
+    },
+    "aptadb:tgt_pub:f276571cebc683f5": {
+      "label": "NPY",
+      "review_recommendation": "approve_group_trim",
+      "recommended_trim_action": "approve",
+      "recommended_trim_5p_nt": 20,
+      "recommended_trim_3p_nt": 20,
+      "requires_specific_human_decision": true,
+      "rationale": "Approve the machine 5-prime and 3-prime group-consensus lengths of 20 nt each."
+    },
+    "aptadb:1170": {
+      "label": "G5a3N.4_known_T7",
+      "review_recommendation": "known_motif_boundary_unresolved",
+      "recommended_trim_action": "",
+      "recommended_trim_5p_nt": "",
+      "recommended_trim_3p_nt": "",
+      "requires_specific_human_decision": true,
+      "rationale": "T7 promoter detection is biologically plausible. Experimental molecule should be reviewed as RNA and the terminal 3 corrected, but the precise final 5-prime core boundary remains deliberately unresolved. Do not auto-approve the known-motif trim or silently resolve the one-leading-G discrepancy."
+    }
+  },
+  "audit_only": {
+    "review_recommendation": "keep_current_route",
+    "recommended_manual_decision": "keep",
+    "requires_specific_human_decision": false,
+    "rationale": "Otherwise-clean length-boundary and/or random-kept-audit rows with no judgement-dependent technical problem and no constant-region proposal. Bulk keep/current-route is recommended; human confirmation is still required before application."
+  }
+}

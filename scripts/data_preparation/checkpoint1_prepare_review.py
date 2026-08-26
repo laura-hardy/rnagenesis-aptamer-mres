@@ -25,6 +25,22 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from s0_build_registry import find_repo_root  # noqa: E402
+from adapters.aptadb_checkpoint1_review import (  # noqa: E402
+    BULK_CONFIRMATION_COLUMNS,
+    DEFAULT_RECOMMENDATIONS_REL,
+    GROUP_REVIEW_COLUMNS,
+    MANUAL_FIELDS,
+    RECOMMENDATION_FIELDS,
+    AptaDBCheckpoint1ReviewError,
+    build_bulk_confirmation_row,
+    build_group_review_rows,
+    build_review_readme,
+    format_validation_markdown,
+    load_review_recommendations,
+    populate_record_recommendations,
+    read_csv_rows,
+    validate_review_package,
+)
 from adapters.aptadb_s3 import (  # noqa: E402
     DEFAULT_APTADB_BATCHES,
     LOCAL_DETAIL_COLUMNS as APTADB_LOCAL_DETAIL_COLUMNS,
@@ -135,11 +151,18 @@ APTADB_SEQUENCE_COLUMNS: tuple[str, ...] = (
     "sequence_full",
     "sequence_core",
     "manual_sequence_corrected",
+    "recommended_sequence_corrected",
 )
 
 APTADB_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
-    "review_order",
-) + APTADB_LOCAL_DETAIL_COLUMNS
+    ("review_order",)
+    + APTADB_LOCAL_DETAIL_COLUMNS
+    + tuple(
+        column
+        for column in RECOMMENDATION_FIELDS
+        if column not in APTADB_LOCAL_DETAIL_COLUMNS
+    )
+)
 
 APTADB_INDEX_COLUMNS: tuple[str, ...] = tuple(
     column
@@ -299,6 +322,10 @@ class ReviewPackageResult:
     local_detail_hash_before: str
     local_detail_hash_after: str
     inputs_unchanged: bool
+    output_group_review: Path | None = None
+    output_bulk_confirmation: Path | None = None
+    output_readme: Path | None = None
+    output_validation: Path | None = None
 
 
 def assert_no_legacy_cleaner_import() -> None:
@@ -1201,10 +1228,8 @@ def build_aptadb_manual_review_row(
     row["review_batch"] = review_batch
     row["review_order"] = str(review_order)
     row["record_id"] = review_row["record_id"]
-    row["manual_decision"] = ""
-    row["manual_sequence_corrected"] = ""
-    row["manual_target_corrected"] = ""
-    row["manual_notes"] = ""
+    for name in MANUAL_FIELDS:
+        row[name] = ""
     return row
 
 
@@ -1248,8 +1273,9 @@ def build_aptadb_review_summary(
         "",
         "- `review_model` = `single_reviewer`",
         "- Permitted `manual_decision` values: `keep` / `drop` / `edit`",
-        "- `manual_decision` is blank until Laura completes review.",
-        "- Machine `proposed_decision` is not a human decision.",
+        "- Permitted `manual_trim_action` values: `approve` / `override` / `reject` / `defer`",
+        "- `manual_*` fields are blank until Laura completes review.",
+        "- Machine `proposed_decision` and `review_recommendation` are not human decisions.",
         "",
         "## Counts by review batch",
         "",
@@ -1286,8 +1312,9 @@ def build_aptadb_review_summary(
             "",
             "## Completion requirements",
             "",
-            "- `manual_decision` must be nonempty for every active row.",
-            "- `manual_notes` may remain blank.",
+            "- `manual_decision` must be nonempty for every active row before apply.",
+            "- Trim actions, molecule overrides and sequence corrections are structured fields.",
+            "- Recommendations must not be copied blindly into `manual_*` fields.",
             "- No human decision has yet been recorded.",
             "- Do not apply constant-region trims during this review step.",
             "- Do not infer UniProt, target families, evidence scores or leakage.",
@@ -1298,6 +1325,30 @@ def build_aptadb_review_summary(
             f"`{_relative_display(result.output_queue, repo_root)}`",
             f"- Sequence-free review index: "
             f"`{_relative_display(result.output_index, repo_root)}`",
+            (
+                f"- Group-level constant review: "
+                f"`{_relative_display(result.output_group_review, repo_root)}`"
+                if result.output_group_review
+                else "- Group-level constant review: `(not generated)`"
+            ),
+            (
+                f"- Bulk audit confirmation template: "
+                f"`{_relative_display(result.output_bulk_confirmation, repo_root)}`"
+                if result.output_bulk_confirmation
+                else "- Bulk audit confirmation template: `(not generated)`"
+            ),
+            (
+                f"- Local review README: "
+                f"`{_relative_display(result.output_readme, repo_root)}`"
+                if result.output_readme
+                else "- Local review README: `(not generated)`"
+            ),
+            (
+                f"- Validation snapshot: "
+                f"`{_relative_display(result.output_validation, repo_root)}`"
+                if result.output_validation
+                else "- Validation snapshot: `(not generated)`"
+            ),
             f"- Summary: `{_relative_display(result.output_summary, repo_root)}`",
             "",
             "## Local sequence warning",
@@ -1419,28 +1470,33 @@ def prepare_aptadb_checkpoint1_review(
             f"got {len(active_pairs)}"
         )
 
+    recommendations_path = repo_root / DEFAULT_RECOMMENDATIONS_REL
+    recommendations: dict[str, object] = {"records": {}, "groups": {}, "audit_only": {}}
+    if recommendations_path.is_file():
+        recommendations = load_review_recommendations(recommendations_path)
+
     draft_rows: list[dict[str, str]] = []
     for review_row, detail_row, batch in active_pairs:
-        draft_rows.append(
-            build_aptadb_manual_review_row(
-                review_row=review_row,
-                local_detail=detail_row,
-                review_batch=batch,
-                review_order=0,
-            )
+        built = build_aptadb_manual_review_row(
+            review_row=review_row,
+            local_detail=detail_row,
+            review_batch=batch,
+            review_order=0,
         )
+        try:
+            built = populate_record_recommendations(
+                built, recommendations=recommendations
+            )
+        except AptaDBCheckpoint1ReviewError as exc:
+            raise Checkpoint1ReviewError(str(exc)) from exc
+        draft_rows.append(built)
 
     draft_rows.sort(key=aptadb_review_package_sort_key)
     queue_rows: list[dict[str, str]] = []
     for index, row in enumerate(draft_rows, start=1):
         ordered = dict(row)
         ordered["review_order"] = str(index)
-        if (
-            ordered["manual_decision"]
-            or ordered["manual_sequence_corrected"]
-            or ordered["manual_target_corrected"]
-            or ordered["manual_notes"]
-        ):
+        if any(ordered.get(name) for name in MANUAL_FIELDS):
             raise Checkpoint1ReviewError(
                 "Reviewer fields must be empty in the prepared package"
             )
@@ -1464,13 +1520,47 @@ def prepare_aptadb_checkpoint1_review(
     if any(column in APTADB_INDEX_COLUMNS for column in APTADB_SEQUENCE_COLUMNS):
         raise Checkpoint1ReviewError("Sequence columns leaked into index schema")
 
+    proposals_path = (
+        repo_root / "data" / "interim" / "normalised" / "aptadb_constant_region_proposals.csv"
+    )
+    canonical_path = checkpoint_dir / "aptadb_s3_canonical.csv"
+    proposals = read_csv_rows(proposals_path) if proposals_path.is_file() else []
+    canonical_by_id: dict[str, dict[str, str]] = {}
+    if canonical_path.is_file():
+        canonical_by_id = {
+            row["record_id"]: row for row in read_csv_rows(canonical_path)
+        }
+    group_rows = build_group_review_rows(
+        queue_rows=queue_rows,
+        proposals=proposals,
+        canonical_by_id=canonical_by_id,
+        recommendations=recommendations,
+    )
+    bulk_row = build_bulk_confirmation_row(queue_rows)
+    try:
+        validation = validate_review_package(
+            queue_rows=queue_rows,
+            group_rows=group_rows,
+            bulk_confirmation=bulk_row,
+        )
+    except AptaDBCheckpoint1ReviewError as exc:
+        raise Checkpoint1ReviewError(str(exc)) from exc
+
     output_dir.mkdir(parents=True, exist_ok=True)
     out_queue = output_dir / "aptadb_checkpoint1_manual_review.csv"
     out_index = output_dir / "aptadb_checkpoint1_manual_review_index.csv"
     out_summary = output_dir / "aptadb_checkpoint1_manual_review_summary.md"
+    out_group = output_dir / "aptadb_checkpoint1_constant_group_review.csv"
+    out_bulk = output_dir / "aptadb_checkpoint1_bulk_audit_confirmation.csv"
+    out_readme = output_dir / "README.md"
+    out_validation = output_dir / "aptadb_checkpoint1_validation.md"
 
     write_csv_atomic(out_queue, APTADB_MANUAL_REVIEW_COLUMNS, queue_rows)
     write_csv_atomic(out_index, APTADB_INDEX_COLUMNS, index_rows)
+    write_csv_atomic(out_group, GROUP_REVIEW_COLUMNS, group_rows)
+    write_csv_atomic(out_bulk, BULK_CONFIRMATION_COLUMNS, [bulk_row])
+    _write_text_atomic(out_readme, build_review_readme())
+    _write_text_atomic(out_validation, format_validation_markdown(validation))
 
     review_hash_after = _sha256_file(review_path)
     local_detail_hash_after = _sha256_file(local_detail_path)
@@ -1494,6 +1584,10 @@ def prepare_aptadb_checkpoint1_review(
         local_detail_hash_before=local_detail_hash_before,
         local_detail_hash_after=local_detail_hash_after,
         inputs_unchanged=inputs_unchanged,
+        output_group_review=out_group,
+        output_bulk_confirmation=out_bulk,
+        output_readme=out_readme,
+        output_validation=out_validation,
     )
     summary_text = build_aptadb_review_summary(repo_root=repo_root, result=result)
     abs_root = str(repo_root.resolve())

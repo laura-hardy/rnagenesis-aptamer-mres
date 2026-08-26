@@ -141,6 +141,12 @@ LOCAL_DETAIL_COLUMNS: Final[tuple[str, ...]] = (
     "manual_decision",
     "manual_sequence_corrected",
     "manual_target_corrected",
+    "manual_molecule_type_override",
+    "manual_chemistry_override",
+    "manual_trim_action",
+    "manual_trim_5p_nt",
+    "manual_trim_3p_nt",
+    "manual_trim_group_override",
     "manual_notes",
 )
 
@@ -1067,6 +1073,12 @@ def build_local_detail_row(
         "manual_decision": "",
         "manual_sequence_corrected": "",
         "manual_target_corrected": "",
+        "manual_molecule_type_override": "",
+        "manual_chemistry_override": "",
+        "manual_trim_action": "",
+        "manual_trim_5p_nt": "",
+        "manual_trim_3p_nt": "",
+        "manual_trim_group_override": "",
         "manual_notes": "",
     }
 
@@ -1390,3 +1402,18 @@ def assert_aptadb_reject_park_invariants(
                 )
         if row.get("manual_decision"):
             raise AptaDBS3Error("S3 must not pre-fill a human manual_decision")
+        for field_name in (
+            "manual_sequence_corrected",
+            "manual_target_corrected",
+            "manual_molecule_type_override",
+            "manual_chemistry_override",
+            "manual_trim_action",
+            "manual_trim_5p_nt",
+            "manual_trim_3p_nt",
+            "manual_trim_group_override",
+            "manual_notes",
+        ):
+            if row.get(field_name):
+                raise AptaDBS3Error(
+                    f"S3 must not pre-fill human field {field_name}"
+                )
