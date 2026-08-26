@@ -20,6 +20,7 @@ from s0_build_registry import (  # noqa: E402
     RegistrySpecRow,
     build_registry,
     count_csv_data_rows,
+    detect_csv_text_encoding,
     load_registry_spec,
     main,
 )
@@ -230,7 +231,7 @@ def test_missing_registered_input_hard_failure(demo_repo: Path) -> None:
         )
 
 
-def test_duplicate_source_key_rejection(demo_repo: Path) -> None:
+def test_inconsistent_source_dataset_for_same_key_rejected(demo_repo: Path) -> None:
     digest = _hash_path(demo_repo / "data" / "raw" / "demo" / "demo.csv")
     other = demo_repo / "data" / "raw" / "demo" / "other.csv"
     _write_utf8_sig_csv(
@@ -251,7 +252,7 @@ def test_duplicate_source_key_rejection(demo_repo: Path) -> None:
             ),
         ],
     )
-    with pytest.raises(RegistryError, match="Duplicate source_key"):
+    with pytest.raises(RegistryError, match="inconsistent source_dataset"):
         load_registry_spec(demo_repo / "config" / "source_registry.csv")
 
 
@@ -906,3 +907,122 @@ def test_xlsx_registry_rejects_lock_file_and_row_mismatch(tmp_path: Path) -> Non
     )
     with pytest.raises(RegistryError, match="Row-count mismatch"):
         validate_registered_file(repo, row)
+
+
+def test_same_source_key_same_dataset_multiple_paths_allowed(demo_repo: Path) -> None:
+    digest = _hash_path(demo_repo / "data" / "raw" / "demo" / "demo.csv")
+    other = demo_repo / "data" / "raw" / "demo" / "lookup.csv"
+    _write_utf8_sig_csv(
+        other, ["record_id", "label", "payload"], _synthetic_input_rows(2)
+    )
+    other_digest = _hash_path(other)
+    _write_csv(
+        demo_repo / "config" / "source_registry.csv",
+        list(REQUIRED_COLUMNS),
+        [
+            _spec_row(sha256=digest, n_rows_expected=3),
+            _spec_row(
+                source_key="demo",
+                source_dataset="demo_v1",
+                path="data/raw/demo/lookup.csv",
+                sha256=other_digest,
+                n_rows_expected=2,
+            ),
+        ],
+    )
+    rows = load_registry_spec(demo_repo / "config" / "source_registry.csv")
+    assert len(rows) == 2
+    assert {row.path for row in rows} == {
+        "data/raw/demo/demo.csv",
+        "data/raw/demo/lookup.csv",
+    }
+    result = build_registry(
+        repo_root=demo_repo,
+        registry_spec=demo_repo / "config" / "source_registry.csv",
+        inventory_path=demo_repo / "docs" / "data_curation" / "raw_data_inventory.csv",
+        output_path=demo_repo / "data" / "interim" / "registry" / "out.csv",
+    )
+    assert result.validated == 2
+    written = list(
+        csv.DictReader(
+            (demo_repo / "data" / "interim" / "registry" / "out.csv").open(
+                encoding="utf-8", newline=""
+            )
+        )
+    )
+    assert [row["path"] for row in written] == [
+        "data/raw/demo/demo.csv",
+        "data/raw/demo/lookup.csv",
+    ]
+
+
+def test_same_source_dataset_different_source_key_rejected(demo_repo: Path) -> None:
+    digest = _hash_path(demo_repo / "data" / "raw" / "demo" / "demo.csv")
+    other = demo_repo / "data" / "raw" / "demo" / "other.csv"
+    _write_utf8_sig_csv(
+        other, ["record_id", "label", "payload"], _synthetic_input_rows(1)
+    )
+    other_digest = _hash_path(other)
+    _write_csv(
+        demo_repo / "config" / "source_registry.csv",
+        list(REQUIRED_COLUMNS),
+        [
+            _spec_row(sha256=digest, n_rows_expected=3),
+            _spec_row(
+                source_key="demo2",
+                source_dataset="demo_v1",
+                path="data/raw/demo/other.csv",
+                sha256=other_digest,
+                n_rows_expected=1,
+            ),
+        ],
+    )
+    with pytest.raises(RegistryError, match="Duplicate source_dataset"):
+        load_registry_spec(demo_repo / "config" / "source_registry.csv")
+
+
+def test_latin1_csv_row_count_fallback(tmp_path: Path) -> None:
+    path = tmp_path / "latin1.csv"
+    # Non-biological payload; 0xA6 is not valid UTF-8.
+    header = b"id,label,note\n"
+    row1 = b"1,item_1,token-1\n"
+    row2 = b"2,item_2,token-" + bytes([0xA6]) + b"-latin1\n"
+    path.write_bytes(header + row1 + row2)
+    assert detect_csv_text_encoding(path) == "latin-1"
+    assert count_csv_data_rows(path) == 2
+    utf8_path = tmp_path / "utf8.csv"
+    utf8_path.write_bytes(b"\xef\xbb\xbfid,label\n1,a\n2,b\n")
+    assert detect_csv_text_encoding(utf8_path) == "utf-8-sig"
+    assert count_csv_data_rows(utf8_path) == 2
+
+
+def test_aptadb_nonprotein_lookup_registration_rejected(demo_repo: Path) -> None:
+    forbidden = demo_repo / "data" / "raw" / "AptaDB" / "molecule.csv"
+    forbidden.parent.mkdir(parents=True)
+    _write_utf8_sig_csv(
+        forbidden, ["record_id", "label", "payload"], _synthetic_input_rows(1)
+    )
+    digest = _hash_path(forbidden)
+    _write_csv(
+        demo_repo / "config" / "source_registry.csv",
+        list(REQUIRED_COLUMNS),
+        [
+            _spec_row(
+                source_key="aptadb",
+                source_dataset="aptadb_official_export_2026-08",
+                path="data/raw/AptaDB/molecule.csv",
+                sha256=digest,
+                n_rows_expected=1,
+            )
+        ],
+    )
+    with pytest.raises(RegistryError, match="non-protein lookup"):
+        build_registry(
+            repo_root=demo_repo,
+            registry_spec=demo_repo / "config" / "source_registry.csv",
+            inventory_path=demo_repo
+            / "docs"
+            / "data_curation"
+            / "raw_data_inventory.csv",
+            output_path=demo_repo / "data" / "interim" / "registry" / "out.csv",
+        )

@@ -2981,3 +2981,183 @@ Laura/ChatGPT should review the UTexas CHECKPOINT-1 closure summary and
 the global-S4 handoff summary before beginning corpus-wide global S4.
 Do not merge UTexas with AptaBase yet.
 
+## 2026-08-26 — AptaDB S0 registration (three-file logical source)
+
+### Stage
+
+S0a registry extension and AptaDB registration only. AptaDB S1 had not yet
+been run when this entry was drafted; the S1 extraction follows as a
+separate log item after the extract completed. No S2, S3, target
+normalisation, evidence scoring, leakage application, parking or
+deduplication was started for AptaDB.
+
+### What was done
+
+The tracked registry previously required a unique `source_key` and a unique
+`source_dataset` per row, which could not represent AptaDB's three
+authoritative exports as one logical source. Uniqueness was changed so that:
+
+- many rows may share one `source_key` when they also share one
+  `source_dataset`;
+- a `source_dataset` still belongs to exactly one `source_key`;
+- registered paths remain unique.
+
+Existing one-file sources are unchanged. CSV row counting now tries
+`utf-8-sig` and, on `UnicodeDecodeError`, retries `latin-1` without rewriting
+the file. That fallback is required because AptaDB `interaction.csv` and
+`aptamer.csv` are not valid UTF-8.
+
+Three registry rows were added, all `source_key=aptadb` and
+`source_dataset=aptadb_official_export_2026-08`:
+
+| Path | SHA-256 | Rows |
+|---|---|---:|
+| `data/raw/AptaDB/interaction.csv` | `6dbd97f20fa6f98d359d697713c43032d5a6a3c1a400d80ef28a150d676dff86` | 1,350 |
+| `data/raw/AptaDB/aptamer.csv` | `9d3ab029d1de4408d2406051a68bc0e6da347ee1be1838aee9c938ca3f3fb464` | 1,293 |
+| `data/raw/AptaDB/protein.csv` | `4de0d8b105b3318c9704ff64819089f5e17b5c735f0730724052f3e808325f79` | 194 |
+
+`redistribution_status` remains `unknown`. Snapshot date is `2026-08-04`
+(inventory-refresh campaign; the interaction export was added then).
+`molecule.csv`, `cell.csv` and `other.csv` are forbidden registry inputs and
+were not read or downloaded.
+
+S0a was rebuilt successfully: 10 registered rows validated (8 unique
+source keys). The only inventory warnings were the two pre-existing AptaBase
+overrides. Nothing under `data/raw/` was written.
+
+### Decisions made
+
+- AptaDB is one logical dataset with three registered files, not a single
+  interaction path with companion hashes hidden in `notes`.
+- S1 remains interaction-grain: `interaction.csv` is the spine.
+- Encoding: utf-8-sig, then latin-1. The aptamer molarity header's
+  non-UTF-8 micro-symbol token is not repaired.
+- Non-protein AptaDB lookup tables stay out of the registry.
+
+### Outputs produced
+
+- Tracked: `config/source_registry.csv`; `scripts/data_preparation/s0_build_registry.py`; S0 tests
+- Ignored: rebuilt `data/interim/registry/source_registry.csv`
+
+### Numbers
+
+- Registered rows: 10 (previously 7); unique source keys: 8
+- AptaDB files validated: 3
+- Inventory warnings: 2 (AptaBase only)
+- AptaDB raw SHA-256 values matched the registry and the preflight audit
+
+### Open questions carried forward
+
+- AptaDB S1 extraction (next)
+- AptaDB S2 molecule/chemistry classification and constant-region proposals
+- AptaDB S3 technical eligibility, ssDNA parking, and source-level
+  `missing_target` rejection logging for the 37 unlinked aptamers
+- Global S4 target canonicalisation, UniProt beyond the supplied protein
+  table, evidence scoring, and leakage
+
+## 2026-08-26 — AptaDB S1 verbatim extraction
+
+### Stage
+
+AptaDB S1 extraction only. No S2 normalisation, molecule classification,
+constant-region inference, target canonicalisation, evidence scoring,
+filtering, parking, leakage, or CHECKPOINT-1 work was started for AptaDB.
+
+### Source
+
+Logical source `aptadb` (`source_dataset=aptadb_official_export_2026-08`),
+registered as three SHA-pinned files:
+
+- `data/raw/AptaDB/interaction.csv` — 1,350 rows; SHA-256
+  `6dbd97f20fa6f98d359d697713c43032d5a6a3c1a400d80ef28a150d676dff86`
+- `data/raw/AptaDB/aptamer.csv` — 1,293 rows; SHA-256
+  `9d3ab029d1de4408d2406051a68bc0e6da347ee1be1838aee9c938ca3f3fb464`
+- `data/raw/AptaDB/protein.csv` — 194 rows; SHA-256
+  `4de0d8b105b3318c9704ff64819089f5e17b5c735f0730724052f3e808325f79`
+
+`interaction.csv` and `aptamer.csv` are read with utf-8-sig then latin-1.
+`protein.csv` is valid UTF-8. Raw files were not transcoded. The aptamer
+molarity header's non-UTF-8 micro-symbol token was left unrepaired.
+
+### Identifier decision
+
+`interaction.csv.Index` is unique across 1–1,350 and is the interaction
+spine. S1 therefore uses:
+
+- `native_id` = `Index` verbatim
+- `record_id` = `aptadb:{Index}`
+
+Duplicate `(Apta_index, TargetID)` pairs are retained as separate
+interaction records. Aptamer-table rows without an interaction are not
+given fabricated interaction identities.
+
+### Extraction methodology
+
+Adapter: `scripts/data_preparation/adapters/aptadb.py`, dispatched by
+`scripts/data_preparation/s1_extract.py --source aptadb`. The dispatcher
+resolves the three registered paths by basename rather than hardcoding
+absolute locations.
+
+For each interaction row the adapter joins `Apta_index` to `aptamer.csv`,
+hard-fails if the aptamer is absent, compares interaction `Sequence` with
+aptamer `Sequence` byte-for-byte, and copies `aptamer.csv.Sequence` into
+`sequence_raw`. Protein interactions join `TargetID` to `protein.csv`
+`Uni-port ID` and copy `Protein names` into `target_name_raw`. Molecule,
+Cell and Other interactions leave `target_name_raw` empty; their TargetIDs
+are sidecar-only. `Reference(pubmed ID)` is copied verbatim to `pubmed_id`.
+`publication` is left empty because the source does not supply publication
+text. No sequence normalisation, T→U conversion, trimming, chemistry
+classification, or evidence assignment occurs at S1.
+
+The unnamed trailing interaction field is preserved in the sidecar. One
+row (Index 370) has a nonempty trailing token; it is retained verbatim and
+is not interpreted.
+
+### Unlinked-aptamer reconciliation
+
+Thirty-seven aptamer-table rows have no interaction. They are omitted from
+`aptadb_extracted.csv` and written to
+`data/interim/extracted/aptadb_unlinked_aptamers.csv` (DNA 34, RNA 3) with
+`planned_s3_reason=missing_target`. Later S3 must emit source-level
+`missing_target` rejection-log rows; that step is not implemented here.
+
+### Outputs produced
+
+- Ignored under `/data/`: `aptadb_extracted.csv` (1,350 rows),
+  `aptadb_source_metadata.csv` (1,350 rows),
+  `aptadb_unlinked_aptamers.csv` (37 rows), `aptadb_s1_report.md`
+- Tracked: adapter, S1 dispatcher, tests, this log entry
+
+### Numbers
+
+- Canonical rows: 1,350; unique native IDs: 1,350; unique record IDs: 1,350
+- Aptamer joins: 1,350/1,350; sequence disagreements: 0/1,350
+- Protein interactions: 639; protein joins: 639/639; protein-table
+  coverage: 194/194
+- Non-protein interactions: 711 (`Molecule` 393, `Cell` 189, `Other` 129)
+- Nonempty `target_name_raw`: 639; empty `target_name_raw`: 711
+- Nonempty `pubmed_id`: 1,350; nonempty `publication`: 0
+- Unlinked aptamers: 37
+- Deterministic rerun: byte-identical canonical, sidecar and unlinked CSVs
+- AptaDB raw SHA-256 values unchanged before and after S0/S1
+- No file under `data/` is tracked by Git
+
+### Deferred
+
+- S2: molecule/chemistry classification, constant-region proposals;
+  grouping helper should later use `target_name_raw + publication`,
+  falling back to `target_name_raw + pubmed_id` when publication is empty
+- S3: technical eligibility, ssDNA parking, and `missing_target` logging
+  for the 37 unlinked aptamers
+- S4: UniProt/PDB/target canonicalisation beyond the supplied protein
+  table, evidence scoring, leakage, clustering, partitions
+
+### Pipeline status
+
+```text
+AptaDB S0 complete
+AptaDB S1 complete
+AptaDB S2 has not started
+No AptaDB records are yet authorised for global S4
+```
+

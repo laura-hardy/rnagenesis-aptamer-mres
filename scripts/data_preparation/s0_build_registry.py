@@ -48,6 +48,9 @@ FORBIDDEN_EXACT_RELATIVE_PATHS = frozenset(
     }
 )
 
+# AptaDB non-protein lookup tables are deliberately not ingested in v1.
+FORBIDDEN_APTADB_BASENAMES = frozenset({"molecule.csv", "cell.csv", "other.csv"})
+
 APTABASE_CLEANED_REL = "data/raw/aptabase/aptabase_cleaned.csv"
 APTABASE_RAW_REL = "data/raw/aptabase/aptabase_raw.csv"
 
@@ -147,13 +150,29 @@ def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
+def detect_csv_text_encoding(path: Path) -> str:
+    """Return the encoding to use for a registered CSV.
+
+    Tries ``utf-8-sig`` first. On ``UnicodeDecodeError`` falls back to
+    ``latin-1`` (lossless for any byte sequence). Does not rewrite the file.
+    """
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            handle.read()
+        return "utf-8-sig"
+    except UnicodeDecodeError:
+        return "latin-1"
+
+
 def count_csv_data_rows(path: Path) -> int:
     """Count CSV data rows, excluding the header and respecting quoted newlines.
 
-    Opens the file as ``utf-8-sig``. Raises ``RegistryError`` if the header is
-    missing or the file is empty.
+    Opens the file as ``utf-8-sig``, falling back to ``latin-1`` when the file
+    is not valid UTF-8. Raises ``RegistryError`` if the header is missing or
+    the file is empty. Does not transcode or rewrite the file.
     """
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+    encoding = detect_csv_text_encoding(path)
+    with path.open("r", encoding=encoding, newline="") as handle:
         reader = csv.reader(handle)
         try:
             header = next(reader)
@@ -263,8 +282,8 @@ def load_registry_spec(path: Path) -> list[RegistrySpecRow]:
         raise RegistryError(f"Registry specification is empty: {path}")
 
     parsed: list[RegistrySpecRow] = []
-    keys: set[str] = set()
-    datasets: set[str] = set()
+    key_to_dataset: dict[str, str] = {}
+    dataset_to_key: dict[str, str] = {}
     paths: set[str] = set()
 
     for index, row in enumerate(raw_rows, start=2):
@@ -295,22 +314,35 @@ def load_registry_spec(path: Path) -> list[RegistrySpecRow]:
                 f"nonempty field(s): {', '.join(missing)}"
             )
 
-        if source_key in keys:
-            raise RegistryError(
-                f"Duplicate source_key in registry specification: {source_key!r}"
-            )
-        if source_dataset in datasets:
-            raise RegistryError(
-                f"Duplicate source_dataset in registry specification: "
-                f"{source_dataset!r}"
-            )
+        # Multiple rows may share one source_key when they are files of the
+        # same logical dataset (same source_dataset). Paths remain unique.
+        if source_key in key_to_dataset:
+            existing_dataset = key_to_dataset[source_key]
+            if existing_dataset != source_dataset:
+                raise RegistryError(
+                    f"source_key {source_key!r} has inconsistent "
+                    f"source_dataset values: {existing_dataset!r} vs "
+                    f"{source_dataset!r}"
+                )
+        else:
+            key_to_dataset[source_key] = source_dataset
+
+        if source_dataset in dataset_to_key:
+            existing_key = dataset_to_key[source_dataset]
+            if existing_key != source_key:
+                raise RegistryError(
+                    f"Duplicate source_dataset in registry specification: "
+                    f"{source_dataset!r} (used by {existing_key!r} and "
+                    f"{source_key!r})"
+                )
+        else:
+            dataset_to_key[source_dataset] = source_key
+
         if rel_path in paths:
             raise RegistryError(
                 f"Duplicate registered path in registry specification: "
                 f"{rel_path!r}"
             )
-        keys.add(source_key)
-        datasets.add(source_dataset)
         paths.add(rel_path)
 
         if not SHA256_RE.fullmatch(sha256):
@@ -354,6 +386,14 @@ def load_registry_spec(path: Path) -> list[RegistrySpecRow]:
     return parsed
 
 
+def rows_for_source_key(
+    rows: Sequence[RegistrySpecRow],
+    source_key: str,
+) -> list[RegistrySpecRow]:
+    """Return all registry rows for ``source_key``, preserving spec order."""
+    return [row for row in rows if row.source_key == source_key]
+
+
 def assert_path_allowed(repo_root: Path, relative_path: str) -> Path:
     """Reject forbidden or unsafe registered paths; return the resolved file path."""
     rel = normalise_relative_path(relative_path)
@@ -366,6 +406,12 @@ def assert_path_allowed(repo_root: Path, relative_path: str) -> Path:
     if rel == APTABASE_RAW_REL or rel.endswith("/aptabase_raw.csv"):
         raise RegistryError(
             f"Forbidden AptaBase raw CSV registered as input: {rel}"
+        )
+    basename_lower = Path(rel).name.lower()
+    if basename_lower in FORBIDDEN_APTADB_BASENAMES and "aptadb" in lower:
+        raise RegistryError(
+            f"Forbidden AptaDB non-protein lookup table registered as input: "
+            f"{rel}"
         )
     if ".ds_store" in lower or lower.endswith(".ds_store"):
         raise RegistryError(f"Registered path must not be .DS_Store: {rel}")
@@ -524,7 +570,7 @@ def write_operational_registry(
     rows: Iterable[RegistrySpecRow],
 ) -> None:
     """Atomically write the operational registry with deterministic formatting."""
-    ordered = sorted(rows, key=lambda item: item.source_key)
+    ordered = sorted(rows, key=lambda item: (item.source_key, item.path))
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Refuse to create anything under data/raw via this writer.
