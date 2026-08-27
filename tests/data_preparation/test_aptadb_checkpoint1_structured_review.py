@@ -20,6 +20,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from adapters.aptadb_checkpoint1_review import (  # noqa: E402
     AptaDBCheckpoint1ReviewError,
+    LARGE_TRIM_HUMAN_APPROVED_FLAG,
     apply_aptadb_checkpoint1_package,
     apply_numeric_terminal_trim,
     apply_reviewed_record,
@@ -32,10 +33,12 @@ from adapters.aptadb_checkpoint1_review import (  # noqa: E402
     validate_review_package,
 )
 from adapters.aptadb_s3 import (  # noqa: E402
+    DECISION_COLUMNS,
     PRIMARY_ROUTE_ELIGIBLE,
     PRIMARY_ROUTE_REJECT,
     PRIMARY_ROUTE_SSDNA,
     LOCAL_DETAIL_COLUMNS,
+    REJECTION_COLUMNS,
 )
 from checkpoint1_prepare_review import (  # noqa: E402
     APTADB_MANUAL_REVIEW_COLUMNS,
@@ -385,9 +388,225 @@ def test_trim_guard_rails() -> None:
         from adapters.aptadb_checkpoint1_review import parse_trim_nt
 
         parse_trim_nt("-1", field_name="manual_trim_5p_nt", record_id="aptadb:x")
-    with pytest.raises(AptaDBCheckpoint1ReviewError, match="guard rail"):
+    with pytest.raises(AptaDBCheckpoint1ReviewError, match="review guard rail"):
         apply_numeric_terminal_trim(
             sequence, five_nt=10, three_nt=10, record_id="aptadb:x"
+        )
+
+
+def test_machine_only_trim_within_40_percent_may_proceed() -> None:
+    sequence = _rna(40)
+    core = apply_numeric_terminal_trim(
+        sequence, five_nt=5, three_nt=5, record_id="aptadb:x"
+    )
+    assert core == sequence[5:-5]
+
+
+def test_machine_only_trim_over_40_percent_blocked() -> None:
+    sequence = _rna(40)
+    with pytest.raises(AptaDBCheckpoint1ReviewError, match="review guard rail"):
+        apply_numeric_terminal_trim(
+            sequence,
+            five_nt=10,
+            three_nt=10,
+            record_id="aptadb:x",
+            human_authorised=False,
+        )
+
+
+def test_recommendation_only_trim_over_40_percent_not_applied() -> None:
+    sequence = _rna(40)
+    canonical = _canonical(sequence=sequence)
+    review = _review(
+        canonical,
+        decision="keep",
+        recommended_trim_action="approve",
+        recommended_trim_5p_nt="10",
+        recommended_trim_3p_nt="10",
+    )
+    result = apply_reviewed_record(
+        canonical=canonical,
+        review_row=review,
+        source_metadata=_meta(canonical),
+        s2_qc=_qc(canonical),
+        policy=POLICY,
+        machine_five=10,
+        machine_three=10,
+    )
+    assert result.sequence_core == sequence
+    assert result.applied_trim_5p_nt == 0
+    assert result.applied_trim_3p_nt == 0
+    assert result.large_trim_human_approved is False
+    assert LARGE_TRIM_HUMAN_APPROVED_FLAG not in result.canonical["qc_flags"]
+
+
+def test_bulk_keep_without_trim_action_does_not_authorise_large_trim() -> None:
+    sequence = _rna(40)
+    canonical = _canonical(sequence=sequence)
+    review = _review(canonical, decision="keep")
+    result = apply_reviewed_record(
+        canonical=canonical,
+        review_row=review,
+        source_metadata=_meta(canonical),
+        s2_qc=_qc(canonical),
+        policy=POLICY,
+        machine_five=10,
+        machine_three=10,
+    )
+    assert result.sequence_core == sequence
+    assert result.applied_trim_5p_nt == 0
+
+
+def test_explicit_human_group_approve_over_40_percent_allowed() -> None:
+    sequence = _rna(40)
+    canonical = _canonical(sequence=sequence)
+    group = {
+        "constant_group_id": "group-wide",
+        "manual_trim_action": "approve",
+        "manual_trim_5p_nt": "",
+        "manual_trim_3p_nt": "",
+        "machine_trim_5p_nt": "10",
+        "machine_trim_3p_nt": "10",
+    }
+    review = _review(
+        canonical, decision="keep", constant_group_id="group-wide"
+    )
+    result = apply_reviewed_record(
+        canonical=canonical,
+        review_row=review,
+        source_metadata=_meta(canonical),
+        s2_qc=_qc(canonical),
+        policy=POLICY,
+        group_row=group,
+        machine_five=10,
+        machine_three=10,
+    )
+    assert result.sequence_core == sequence[10:-10]
+    assert result.sequence_length_core == 20
+    assert result.large_trim_human_approved is True
+    assert LARGE_TRIM_HUMAN_APPROVED_FLAG in result.canonical["qc_flags"]
+    assert LARGE_TRIM_HUMAN_APPROVED_FLAG in result.notes
+    assert "trim_pct=50.00" in result.notes
+    assert "authorisation=CHECKPOINT-1" in result.notes
+    assert "human_trim_action=approve" in result.notes
+    assert result.trim_source == "group"
+
+
+def test_explicit_human_group_override_over_40_percent_allowed() -> None:
+    sequence = _rna(40)
+    canonical = _canonical(sequence=sequence)
+    group = {
+        "constant_group_id": "group-wide",
+        "manual_trim_action": "override",
+        "manual_trim_5p_nt": "10",
+        "manual_trim_3p_nt": "10",
+        "machine_trim_5p_nt": "5",
+        "machine_trim_3p_nt": "5",
+    }
+    review = _review(
+        canonical, decision="keep", constant_group_id="group-wide"
+    )
+    result = apply_reviewed_record(
+        canonical=canonical,
+        review_row=review,
+        source_metadata=_meta(canonical),
+        s2_qc=_qc(canonical),
+        policy=POLICY,
+        group_row=group,
+        machine_five=5,
+        machine_three=5,
+    )
+    assert result.sequence_length_core == 20
+    assert result.applied_trim_5p_nt == 10
+    assert result.applied_trim_3p_nt == 10
+    assert result.large_trim_human_approved is True
+    assert result.trim_source == "group"
+    assert "human_trim_action=override" in result.notes
+
+
+def test_explicit_human_record_override_over_40_percent_allowed() -> None:
+    sequence = _rna(40)
+    canonical = _canonical(sequence=sequence)
+    group = {
+        "constant_group_id": "group-wide",
+        "manual_trim_action": "approve",
+        "manual_trim_5p_nt": "",
+        "manual_trim_3p_nt": "",
+        "machine_trim_5p_nt": "5",
+        "machine_trim_3p_nt": "5",
+    }
+    review = _review(
+        canonical,
+        decision="edit",
+        constant_group_id="group-wide",
+        manual_trim_action="override",
+        manual_trim_5p_nt="10",
+        manual_trim_3p_nt="10",
+        manual_trim_group_override="true",
+    )
+    result = apply_reviewed_record(
+        canonical=canonical,
+        review_row=review,
+        source_metadata=_meta(canonical),
+        s2_qc=_qc(canonical),
+        policy=POLICY,
+        group_row=group,
+        machine_five=5,
+        machine_three=5,
+    )
+    assert result.sequence_length_core == 20
+    assert result.applied_trim_5p_nt == 10
+    assert result.applied_trim_3p_nt == 10
+    assert result.trim_source == "record"
+    assert result.large_trim_human_approved is True
+    assert LARGE_TRIM_HUMAN_APPROVED_FLAG in result.canonical["qc_flags"]
+
+
+def test_explicit_human_trim_over_40_percent_core_below_20_still_fails() -> None:
+    sequence = _rna(40)
+    with pytest.raises(AptaDBCheckpoint1ReviewError, match="below 20"):
+        apply_numeric_terminal_trim(
+            sequence,
+            five_nt=15,
+            three_nt=10,
+            record_id="aptadb:x",
+            human_authorised=True,
+        )
+
+
+def test_explicit_human_trim_exceeding_sequence_length_still_fails() -> None:
+    sequence = _rna(40)
+    with pytest.raises(AptaDBCheckpoint1ReviewError, match="exceeds sequence length"):
+        apply_numeric_terminal_trim(
+            sequence,
+            five_nt=50,
+            three_nt=0,
+            record_id="aptadb:x",
+            human_authorised=True,
+        )
+
+
+def test_explicit_human_negative_or_non_integer_trim_still_fails() -> None:
+    from adapters.aptadb_checkpoint1_review import parse_trim_nt
+
+    with pytest.raises(AptaDBCheckpoint1ReviewError, match="non-negative integer"):
+        parse_trim_nt("-1", field_name="manual_trim_5p_nt", record_id="aptadb:x")
+    with pytest.raises(AptaDBCheckpoint1ReviewError, match="non-negative integer"):
+        parse_trim_nt("1.5", field_name="manual_trim_3p_nt", record_id="aptadb:x")
+    canonical = _canonical(sequence=_rna(40))
+    review = _review(
+        canonical,
+        manual_trim_action="override",
+        manual_trim_5p_nt="-3",
+        manual_trim_3p_nt="0",
+    )
+    with pytest.raises(AptaDBCheckpoint1ReviewError, match="non-negative integer"):
+        apply_reviewed_record(
+            canonical=canonical,
+            review_row=review,
+            source_metadata=_meta(canonical),
+            s2_qc=_qc(canonical),
+            policy=POLICY,
         )
 
 
@@ -563,3 +782,574 @@ def test_prepare_leaves_manual_blank_and_adds_recommendation_columns(
     assert result.output_readme is not None
     assert "ACGU" not in result.output_readme.read_text(encoding="utf-8")
     assert "ACGU" not in result.output_summary.read_text(encoding="utf-8")
+
+
+def _decision_row(canonical: dict[str, str], *, route: str, reason: str) -> dict[str, str]:
+    proposed = {
+        PRIMARY_ROUTE_ELIGIBLE: "proposed_accept",
+        PRIMARY_ROUTE_SSDNA: "proposed_park",
+        PRIMARY_ROUTE_REJECT: "proposed_reject",
+    }[route]
+    return {
+        column: ""
+        for column in DECISION_COLUMNS
+    } | {
+        "record_id": canonical["record_id"],
+        "native_id": canonical["native_id"],
+        "proposed_decision": proposed,
+        "primary_reason": reason,
+        "primary_route": route,
+        "molecule_type": canonical["molecule_type"],
+        "chemistry": canonical["chemistry"],
+        "sequence_length_full": canonical["sequence_length_full"],
+        "sequence_length_core": canonical["sequence_length_core"],
+        "trim_status": canonical["trim_status"],
+        "trim_confidence": canonical["trim_confidence"],
+        "qc_flags": canonical["qc_flags"],
+    }
+
+
+def test_dry_run_uses_apply_package_and_does_not_mutate_inputs() -> None:
+    from adapters.aptadb_checkpoint1_dry_run import simulate_aptadb_checkpoint1_application
+    from copy import deepcopy
+
+    hyphen = _dna(20) + "-" + _dna(20)
+    edited = _canonical(
+        native_id="230",
+        sequence=hyphen,
+        molecule_type="ssDNA",
+        chemistry="DNA",
+        alphabet="DNA_T",
+        qc_flags="alignment_gaps",
+    )
+    kept = _canonical(native_id="keep", sequence=_rna(40))
+    dropped = _canonical(
+        native_id="305",
+        sequence=_rna(20) + "T" + _rna(19),
+        qc_flags="mixed_t_u",
+        alphabet="mixed_T_U",
+    )
+    unreviewed = _canonical(native_id="900", sequence=_rna(40))
+    originals = [edited, kept, dropped, unreviewed]
+    snapshot = deepcopy(originals)
+    decisions = [
+        _decision_row(edited, route=PRIMARY_ROUTE_REJECT, reason="alignment_gaps"),
+        _decision_row(kept, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna"),
+        _decision_row(dropped, route=PRIMARY_ROUTE_REJECT, reason="mixed_T_and_U"),
+        _decision_row(
+            unreviewed, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna"
+        ),
+    ]
+    queue = [
+        _review(
+            edited,
+            route=PRIMARY_ROUTE_REJECT,
+            manual_sequence_corrected=hyphen.replace("-", ""),
+        ),
+        _review(kept, decision="keep", route=PRIMARY_ROUTE_ELIGIBLE),
+        _review(dropped, decision="drop", route=PRIMARY_ROUTE_REJECT),
+    ]
+    unlinked = [
+        {
+            "apta_index": "u1",
+            "aptamer_chemistry": "RNA",
+            "sequence": "ACGU",
+            "planned_s3_reason": "missing_target",
+        },
+        {
+            "apta_index": "u2",
+            "aptamer_chemistry": "DNA",
+            "sequence": "ACGT",
+            "planned_s3_reason": "missing_target",
+        },
+    ]
+    rejection = {
+        "record_id": dropped["record_id"],
+        "source_db": "aptadb",
+        "source_dataset": dropped["source_dataset"],
+        "native_id": dropped["native_id"],
+        "sequence_raw": dropped["sequence_raw"],
+        "target_name_raw": dropped["target_name_raw"],
+        "stage": "S3",
+        "rejection_reason": "mixed_T_and_U",
+        "rejection_detail": "",
+    }
+    meta = {row["record_id"]: _meta(row) for row in originals}
+    qc = {row["record_id"]: _qc(row) for row in originals}
+    first = simulate_aptadb_checkpoint1_application(
+        queue_rows=queue,
+        group_rows=[],
+        canonical_rows=originals,
+        decision_rows=decisions,
+        source_metadata_by_id=meta,
+        s2_qc_by_id=qc,
+        policy=POLICY,
+        unlinked_rows=unlinked,
+        existing_rejection_rows=[rejection],
+        expected_interaction_rows=4,
+        expected_unlinked_rows=2,
+    )
+    second = simulate_aptadb_checkpoint1_application(
+        queue_rows=queue,
+        group_rows=[],
+        canonical_rows=originals,
+        decision_rows=decisions,
+        source_metadata_by_id=meta,
+        s2_qc_by_id=qc,
+        policy=POLICY,
+        unlinked_rows=unlinked,
+        existing_rejection_rows=[rejection],
+        expected_interaction_rows=4,
+        expected_unlinked_rows=2,
+    )
+    assert originals == snapshot
+    assert first.preview_canonical == second.preview_canonical
+    assert first.preview_decisions == second.preview_decisions
+    assert first.preview_rejections == second.preview_rejections
+    by_id = {row["record_id"]: row for row in first.preview_decisions}
+    assert by_id["aptadb:230"]["primary_route"] == PRIMARY_ROUTE_SSDNA
+    assert by_id["aptadb:305"]["primary_route"] == PRIMARY_ROUTE_REJECT
+    drop_rej = next(
+        row for row in first.preview_rejections if row["record_id"] == "aptadb:305"
+    )
+    assert drop_rej["rejection_reason"] == "mixed_T_and_U"
+    assert "checkpoint1_manual_decision=drop" in drop_rej["rejection_detail"]
+    unlinked_ids = [
+        row["record_id"]
+        for row in first.preview_rejections
+        if row["record_id"].startswith("aptadb:unlinked:")
+    ]
+    assert unlinked_ids == ["aptadb:unlinked:u1", "aptadb:unlinked:u2"]
+    assert all(
+        row["rejection_reason"] == "missing_target"
+        for row in first.preview_rejections
+        if row["record_id"].startswith("aptadb:unlinked:")
+    )
+    for row in first.preview_canonical:
+        for field_name in S3_FORBIDDEN_FIELDS:
+            assert row[field_name] == ""
+        assert row["sequence_raw"] == snapshot[
+            [item["record_id"] for item in snapshot].index(row["record_id"])
+        ]["sequence_raw"]
+    assert first.stats["human_reviewed_drops"] == 1
+    assert first.stats["authorised_for_s4"] == 0
+    assert first.stats["guard_rail_failures"] == 0
+
+
+def test_dry_run_group_trim_and_record_override() -> None:
+    from adapters.aptadb_checkpoint1_dry_run import simulate_aptadb_checkpoint1_application
+
+    member = _canonical(native_id="10", sequence=_rna(40))
+    exception = _canonical(native_id="11", sequence=_rna(40))
+    group = {
+        "constant_group_id": "group-a",
+        "group_label": "demo",
+        "manual_trim_action": "approve",
+        "manual_trim_5p_nt": "5",
+        "manual_trim_3p_nt": "5",
+        "machine_trim_5p_nt": "5",
+        "machine_trim_3p_nt": "5",
+    }
+    queue = [
+        _review(
+            member,
+            decision="edit",
+            route=PRIMARY_ROUTE_ELIGIBLE,
+            constant_group_id="group-a",
+        ),
+        _review(
+            exception,
+            decision="edit",
+            route=PRIMARY_ROUTE_ELIGIBLE,
+            constant_group_id="group-a",
+            manual_trim_action="override",
+            manual_trim_5p_nt="5",
+            manual_trim_3p_nt="0",
+            manual_trim_group_override="true",
+        ),
+    ]
+    rows = [member, exception]
+    decisions = [
+        _decision_row(row, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna")
+        for row in rows
+    ]
+    simulation = simulate_aptadb_checkpoint1_application(
+        queue_rows=queue,
+        group_rows=[group],
+        canonical_rows=rows,
+        decision_rows=decisions,
+        source_metadata_by_id={row["record_id"]: _meta(row) for row in rows},
+        s2_qc_by_id={row["record_id"]: _qc(row) for row in rows},
+        policy=POLICY,
+        expected_interaction_rows=2,
+        expected_unlinked_rows=0,
+    )
+    by_id = {item.record_id: item for item in simulation.applied}
+    assert by_id["aptadb:10"].applied_trim_5p_nt == 5
+    assert by_id["aptadb:10"].applied_trim_3p_nt == 5
+    assert by_id["aptadb:10"].sequence_length_core == 30
+    assert by_id["aptadb:11"].applied_trim_5p_nt == 5
+    assert by_id["aptadb:11"].applied_trim_3p_nt == 0
+    assert by_id["aptadb:11"].sequence_length_core == 35
+    assert by_id["aptadb:10"].trim_source == "group"
+    assert by_id["aptadb:11"].trim_source == "record"
+
+
+def test_dry_run_molecule_override_changes_route() -> None:
+    from adapters.aptadb_checkpoint1_dry_run import simulate_aptadb_checkpoint1_application
+
+    original = _canonical(
+        native_id="9",
+        sequence=_dna(40),
+        molecule_type="ssDNA",
+        chemistry="DNA",
+        alphabet="DNA_T",
+    )
+    queue = [
+        _review(
+            original,
+            route=PRIMARY_ROUTE_SSDNA,
+            manual_molecule_type_override="RNA",
+            manual_chemistry_override="RNA",
+        )
+    ]
+    simulation = simulate_aptadb_checkpoint1_application(
+        queue_rows=queue,
+        group_rows=[],
+        canonical_rows=[original],
+        decision_rows=[
+            _decision_row(original, route=PRIMARY_ROUTE_SSDNA, reason="ssdna_parked")
+        ],
+        source_metadata_by_id={original["record_id"]: _meta(original)},
+        s2_qc_by_id={original["record_id"]: _qc(original)},
+        policy=POLICY,
+        expected_interaction_rows=1,
+        expected_unlinked_rows=0,
+    )
+    assert simulation.applied[0].primary_route_before == PRIMARY_ROUTE_SSDNA
+    assert simulation.applied[0].primary_route_after == PRIMARY_ROUTE_ELIGIBLE
+    assert simulation.route_changed_ids == ("aptadb:9",)
+
+
+def test_dry_run_human_approved_large_trim_produces_complete_preview() -> None:
+    from adapters.aptadb_checkpoint1_dry_run import simulate_aptadb_checkpoint1_application
+
+    record = _canonical(native_id="40pct", sequence=_rna(40))
+    queue = [
+        _review(
+            record,
+            decision="keep",
+            route=PRIMARY_ROUTE_ELIGIBLE,
+            constant_group_id="group-wide",
+        )
+    ]
+    group = {
+        "constant_group_id": "group-wide",
+        "group_label": "wide",
+        "manual_trim_action": "approve",
+        "manual_trim_5p_nt": "10",
+        "manual_trim_3p_nt": "10",
+        "machine_trim_5p_nt": "10",
+        "machine_trim_3p_nt": "10",
+    }
+    simulation = simulate_aptadb_checkpoint1_application(
+        queue_rows=queue,
+        group_rows=[group],
+        canonical_rows=[record],
+        decision_rows=[
+            _decision_row(
+                record, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna"
+            )
+        ],
+        source_metadata_by_id={record["record_id"]: _meta(record)},
+        s2_qc_by_id={record["record_id"]: _qc(record)},
+        policy=POLICY,
+        expected_interaction_rows=1,
+        expected_unlinked_rows=0,
+    )
+    assert simulation.stats["guard_rail_failures"] == 0
+    assert simulation.stats["preview_complete"] is True
+    assert len(simulation.preview_canonical) == 1
+    assert simulation.applied[0].large_trim_human_approved is True
+    assert simulation.stats["large_trim_human_approved"] == 1
+    assert simulation.large_trim_records[0]["record_id"] == "aptadb:40pct"
+    assert simulation.large_trim_records[0]["authorisation"] == "CHECKPOINT-1"
+    assert LARGE_TRIM_HUMAN_APPROVED_FLAG in simulation.preview_canonical[0]["qc_flags"]
+    assert simulation.stats["authorised_for_s4"] == 0
+
+
+def test_dry_run_collects_remaining_absolute_trim_guard_rail_failures() -> None:
+    from adapters.aptadb_checkpoint1_dry_run import simulate_aptadb_checkpoint1_application
+
+    record = _canonical(native_id="tooshort", sequence=_rna(40))
+    queue = [
+        _review(
+            record,
+            decision="edit",
+            route=PRIMARY_ROUTE_ELIGIBLE,
+            constant_group_id="group-wide",
+            manual_trim_action="override",
+            manual_trim_5p_nt="15",
+            manual_trim_3p_nt="10",
+        )
+    ]
+    group = {
+        "constant_group_id": "group-wide",
+        "group_label": "wide",
+        "manual_trim_action": "approve",
+        "manual_trim_5p_nt": "5",
+        "manual_trim_3p_nt": "5",
+        "machine_trim_5p_nt": "5",
+        "machine_trim_3p_nt": "5",
+    }
+    simulation = simulate_aptadb_checkpoint1_application(
+        queue_rows=queue,
+        group_rows=[group],
+        canonical_rows=[record],
+        decision_rows=[
+            _decision_row(
+                record, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna"
+            )
+        ],
+        source_metadata_by_id={record["record_id"]: _meta(record)},
+        s2_qc_by_id={record["record_id"]: _qc(record)},
+        policy=POLICY,
+        expected_interaction_rows=1,
+        expected_unlinked_rows=0,
+    )
+    assert simulation.stats["guard_rail_failures"] == 1
+    assert simulation.preview_canonical == []
+    assert simulation.guard_rail_failure_rows[0]["record_id"] == "aptadb:tooshort"
+    assert "below 20" in simulation.guard_rail_failure_rows[0]["error"]
+    assert simulation.stats["authorised_for_s4"] == 0
+    assert simulation.stats["preview_complete"] is False
+
+
+def test_dry_run_and_apply_package_share_large_trim_transformation() -> None:
+    from adapters.aptadb_checkpoint1_dry_run import simulate_aptadb_checkpoint1_application
+
+    record = _canonical(native_id="shared", sequence=_rna(40))
+    queue = [
+        _review(
+            record,
+            decision="keep",
+            route=PRIMARY_ROUTE_ELIGIBLE,
+            constant_group_id="group-wide",
+        )
+    ]
+    group = {
+        "constant_group_id": "group-wide",
+        "group_label": "wide",
+        "manual_trim_action": "approve",
+        "manual_trim_5p_nt": "",
+        "manual_trim_3p_nt": "",
+        "machine_trim_5p_nt": "10",
+        "machine_trim_3p_nt": "10",
+    }
+    canonical_by_id = {record["record_id"]: record}
+    meta = {record["record_id"]: _meta(record)}
+    qc = {record["record_id"]: _qc(record)}
+    applied, _report = apply_aptadb_checkpoint1_package(
+        queue_rows=queue,
+        group_rows=[group],
+        canonical_by_id=canonical_by_id,
+        source_metadata_by_id=meta,
+        s2_qc_by_id=qc,
+        policy=POLICY,
+    )
+    simulation = simulate_aptadb_checkpoint1_application(
+        queue_rows=queue,
+        group_rows=[group],
+        canonical_rows=[record],
+        decision_rows=[
+            _decision_row(
+                record, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna"
+            )
+        ],
+        source_metadata_by_id=meta,
+        s2_qc_by_id=qc,
+        policy=POLICY,
+        expected_interaction_rows=1,
+        expected_unlinked_rows=0,
+    )
+    assert applied[0].sequence_core == simulation.applied[0].sequence_core
+    assert applied[0].sequence_length_core == simulation.applied[0].sequence_length_core
+    assert applied[0].notes == simulation.applied[0].notes
+    assert applied[0].canonical["qc_flags"] == simulation.applied[0].canonical["qc_flags"]
+    assert applied[0].large_trim_human_approved is True
+    assert simulation.applied[0].large_trim_human_approved is True
+    assert applied[0].primary_route_after == simulation.applied[0].primary_route_after
+
+
+def test_aptadb_live_apply_without_inputs_fails_closed(tmp_path: Path) -> None:
+    from checkpoint1_apply_review import main
+    from io import StringIO
+    from contextlib import redirect_stderr
+
+    err = StringIO()
+    with redirect_stderr(err):
+        rc = main(["--source", "aptadb", "--repo-root", str(tmp_path)])
+    assert rc == 1
+    message = err.getvalue()
+    assert "not authorised" not in message
+    assert "Missing apply input" in message or "does not exist" in message
+
+
+def test_aptadb_live_apply_matches_dry_run_and_closes(tmp_path: Path) -> None:
+    import hashlib
+    import shutil
+    from adapters.aptadb_s2 import CONSTANT_PROPOSAL_COLUMNS, S2_QC_COLUMNS
+    from adapters.aptadb_s3 import PARK_COLUMNS
+    from adapters.aptadb import UNLINKED_COLUMNS
+    from adapters.aptadb_checkpoint1_review import (
+        BULK_CONFIRMATION_COLUMNS,
+        GROUP_REVIEW_COLUMNS,
+    )
+    from checkpoint1_apply_review import (
+        run_aptadb_checkpoint1_apply,
+        run_aptadb_checkpoint1_dry_run,
+    )
+    from checkpoint1_prepare_review import write_csv_atomic
+    from common.corpus_schema import CORPUS_COLUMNS, write_corpus_csv_atomic
+
+    canonical = _canonical(native_id="1", sequence=_rna(40))
+    edited = _canonical(
+        native_id="230",
+        sequence=_dna(20) + "-" + _dna(20),
+        molecule_type="ssDNA",
+        chemistry="DNA",
+        alphabet="DNA_T",
+        qc_flags="alignment_gaps",
+    )
+    rows = [canonical, edited]
+    decisions = [
+        _decision_row(canonical, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna"),
+        _decision_row(edited, route=PRIMARY_ROUTE_REJECT, reason="alignment_gaps"),
+    ]
+    queue = [
+        _review(canonical, decision="keep", route=PRIMARY_ROUTE_ELIGIBLE),
+        _review(
+            edited,
+            route=PRIMARY_ROUTE_REJECT,
+            manual_sequence_corrected=(_dna(20) + _dna(20)),
+        ),
+    ]
+    rejection = {
+        "record_id": edited["record_id"],
+        "source_db": "aptadb",
+        "source_dataset": edited["source_dataset"],
+        "native_id": edited["native_id"],
+        "sequence_raw": edited["sequence_raw"],
+        "target_name_raw": edited["target_name_raw"],
+        "stage": "S3",
+        "rejection_reason": "alignment_gaps",
+        "rejection_detail": "",
+    }
+    checkpoint = tmp_path / "data" / "interim" / "checkpoints" / "aptadb_cp1"
+    review_dir = checkpoint / "manual_review"
+    normalised = tmp_path / "data" / "interim" / "normalised"
+    extracted = tmp_path / "data" / "interim" / "extracted"
+    config_elig = tmp_path / "config" / "source_eligibility"
+    config_norm = tmp_path / "config" / "source_normalisation"
+    config_rev = tmp_path / "config" / "checkpoint_reviews"
+    for path in (review_dir, normalised, extracted, config_elig, config_norm, config_rev):
+        path.mkdir(parents=True, exist_ok=True)
+    shutil.copy(
+        REPO_ROOT / "config" / "source_eligibility" / "aptadb.json",
+        config_elig / "aptadb.json",
+    )
+    shutil.copy(
+        REPO_ROOT / "config" / "source_normalisation" / "aptadb.json",
+        config_norm / "aptadb.json",
+    )
+    (config_rev / "aptadb_checkpoint1_recommendations.json").write_text(
+        '{"source_key":"aptadb","records":{},"groups":{}}\n',
+        encoding="utf-8",
+    )
+    write_corpus_csv_atomic(
+        checkpoint / "aptadb_s3_canonical.csv", rows, columns=CORPUS_COLUMNS
+    )
+    write_corpus_csv_atomic(
+        normalised / "aptadb_normalised.csv", rows, columns=CORPUS_COLUMNS
+    )
+    write_csv_atomic(checkpoint / "aptadb_s3_decisions.csv", DECISION_COLUMNS, decisions)
+    write_csv_atomic(checkpoint / "rejected_aptadb.csv", REJECTION_COLUMNS, [rejection])
+    write_csv_atomic(checkpoint / "aptadb_s3_parked_ssdna.csv", PARK_COLUMNS, [])
+    write_csv_atomic(checkpoint / "aptadb_s3_parked_non_protein.csv", PARK_COLUMNS, [])
+    write_csv_atomic(
+        review_dir / "aptadb_checkpoint1_manual_review.csv",
+        list(queue[0].keys()),
+        queue,
+    )
+    write_csv_atomic(
+        review_dir / "aptadb_checkpoint1_constant_group_review.csv",
+        GROUP_REVIEW_COLUMNS,
+        [],
+    )
+    write_csv_atomic(
+        review_dir / "aptadb_checkpoint1_bulk_audit_confirmation.csv",
+        BULK_CONFIRMATION_COLUMNS,
+        [],
+    )
+    write_csv_atomic(
+        normalised / "aptadb_s2_qc.csv",
+        S2_QC_COLUMNS,
+        [_qc(row) for row in rows],
+    )
+    write_csv_atomic(
+        extracted / "aptadb_source_metadata.csv",
+        ["record_id", "aptadb_target_chemistry", "aptadb_aptamer_chemistry"],
+        [_meta(row) for row in rows],
+    )
+    write_csv_atomic(
+        normalised / "aptadb_constant_region_proposals.csv",
+        CONSTANT_PROPOSAL_COLUMNS,
+        [],
+    )
+    write_csv_atomic(extracted / "aptadb_unlinked_aptamers.csv", UNLINKED_COLUMNS, [])
+
+    preview_dir = checkpoint / "dry_run"
+    run_aptadb_checkpoint1_dry_run(
+        repo_root=tmp_path,
+        checkpoint_dir=checkpoint,
+        output_dir=preview_dir,
+        check_deterministic_rerun=True,
+        expected_interaction_rows=2,
+        expected_unlinked_rows=0,
+    )
+    preview_canonical = preview_dir / "aptadb_checkpoint1_dry_run_canonical_preview.csv"
+    preview_hash = hashlib.sha256(preview_canonical.read_bytes()).hexdigest()
+    s3_hash = hashlib.sha256(
+        (checkpoint / "aptadb_s3_canonical.csv").read_bytes()
+    ).hexdigest()
+
+    result = run_aptadb_checkpoint1_apply(
+        repo_root=tmp_path,
+        checkpoint_dir=checkpoint,
+        output_dir=checkpoint / "resolved",
+        tracked_manifest=config_rev / "aptadb_checkpoint1_resolutions.csv",
+        metadata_out=config_rev / "aptadb_checkpoint1_metadata.json",
+        preview_dir=preview_dir,
+        check_deterministic_rerun=True,
+        expected_interaction_rows=2,
+        expected_unlinked_rows=0,
+        compare_to_preview=True,
+    )
+    applied_canonical = (
+        checkpoint / "resolved" / "aptadb_checkpoint1_applied_canonical.csv"
+    )
+    assert result.checkpoint_closed is True
+    assert result.preview_comparison_ok is True
+    assert result.deterministic_rerun_ok is True
+    assert applied_canonical.read_bytes() == preview_canonical.read_bytes()
+    assert hashlib.sha256(preview_canonical.read_bytes()).hexdigest() == preview_hash
+    assert (
+        hashlib.sha256((checkpoint / "aptadb_s3_canonical.csv").read_bytes()).hexdigest()
+        == s3_hash
+    )
+    metadata = json.loads(
+        (config_rev / "aptadb_checkpoint1_metadata.json").read_text(encoding="utf-8")
+    )
+    assert metadata["checkpoint_closed"] is True
+    assert metadata["s4_started"] is False
+    assert metadata["source_key"] == "aptadb"

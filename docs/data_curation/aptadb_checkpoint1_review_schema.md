@@ -1,7 +1,11 @@
 # AptaDB CHECKPOINT-1 structured review schema
 
-This note records the CHECKPOINT-1 review-field extension used before AptaDB
-human review. It contains no sequences and does not authorise S4.
+This note records the CHECKPOINT-1 review-field extension and fail-closed
+apply process. It contains no sequences and does not authorise S4.
+
+The schema and apply machinery below are reusable. The historical AptaDB
+review that first used them has been completed and applied. AptaDB
+CHECKPOINT-1 is closed. S4 has not begun.
 
 CHECKPOINT-1 remains a human-review gate. Machine `review_recommendation`
 values are guidance only and must never be treated as `manual_decision`.
@@ -44,7 +48,7 @@ the run.
 
 ## Provenance
 
-`sequence_raw` remains the original AptaDB source sequence. Future application
+`sequence_raw` remains the original AptaDB source sequence. Application
 re-runs shared molecule-aware normalisation after any sequence or molecule
 correction, then applies approved numeric trims to `sequence_full`.
 
@@ -53,5 +57,7 @@ S4+ work.
 
 ## Status
 
-CHECKPOINT-1 is prepared for structured human review. It is not complete and
-has not been applied.
+This document describes the reusable structured-review schema and apply
+process, not a live review queue. For AptaDB, CHECKPOINT-1 human review
+has been completed and applied; the checkpoint is closed. S4 has not yet
+begun.

@@ -14,7 +14,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final, Mapping, Sequence
 
-from common.corpus_schema import CHEMISTRY_VOCABULARY, S3_FORBIDDEN_FIELDS
+from common.corpus_schema import (
+    CHEMISTRY_VOCABULARY,
+    CORPUS_COLUMNS,
+    S3_FORBIDDEN_FIELDS,
+    format_qc_flags,
+)
 from common.eligibility import EligibilityPolicy, load_eligibility_policy
 from common.sequence_normalisation import (
     TRIM_CONFIDENCE_HIGH,
@@ -34,6 +39,11 @@ AUDIT_ONLY_REASONS: Final[frozenset[str]] = frozenset(
 )
 MAX_COMBINED_TRIM_FRACTION: Final[float] = 0.40
 CORE_LENGTH_MIN: Final[int] = 20
+EXPLICIT_HUMAN_TRIM_ACTIONS: Final[frozenset[str]] = frozenset(
+    {"approve", "override"}
+)
+LARGE_TRIM_HUMAN_APPROVED_FLAG: Final[str] = "large_trim_human_approved"
+CHECKPOINT1_TRIM_AUTHORISATION: Final[str] = "CHECKPOINT-1"
 DEFAULT_RECOMMENDATIONS_REL: Final[str] = (
     "config/checkpoint_reviews/aptadb_checkpoint1_recommendations.json"
 )
@@ -195,6 +205,23 @@ class AppliedRecordResult:
     primary_route_after: str
     notes: str
     canonical: dict[str, str]
+    proposed_decision: str = ""
+    primary_reason: str = ""
+    decision: dict[str, str] = field(default_factory=dict)
+    rejection_row: dict[str, str] | None = None
+    park_row: dict[str, str] | None = None
+    applied_trim_5p_nt: int = 0
+    applied_trim_3p_nt: int = 0
+    trim_source: str = ""
+    sequence_corrected: bool = False
+    molecule_overridden: bool = False
+    large_trim_human_approved: bool = False
+    trim_fraction: float = 0.0
+
+
+def _corpus_only(record: Mapping[str, str]) -> dict[str, str]:
+    """Copy canonical corpus columns only (no decision/route extras)."""
+    return {column: str(record.get(column, "") or "") for column in CORPUS_COLUMNS}
 
 
 def _blank(value: Any) -> str:
@@ -250,6 +277,61 @@ def parse_trim_nt(value: str, *, field_name: str, record_id: str) -> int | None:
     return int(text)
 
 
+def combined_trim_fraction(
+    sequence_length: int, five_nt: int, three_nt: int
+) -> float:
+    if sequence_length <= 0:
+        return 0.0
+    return (five_nt + three_nt) / float(sequence_length)
+
+
+def combined_trim_exceeds_review_threshold(
+    sequence_length: int,
+    five_nt: int,
+    three_nt: int,
+    *,
+    max_fraction: float = MAX_COMBINED_TRIM_FRACTION,
+) -> bool:
+    """True when combined trimming exceeds the 40% review/trigger rail."""
+    return (
+        combined_trim_fraction(sequence_length, five_nt, three_nt) > max_fraction
+    )
+
+
+def is_explicit_human_trim_authorisation(action: str) -> bool:
+    """True only for an explicit human approve/override.
+
+    Machine recommendations, bulk ``keep``, blank/defer/reject, and inferred
+    approvals are not authorisation.
+    """
+    return _blank(action) in EXPLICIT_HUMAN_TRIM_ACTIONS
+
+
+def format_large_trim_provenance(
+    *,
+    fraction: float,
+    five_nt: int,
+    three_nt: int,
+    core_length: int,
+    trim_source: str,
+    human_trim_action: str,
+    group_id: str,
+) -> str:
+    """Derived application provenance for a human-approved >40% trim."""
+    return (
+        f"{LARGE_TRIM_HUMAN_APPROVED_FLAG}=true;"
+        f"trim_pct={fraction * 100:.2f};"
+        f"trim_fraction={fraction:.6f};"
+        f"trim_source={trim_source};"
+        f"human_trim_action={human_trim_action};"
+        f"trim_5p={five_nt};"
+        f"trim_3p={three_nt};"
+        f"core_length={core_length};"
+        f"group={group_id};"
+        f"authorisation={CHECKPOINT1_TRIM_AUTHORISATION}"
+    )
+
+
 def validate_trim_lengths(
     *,
     sequence_length: int,
@@ -258,7 +340,23 @@ def validate_trim_lengths(
     record_id: str,
     min_core: int = CORE_LENGTH_MIN,
     max_fraction: float = MAX_COMBINED_TRIM_FRACTION,
-) -> None:
+    human_authorised: bool = False,
+) -> bool:
+    """Validate absolute trim rails.
+
+    Combined trim >40% is a review/trigger guard rail, not an absolute
+    prohibition:
+
+    - unreviewed / automatic / machine-only application fails closed and
+      requires CHECKPOINT-1 human review;
+    - an explicit human CHECKPOINT-1 ``approve`` or ``override`` may proceed;
+      callers must persist derived ``large_trim_human_approved`` provenance.
+
+    Human review does not bypass empty-core, ``<20`` nt core, over-length,
+    negative, or non-integer trims.
+
+    Returns True if the combined trim exceeds ``max_fraction``.
+    """
     if five_nt < 0 or three_nt < 0:
         raise AptaDBCheckpoint1ReviewError(
             f"Trim lengths must be >=0 for {record_id!r}"
@@ -277,10 +375,19 @@ def validate_trim_lengths(
         raise AptaDBCheckpoint1ReviewError(
             f"Trim would leave core below {min_core} nt for {record_id!r}"
         )
-    if sequence_length and (combined / sequence_length) > max_fraction:
+    exceeds = combined_trim_exceeds_review_threshold(
+        sequence_length,
+        five_nt,
+        three_nt,
+        max_fraction=max_fraction,
+    )
+    if exceeds and not human_authorised:
         raise AptaDBCheckpoint1ReviewError(
-            f"Combined trim exceeds {max_fraction:.0%} guard rail for {record_id!r}"
+            f"Combined trim exceeds {max_fraction:.0%} review guard rail for "
+            f"{record_id!r}; requires explicit CHECKPOINT-1 human "
+            "approve/override"
         )
+    return exceeds
 
 
 def apply_numeric_terminal_trim(
@@ -291,8 +398,13 @@ def apply_numeric_terminal_trim(
     record_id: str,
     min_core: int = CORE_LENGTH_MIN,
     max_fraction: float = MAX_COMBINED_TRIM_FRACTION,
+    human_authorised: bool = False,
 ) -> str:
-    """Trim reviewed ``sequence_full`` by nucleotide counts. Never trim raw."""
+    """Trim reviewed ``sequence_full`` by nucleotide counts. Never trim raw.
+
+    ``human_authorised`` must be True only for an explicit CHECKPOINT-1
+    ``approve`` / ``override``. It must not be inferred from a recommendation.
+    """
     validate_trim_lengths(
         sequence_length=len(sequence_full),
         five_nt=five_nt,
@@ -300,6 +412,7 @@ def apply_numeric_terminal_trim(
         record_id=record_id,
         min_core=min_core,
         max_fraction=max_fraction,
+        human_authorised=human_authorised,
     )
     end = len(sequence_full) - three_nt if three_nt else len(sequence_full)
     return sequence_full[five_nt:end]
@@ -1030,13 +1143,15 @@ def apply_reviewed_record(
             f"Cannot apply unresolved manual_decision for {record_id!r}"
         )
     if decision == "drop":
-        updated = dict(canonical)
+        updated = _corpus_only(canonical)
         for field_name in S3_FORBIDDEN_FIELDS:
             updated[field_name] = ""
         note_parts = [
             "checkpoint1_manual_decision=drop",
-            _blank(review_row.get("manual_notes")),
+            "human_reviewed_exclusion=true",
         ]
+        if review_row.get("manual_notes"):
+            note_parts.append("reviewer_notes_present=true")
         updated["notes"] = "|".join(part for part in note_parts if part)
         return AppliedRecordResult(
             record_id=record_id,
@@ -1055,6 +1170,8 @@ def apply_reviewed_record(
             primary_route_after=route_before,
             notes=updated["notes"],
             canonical=updated,
+            proposed_decision=review_row.get("proposed_decision", ""),
+            primary_reason=review_row.get("primary_reason", ""),
         )
 
     working_input = _blank(review_row.get("manual_sequence_corrected")) or original_raw
@@ -1090,6 +1207,8 @@ def apply_reviewed_record(
     trim_confidence = canonical.get("trim_confidence") or TRIM_CONFIDENCE_NA
     applied_five = 0
     applied_three = 0
+    trim_frac = 0.0
+    large_trim_human_approved = False
     effective = resolve_effective_trim(
         review_row,
         group_row,
@@ -1097,14 +1216,27 @@ def apply_reviewed_record(
         machine_three=machine_three,
     )
     if effective is not None:
+        # Authorisation comes only from the resolved human approve/override.
+        # Recommended trim fields are ignored by resolve_effective_trim.
+        human_authorised = is_explicit_human_trim_authorisation(effective.action)
         sequence_core = apply_numeric_terminal_trim(
             sequence_full,
             five_nt=effective.five_nt,
             three_nt=effective.three_nt,
             record_id=record_id,
+            human_authorised=human_authorised,
         )
         applied_five = effective.five_nt
         applied_three = effective.three_nt
+        trim_frac = combined_trim_fraction(
+            len(sequence_full), applied_five, applied_three
+        )
+        large_trim_human_approved = (
+            human_authorised
+            and combined_trim_exceeds_review_threshold(
+                len(sequence_full), applied_five, applied_three
+            )
+        )
         source = review_row.get("constant_proposal_sources", "")
         if source == "known_motif" or "known_motif" in source:
             trim_confidence = TRIM_CONFIDENCE_HIGH
@@ -1114,8 +1246,13 @@ def apply_reviewed_record(
         else:
             trim_confidence = TRIM_CONFIDENCE_MEDIUM
             trim_status = "primers_removed"
+    if sequence_full and sequence_core and sequence_core not in sequence_full:
+        raise AptaDBCheckpoint1ReviewError(
+            f"sequence_core is not a contiguous substring of reviewed "
+            f"sequence_full for {record_id!r}"
+        )
 
-    updated = dict(canonical)
+    updated = _corpus_only(canonical)
     updated["sequence_raw"] = original_raw
     updated["sequence_full"] = sequence_full
     updated["sequence_core"] = sequence_core
@@ -1127,7 +1264,10 @@ def apply_reviewed_record(
     updated["t_to_u_applied"] = "true" if norm.t_to_u_applied else "false"
     updated["trim_status"] = trim_status
     updated["trim_confidence"] = trim_confidence
-    updated["qc_flags"] = "|".join(norm.qc_flags)
+    qc_flag_values = list(norm.qc_flags)
+    if large_trim_human_approved:
+        qc_flag_values.append(LARGE_TRIM_HUMAN_APPROVED_FLAG)
+    updated["qc_flags"] = format_qc_flags(qc_flag_values)
     for field_name in S3_FORBIDDEN_FIELDS:
         updated[field_name] = ""
 
@@ -1166,12 +1306,45 @@ def apply_reviewed_record(
             f"applied_5p={applied_five};applied_3p={applied_three};"
             f"trim_source={effective.source};group={effective.group_id}"
         )
+    if large_trim_human_approved:
+        note_parts.append(
+            format_large_trim_provenance(
+                fraction=trim_frac,
+                five_nt=applied_five,
+                three_nt=applied_three,
+                core_length=len(sequence_core),
+                trim_source=effective.source if effective is not None else "",
+                human_trim_action=effective.action if effective is not None else "",
+                group_id=effective.group_id if effective is not None else "",
+            )
+        )
     if review_row.get("manual_notes"):
-        note_parts.append(f"reviewer_notes_present=true")
+        note_parts.append("reviewer_notes_present=true")
     note_parts.append(f"route_before={route_before}")
     note_parts.append(f"route_after={route_after}")
     updated["notes"] = "|".join(part for part in note_parts if part)
-    updated["primary_route"] = route_after
+    decision = dict(classified.decision)
+    decision["notes"] = updated["notes"]
+    decision["molecule_type"] = updated["molecule_type"]
+    decision["chemistry"] = updated["chemistry"]
+    decision["alphabet_as_reported"] = updated["alphabet_as_reported"]
+    decision["sequence_length_full"] = updated["sequence_length_full"]
+    decision["sequence_length_core"] = updated["sequence_length_core"]
+    decision["trim_status"] = updated["trim_status"]
+    decision["trim_confidence"] = updated["trim_confidence"]
+    decision["qc_flags"] = updated["qc_flags"]
+    decision["primary_route"] = route_after
+    rejection_row = (
+        dict(classified.rejection_row) if classified.rejection_row else None
+    )
+    park_row = dict(classified.park_row) if classified.park_row else None
+    if park_row is not None:
+        park_row["sequence_length_core"] = updated["sequence_length_core"]
+        park_row["trim_status"] = updated["trim_status"]
+        park_row["trim_confidence"] = updated["trim_confidence"]
+        park_row["molecule_type"] = updated["molecule_type"]
+        park_row["chemistry"] = updated["chemistry"]
+        park_row["qc_flags"] = updated["qc_flags"]
 
     return AppliedRecordResult(
         record_id=record_id,
@@ -1190,6 +1363,18 @@ def apply_reviewed_record(
         primary_route_after=route_after,
         notes=updated["notes"],
         canonical=updated,
+        proposed_decision=decision.get("proposed_decision", ""),
+        primary_reason=decision.get("primary_reason", ""),
+        decision=decision,
+        rejection_row=rejection_row,
+        park_row=park_row,
+        applied_trim_5p_nt=applied_five,
+        applied_trim_3p_nt=applied_three,
+        trim_source=effective.source if effective is not None else "",
+        sequence_corrected=working_input != original_raw,
+        molecule_overridden=molecule != original_molecule,
+        large_trim_human_approved=large_trim_human_approved,
+        trim_fraction=trim_frac,
     )
 
 

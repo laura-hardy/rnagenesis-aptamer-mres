@@ -3624,3 +3624,125 @@ No AptaDB record is authorised for S4 yet.
 The pipeline is stopped awaiting Laura CHECKPOINT-1 review.
 ```
 
+## 2026-08-26 — AptaDB CHECKPOINT-1 human review entered (unapplied)
+
+Human CHECKPOINT-1 decisions were completed for AptaDB: 238 record
+decisions and 9 group decisions were reviewed. The fail-closed validator
+passed (`ready_for_application=238`; unresolved manual decisions,
+constant groups, record exceptions, unconfirmed audit-only rows,
+contradictory fields, invalid trim lengths and edits without a
+specification all 0). No decisions have yet been applied to canonical
+outputs. S4 remains blocked pending reviewed application. CHECKPOINT-1
+is not closed.
+
+## 2026-08-26 — AptaDB CHECKPOINT-1 application dry-run (unapplied)
+
+Human CHECKPOINT-1 decisions were validated (`ready_for_application=238`).
+An application dry-run using the real apply transformation failed closed:
+60 human-approved constant-region trims exceeded the combined ≤40%
+threshold (HIV/Gag-Pol, AP65 ordinary members, OX40, pancreatic
+polypeptide, CBF1, CD25, NPY). That stop was correct given the
+implementation at the time: >40% was coded as a hard apply-time gate.
+No complete post-review 1,350-row routing preview was authorised.
+Technical/exception simulations for `aptadb:230`, `aptadb:491`,
+`aptadb:305`, `aptadb:1170` and `aptadb:459` succeeded in isolation,
+including G5α3N.4 core 57 nt and AP65_A1 23/0. Canonical S2/S3 outputs
+were not changed. CHECKPOINT-1 remained unapplied. S4 remained blocked.
+Real application was **NO-GO** pending a specification-aligned
+reinterpretation of the 40% rail.
+
+## 2026-08-27 — AptaDB CHECKPOINT-1 large-trim semantics + second dry-run (unapplied)
+
+Specification review clarified that "never trim more than 40% of a
+sequence in one operation without flagging" is a review/trigger guard
+rail, not an absolute prohibition. The apply path was corrected:
+
+- unreviewed / automatic / machine-only combined trims >40% still fail
+  closed and require explicit CHECKPOINT-1 human review;
+- an explicit human group or record `manual_trim_action` of `approve` or
+  `override` may apply a biologically large trim;
+- recommendations, bulk `keep`, blank/defer/reject, and inferred
+  approvals are not authorisation;
+- empty core, core <20 nt, over-length, negative, and non-integer trims
+  remain hard failures;
+- every human-approved >40% trim records derived
+  `large_trim_human_approved` provenance (percentage, source, action,
+  5′/3′ nt, core length, CHECKPOINT-1 authorisation) in notes and
+  `qc_flags`.
+
+Reviewed trim lengths were not reduced to satisfy 40%. Human review
+files were not edited.
+
+The fail-closed validator still passed (`238` total; `0` unresolved
+record/group/exception/audit/blocker rows; `ready_for_application=238`).
+The second full AptaDB application dry-run succeeded: all 1,350
+interactions received a post-review route; remaining guard-rail
+failures = `0`; human-approved >40% cohort = `60`; in-memory and
+on-disk reruns were byte-identical. Canonical S2/S3, raw AptaDB files,
+source-metadata sidecar, recommendation JSON, and all three human
+review files were unchanged. No resolved/S4 outputs were written.
+CHECKPOINT-1 remains unapplied. S4 remains blocked. The checkpoint is
+not closed.
+
+Post-review routing (including 1 human drop inside technical rejects):
+`47` technical rejects + `1037` parked ssDNA + `115` parked RNA
+non-protein + `151` RNA-protein technically eligible = `1350`.
+Unlinked aptamers remain `37` `missing_target`. `authorised_for_s4=0`.
+
+Real CHECKPOINT-1 application is technically **GO** from this dry-run.
+It was not executed in this pass.
+
+## 2026-08-27 — AptaDB CHECKPOINT-1 applied and closed
+
+Human CHECKPOINT-1 review was applied to AptaDB and the checkpoint is
+**closed**. The real application used the same `apply_reviewed_record`
+transformation as the validated dry-run. Applied canonical, routing,
+rejection, parked, eligible, change-report, group-summary, and large-trim
+artefacts were byte-identical to that dry-run preview. Guard-rail
+failures remained 0. S4 was not started.
+
+This checkpoint exists because AptaDB source annotation, construct
+constants, and molecule labels are not reliable enough to feed S4
+automatically. The 238-row review queue is the scientific authorisation
+for sequence repair, molecule correction, and terminal trimming. The 40%
+combined-trim rule is a review trigger, not an absolute prohibition:
+sixty constant-region trims exceeded 40% and were applied only because
+CHECKPOINT-1 explicitly approved or overrode them, with
+`large_trim_human_approved` provenance retained. Empty core, core <20 nt,
+over-length, negative, non-integer, contradictory, and non-contiguous
+trims remain hard failures.
+
+Record decisions: 173 keep / 64 edit / 1 drop (`aptadb:305`, mixed T/U,
+unrepairable from source evidence). Group decisions: 5 approve / 3
+override / 1 reject (albumin deletion-series left untrimmed because the
+shared prefix is part of the shortened construct). Bulk audit
+confirmations: 168. Source-sequence corrections: 3. Molecule correction:
+1 (G5α3N.4 / `aptadb:1170`, AptaDB ssDNA annotation to experimental RNA;
+reviewed trim 18/0; core 57 nt; high-confidence T7 motif retained;
+route technically eligible). AP65_A1 (`aptadb:459`) used the record-level
+23/0 override rather than the group 3′ trim. Alignment-gap and terminal-
+period repairs (`aptadb:230`, `aptadb:491`) restored ssDNA parking
+without mutating `sequence_raw`.
+
+Post-review interaction routing: 47 technical/human rejects + 1037
+parked ssDNA + 115 parked RNA non-protein + 151 RNA-protein technically
+eligible = 1350. Unlinked aptamers remain 37 source-level
+`missing_target` rows outside that denominator. Only the 151 technically
+eligible RNA-protein records are marked authorised for a future global
+S4 handoff. That handoff has not been prepared.
+
+Original S2, pre-review S3, raw AptaDB files, source-metadata sidecar,
+review CSVs, and the recommendation JSON were not overwritten.
+In-memory and on-disk deterministic reruns matched the authoritative
+applied payload.
+
+### Verification
+
+- AptaDB structured review / dry-run / apply, checkpoint prepare/apply,
+  AptaDB S3, shared eligibility, sequence normalisation, and
+  AptaBase/UTexas S3 and checkpoint regressions: **287 passed**
+- Dry-run vs applied byte identity: pass
+- Frozen human-review, recommendation, S2/S3, and raw hashes: unchanged
+- S4 was not started
+
+

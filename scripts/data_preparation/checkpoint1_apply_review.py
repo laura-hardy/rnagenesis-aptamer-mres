@@ -1716,6 +1716,1167 @@ def apply_utexas_checkpoint1_review(
     return result
 
 
+DRY_RUN_FORBIDDEN_DIR_NAMES: frozenset[str] = frozenset(
+    {"resolved", "s4", "handoff", "authorised_for_s4"}
+)
+EXPECTED_APTADB_S2_S3_SHA256 = (
+    "b4075b602a9e569e3e91a66f1437a8939d56432138b8e9fcd2063920b0028aa5"
+)
+EXPECTED_APTADB_RAW_SHA256 = {
+    "interaction.csv": (
+        "6dbd97f20fa6f98d359d697713c43032d5a6a3c1a400d80ef28a150d676dff86"
+    ),
+    "aptamer.csv": (
+        "9d3ab029d1de4408d2406051a68bc0e6da347ee1be1838aee9c938ca3f3fb464"
+    ),
+    "protein.csv": (
+        "4de0d8b105b3318c9704ff64819089f5e17b5c735f0730724052f3e808325f79"
+    ),
+}
+
+
+def _assert_aptadb_dry_run_output(path: Path) -> Path:
+    resolved = path.resolve()
+    lowered = [part.lower() for part in resolved.parts]
+    if any(name in DRY_RUN_FORBIDDEN_DIR_NAMES for name in lowered):
+        raise Checkpoint1ApplyError(
+            f"Dry-run output must not use a resolved/S4 directory: {resolved}"
+        )
+    return resolved
+
+
+def _index_rows(rows: Sequence[Mapping[str, str]]) -> dict[str, dict[str, str]]:
+    indexed: dict[str, dict[str, str]] = {}
+    for row in rows:
+        record_id = row["record_id"]
+        if record_id in indexed:
+            raise Checkpoint1ApplyError(f"Duplicate record_id {record_id!r}")
+        indexed[record_id] = dict(row)
+    return indexed
+
+
+def _serialise_preview_payload(simulation: object) -> bytes:
+    from adapters.aptadb_checkpoint1_dry_run import AptaDBDryRunSimulation
+
+    if not isinstance(simulation, AptaDBDryRunSimulation):
+        raise Checkpoint1ApplyError("Dry-run payload has unexpected type")
+    chunks = [
+        json.dumps(simulation.preview_canonical, sort_keys=True, ensure_ascii=True),
+        json.dumps(simulation.preview_decisions, sort_keys=True, ensure_ascii=True),
+        json.dumps(simulation.preview_rejections, sort_keys=True, ensure_ascii=True),
+        json.dumps(simulation.preview_parked_ssdna, sort_keys=True, ensure_ascii=True),
+        json.dumps(
+            simulation.preview_parked_non_protein, sort_keys=True, ensure_ascii=True
+        ),
+        json.dumps(simulation.preview_eligible, sort_keys=True, ensure_ascii=True),
+        json.dumps(simulation.change_report, sort_keys=True, ensure_ascii=True),
+        json.dumps(simulation.group_summaries, sort_keys=True, ensure_ascii=True),
+        json.dumps(
+            simulation.guard_rail_failure_rows, sort_keys=True, ensure_ascii=True
+        ),
+        json.dumps(simulation.large_trim_records, sort_keys=True, ensure_ascii=True),
+        json.dumps(simulation.large_trim_groups, sort_keys=True, ensure_ascii=True),
+    ]
+    return "\n".join(chunks).encode("utf-8")
+
+
+def run_aptadb_checkpoint1_dry_run(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    check_deterministic_rerun: bool = True,
+    expected_interaction_rows: int | None = 1350,
+    expected_unlinked_rows: int | None = 37,
+) -> None:
+    """Simulate AptaDB CHECKPOINT-1 application without closing it."""
+    from adapters.aptadb_checkpoint1_dry_run import (
+        CHANGE_REPORT_COLUMNS,
+        DRY_RUN_BANNER,
+        ELIGIBLE_PREVIEW_COLUMNS,
+        GROUP_SUMMARY_COLUMNS,
+        GUARD_RAIL_FAILURE_COLUMNS,
+        LARGE_TRIM_GROUP_COLUMNS,
+        LARGE_TRIM_RECORD_COLUMNS,
+        format_dry_run_markdown,
+        simulate_aptadb_checkpoint1_application,
+    )
+    from adapters.aptadb_checkpoint1_review import (
+        AptaDBCheckpoint1ReviewError,
+        load_default_policy,
+        read_csv_rows,
+        validate_review_package,
+    )
+    from adapters.aptadb_s2 import load_aptadb_policy
+    from adapters.aptadb_s3 import (
+        DECISION_COLUMNS,
+        PARK_COLUMNS,
+        REJECTION_COLUMNS,
+        index_constant_proposals,
+    )
+    from common.corpus_schema import CORPUS_COLUMNS, write_corpus_csv_atomic
+
+    output_dir = _assert_aptadb_dry_run_output(output_dir)
+    review_dir = checkpoint_dir / "manual_review"
+    queue_path = review_dir / "aptadb_checkpoint1_manual_review.csv"
+    group_path = review_dir / "aptadb_checkpoint1_constant_group_review.csv"
+    bulk_path = review_dir / "aptadb_checkpoint1_bulk_audit_confirmation.csv"
+    canonical_path = checkpoint_dir / "aptadb_s3_canonical.csv"
+    decision_path = checkpoint_dir / "aptadb_s3_decisions.csv"
+    rejection_path = checkpoint_dir / "rejected_aptadb.csv"
+    parked_ssdna_path = checkpoint_dir / "aptadb_s3_parked_ssdna.csv"
+    parked_non_protein_path = checkpoint_dir / "aptadb_s3_parked_non_protein.csv"
+    s2_path = repo_root / "data" / "interim" / "normalised" / "aptadb_normalised.csv"
+    qc_path = repo_root / "data" / "interim" / "normalised" / "aptadb_s2_qc.csv"
+    proposals_path = (
+        repo_root / "data" / "interim" / "normalised" / "aptadb_constant_region_proposals.csv"
+    )
+    sidecar_path = (
+        repo_root / "data" / "interim" / "extracted" / "aptadb_source_metadata.csv"
+    )
+    unlinked_path = (
+        repo_root / "data" / "interim" / "extracted" / "aptadb_unlinked_aptamers.csv"
+    )
+    rec_json = (
+        repo_root / "config" / "checkpoint_reviews" / "aptadb_checkpoint1_recommendations.json"
+    )
+    raw_dir = repo_root / "data" / "raw" / "AptaDB"
+
+    required = [
+        queue_path,
+        group_path,
+        bulk_path,
+        canonical_path,
+        decision_path,
+        rejection_path,
+        s2_path,
+        qc_path,
+        proposals_path,
+        sidecar_path,
+        unlinked_path,
+    ]
+    for path in required:
+        if not path.is_file():
+            raise Checkpoint1ApplyError(f"Missing dry-run input: {path.name}")
+
+    hashes_before = {
+        "queue": sha256_file(queue_path),
+        "groups": sha256_file(group_path),
+        "bulk": sha256_file(bulk_path),
+        "s2": sha256_file(s2_path),
+        "s3": sha256_file(canonical_path),
+        "s3_decisions": sha256_file(decision_path),
+        "sidecar": sha256_file(sidecar_path),
+        "qc": sha256_file(qc_path),
+        "proposals": sha256_file(proposals_path),
+        "unlinked": sha256_file(unlinked_path),
+        "rec_json": sha256_file(rec_json) if rec_json.is_file() else "",
+        "raw_interaction": (
+            sha256_file(raw_dir / "interaction.csv")
+            if (raw_dir / "interaction.csv").is_file()
+            else ""
+        ),
+        "raw_aptamer": (
+            sha256_file(raw_dir / "aptamer.csv")
+            if (raw_dir / "aptamer.csv").is_file()
+            else ""
+        ),
+        "raw_protein": (
+            sha256_file(raw_dir / "protein.csv")
+            if (raw_dir / "protein.csv").is_file()
+            else ""
+        ),
+    }
+    if hashes_before["s2"] != EXPECTED_APTADB_S2_S3_SHA256 and (
+        expected_interaction_rows == 1350
+    ):
+        raise Checkpoint1ApplyError(
+            "S2 canonical SHA-256 does not match the frozen AptaDB value"
+        )
+    if hashes_before["s3"] != EXPECTED_APTADB_S2_S3_SHA256 and (
+        expected_interaction_rows == 1350
+    ):
+        raise Checkpoint1ApplyError(
+            "S3 canonical SHA-256 does not match the frozen AptaDB value"
+        )
+    if expected_interaction_rows == 1350:
+        for name, expected in EXPECTED_APTADB_RAW_SHA256.items():
+            key = f"raw_{name.split('.')[0]}"
+            if hashes_before[key] != expected:
+                raise Checkpoint1ApplyError(
+                    f"Raw {name} SHA-256 does not match registry"
+                )
+
+    queue_rows = read_csv_rows(queue_path)
+    group_rows = read_csv_rows(group_path)
+    bulk_rows = read_csv_rows(bulk_path)
+    bulk = bulk_rows[0] if bulk_rows else None
+    try:
+        report = validate_review_package(
+            queue_rows=queue_rows,
+            group_rows=group_rows,
+            bulk_confirmation=bulk,
+        )
+    except AptaDBCheckpoint1ReviewError as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+    if expected_interaction_rows == 1350 and (
+        report.total_review_records != 238
+        or report.unresolved_manual_decisions != 0
+        or report.unresolved_constant_groups != 0
+        or report.unresolved_exceptions != 0
+        or report.audit_only_unconfirmed != 0
+        or report.blocking_issues
+        or report.ready_for_application != 238
+        or not report.ok
+    ):
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for dry-run application"
+        )
+    if expected_interaction_rows != 1350 and not report.ok:
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for dry-run application"
+        )
+
+    canonical_rows = read_csv_rows(canonical_path)
+    decision_rows = read_csv_rows(decision_path)
+    rejection_rows = read_csv_rows(rejection_path)
+    parked_ssdna = (
+        read_csv_rows(parked_ssdna_path) if parked_ssdna_path.is_file() else []
+    )
+    parked_non_protein = (
+        read_csv_rows(parked_non_protein_path)
+        if parked_non_protein_path.is_file()
+        else []
+    )
+    qc_rows = read_csv_rows(qc_path)
+    sidecar_rows = read_csv_rows(sidecar_path)
+    proposal_rows = read_csv_rows(proposals_path)
+    unlinked_rows = read_csv_rows(unlinked_path)
+    qc_by_id = _index_rows(qc_rows)
+    sidecar_by_id = _index_rows(sidecar_rows)
+    grouping_mode = "target_name_raw_plus_publication"
+    policy_path = repo_root / "config" / "source_normalisation" / "aptadb.json"
+    if policy_path.is_file():
+        grouping_mode = load_aptadb_policy(policy_path).group_inference_key
+    proposals_by_record = index_constant_proposals(
+        canonical_rows, proposal_rows, grouping_mode=grouping_mode
+    )
+    policy = load_default_policy(repo_root)
+
+    def _simulate():
+        try:
+            return simulate_aptadb_checkpoint1_application(
+                queue_rows=queue_rows,
+                group_rows=group_rows,
+                canonical_rows=canonical_rows,
+                decision_rows=decision_rows,
+                source_metadata_by_id=sidecar_by_id,
+                s2_qc_by_id=qc_by_id,
+                policy=policy,
+                proposals_by_record=proposals_by_record,
+                bulk_confirmation=bulk,
+                unlinked_rows=unlinked_rows,
+                existing_rejection_rows=rejection_rows,
+                existing_parked_ssdna=parked_ssdna,
+                existing_parked_non_protein=parked_non_protein,
+                expected_interaction_rows=expected_interaction_rows,
+                expected_unlinked_rows=expected_unlinked_rows,
+            )
+        except AptaDBCheckpoint1ReviewError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    simulation = _simulate()
+    deterministic_ok = False
+    if check_deterministic_rerun:
+        second = _simulate()
+        if _serialise_preview_payload(simulation) != _serialise_preview_payload(
+            second
+        ):
+            raise Checkpoint1ApplyError(
+                "AptaDB CHECKPOINT-1 dry-run preview was not byte-identical "
+                "across deterministic rerun"
+            )
+        deterministic_ok = True
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    failed = bool(simulation.guard_rail_failure_rows)
+    if not failed:
+        write_corpus_csv_atomic(
+            output_dir / "aptadb_checkpoint1_dry_run_canonical_preview.csv",
+            simulation.preview_canonical,
+            columns=CORPUS_COLUMNS,
+        )
+        write_csv_atomic(
+            output_dir / "aptadb_checkpoint1_dry_run_routing_preview.csv",
+            DECISION_COLUMNS,
+            simulation.preview_decisions,
+        )
+        write_csv_atomic(
+            output_dir / "aptadb_checkpoint1_dry_run_rejection_preview.csv",
+            REJECTION_COLUMNS,
+            simulation.preview_rejections,
+        )
+        write_csv_atomic(
+            output_dir / "aptadb_checkpoint1_dry_run_parked_ssdna_preview.csv",
+            PARK_COLUMNS,
+            simulation.preview_parked_ssdna,
+        )
+        write_csv_atomic(
+            output_dir / "aptadb_checkpoint1_dry_run_parked_non_protein_preview.csv",
+            PARK_COLUMNS,
+            simulation.preview_parked_non_protein,
+        )
+        write_csv_atomic(
+            output_dir / "aptadb_checkpoint1_dry_run_eligible_preview.csv",
+            ELIGIBLE_PREVIEW_COLUMNS,
+            simulation.preview_eligible,
+        )
+        write_csv_atomic(
+            output_dir / "aptadb_checkpoint1_dry_run_change_report.csv",
+            CHANGE_REPORT_COLUMNS,
+            simulation.change_report,
+        )
+        write_csv_atomic(
+            output_dir / "aptadb_checkpoint1_dry_run_large_trim_human_approved.csv",
+            LARGE_TRIM_RECORD_COLUMNS,
+            simulation.large_trim_records,
+        )
+        write_csv_atomic(
+            output_dir / "aptadb_checkpoint1_dry_run_large_trim_group_summary.csv",
+            LARGE_TRIM_GROUP_COLUMNS,
+            simulation.large_trim_groups,
+        )
+    write_csv_atomic(
+        output_dir / "aptadb_checkpoint1_dry_run_group_summary.csv",
+        GROUP_SUMMARY_COLUMNS,
+        simulation.group_summaries,
+    )
+    write_csv_atomic(
+        output_dir / "aptadb_checkpoint1_dry_run_guard_rail_failures.csv",
+        GUARD_RAIL_FAILURE_COLUMNS,
+        simulation.guard_rail_failure_rows,
+    )
+    review_hashes = {
+        "queue": hashes_before["queue"],
+        "groups": hashes_before["groups"],
+        "bulk": hashes_before["bulk"],
+    }
+    integrity = {
+        "s2": hashes_before["s2"],
+        "s3": hashes_before["s3"],
+        "raw_interaction": hashes_before["raw_interaction"],
+        "raw_aptamer": hashes_before["raw_aptamer"],
+        "raw_protein": hashes_before["raw_protein"],
+        "deterministic_ok": "true" if deterministic_ok else "false",
+    }
+    report_text = format_dry_run_markdown(
+        simulation, review_hashes=review_hashes, integrity=integrity
+    )
+    _write_text_atomic(
+        output_dir / "aptadb_checkpoint1_dry_run_report.md", report_text
+    )
+    _write_text_atomic(
+        output_dir / "README.md",
+        DRY_RUN_BANNER
+        + (
+            "\n\nDRY-RUN FAILED CLOSED: remaining absolute trim guard-rail "
+            "failures.\n"
+            "These files are not an applied CHECKPOINT-1 and not an S4 handoff.\n"
+            if failed
+            else
+            "\n\nThese files are application previews only. They must not be "
+            "treated as resolved CHECKPOINT-1 outputs or an S4 handoff.\n"
+        ),
+    )
+
+    hashes_after = {
+        "queue": sha256_file(queue_path),
+        "groups": sha256_file(group_path),
+        "bulk": sha256_file(bulk_path),
+        "s2": sha256_file(s2_path),
+        "s3": sha256_file(canonical_path),
+        "s3_decisions": sha256_file(decision_path),
+        "sidecar": sha256_file(sidecar_path),
+        "qc": sha256_file(qc_path),
+        "proposals": sha256_file(proposals_path),
+        "unlinked": sha256_file(unlinked_path),
+        "rec_json": sha256_file(rec_json) if rec_json.is_file() else "",
+        "raw_interaction": (
+            sha256_file(raw_dir / "interaction.csv")
+            if (raw_dir / "interaction.csv").is_file()
+            else ""
+        ),
+        "raw_aptamer": (
+            sha256_file(raw_dir / "aptamer.csv")
+            if (raw_dir / "aptamer.csv").is_file()
+            else ""
+        ),
+        "raw_protein": (
+            sha256_file(raw_dir / "protein.csv")
+            if (raw_dir / "protein.csv").is_file()
+            else ""
+        ),
+    }
+    if hashes_after != hashes_before:
+        raise Checkpoint1ApplyError(
+            "Dry-run mutated an input artefact; aborting without treating "
+            "preview files as authoritative"
+        )
+
+    stats = simulation.stats
+    print(
+        "source=aptadb\n"
+        "mode=dry_run\n"
+        "checkpoint_status=unapplied\n"
+        f"total_interactions={stats['total_interactions']}\n"
+        f"human_reviewed_drops={stats['human_reviewed_drops']}\n"
+        f"technical_rejects_after_review={stats['technical_rejects_after_review']}\n"
+        f"parked_ssdna={stats['parked_ssdna']}\n"
+        f"parked_non_protein={stats['parked_non_protein']}\n"
+        f"technically_eligible={stats['technically_eligible']}\n"
+        f"route_changed={stats['route_changed']}\n"
+        f"guard_rail_failures={stats['guard_rail_failures']}\n"
+        f"authorised_for_s4={stats['authorised_for_s4']}\n"
+        f"review_queue_sha256={hashes_before['queue']}\n"
+        f"review_groups_sha256={hashes_before['groups']}\n"
+        f"review_bulk_sha256={hashes_before['bulk']}\n"
+        f"s2_sha256={hashes_before['s2']}\n"
+        f"s3_sha256={hashes_before['s3']}\n"
+        f"deterministic_rerun={'pass' if deterministic_ok else 'skipped'}\n"
+        "CHECKPOINT-1 is not closed\n"
+        "S4 remains blocked"
+    )
+    if failed:
+        raise Checkpoint1ApplyError(
+            f"Dry-run fail-closed: {stats['guard_rail_failures']} remaining "
+            "absolute trim guard-rail failures. No canonical preview was "
+            "authorised. CHECKPOINT-1 remains unapplied."
+        )
+
+
+APPLY_FORBIDDEN_DIR_NAMES: frozenset[str] = frozenset(
+    {"dry_run", "s4", "handoff", "authorised_for_s4", "normalised", "extracted"}
+)
+
+
+@dataclass(frozen=True)
+class AptaDBApplyResult:
+    """Authoritative AptaDB CHECKPOINT-1 apply/closure result."""
+
+    output_dir: Path
+    metadata_out: Path
+    tracked_manifest: Path
+    summary_out: Path
+    output_hashes: dict[str, str]
+    stats: dict[str, int | str | bool]
+    preview_comparison_ok: bool
+    deterministic_rerun_ok: bool
+    checkpoint_closed: bool
+
+
+def _assert_aptadb_resolved_output(path: Path, *, checkpoint_dir: Path) -> Path:
+    resolved = path.resolve()
+    checkpoint_resolved = checkpoint_dir.resolve()
+    if resolved == checkpoint_resolved:
+        raise Checkpoint1ApplyError(
+            "Refusing to overwrite the AptaDB CHECKPOINT-1 snapshot directory"
+        )
+    dry_run_dir = (checkpoint_resolved / "dry_run").resolve()
+    if resolved == dry_run_dir:
+        raise Checkpoint1ApplyError(
+            "Refusing to overwrite the validated dry-run preview directory"
+        )
+    lowered = [part.lower() for part in resolved.parts]
+    if any(name in APPLY_FORBIDDEN_DIR_NAMES for name in lowered):
+        raise Checkpoint1ApplyError(
+            f"Resolved output must not use a dry-run/S2/S3/S4 directory: {resolved}"
+        )
+    return resolved
+
+
+def _hash_paths(paths: Mapping[str, Path]) -> dict[str, str]:
+    hashed: dict[str, str] = {}
+    for name, path in paths.items():
+        hashed[name] = sha256_file(path) if path.is_file() else ""
+    return hashed
+
+
+def _write_aptadb_transform_csvs(output_dir: Path, simulation: object) -> dict[str, Path]:
+    from adapters.aptadb_checkpoint1_dry_run import (
+        CHANGE_REPORT_COLUMNS,
+        ELIGIBLE_PREVIEW_COLUMNS,
+        GROUP_SUMMARY_COLUMNS,
+        GUARD_RAIL_FAILURE_COLUMNS,
+        LARGE_TRIM_GROUP_COLUMNS,
+        LARGE_TRIM_RECORD_COLUMNS,
+        AptaDBDryRunSimulation,
+    )
+    from adapters.aptadb_s3 import DECISION_COLUMNS, PARK_COLUMNS, REJECTION_COLUMNS
+    from common.corpus_schema import CORPUS_COLUMNS, write_corpus_csv_atomic
+
+    if not isinstance(simulation, AptaDBDryRunSimulation):
+        raise Checkpoint1ApplyError("Apply payload has unexpected type")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths = {
+        "canonical": output_dir / "aptadb_checkpoint1_applied_canonical.csv",
+        "routing": output_dir / "aptadb_checkpoint1_applied_routing.csv",
+        "rejection": output_dir / "aptadb_checkpoint1_applied_rejection.csv",
+        "parked_ssdna": output_dir / "aptadb_checkpoint1_applied_parked_ssdna.csv",
+        "parked_non_protein": output_dir / "aptadb_checkpoint1_applied_parked_non_protein.csv",
+        "eligible": output_dir / "aptadb_checkpoint1_applied_eligible.csv",
+        "change_report": output_dir / "aptadb_checkpoint1_applied_change_report.csv",
+        "group_summary": output_dir / "aptadb_checkpoint1_applied_group_summary.csv",
+        "large_trim_human_approved": (
+            output_dir / "aptadb_checkpoint1_applied_large_trim_human_approved.csv"
+        ),
+        "large_trim_group_summary": (
+            output_dir / "aptadb_checkpoint1_applied_large_trim_group_summary.csv"
+        ),
+        "guard_rail_failures": (
+            output_dir / "aptadb_checkpoint1_applied_guard_rail_failures.csv"
+        ),
+    }
+    write_corpus_csv_atomic(
+        paths["canonical"], simulation.preview_canonical, columns=CORPUS_COLUMNS
+    )
+    write_csv_atomic(paths["routing"], DECISION_COLUMNS, simulation.preview_decisions)
+    write_csv_atomic(
+        paths["rejection"], REJECTION_COLUMNS, simulation.preview_rejections
+    )
+    write_csv_atomic(
+        paths["parked_ssdna"], PARK_COLUMNS, simulation.preview_parked_ssdna
+    )
+    write_csv_atomic(
+        paths["parked_non_protein"],
+        PARK_COLUMNS,
+        simulation.preview_parked_non_protein,
+    )
+    write_csv_atomic(
+        paths["eligible"], ELIGIBLE_PREVIEW_COLUMNS, simulation.preview_eligible
+    )
+    write_csv_atomic(
+        paths["change_report"], CHANGE_REPORT_COLUMNS, simulation.change_report
+    )
+    write_csv_atomic(
+        paths["group_summary"], GROUP_SUMMARY_COLUMNS, simulation.group_summaries
+    )
+    write_csv_atomic(
+        paths["large_trim_human_approved"],
+        LARGE_TRIM_RECORD_COLUMNS,
+        simulation.large_trim_records,
+    )
+    write_csv_atomic(
+        paths["large_trim_group_summary"],
+        LARGE_TRIM_GROUP_COLUMNS,
+        simulation.large_trim_groups,
+    )
+    write_csv_atomic(
+        paths["guard_rail_failures"],
+        GUARD_RAIL_FAILURE_COLUMNS,
+        simulation.guard_rail_failure_rows,
+    )
+    return paths
+
+
+def _compare_applied_to_preview(
+    *,
+    applied_paths: Mapping[str, Path],
+    preview_dir: Path,
+) -> None:
+    from adapters.aptadb_checkpoint1_apply import PREVIEW_COMPARISON_FILES
+
+    missing = [
+        preview_name
+        for _key, preview_name, _applied in PREVIEW_COMPARISON_FILES
+        if not (preview_dir / preview_name).is_file()
+    ]
+    if missing:
+        raise Checkpoint1ApplyError(
+            "Validated dry-run preview is incomplete; refusing real apply: "
+            + ", ".join(missing)
+        )
+    mismatches: list[str] = []
+    for key, preview_name, _applied_name in PREVIEW_COMPARISON_FILES:
+        preview_path = preview_dir / preview_name
+        applied_path = applied_paths[key]
+        if preview_path.read_bytes() != applied_path.read_bytes():
+            mismatches.append(key)
+    if mismatches:
+        raise Checkpoint1ApplyError(
+            "Real application is not byte-identical to the validated dry-run "
+            "preview for: " + ", ".join(mismatches)
+        )
+
+
+def run_aptadb_checkpoint1_apply(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    tracked_manifest: Path,
+    metadata_out: Path,
+    preview_dir: Path | None = None,
+    check_deterministic_rerun: bool = True,
+    expected_interaction_rows: int | None = 1350,
+    expected_unlinked_rows: int | None = 37,
+    compare_to_preview: bool | None = None,
+) -> AptaDBApplyResult:
+    """Apply completed AptaDB CHECKPOINT-1 review and close the checkpoint."""
+    from adapters.aptadb_checkpoint1_apply import (
+        APTADB_CHECKPOINT_CLOSED_STATEMENT,
+        APTADB_TRACKED_RESOLUTION_COLUMNS,
+        CLOSURE_ONLY_FIELDS,
+        EXPECTED_APTADB_REC_JSON_SHA256,
+        EXPECTED_APTADB_REVIEW_BULK_SHA256,
+        EXPECTED_APTADB_REVIEW_GROUPS_SHA256,
+        EXPECTED_APTADB_REVIEW_QUEUE_SHA256,
+        EXPECTED_APTADB_SIDECAR_SHA256,
+        AptaDBCheckpoint1ApplyError,
+        build_tracked_resolutions,
+        check_production_expectations,
+        count_group_decisions,
+        count_manual_decisions,
+        format_closure_markdown,
+        PREVIEW_COMPARISON_FILES,
+    )
+    from adapters.aptadb_checkpoint1_dry_run import (
+        simulate_aptadb_checkpoint1_application,
+    )
+    from adapters.aptadb_checkpoint1_review import (
+        AptaDBCheckpoint1ReviewError,
+        load_default_policy,
+        read_csv_rows,
+        validate_review_package,
+    )
+    from adapters.aptadb_s2 import load_aptadb_policy
+    from adapters.aptadb_s3 import index_constant_proposals
+
+    output_dir = _assert_aptadb_resolved_output(
+        output_dir, checkpoint_dir=checkpoint_dir
+    )
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    tracked_manifest = _assert_tracked_path_allowed(repo_root, tracked_manifest)
+    metadata_out = _assert_tracked_path_allowed(repo_root, metadata_out)
+    if preview_dir is None:
+        preview_dir = checkpoint_dir / "dry_run"
+    if not Path(preview_dir).is_absolute():
+        preview_dir = repo_root / preview_dir
+    preview_dir = preview_dir.resolve()
+    if compare_to_preview is None:
+        compare_to_preview = expected_interaction_rows == 1350
+
+    review_dir = checkpoint_dir / "manual_review"
+    queue_path = review_dir / "aptadb_checkpoint1_manual_review.csv"
+    group_path = review_dir / "aptadb_checkpoint1_constant_group_review.csv"
+    bulk_path = review_dir / "aptadb_checkpoint1_bulk_audit_confirmation.csv"
+    canonical_path = checkpoint_dir / "aptadb_s3_canonical.csv"
+    decision_path = checkpoint_dir / "aptadb_s3_decisions.csv"
+    rejection_path = checkpoint_dir / "rejected_aptadb.csv"
+    parked_ssdna_path = checkpoint_dir / "aptadb_s3_parked_ssdna.csv"
+    parked_non_protein_path = checkpoint_dir / "aptadb_s3_parked_non_protein.csv"
+    s2_path = repo_root / "data" / "interim" / "normalised" / "aptadb_normalised.csv"
+    qc_path = repo_root / "data" / "interim" / "normalised" / "aptadb_s2_qc.csv"
+    proposals_path = (
+        repo_root / "data" / "interim" / "normalised" / "aptadb_constant_region_proposals.csv"
+    )
+    sidecar_path = (
+        repo_root / "data" / "interim" / "extracted" / "aptadb_source_metadata.csv"
+    )
+    unlinked_path = (
+        repo_root / "data" / "interim" / "extracted" / "aptadb_unlinked_aptamers.csv"
+    )
+    rec_json = (
+        repo_root / "config" / "checkpoint_reviews" / "aptadb_checkpoint1_recommendations.json"
+    )
+    raw_dir = repo_root / "data" / "raw" / "AptaDB"
+
+    required = [
+        queue_path,
+        group_path,
+        bulk_path,
+        canonical_path,
+        decision_path,
+        rejection_path,
+        s2_path,
+        qc_path,
+        proposals_path,
+        sidecar_path,
+        unlinked_path,
+        rec_json,
+    ]
+    for path in required:
+        if not path.is_file():
+            raise Checkpoint1ApplyError(f"Missing apply input: {path.name}")
+
+    preview_hash_paths = {
+        key: preview_dir / preview_name
+        for key, preview_name, _applied in PREVIEW_COMPARISON_FILES
+    }
+    preview_hashes_before = (
+        _hash_paths(preview_hash_paths) if compare_to_preview else {}
+    )
+
+    hashes_before = {
+        "queue": sha256_file(queue_path),
+        "groups": sha256_file(group_path),
+        "bulk": sha256_file(bulk_path),
+        "s2": sha256_file(s2_path),
+        "s3": sha256_file(canonical_path),
+        "s3_decisions": sha256_file(decision_path),
+        "sidecar": sha256_file(sidecar_path),
+        "qc": sha256_file(qc_path),
+        "proposals": sha256_file(proposals_path),
+        "unlinked": sha256_file(unlinked_path),
+        "rec_json": sha256_file(rec_json),
+        "raw_interaction": (
+            sha256_file(raw_dir / "interaction.csv")
+            if (raw_dir / "interaction.csv").is_file()
+            else ""
+        ),
+        "raw_aptamer": (
+            sha256_file(raw_dir / "aptamer.csv")
+            if (raw_dir / "aptamer.csv").is_file()
+            else ""
+        ),
+        "raw_protein": (
+            sha256_file(raw_dir / "protein.csv")
+            if (raw_dir / "protein.csv").is_file()
+            else ""
+        ),
+    }
+    if expected_interaction_rows == 1350:
+        if hashes_before["queue"] != EXPECTED_APTADB_REVIEW_QUEUE_SHA256:
+            raise Checkpoint1ApplyError(
+                "Record review SHA-256 does not match the frozen reviewed file"
+            )
+        if hashes_before["groups"] != EXPECTED_APTADB_REVIEW_GROUPS_SHA256:
+            raise Checkpoint1ApplyError(
+                "Group review SHA-256 does not match the frozen reviewed file"
+            )
+        if hashes_before["bulk"] != EXPECTED_APTADB_REVIEW_BULK_SHA256:
+            raise Checkpoint1ApplyError(
+                "Bulk confirmation SHA-256 does not match the frozen reviewed file"
+            )
+        if hashes_before["rec_json"] != EXPECTED_APTADB_REC_JSON_SHA256:
+            raise Checkpoint1ApplyError(
+                "Recommendation JSON SHA-256 does not match the tracked file"
+            )
+        if hashes_before["s2"] != EXPECTED_APTADB_S2_S3_SHA256:
+            raise Checkpoint1ApplyError(
+                "S2 canonical SHA-256 does not match the frozen AptaDB value"
+            )
+        if hashes_before["s3"] != EXPECTED_APTADB_S2_S3_SHA256:
+            raise Checkpoint1ApplyError(
+                "S3 canonical SHA-256 does not match the frozen AptaDB value"
+            )
+        if hashes_before["sidecar"] != EXPECTED_APTADB_SIDECAR_SHA256:
+            raise Checkpoint1ApplyError(
+                "AptaDB source-metadata sidecar SHA-256 does not match freeze"
+            )
+        for name, expected in EXPECTED_APTADB_RAW_SHA256.items():
+            key = f"raw_{name.split('.')[0]}"
+            if hashes_before[key] != expected:
+                raise Checkpoint1ApplyError(
+                    f"Raw {name} SHA-256 does not match registry"
+                )
+
+    queue_rows = read_csv_rows(queue_path)
+    group_rows = read_csv_rows(group_path)
+    bulk_rows = read_csv_rows(bulk_path)
+    bulk = bulk_rows[0] if bulk_rows else None
+    try:
+        report = validate_review_package(
+            queue_rows=queue_rows,
+            group_rows=group_rows,
+            bulk_confirmation=bulk,
+        )
+    except AptaDBCheckpoint1ReviewError as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+    if expected_interaction_rows == 1350 and (
+        report.total_review_records != 238
+        or report.unresolved_manual_decisions != 0
+        or report.unresolved_constant_groups != 0
+        or report.unresolved_exceptions != 0
+        or report.audit_only_unconfirmed != 0
+        or report.blocking_issues
+        or report.ready_for_application != 238
+        or not report.ok
+    ):
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for CHECKPOINT-1 application"
+        )
+    if expected_interaction_rows != 1350 and not report.ok:
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for CHECKPOINT-1 application"
+        )
+
+    canonical_rows = read_csv_rows(canonical_path)
+    decision_rows = read_csv_rows(decision_path)
+    rejection_rows = read_csv_rows(rejection_path)
+    parked_ssdna = (
+        read_csv_rows(parked_ssdna_path) if parked_ssdna_path.is_file() else []
+    )
+    parked_non_protein = (
+        read_csv_rows(parked_non_protein_path)
+        if parked_non_protein_path.is_file()
+        else []
+    )
+    qc_rows = read_csv_rows(qc_path)
+    sidecar_rows = read_csv_rows(sidecar_path)
+    proposal_rows = read_csv_rows(proposals_path)
+    unlinked_rows = read_csv_rows(unlinked_path)
+    qc_by_id = _index_rows(qc_rows)
+    sidecar_by_id = _index_rows(sidecar_rows)
+    grouping_mode = "target_name_raw_plus_publication"
+    policy_path = repo_root / "config" / "source_normalisation" / "aptadb.json"
+    if policy_path.is_file():
+        grouping_mode = load_aptadb_policy(policy_path).group_inference_key
+    proposals_by_record = index_constant_proposals(
+        canonical_rows, proposal_rows, grouping_mode=grouping_mode
+    )
+    policy = load_default_policy(repo_root)
+
+    def _simulate():
+        try:
+            return simulate_aptadb_checkpoint1_application(
+                queue_rows=queue_rows,
+                group_rows=group_rows,
+                canonical_rows=canonical_rows,
+                decision_rows=decision_rows,
+                source_metadata_by_id=sidecar_by_id,
+                s2_qc_by_id=qc_by_id,
+                policy=policy,
+                proposals_by_record=proposals_by_record,
+                bulk_confirmation=bulk,
+                unlinked_rows=unlinked_rows,
+                existing_rejection_rows=rejection_rows,
+                existing_parked_ssdna=parked_ssdna,
+                existing_parked_non_protein=parked_non_protein,
+                expected_interaction_rows=expected_interaction_rows,
+                expected_unlinked_rows=expected_unlinked_rows,
+            )
+        except AptaDBCheckpoint1ReviewError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    simulation = _simulate()
+    if simulation.guard_rail_failure_rows:
+        raise Checkpoint1ApplyError(
+            f"Real apply fail-closed: {simulation.stats['guard_rail_failures']} "
+            "remaining absolute trim guard-rail failures. CHECKPOINT-1 is not closed."
+        )
+
+    deterministic_ok = False
+    if check_deterministic_rerun:
+        second = _simulate()
+        if _serialise_preview_payload(simulation) != _serialise_preview_payload(
+            second
+        ):
+            raise Checkpoint1ApplyError(
+                "AptaDB CHECKPOINT-1 application was not byte-identical "
+                "across deterministic in-memory rerun"
+            )
+        deterministic_ok = True
+
+    record_decisions = count_manual_decisions(queue_rows)
+    group_decisions = count_group_decisions(group_rows)
+    bulk_count = len(report.eligible_bulk_audit_ids)
+    if expected_interaction_rows == 1350:
+        try:
+            check_production_expectations(
+                simulation=simulation,
+                queue_rows=queue_rows,
+                group_rows=group_rows,
+                bulk_confirmation_count=bulk_count,
+            )
+        except AptaDBCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    compare_dir = checkpoint_dir / "closure_validation" / "apply_vs_preview"
+    compare_dir = _assert_output_dir_allowed(repo_root, compare_dir)
+    compare_paths = _write_aptadb_transform_csvs(compare_dir, simulation)
+    preview_comparison_ok = False
+    if compare_to_preview:
+        _compare_applied_to_preview(
+            applied_paths=compare_paths, preview_dir=preview_dir
+        )
+        preview_hashes_after_compare = _hash_paths(preview_hash_paths)
+        if preview_hashes_after_compare != preview_hashes_before:
+            raise Checkpoint1ApplyError(
+                "Dry-run preview files changed during real application"
+            )
+        preview_comparison_ok = True
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    applied_paths = _write_aptadb_transform_csvs(output_dir, simulation)
+    if compare_to_preview:
+        _compare_applied_to_preview(
+            applied_paths=applied_paths, preview_dir=preview_dir
+        )
+
+    tracked_rows = build_tracked_resolutions(
+        decisions=simulation.preview_decisions,
+        queue_rows=queue_rows,
+        route_changed_ids=simulation.route_changed_ids,
+    )
+    s4_rows = [
+        {
+            "record_id": row["record_id"],
+            "resolved_decision": "accept",
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+        }
+        for row in tracked_rows
+        if row["authorised_for_s4"] == "true"
+    ]
+    parked_id_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["manual_decision"],
+        }
+        for row in tracked_rows
+        if row["primary_route"]
+        in {"parked_ssdna", "parked_non_protein"}
+    ]
+    rejected_id_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["manual_decision"],
+        }
+        for row in tracked_rows
+        if row["primary_route"] == "technical_reject"
+    ]
+    write_csv_atomic(
+        tracked_manifest, APTADB_TRACKED_RESOLUTION_COLUMNS, tracked_rows
+    )
+    write_csv_atomic(
+        output_dir / "aptadb_checkpoint1_s4_authorised_ids.csv",
+        S4_ID_COLUMNS,
+        s4_rows,
+    )
+    write_csv_atomic(
+        output_dir / "aptadb_checkpoint1_parked_ids.csv",
+        PARKED_ID_COLUMNS,
+        parked_id_rows,
+    )
+    write_csv_atomic(
+        output_dir / "aptadb_checkpoint1_rejected_ids.csv",
+        REJECTED_ID_COLUMNS,
+        rejected_id_rows,
+    )
+
+    transform_hashes = {name: sha256_file(path) for name, path in applied_paths.items()}
+    closure_paths = {
+        "s4_authorised_ids": output_dir / "aptadb_checkpoint1_s4_authorised_ids.csv",
+        "parked_ids": output_dir / "aptadb_checkpoint1_parked_ids.csv",
+        "rejected_ids": output_dir / "aptadb_checkpoint1_rejected_ids.csv",
+        "tracked_manifest": tracked_manifest,
+    }
+    output_hashes = {
+        **transform_hashes,
+        **{name: sha256_file(path) for name, path in closure_paths.items()},
+    }
+
+    review_hashes = {
+        "queue": hashes_before["queue"],
+        "groups": hashes_before["groups"],
+        "bulk": hashes_before["bulk"],
+        "rec_json": hashes_before["rec_json"],
+    }
+    integrity = {
+        "s2": hashes_before["s2"],
+        "s3": hashes_before["s3"],
+        "sidecar": hashes_before["sidecar"],
+        "raw_interaction": hashes_before["raw_interaction"],
+        "raw_aptamer": hashes_before["raw_aptamer"],
+        "raw_protein": hashes_before["raw_protein"],
+        "deterministic_ok": "true" if deterministic_ok else "false",
+    }
+    summary_text = format_closure_markdown(
+        simulation,
+        review_hashes=review_hashes,
+        integrity=integrity,
+        output_hashes=output_hashes,
+        record_decisions=record_decisions,
+        group_decisions=group_decisions,
+        bulk_confirmations=bulk_count,
+        preview_comparison_ok=preview_comparison_ok or not compare_to_preview,
+        deterministic_ok=deterministic_ok,
+    )
+    if APTADB_CHECKPOINT_CLOSED_STATEMENT not in summary_text:
+        raise Checkpoint1ApplyError("Resolution summary missing checkpoint-closed statement")
+    if str(repo_root.resolve()) in summary_text:
+        raise Checkpoint1ApplyError(
+            "Resolution summary must not contain absolute repository paths"
+        )
+    summary_path = output_dir / "aptadb_checkpoint1_resolution_summary.md"
+    _write_text_atomic(summary_path, summary_text)
+    _write_text_atomic(
+        output_dir / "README.md",
+        "CHECKPOINT-1 CLOSED.\n"
+        "These files are the authoritative AptaDB post-review artefacts.\n"
+        "They must not overwrite S2, pre-review S3, or dry-run previews.\n"
+        "S4 has not started.\n",
+    )
+    output_hashes["summary"] = sha256_file(summary_path)
+
+    metadata = {
+        "source_key": "aptadb",
+        "checkpoint": "CHECKPOINT-1",
+        "review_model": "single_reviewer",
+        "checkpoint_status": "closed",
+        "checkpoint_closed": True,
+        "s4_started": False,
+        "next_stage": "global_S4_handoff",
+        "reviewed_records": int(simulation.stats["reviewed_records"]),
+        "record_decisions": record_decisions,
+        "group_decisions": group_decisions,
+        "bulk_audit_confirmations": bulk_count,
+        "human_reviewed_drops": int(simulation.stats["human_reviewed_drops"]),
+        "technical_rejects_after_review": int(
+            simulation.stats["technical_rejects_after_review"]
+        ),
+        "technical_rejects_excluding_human_drop": int(
+            simulation.stats["technical_rejects_excluding_human_drop"]
+        ),
+        "parked_ssdna": int(simulation.stats["parked_ssdna"]),
+        "parked_non_protein": int(simulation.stats["parked_non_protein"]),
+        "technically_eligible": int(simulation.stats["technically_eligible"]),
+        "authorised_for_s4": int(simulation.stats["technically_eligible"]),
+        "unlinked_aptamers": int(simulation.stats["unlinked_aptamers"]),
+        "unlinked_missing_target": int(simulation.stats["unlinked_missing_target"]),
+        "route_changed": int(simulation.stats["route_changed"]),
+        "route_changed_ids": list(simulation.route_changed_ids),
+        "sequence_corrections": int(simulation.stats["sequence_corrections"]),
+        "molecule_overrides": int(simulation.stats["molecule_overrides"]),
+        "records_trimmed": int(simulation.stats["records_trimmed"]),
+        "trimmed_by_group": int(simulation.stats["trimmed_by_group"]),
+        "trimmed_by_record_override": int(
+            simulation.stats["trimmed_by_record_override"]
+        ),
+        "core_length_changed": int(simulation.stats["core_length_changed"]),
+        "large_trim_human_approved": int(
+            simulation.stats["large_trim_human_approved"]
+        ),
+        "guard_rail_failures": int(simulation.stats["guard_rail_failures"]),
+        "review_file_sha256": hashes_before["queue"],
+        "review_groups_sha256": hashes_before["groups"],
+        "review_bulk_sha256": hashes_before["bulk"],
+        "recommendations_sha256": hashes_before["rec_json"],
+        "s2_sha256": hashes_before["s2"],
+        "s3_sha256": hashes_before["s3"],
+        "sidecar_sha256": hashes_before["sidecar"],
+        "raw_interaction_sha256": hashes_before["raw_interaction"],
+        "raw_aptamer_sha256": hashes_before["raw_aptamer"],
+        "raw_protein_sha256": hashes_before["raw_protein"],
+        "output_hashes": output_hashes,
+        "preview_comparison_ok": preview_comparison_ok or not compare_to_preview,
+        "deterministic_rerun_ok": deterministic_ok,
+        "closure_only_fields": list(CLOSURE_ONLY_FIELDS),
+        "application_mode": "apply",
+    }
+    _write_json_atomic(metadata_out, metadata)
+    output_hashes["metadata"] = sha256_file(metadata_out)
+
+    if check_deterministic_rerun:
+        determinism_dir = checkpoint_dir / "closure_validation" / "determinism"
+        determinism_dir = _assert_output_dir_allowed(repo_root, determinism_dir)
+        third = _simulate()
+        if _serialise_preview_payload(simulation) != _serialise_preview_payload(
+            third
+        ):
+            raise Checkpoint1ApplyError(
+                "Deterministic verification rerun diverged from the "
+                "authoritative in-memory payload"
+            )
+        verify_paths = _write_aptadb_transform_csvs(determinism_dir, third)
+        for name, path in applied_paths.items():
+            if sha256_file(path) != sha256_file(verify_paths[name]):
+                raise Checkpoint1ApplyError(
+                    f"Deterministic verification mismatch for {name}"
+                )
+
+    hashes_after = {
+        "queue": sha256_file(queue_path),
+        "groups": sha256_file(group_path),
+        "bulk": sha256_file(bulk_path),
+        "s2": sha256_file(s2_path),
+        "s3": sha256_file(canonical_path),
+        "s3_decisions": sha256_file(decision_path),
+        "sidecar": sha256_file(sidecar_path),
+        "qc": sha256_file(qc_path),
+        "proposals": sha256_file(proposals_path),
+        "unlinked": sha256_file(unlinked_path),
+        "rec_json": sha256_file(rec_json),
+        "raw_interaction": (
+            sha256_file(raw_dir / "interaction.csv")
+            if (raw_dir / "interaction.csv").is_file()
+            else ""
+        ),
+        "raw_aptamer": (
+            sha256_file(raw_dir / "aptamer.csv")
+            if (raw_dir / "aptamer.csv").is_file()
+            else ""
+        ),
+        "raw_protein": (
+            sha256_file(raw_dir / "protein.csv")
+            if (raw_dir / "protein.csv").is_file()
+            else ""
+        ),
+    }
+    if hashes_after != hashes_before:
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 apply mutated an immutable input artefact"
+        )
+    if compare_to_preview:
+        preview_hashes_final = _hash_paths(preview_hash_paths)
+        if preview_hashes_final != preview_hashes_before:
+            raise Checkpoint1ApplyError(
+                "Dry-run preview files changed after real application"
+            )
+
+    stats = dict(simulation.stats)
+    stats["checkpoint_closed"] = True
+    stats["authorised_for_s4"] = int(simulation.stats["technically_eligible"])
+    stats["preview_comparison_ok"] = preview_comparison_ok or not compare_to_preview
+    stats["deterministic_rerun_ok"] = deterministic_ok
+    print(
+        "source=aptadb\n"
+        "mode=apply\n"
+        "checkpoint_status=closed\n"
+        "checkpoint_closed=true\n"
+        f"total_interactions={stats['total_interactions']}\n"
+        f"human_reviewed_drops={stats['human_reviewed_drops']}\n"
+        f"technical_rejects_after_review={stats['technical_rejects_after_review']}\n"
+        f"parked_ssdna={stats['parked_ssdna']}\n"
+        f"parked_non_protein={stats['parked_non_protein']}\n"
+        f"technically_eligible={stats['technically_eligible']}\n"
+        f"route_changed={stats['route_changed']}\n"
+        f"guard_rail_failures={stats['guard_rail_failures']}\n"
+        f"authorised_for_s4={stats['authorised_for_s4']}\n"
+        f"review_queue_sha256={hashes_before['queue']}\n"
+        f"review_groups_sha256={hashes_before['groups']}\n"
+        f"review_bulk_sha256={hashes_before['bulk']}\n"
+        f"s2_sha256={hashes_before['s2']}\n"
+        f"s3_sha256={hashes_before['s3']}\n"
+        f"preview_comparison={'pass' if stats['preview_comparison_ok'] else 'fail'}\n"
+        f"deterministic_rerun={'pass' if deterministic_ok else 'skipped'}\n"
+        "CHECKPOINT-1 is closed\n"
+        "S4 was not started"
+    )
+    return AptaDBApplyResult(
+        output_dir=output_dir,
+        metadata_out=metadata_out,
+        tracked_manifest=tracked_manifest,
+        summary_out=summary_path,
+        output_hashes=output_hashes,
+        stats=stats,
+        preview_comparison_ok=bool(stats["preview_comparison_ok"]),
+        deterministic_rerun_ok=deterministic_ok,
+        checkpoint_closed=True,
+    )
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -1788,6 +2949,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip raw/S1/S2 integrity checks (tests only)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Simulate CHECKPOINT-1 application without writing resolved, "
+            "closed, or S4-authorised artefacts"
+        ),
+    )
+    parser.add_argument(
+        "--skip-deterministic-rerun",
+        action="store_true",
+        help="Skip in-memory dry-run determinism check (tests only)",
+    )
     return parser
 
 
@@ -1810,12 +2984,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise Checkpoint1ApplyError(f"Repository root does not exist: {repo_root}")
 
         if args.source == "aptadb":
-            from adapters.aptadb_checkpoint1_review import (
-                apply_aptadb_checkpoint1_package,
-                load_default_policy,
-                read_csv_rows,
-            )
-
             checkpoint_dir = (
                 args.checkpoint_dir
                 if args.checkpoint_dir is not None
@@ -1823,38 +2991,51 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             if not Path(checkpoint_dir).is_absolute():
                 checkpoint_dir = repo_root / checkpoint_dir
-            review_file = (
-                args.review_file
-                if args.review_file is not None
-                else Path(checkpoint_dir)
-                / "manual_review"
-                / "aptadb_checkpoint1_manual_review.csv"
+            if args.dry_run:
+                output_dir = (
+                    args.output_dir
+                    if args.output_dir is not None
+                    else Path(checkpoint_dir) / "dry_run"
+                )
+                if not Path(output_dir).is_absolute():
+                    output_dir = repo_root / output_dir
+                run_aptadb_checkpoint1_dry_run(
+                    repo_root=repo_root,
+                    checkpoint_dir=Path(checkpoint_dir),
+                    output_dir=Path(output_dir),
+                    check_deterministic_rerun=not args.skip_deterministic_rerun,
+                )
+                return 0
+            output_dir = (
+                args.output_dir
+                if args.output_dir is not None
+                else Path(checkpoint_dir) / "resolved"
             )
-            if not Path(review_file).is_absolute():
-                review_file = repo_root / review_file
-            group_path = (
-                Path(review_file).parent / "aptadb_checkpoint1_constant_group_review.csv"
+            if not Path(output_dir).is_absolute():
+                output_dir = repo_root / output_dir
+            tracked_manifest = (
+                args.tracked_manifest
+                if args.tracked_manifest is not None
+                else Path(
+                    "config/checkpoint_reviews/aptadb_checkpoint1_resolutions.csv"
+                )
             )
-            bulk_path = (
-                Path(review_file).parent
-                / "aptadb_checkpoint1_bulk_audit_confirmation.csv"
+            metadata_out = (
+                args.metadata_out
+                if args.metadata_out is not None
+                else Path(
+                    "config/checkpoint_reviews/aptadb_checkpoint1_metadata.json"
+                )
             )
-            queue_rows = read_csv_rows(Path(review_file))
-            group_rows = read_csv_rows(group_path) if group_path.is_file() else []
-            bulk_rows = read_csv_rows(bulk_path) if bulk_path.is_file() else []
-            apply_aptadb_checkpoint1_package(
-                queue_rows=queue_rows,
-                group_rows=group_rows,
-                canonical_by_id={},
-                source_metadata_by_id={},
-                s2_qc_by_id={},
-                policy=load_default_policy(repo_root),
-                bulk_confirmation=bulk_rows[0] if bulk_rows else None,
+            run_aptadb_checkpoint1_apply(
+                repo_root=repo_root,
+                checkpoint_dir=Path(checkpoint_dir),
+                output_dir=Path(output_dir),
+                tracked_manifest=tracked_manifest,
+                metadata_out=metadata_out,
+                check_deterministic_rerun=not args.skip_deterministic_rerun,
             )
-            raise Checkpoint1ApplyError(
-                "AptaDB CHECKPOINT-1 application reached an unexpected success "
-                "path; live closure is not authorised in this task"
-            )
+            return 0
         if args.source == "utexas":
             checkpoint_dir = (
                 args.checkpoint_dir
