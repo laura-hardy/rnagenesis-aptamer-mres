@@ -234,6 +234,10 @@ def test_forbidden_companion_cannot_be_substituted(
         "data/raw/aptabase/Aptabase_Raw.Csv",
         "data/raw/aptabase/aptamer search page 1.html",
         "data/raw/aptabase/APTAMER SEARCH PAGE 37.HTML",
+        "data/raw/riboaptamer/rna_aptamer_seqs.csv",
+        "data/raw/riboaptamer/RNA_APTAMER_SEQS.CSV",
+        "data/raw/riboaptamer/rna_aptamer_seqs.xlsx",
+        "data/raw/riboaptamer/RNA_APTAMER_SEQS.XLSX",
     ],
 )
 def test_forbidden_companion_basename_check_is_case_insensitive(
@@ -289,6 +293,8 @@ def test_forbidden_fixtures_directory_check_is_case_insensitive(
         "data/raw/aptabase/htmlish_notes.csv",
         "data/raw/aptabase/my_fixtures_notes.csv",
         "data/raw/aptabase/Aptamer Search Page Notes.html",
+        "data/raw/riboaptamer/all_sequences_509_rows.csv",
+        "data/raw/riboaptamer/rna_aptamer_seqs_backup.csv",
     ],
 )
 def test_similar_filename_not_falsely_rejected_as_forbidden_companion(

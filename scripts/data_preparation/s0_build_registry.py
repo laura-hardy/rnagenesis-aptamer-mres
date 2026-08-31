@@ -45,6 +45,16 @@ FORBIDDEN_EXACT_RELATIVE_PATHS = frozenset(
         "data/raw/aptabase/Aptamer Search Page 2.html",
         "data/raw/aptabase/Aptamer Search Page 37.html",
         "data/raw/aptabase/Aptamer Search Page 61.html",
+        "data/raw/riboaptamer/rna_aptamer_seqs.csv",
+        "data/raw/riboaptamer/rna_aptamer_seqs.xlsx",
+    }
+)
+
+# Deleted truncated RiboAptamer exports superseded by all_sequences_509_rows.csv.
+FORBIDDEN_RIBOAPTAMER_TRUNCATED_BASENAMES = frozenset(
+    {
+        "rna_aptamer_seqs.csv",
+        "rna_aptamer_seqs.xlsx",
     }
 )
 
@@ -399,6 +409,12 @@ def assert_path_allowed(repo_root: Path, relative_path: str) -> Path:
     rel = normalise_relative_path(relative_path)
     lower = rel.lower()
 
+    basename_lower = Path(rel).name.lower()
+    if basename_lower in FORBIDDEN_RIBOAPTAMER_TRUNCATED_BASENAMES:
+        raise RegistryError(
+            "Forbidden superseded truncated RiboAptamer export registered "
+            f"as input: {rel}"
+        )
     if rel in FORBIDDEN_EXACT_RELATIVE_PATHS:
         raise RegistryError(
             f"Forbidden AptaBase companion registered as input: {rel}"
@@ -407,7 +423,6 @@ def assert_path_allowed(repo_root: Path, relative_path: str) -> Path:
         raise RegistryError(
             f"Forbidden AptaBase raw CSV registered as input: {rel}"
         )
-    basename_lower = Path(rel).name.lower()
     if basename_lower in FORBIDDEN_APTADB_BASENAMES and "aptadb" in lower:
         raise RegistryError(
             f"Forbidden AptaDB non-protein lookup table registered as input: "

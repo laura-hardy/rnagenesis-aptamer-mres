@@ -33,6 +33,12 @@ from adapters.aptadb import (  # noqa: E402
     write_sidecar_csv_atomic as write_aptadb_sidecar_csv_atomic,
     write_unlinked_csv_atomic as write_aptadb_unlinked_csv_atomic,
 )
+from adapters.riboaptamer import (  # noqa: E402
+    RiboAptamerAdapterError,
+    RiboAptamerExtractionResult,
+    extract_riboaptamer,
+    write_sidecar_csv_atomic as write_riboaptamer_sidecar_csv_atomic,
+)
 from adapters.utexas import (  # noqa: E402
     UTexasAdapterError,
     UTexasExtractionResult,
@@ -71,6 +77,12 @@ FORBIDDEN_COMPANION_BASENAMES = frozenset(
         "aptamer search page 61.html",
     }
 )
+FORBIDDEN_RIBOAPTAMER_TRUNCATED_BASENAMES = frozenset(
+    {
+        "rna_aptamer_seqs.csv",
+        "rna_aptamer_seqs.xlsx",
+    }
+)
 
 
 class S1ExtractError(ValueError):
@@ -99,7 +111,9 @@ class S1RunResult:
     registered_paths: tuple[str, ...] = ()
 
 
-AdapterFn = Callable[..., AptaBaseExtractionResult | UTexasExtractionResult]
+AdapterFn = Callable[
+    ..., AptaBaseExtractionResult | UTexasExtractionResult | RiboAptamerExtractionResult
+]
 
 
 def _get_adapter(source_key: str) -> AdapterFn:
@@ -107,6 +121,8 @@ def _get_adapter(source_key: str) -> AdapterFn:
         return extract_aptabase
     if source_key == "utexas":
         return extract_utexas
+    if source_key == "riboaptamer":
+        return extract_riboaptamer
     raise S1ExtractError(f"Unknown S1 adapter for source_key={source_key!r}")
 
 
@@ -177,6 +193,11 @@ def _resolve_aptadb_roles(
 def _assert_not_forbidden_companion(relative_path: str) -> None:
     lower = relative_path.replace("\\", "/").lower()
     name_lower = Path(lower).name
+    if name_lower in FORBIDDEN_RIBOAPTAMER_TRUNCATED_BASENAMES:
+        raise S1ExtractError(
+            "Forbidden superseded truncated RiboAptamer export cannot be "
+            f"used as S1 input: {relative_path}"
+        )
     if name_lower in FORBIDDEN_COMPANION_BASENAMES:
         raise S1ExtractError(
             f"Forbidden AptaBase companion cannot be used as S1 input: "
@@ -647,6 +668,143 @@ def build_aptadb_s1_report(
     return "\n".join(lines)
 
 
+def build_riboaptamer_s1_report(
+    *,
+    repo_root: Path,
+    registry_row: RegistrySpecRow,
+    result: S1RunResult,
+) -> str:
+    """Build an aggregate-only Markdown RiboAptamer S1 report (no sequences)."""
+    stats = result.stats
+    lines = [
+        "# RiboAptamer S1 extraction report",
+        "",
+        "## Registered source",
+        "",
+        f"- Registered path: `{registry_row.path}`",
+        f"- Registered source dataset: `{registry_row.source_dataset}`",
+        f"- Registered SHA-256: `{registry_row.sha256}`",
+        f"- Observed SHA-256: `{result.observed_sha256}`",
+        f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+        f"- Registered n_rows_expected: `{registry_row.n_rows_expected}`",
+        f"- Redistribution status: `{registry_row.redistribution_status}`",
+        "",
+        "## Row counts",
+        "",
+        f"- Input rows: `{stats.input_rows}`",
+        f"- Canonical output rows: `{stats.canonical_rows}`",
+        f"- Sidecar rows: `{stats.sidecar_rows}`",
+        f"- Unique native IDs: `{stats.unique_native_ids}`",
+        f"- Unique canonical record IDs: `{stats.unique_record_ids}`",
+        f"- First native ID: `{stats.first_native_id}`",
+        f"- Last native ID: `{stats.last_native_id}`",
+        f"- S1 records filtered, rejected, or parked: `0`",
+        "",
+        "## Native-ID strategy",
+        "",
+        f"- Strategy: `{stats.native_id_strategy}`",
+        "- Source `Sequence Name` is preserved only in the sidecar; it is not",
+        "  used as `native_id` because three identifiers are duplicated.",
+        f"- Unique Sequence Name values: `{stats.unique_sequence_names}`",
+        f"- Duplicate Sequence Name keys: `{stats.duplicate_sequence_name_keys}`",
+        f"- Rows participating in duplicated Sequence Name keys: "
+        f"`{stats.rows_in_duplicate_sequence_name_groups}`",
+        "- Exact duplicate source rows remain separate S1 records.",
+        "",
+        "## Canonical mapping summary",
+        "",
+        "- `Sequence` → `sequence_raw` (verbatim; no cleaning)",
+        "- 1-based CSV data-row number → `native_id` (`001`…`509`)",
+        "- `record_id` = `riboaptamer:{native_id}`",
+        "- No canonical target column exists; `target_name_raw` is empty",
+        "- Source `Category` → optional JSON `notes` as `category_prior`",
+        "- Source `Type` is a source target-class field and is sidecar-only;",
+        "  it is not experimental molecule type and is not copied to",
+        "  `molecule_type` or `target_type`",
+        "- `PubMed Link` → `pubmed_id` only when a numeric PMID can be",
+        "  extracted from an unambiguous PubMed URL; otherwise empty",
+        "- `Article name` is a clone/variant label, not a publication citation",
+        "- `publication` and `doi` remain empty; no DOI is invented from",
+        "  non-PubMed URLs",
+        "- `Affinity (Kd)` and `mmCIF Download URL` remain sidecar-only",
+        "",
+        "## Sequence and target retention (verbatim; no cleaning)",
+        "",
+        f"- Records with nonempty sequence_raw: `{stats.nonempty_sequences}`",
+        f"- Records with empty sequence_raw: `{stats.missing_sequences}`",
+        f"- Exact-copy validation for sequence_raw: "
+        f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+        f"- Records with empty target_name_raw: `{stats.empty_target_name_raw}`",
+        f"- Records with nonempty target_name_raw: "
+        f"`{stats.nonempty_target_name_raw}`",
+        "",
+        "## Publication fields",
+        "",
+        f"- Nonempty publication: `{stats.nonempty_publication}`",
+        f"- Nonempty DOI: `{stats.nonempty_doi}`",
+        f"- Nonempty PMID (unambiguous PubMed URL parse): "
+        f"`{stats.nonempty_pmid}`",
+        "",
+        "## Source-metadata sidecar",
+        "",
+        f"- Sidecar rows: `{stats.sidecar_rows}`",
+        "- Sidecar retains the CSV data-row number / native_id and all 13",
+        "  original RiboAptamer columns, including Sequence Name, Aptamer",
+        "  Name, Category, Type, Article name, Sequence, Length, GC Content,",
+        "  Discovery Year, Affinity (Kd), Description, PubMed Link, and",
+        "  mmCIF Download URL.",
+        "",
+        "## Validation results",
+        "",
+        f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+        f"- Row retention (rows_in == rows_out == "
+        f"{registry_row.n_rows_expected}): "
+        f"`{'pass' if stats.canonical_rows == registry_row.n_rows_expected else 'fail'}`",
+        f"- Unique native/record IDs: "
+        f"`{'pass' if stats.unique_native_ids == stats.canonical_rows and stats.unique_record_ids == stats.canonical_rows else 'fail'}`",
+        f"- Sequence exact-copy: "
+        f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+        f"- Canonical target inference at S1: "
+        f"`{'none' if stats.nonempty_target_name_raw == 0 else 'fail'}`",
+        "",
+        "## Integrity / raw-data immutability",
+        "",
+        f"- Source-input hash before: `{result.input_hash_before}`",
+        f"- Source-input hash after: `{result.input_hash_after}`",
+        f"- Source-input pre/post hash result: "
+        f"`{'pass' if result.input_hash_unchanged else 'fail'}`",
+        (
+            f"- Deterministic rerun result: "
+            f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+            if result.deterministic_rerun_ok is not None
+            else "- Deterministic rerun result: `not_checked`"
+        ),
+        "",
+        "## Outputs",
+        "",
+        f"- Canonical: `{_relative_display(result.output_canonical, repo_root)}`",
+        f"- Sidecar: `{_relative_display(result.output_sidecar, repo_root)}`",
+        f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+        "",
+        "## Stage boundary",
+        "",
+        "- S1 only: no sequence cleaning, alphabet conversion, molecule",
+        "  classification, length filtering, trimming, target extraction,",
+        "  target-type classification, evidence scoring, affinity",
+        "  normalisation, parking, eligibility filtering, leakage, or",
+        "  deduplication was performed.",
+        "- No S2 normalisation was started.",
+        "",
+        "## Pipeline status",
+        "",
+        "- RiboAptamer S1 complete.",
+        "- RiboAptamer S2 has not started.",
+        "- No RiboAptamer records are yet authorised for global S4.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def _combined_hash_token(role_hashes: Mapping[str, str]) -> str:
     return "|".join(
         f"{role}:{role_hashes[role]}"
@@ -838,7 +996,7 @@ def run_s1_extraction(
             f"SHA-256 mismatch before adapter execution for {source_key!r}"
         )
 
-    if source_key in {"aptabase", "utexas"}:
+    if source_key in {"aptabase", "utexas", "riboaptamer"}:
         extraction = adapter(
             input_path,
             source_dataset=row.source_dataset,
@@ -866,6 +1024,9 @@ def run_s1_extraction(
     elif source_key == "utexas":
         write_utexas_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
         report_builder = build_utexas_s1_report
+    elif source_key == "riboaptamer":
+        write_riboaptamer_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
+        report_builder = build_riboaptamer_s1_report
     else:
         raise S1ExtractError(f"No sidecar writer for source_key={source_key!r}")
 
@@ -896,8 +1057,10 @@ def run_s1_extraction(
             write_corpus_csv_atomic(tmp_c, second.canonical_rows)
             if source_key == "aptabase":
                 write_aptabase_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
-            else:
+            elif source_key == "utexas":
                 write_utexas_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
+            else:
+                write_riboaptamer_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
             deterministic_ok = (
                 tmp_c.read_bytes() == canonical_path.read_bytes()
                 and tmp_s.read_bytes() == sidecar_path.read_bytes()
@@ -957,7 +1120,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Registry source_key to extract (e.g. aptabase, utexas, aptadb)",
+        help="Registry source_key to extract (e.g. aptabase, utexas, aptadb, riboaptamer)",
     )
     parser.add_argument(
         "--registry-spec",
@@ -1024,6 +1187,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         RegistryError,
         AptaBaseAdapterError,
         AptaDBAdapterError,
+        RiboAptamerAdapterError,
         UTexasAdapterError,
         CorpusSchemaError,
     ) as exc:

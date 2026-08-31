@@ -493,6 +493,39 @@ def test_explicit_aptabase_raw_rejection(demo_repo: Path) -> None:
         )
 
 
+def test_explicit_riboaptamer_truncated_rejection(demo_repo: Path) -> None:
+    truncated_dir = demo_repo / "data" / "raw" / "riboaptamer"
+    truncated_dir.mkdir(parents=True)
+    truncated = truncated_dir / "rna_aptamer_seqs.csv"
+    _write_utf8_sig_csv(
+        truncated, ["record_id", "label", "payload"], _synthetic_input_rows(1)
+    )
+    digest = _hash_path(truncated)
+    _write_csv(
+        demo_repo / "config" / "source_registry.csv",
+        list(REQUIRED_COLUMNS),
+        [
+            _spec_row(
+                source_key="riboaptamer",
+                source_dataset="riboaptamer_truncated_forbidden",
+                path="data/raw/riboaptamer/rna_aptamer_seqs.csv",
+                sha256=digest,
+                n_rows_expected=1,
+            )
+        ],
+    )
+    with pytest.raises(RegistryError, match="truncated RiboAptamer"):
+        build_registry(
+            repo_root=demo_repo,
+            registry_spec=demo_repo / "config" / "source_registry.csv",
+            inventory_path=demo_repo
+            / "docs"
+            / "data_curation"
+            / "raw_data_inventory.csv",
+            output_path=demo_repo / "data" / "interim" / "registry" / "out.csv",
+        )
+
+
 def test_inventory_hash_disagreement_warning(demo_repo: Path) -> None:
     inv = demo_repo / "docs" / "data_curation" / "raw_data_inventory.csv"
     digest = _hash_path(demo_repo / "data" / "raw" / "demo" / "demo.csv")

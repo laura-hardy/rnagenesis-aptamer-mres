@@ -3745,4 +3745,107 @@ applied payload.
 - Frozen human-review, recommendation, S2/S3, and raw hashes: unchanged
 - S4 was not started
 
+## 2026-08-31 — RiboAptamer registration and S1 extraction
+
+**Stage:** Aim 2 / data curation / S0 registration + S1 extraction only.
+RiboAptamer S2 was not started.
+
+### What was done
+
+The corrected 509-row Ribocentre/RiboAptamer export was registered as the
+authoritative Tier-1 source and frozen by SHA-256 and expected row count.
+A source-specific S1 adapter then extracted every registered row into the
+canonical corpus schema, with a complete source-metadata sidecar. All 509
+source records and all 13 raw source columns were retained. Deterministic
+row-based source IDs were used because `Sequence Name` is complete but
+not unique. Sequence normalisation, target extraction, target
+classification, affinity/evidence mapping, eligibility filtering,
+parking, leakage checks, and deduplication were deliberately deferred to
+their specified later stages.
+
+### Decisions made
+
+- `native_id` uses the zero-padded 1-based source CSV data-row number
+  (`001`…`509`) because `Sequence Name` has three duplicated identifiers
+  affecting six rows. `record_id` is `riboaptamer:{native_id}`.
+  `Sequence Name` is preserved verbatim in the sidecar only.
+- Exact duplicate source rows are intentionally retained as separate S1
+  records. Deduplication belongs later (S5), not at extraction.
+- Source `Category` is recorded only as structured provenance in
+  `notes` (`category_prior`). Source `Type` (`Proteins`, `Small
+  molecules`, `Cells`, `Nucleic acids`) is a source target-class field
+  retained in the sidecar. Neither is used as experimental molecule type
+  or as a canonical target.
+- The source has no canonical target column, so `target_name_raw` is
+  empty through S1. Target identity will be extracted and resolved
+  globally at S4 from the retained descriptive metadata (`Aptamer Name`,
+  `Description`, `Sequence Name`, `Category`, `Type`).
+- RiboAptamer `redistribution_status` remains `unknown` because no
+  reliable local licence information was identified.
+- Numeric PubMed IDs are parsed from `PubMed Link` only where the URL
+  matches an unambiguous PubMed-ID pattern (505/509). The remaining four
+  links are non-PubMed publisher/dissertation URLs and were left unparsed.
+  `Article name` is a clone/variant label, not a publication citation.
+  DOI values are not invented from arbitrary external URLs.
+
+### Inputs used
+
+- `source_dataset = riboaptamer_full_2026-08`
+- `data/raw/riboaptamer/all_sequences_509_rows.csv`
+- SHA-256:
+  `721d8c5ea81476c1f371ef8bfa814743f364eaf004c0a6eda2aabd6dc5d9a9fd`
+- 509 rows; 13-column UTF-8 CSV (no BOM)
+- Snapshot date: `2026-08-04`; tier `1`;
+  `redistribution_status = unknown`
+
+### Outputs produced
+
+Ignored under `/data/`:
+
+- `data/interim/registry/source_registry.csv` (operational S0 registry;
+  11 validated registered files, exactly one `riboaptamer` entry)
+- `data/interim/extracted/riboaptamer_extracted.csv` (509 rows)
+- `data/interim/extracted/riboaptamer_source_metadata.csv` (509 rows)
+- `data/interim/extracted/riboaptamer_s1_report.md`
+
+Tracked scripts, tests and this log entry. Nothing under `data/` is
+tracked.
+
+### Numbers
+
+- 509 rows input
+- 509 extracted; 509 unique `record_id`; 509 unique `native_id`
+- first native ID `001`; last native ID `509`
+- 0 S1 rejections, parking, or filtering
+- 13 raw metadata columns preserved in the sidecar; one-to-one join to
+  canonical rows
+- `sequence_raw` is byte/text-equivalent to source `Sequence`; source
+  order preserved
+- nonempty PubMed IDs parsed at S1: 505; publication/DOI: 0
+- unique `Sequence Name` values: 506; duplicate keys: 3; rows in those
+  groups: 6 (native IDs `011`/`012`, `026`/`060`, `031`/`043`)
+- source raw hash unchanged before and after S0/S1:
+  `721d8c5ea81476c1f371ef8bfa814743f364eaf004c0a6eda2aabd6dc5d9a9fd`
+- S0: 11 registered, 11 validated; existing AptaBase inventory-override
+  warnings only; no superseded truncated RiboAptamer file registered
+- Deterministic S1 rerun: byte-identical canonical and sidecar CSVs
+
+### Open questions carried forward
+
+- S2 will initially use known-motif detection only; no group-wise
+  consensus grouping has been authorised for RiboAptamer.
+- Target extraction and type reconciliation remain a global S4 /
+  CHECKPOINT-2 task, including Category-versus-resolved-type
+  disagreements.
+
+### Pipeline status
+
+```text
+RiboAptamer S0 complete
+RiboAptamer S1 complete
+RiboAptamer S2 has not started
+No RiboAptamer records are yet authorised for global S4
+```
+
+
 
