@@ -1,0 +1,13 @@
+{
+  "source_key": "riboaptamer",
+  "contract_version": "1.0",
+  "molecule_type": "RNA",
+  "chemistry": "RNA",
+  "molecule_evidence_source": "source_contract",
+  "source_type_field": "riboaptamer_type",
+  "reported_length_field": "riboaptamer_length",
+  "apply_approved_trims": false,
+  "group_inference_key": "disabled",
+  "do_not_use_source_type_as_molecule": true,
+  "do_not_infer_molecule_from_alphabet": true
+}

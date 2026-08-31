@@ -47,6 +47,21 @@ from adapters.aptadb_s2 import (  # noqa: E402
     summarise_lengths as summarise_aptadb_lengths,
     update_stats_from_row as update_aptadb_stats_from_row,
 )
+from adapters.riboaptamer_s2 import (  # noqa: E402
+    CONSTANT_PROPOSAL_COLUMNS as RIBOAPTAMER_CONSTANT_PROPOSAL_COLUMNS,
+    S2_QC_COLUMNS as RIBOAPTAMER_S2_QC_COLUMNS,
+    RiboAptamerS2Error,
+    RiboAptamerS2Stats,
+    assert_genuine_proposals as assert_riboaptamer_genuine_proposals,
+    assert_truncation_regressions as assert_riboaptamer_truncation_regressions,
+    build_known_motif_proposals as build_riboaptamer_known_motif_proposals,
+    finalise_truncation_regressions as finalise_riboaptamer_truncation_regressions,
+    is_review_candidate as riboaptamer_is_review_candidate,
+    load_riboaptamer_policy,
+    normalise_riboaptamer_record,
+    summarise_lengths as summarise_riboaptamer_lengths,
+    update_stats_from_row as update_riboaptamer_stats_from_row,
+)
 from adapters.utexas_s2 import (  # noqa: E402
     CONSTANT_PROPOSAL_COLUMNS as UTEXAS_CONSTANT_PROPOSAL_COLUMNS,
     S2_QC_COLUMNS as UTEXAS_S2_QC_COLUMNS,
@@ -133,6 +148,14 @@ EXPECTED_APTADB_RAW_SHA256 = {
     ),
 }
 
+EXPECTED_RIBOAPTAMER_ROWS = 509
+EXPECTED_RIBOAPTAMER_MOLECULE = {"RNA": 509}
+EXPECTED_RIBOAPTAMER_CHEMISTRY = {"RNA": 509}
+EXPECTED_RIBOAPTAMER_RAW_SHA256 = (
+    "721d8c5ea81476c1f371ef8bfa814743f364eaf004c0a6eda2aabd6dc5d9a9fd"
+)
+EXPECTED_RIBOAPTAMER_SOURCE_DATASET = "riboaptamer_full_2026-08"
+
 
 class S2NormaliseError(ValueError):
     """Hard failure during S2 normalisation orchestration."""
@@ -143,7 +166,7 @@ class S2RunResult:
     """Aggregate outcome of one S2 normalisation run."""
 
     source_key: str
-    stats: AptaBaseS2Stats | UTexasS2Stats | AptaDBS2Stats
+    stats: AptaBaseS2Stats | UTexasS2Stats | AptaDBS2Stats | RiboAptamerS2Stats
     output_normalised: Path
     output_qc: Path
     output_review: Path
@@ -2264,6 +2287,623 @@ def run_aptadb_s2(
     return run_result
 
 
+def build_riboaptamer_s2_report(
+    *,
+    repo_root: Path,
+    result: S2RunResult,
+    rules_path: Path,
+    policy_path: Path,
+) -> str:
+    """Build an aggregate-only Markdown RiboAptamer S2 report (no sequences)."""
+    stats = result.stats
+    if not isinstance(stats, RiboAptamerS2Stats):
+        raise S2NormaliseError("RiboAptamer report requires RiboAptamerS2Stats")
+    full_min, full_med, full_max = summarise_riboaptamer_lengths(
+        stats.length_full_values
+    )
+    core_min, core_med, core_max = summarise_riboaptamer_lengths(
+        stats.length_core_values
+    )
+    regression_a = "PASS" if stats.truncation_regression_a_pass else "FAIL"
+    regression_b = "PASS" if stats.truncation_regression_b_pass else "FAIL"
+    regression_c = "PASS" if stats.truncation_regression_c_pass else "FAIL"
+    scanned = ", ".join(f"`{name}`" for name in stats.known_motifs_scanned) or "(none)"
+    lines = [
+        "# RiboAptamer S2 normalisation report",
+        "",
+        "## Reconciliation",
+        "",
+        f"- Source key: `riboaptamer`",
+        f"- Source dataset: `{EXPECTED_RIBOAPTAMER_SOURCE_DATASET}`",
+        f"- S1 canonical rows: `{stats.s1_rows}`",
+        f"- Source-metadata rows: `{stats.source_metadata_rows}`",
+        f"- S2 output rows: `{stats.s2_rows}`",
+        f"- Records dropped: `{stats.records_dropped}`",
+        f"- Records parked: `{stats.records_parked}`",
+        f"- Unique record_id values: `{stats.unique_record_ids}`",
+        f"- Unique native_id values: `{stats.unique_native_ids}`",
+        f"- Row disappearance: `{stats.s1_rows - stats.s2_rows}`",
+        f"- S1 row order preserved: `{'pass' if stats.order_preserved else 'fail'}`",
+        f"- S1 provenance preserved: "
+        f"`{'pass' if stats.provenance_preserved else 'fail'}`",
+        f"- sequence_raw unchanged: "
+        f"`{'pass' if stats.sequence_raw_unchanged else 'fail'}`",
+        f"- target_name_raw unchanged: "
+        f"`{'pass' if stats.target_name_raw_unchanged else 'fail'}`",
+        f"- notes unchanged: `{'pass' if stats.notes_unchanged else 'fail'}`",
+        f"- Missing sequence rows: `{stats.missing_sequence_rows}`",
+        f"- Nonempty sequence rows: `{stats.nonempty_sequence_rows}`",
+        f"- Shared rules: `{_relative_display(rules_path, repo_root)}`",
+        f"- Source policy: `{_relative_display(policy_path, repo_root)}`",
+        "",
+        "## Molecule / chemistry",
+        "",
+        "Experimental molecule type is fixed by the RiboAptamer source",
+        "contract (`molecule_type=RNA`, `chemistry=RNA`). Source `Type`",
+        "(`Proteins`, `Small molecules`, `Cells`, `Nucleic acids`) is a",
+        "target-class field retained in the sidecar only. It is not used",
+        "as `molecule_type`, `chemistry`, canonical `target_type`, or an",
+        "S2/S3 parking rule.",
+        "",
+        "### Source Type (target class; unused at S2)",
+        "",
+    ]
+    for name, count in _count_sorted(stats.source_type_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Canonical molecule_type", ""])
+    for name, count in _count_sorted(stats.molecule_type_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Canonical chemistry", ""])
+    for name, count in _count_sorted(stats.chemistry_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Reported alphabet",
+            "",
+            "Shared alphabet vocabulary is `RNA` / `DNA_T` / `mixed_T_U` /",
+            "`ambiguous` / `invalid` (not a separate `RNA_U` token).",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.alphabet_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Computational transcription",
+            "",
+            f"- total `t_to_u_applied=true`: `{stats.t_to_u_count}`",
+            "",
+        ]
+    )
+    if stats.t_to_u_by_molecule:
+        for name, count in _count_sorted(stats.t_to_u_by_molecule):
+            lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Display cleaning",
+            "",
+        ]
+    )
+    if stats.transformation_counts:
+        for name, count in _count_sorted(stats.transformation_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+    lines.extend(
+        [
+            "",
+            "## QC",
+            "",
+            f"- Invalid character rows: `{stats.invalid_character_count}`",
+            f"- Alignment-gap rows: `{stats.alignment_gaps_count}`",
+            f"- Ambiguous base rows: `{stats.ambiguous_base_count}`",
+            f"- Mixed T/U rows: `{stats.mixed_t_u_count}`",
+            f"- Truncation / ellipsis rows (`truncated_sequence`): "
+            f"`{stats.truncated_sequence_count}`",
+            f"- Display-normalised sequences containing `...` or `…`: "
+            f"`{stats.containing_ellipsis_count}`",
+            f"- Display-normalised sequences ending in `.` / `...` / `…`: "
+            f"`{stats.ending_period_or_ellipsis_count}`",
+            f"- Core below minimum length: `{stats.core_below_min_count}`",
+            f"- Core above maximum length: `{stats.core_above_max_count}`",
+            f"- Rows with any QC flag: `{stats.rows_with_any_qc_flag}`",
+            f"- Rows with multiple QC flags: `{stats.rows_with_multiple_qc_flags}`",
+            f"- Review-candidate rows: `{stats.review_candidate_rows}`",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.qc_flag_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Length",
+            "",
+            "Lengths are computed from the shared normalised representation,",
+            "not from the source `Length` column. These buckets are",
+            "descriptive at S2; they do not filter records.",
+            "",
+            f"- sequence_length_full min / median / max: "
+            f"`{full_min}` / `{full_med}` / `{full_max}`",
+            f"- sequence_length_core min / median / max: "
+            f"`{core_min}` / `{core_med}` / `{core_max}`",
+            "",
+            "### sequence_length_full buckets",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.length_full_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### sequence_length_core buckets", ""])
+    for name, count in _count_sorted(stats.length_core_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    if stats.core_differs_from_full == 0:
+        lines.extend(
+            [
+                "",
+                "Full and core length distributions are identical because no",
+                "trim was applied (`sequence_core == sequence_full`).",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Construct / trim state",
+            "",
+            "Known-motif detection is recorded as a proposal only.",
+            "Detection does not authorise trimming at S2.",
+            "",
+            "### construct_scope",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.construct_scope_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### trim_status", ""])
+    for name, count in _count_sorted(stats.trim_status_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### trim_confidence", ""])
+    for name, count in _count_sorted(stats.trim_confidence_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Constant-region detection",
+            "",
+            "group-wise inference disabled for RiboAptamer in this run.",
+            "No `(Aptamer Name, PubMed)` grouping mode was added, and",
+            "`experiment_group_id` / `target_name_raw` were not populated",
+            "to exploit an existing grouping key. Known-motif detections",
+            "are proposals only (`applied=false`).",
+            "",
+            f"- Approved known motifs scanned: {scanned}",
+            f"- Records with known-motif detection: "
+            f"`{stats.known_motif_detection_count}`",
+            f"- Genuine proposal rows: `{stats.constant_region_proposals}`",
+            f"- 5′ known-motif proposals: `{stats.five_prime_proposals}`",
+            f"- 3′ known-motif proposals: `{stats.three_prime_proposals}`",
+            f"- Group-consensus proposals: `0`",
+            f"- Groups considered: `{stats.groups_considered}`",
+            f"- Groups meeting minimum size: `{stats.groups_meeting_min_size}`",
+            f"- Records associated with medium-confidence proposals: "
+            f"`{stats.records_with_medium_confidence_proposal}`",
+            f"- Previously approved high-confidence trims applied: "
+            f"`{stats.high_confidence_trims_applied}`",
+            f"- Records actually trimmed: `{stats.applied_trims}`",
+            f"- Rows where sequence_core != sequence_full: "
+            f"`{stats.core_differs_from_full}`",
+            f"- Reason: `{stats.constant_region_reason}`",
+            "",
+            "### proposal sources",
+            "",
+        ]
+    )
+    if stats.proposal_source_counts:
+        for name, count in _count_sorted(stats.proposal_source_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+    lines.extend(
+        [
+            "",
+            "## Truncation regressions",
+            "",
+            "These guards detect accidental re-registration of the old",
+            "truncated RiboAptamer export. They do not drop records.",
+            "Diagnostics use the display-normalised sequence, not",
+            "`sequence_raw`.",
+            "",
+            f"- Regression A (<1% ending in `.` / `...` / `…`): `{regression_a}` "
+            f"({stats.ending_period_or_ellipsis_count}/{stats.s2_rows})",
+            f"- Regression B (median full length > 20 nt): `{regression_b}` "
+            f"(median `{full_med}`)",
+            f"- Regression C (≤1 containing `...` or `…` anywhere): "
+            f"`{regression_c}` "
+            f"({stats.containing_ellipsis_count}/{stats.s2_rows})",
+            "",
+            "## Invariants",
+            "",
+            f"- sequence_raw unchanged: "
+            f"`{'pass' if stats.sequence_raw_unchanged else 'fail'}`",
+            f"- Records retained: `{stats.s2_rows}`",
+            f"- Provenance unchanged: "
+            f"`{'pass' if stats.provenance_preserved else 'fail'}`",
+            "- S4 target/evidence/affinity/PDB fields remain blank",
+            (
+                f"- Raw input hash unchanged: "
+                f"`{'pass' if result.raw_sha_unchanged else 'fail'}`"
+                if result.raw_sha_unchanged is not None
+                else "- Raw input hash unchanged: `not_checked`"
+            ),
+            f"- S1 inputs unchanged: "
+            f"`{'pass' if result.inputs_unchanged else 'fail'}`",
+            (
+                f"- Deterministic rerun result: "
+                f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+                if result.deterministic_rerun_ok is not None
+                else "- Deterministic rerun result: `not_checked`"
+            ),
+            "",
+            f"- S1 canonical hash before: `{result.s1_hash_before}`",
+            f"- S1 canonical hash after: `{result.s1_hash_after}`",
+            f"- Source-metadata hash before: `{result.sidecar_hash_before}`",
+            f"- Source-metadata hash after: `{result.sidecar_hash_after}`",
+            (
+                f"- Raw SHA-256: `{result.raw_sha256}`"
+                if result.raw_sha256
+                else "- Raw SHA-256: `not_checked`"
+            ),
+            "",
+            "## Outputs",
+            "",
+            f"- Normalised: "
+            f"`{_relative_display(result.output_normalised, repo_root)}`",
+            f"- QC: `{_relative_display(result.output_qc, repo_root)}`",
+            f"- Review candidates: "
+            f"`{_relative_display(result.output_review, repo_root)}`",
+            f"- Detected constants / proposals: "
+            f"`{_relative_display(result.output_proposals, repo_root)}`",
+            f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+            "",
+            "## Stage boundary",
+            "",
+            "RiboAptamer S2 sequence normalisation and known-motif detection",
+            "only.",
+            "",
+            "- No record was rejected or parked.",
+            "- No target canonicalisation was performed.",
+            "- No affinity/evidence/PDB decision was performed.",
+            "- No leakage, clustering, balancing or partitioning was performed.",
+            "- S3 has not started.",
+            "- Known-motif detections were not applied as trims.",
+            "- group-wise inference disabled for RiboAptamer in this run.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_riboaptamer_s2(
+    *,
+    repo_root: Path,
+    input_dir: Path,
+    output_dir: Path,
+    rules_path: Path,
+    policy_path: Path,
+    expected_rows: int | None = EXPECTED_RIBOAPTAMER_ROWS,
+    check_deterministic_rerun: bool = False,
+) -> S2RunResult:
+    """Execute RiboAptamer S2 normalisation."""
+    repo_root = repo_root.resolve()
+    input_dir = input_dir if input_dir.is_absolute() else (repo_root / input_dir)
+    input_dir = input_dir.resolve()
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    rules_path = (
+        rules_path if rules_path.is_absolute() else (repo_root / rules_path)
+    ).resolve()
+    policy_path = (
+        policy_path if policy_path.is_absolute() else (repo_root / policy_path)
+    ).resolve()
+
+    canonical_path = input_dir / "riboaptamer_extracted.csv"
+    sidecar_path = input_dir / "riboaptamer_source_metadata.csv"
+    if not canonical_path.is_file():
+        raise S2NormaliseError(f"Missing S1 canonical input: {canonical_path.name}")
+    if not sidecar_path.is_file():
+        raise S2NormaliseError(f"Missing S1 sidecar input: {sidecar_path.name}")
+
+    raw_path = repo_root / "data" / "raw" / "riboaptamer" / "all_sequences_509_rows.csv"
+    raw_sha_before: str | None = None
+    if expected_rows == EXPECTED_RIBOAPTAMER_ROWS:
+        if not raw_path.is_file():
+            raise S2NormaliseError("Missing registered RiboAptamer raw file")
+        digest = _sha256_file(raw_path)
+        if digest != EXPECTED_RIBOAPTAMER_RAW_SHA256:
+            raise S2NormaliseError(
+                "RiboAptamer raw SHA-256 does not match registry expectation"
+            )
+        raw_sha_before = digest
+
+    s1_hash_before = _sha256_file(canonical_path)
+    sidecar_hash_before = _sha256_file(sidecar_path)
+
+    rules = load_normalisation_rules(rules_path)
+    policy = load_riboaptamer_policy(policy_path)
+    if policy.apply_approved_trims:
+        raise S2NormaliseError("RiboAptamer S2 must not apply approved trims")
+    if policy.group_inference_key != "disabled":
+        raise S2NormaliseError(
+            "RiboAptamer S2 must keep group-wise inference disabled"
+        )
+
+    canonical_rows = _read_corpus_csv(canonical_path)
+    sidecar_rows = _read_sidecar_csv(sidecar_path)
+    aligned_sidecar = _match_sidecar_one_to_one(canonical_rows, sidecar_rows)
+
+    if expected_rows is not None and len(canonical_rows) != expected_rows:
+        raise S2NormaliseError(
+            f"S1 row count must be {expected_rows}; got {len(canonical_rows)}"
+        )
+
+    for index, row in enumerate(canonical_rows, start=1):
+        if row["source_db"] != "riboaptamer":
+            raise S2NormaliseError(f"row {index}: source_db must be riboaptamer")
+        if expected_rows == EXPECTED_RIBOAPTAMER_ROWS:
+            if row["source_dataset"] != EXPECTED_RIBOAPTAMER_SOURCE_DATASET:
+                raise S2NormaliseError(
+                    f"row {index}: source_dataset must be "
+                    f"{EXPECTED_RIBOAPTAMER_SOURCE_DATASET}"
+                )
+
+    stats = RiboAptamerS2Stats()
+    stats.s1_rows = len(canonical_rows)
+    stats.source_metadata_rows = len(aligned_sidecar)
+    stats.order_preserved = True
+    stats.provenance_preserved = True
+    stats.sequence_raw_unchanged = True
+    stats.target_name_raw_unchanged = True
+    stats.notes_unchanged = True
+    stats.known_motifs_scanned = tuple(
+        motif.name for motif in rules.known_non_core_motifs
+    )
+    stats.constant_region_reason = (
+        "group-wise inference disabled for RiboAptamer in this run;"
+        "known_motif_detection_only_not_applied"
+    )
+
+    normalised_rows: list[dict[str, str]] = []
+    qc_rows: list[dict[str, str]] = []
+    review_rows: list[dict[str, str]] = []
+    row_results: list = []
+
+    for s1_row, meta_row in zip(canonical_rows, aligned_sidecar, strict=True):
+        result = normalise_riboaptamer_record(
+            s1_row,
+            meta_row,
+            policy=policy,
+            rules=rules,
+        )
+        if result.canonical["record_id"] != s1_row["record_id"]:
+            stats.order_preserved = False
+            raise S2NormaliseError("S2 altered record_id or row identity")
+        if result.canonical["native_id"] != s1_row["native_id"]:
+            raise S2NormaliseError("S2 altered native_id")
+        if result.canonical["sequence_raw"] != s1_row["sequence_raw"]:
+            stats.sequence_raw_unchanged = False
+            raise S2NormaliseError("S2 must not alter sequence_raw")
+        if result.canonical["target_name_raw"] != s1_row["target_name_raw"]:
+            stats.target_name_raw_unchanged = False
+            raise S2NormaliseError("S2 must not alter target_name_raw")
+        if result.canonical["notes"] != s1_row["notes"]:
+            stats.notes_unchanged = False
+            raise S2NormaliseError("S2 must not alter notes")
+        if result.canonical["source_db"] != s1_row["source_db"]:
+            stats.provenance_preserved = False
+            raise S2NormaliseError("S2 must not alter source_db")
+        if result.canonical["source_dataset"] != s1_row["source_dataset"]:
+            stats.provenance_preserved = False
+            raise S2NormaliseError("S2 must not alter source_dataset")
+        if result.canonical["pubmed_id"] != s1_row["pubmed_id"]:
+            raise S2NormaliseError("S2 must not alter pubmed_id")
+        if result.canonical["publication"] != s1_row["publication"]:
+            raise S2NormaliseError("S2 must not alter publication")
+        if result.canonical["sequence_core"] != result.canonical["sequence_full"]:
+            raise S2NormaliseError(
+                "RiboAptamer S2 must not apply trims; sequence_core must equal "
+                "sequence_full"
+            )
+        if result.canonical["molecule_type"] != "RNA":
+            raise S2NormaliseError(
+                "RiboAptamer S2 molecule_type must remain RNA under the "
+                "source contract"
+            )
+        if result.canonical["chemistry"] != "RNA":
+            raise S2NormaliseError(
+                "RiboAptamer S2 chemistry must remain RNA under the "
+                "source contract"
+            )
+        length_full = result.canonical["sequence_length_full"]
+        if length_full != "":
+            if int(length_full) != len(result.canonical["sequence_full"]):
+                raise S2NormaliseError(
+                    "sequence_length_full must equal len(sequence_full)"
+                )
+            if int(result.canonical["sequence_length_core"]) != len(
+                result.canonical["sequence_core"]
+            ):
+                raise S2NormaliseError(
+                    "sequence_length_core must equal len(sequence_core)"
+                )
+        normalised_rows.append(result.canonical)
+        qc_rows.append(result.qc)
+        row_results.append(result)
+        if riboaptamer_is_review_candidate(result.canonical["qc_flags"]):
+            review_rows.append(result.qc)
+        update_riboaptamer_stats_from_row(stats, result)
+
+    stats.s2_rows = len(normalised_rows)
+    stats.unique_record_ids = len({row["record_id"] for row in normalised_rows})
+    stats.unique_native_ids = len({row["native_id"] for row in normalised_rows})
+    stats.records_dropped = 0
+    stats.records_parked = 0
+    finalise_riboaptamer_truncation_regressions(stats)
+
+    if expected_rows == EXPECTED_RIBOAPTAMER_ROWS:
+        if stats.s2_rows != EXPECTED_RIBOAPTAMER_ROWS:
+            raise S2NormaliseError(
+                f"S2 must preserve {EXPECTED_RIBOAPTAMER_ROWS} rows; "
+                f"got {stats.s2_rows}"
+            )
+        if stats.unique_record_ids != EXPECTED_RIBOAPTAMER_ROWS:
+            raise S2NormaliseError("S2 record_id values are not unique")
+        if stats.s1_rows - stats.s2_rows != 0:
+            raise S2NormaliseError("S2 row disappearance must be 0")
+        for key, expected in EXPECTED_RIBOAPTAMER_MOLECULE.items():
+            got = stats.molecule_type_counts.get(key, 0)
+            if got != expected:
+                raise S2NormaliseError(
+                    f"molecule_type {key} expected {expected}; got {got}"
+                )
+        for key, expected in EXPECTED_RIBOAPTAMER_CHEMISTRY.items():
+            got = stats.chemistry_counts.get(key, 0)
+            if got != expected:
+                raise S2NormaliseError(
+                    f"chemistry {key} expected {expected}; got {got}"
+                )
+        if stats.core_differs_from_full != 0:
+            raise S2NormaliseError(
+                "RiboAptamer S2 applied a trim; sequence_core must equal "
+                "sequence_full"
+            )
+        nonempty_target = sum(
+            1 for row in normalised_rows if row["target_name_raw"]
+        )
+        if nonempty_target:
+            raise S2NormaliseError(
+                "RiboAptamer S2 must not populate target_name_raw"
+            )
+        assert_riboaptamer_truncation_regressions(stats)
+
+    known_motif_proposals = build_riboaptamer_known_motif_proposals(row_results)
+    assert_riboaptamer_genuine_proposals(known_motif_proposals)
+
+    stats.constant_region_proposals = len(known_motif_proposals)
+    stats.groups_considered = 0
+    stats.groups_meeting_min_size = 0
+    stats.five_prime_proposals = sum(
+        1 for row in known_motif_proposals if row["side"] == "five_prime"
+    )
+    stats.three_prime_proposals = sum(
+        1 for row in known_motif_proposals if row["side"] == "three_prime"
+    )
+    stats.records_with_medium_confidence_proposal = 0
+    stats.high_confidence_trims_applied = 0
+    stats.applied_trims = 0
+    for row in known_motif_proposals:
+        source = row["proposal_source"]
+        stats.proposal_source_counts[source] = (
+            stats.proposal_source_counts.get(source, 0) + 1
+        )
+
+    for row in normalised_rows:
+        if row["sequence_core"] != row["sequence_full"]:
+            raise S2NormaliseError(
+                "known-motif detections must not mutate sequence_core"
+            )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_normalised = output_dir / "riboaptamer_normalised.csv"
+    out_qc = output_dir / "riboaptamer_s2_qc.csv"
+    out_review = output_dir / "riboaptamer_s2_review_candidates.csv"
+    out_proposals = output_dir / "detected_constants_riboaptamer.csv"
+    out_report = output_dir / "riboaptamer_s2_report.md"
+
+    write_corpus_csv_atomic(out_normalised, normalised_rows)
+    write_csv_atomic(out_qc, RIBOAPTAMER_S2_QC_COLUMNS, qc_rows)
+    write_csv_atomic(out_review, RIBOAPTAMER_S2_QC_COLUMNS, review_rows)
+    write_csv_atomic(
+        out_proposals, RIBOAPTAMER_CONSTANT_PROPOSAL_COLUMNS, known_motif_proposals
+    )
+
+    s1_hash_after = _sha256_file(canonical_path)
+    sidecar_hash_after = _sha256_file(sidecar_path)
+    inputs_unchanged = (
+        s1_hash_before == s1_hash_after
+        and sidecar_hash_before == sidecar_hash_after
+    )
+    if not inputs_unchanged:
+        raise S2NormaliseError("S1 inputs were modified during S2 execution")
+
+    raw_sha_after: str | None = None
+    raw_sha_unchanged: bool | None = None
+    if raw_sha_before is not None:
+        digest = _sha256_file(raw_path)
+        if digest != raw_sha_before:
+            raise S2NormaliseError("RiboAptamer raw SHA changed during S2")
+        raw_sha_after = digest
+        raw_sha_unchanged = True
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        first_hashes = {
+            "normalised": _sha256_file(out_normalised),
+            "qc": _sha256_file(out_qc),
+            "review": _sha256_file(out_review),
+            "proposals": _sha256_file(out_proposals),
+        }
+        second = run_riboaptamer_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=policy_path,
+            expected_rows=expected_rows,
+            check_deterministic_rerun=False,
+        )
+        deterministic_ok = (
+            first_hashes["normalised"] == _sha256_file(second.output_normalised)
+            and first_hashes["qc"] == _sha256_file(second.output_qc)
+            and first_hashes["review"] == _sha256_file(second.output_review)
+            and first_hashes["proposals"] == _sha256_file(second.output_proposals)
+        )
+        if not deterministic_ok:
+            raise S2NormaliseError(
+                "S2 outputs were not byte-identical across deterministic rerun"
+            )
+
+    run_result = S2RunResult(
+        source_key="riboaptamer",
+        stats=stats,
+        output_normalised=out_normalised,
+        output_qc=out_qc,
+        output_review=out_review,
+        output_proposals=out_proposals,
+        output_report=out_report,
+        s1_hash_before=s1_hash_before,
+        s1_hash_after=s1_hash_after,
+        sidecar_hash_before=sidecar_hash_before,
+        sidecar_hash_after=sidecar_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        deterministic_rerun_ok=deterministic_ok,
+        raw_sha256=raw_sha_after,
+        raw_sha_unchanged=raw_sha_unchanged,
+    )
+    report_text = build_riboaptamer_s2_report(
+        repo_root=repo_root,
+        result=run_result,
+        rules_path=rules_path,
+        policy_path=policy_path,
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in report_text:
+        raise S2NormaliseError("S2 report must not contain absolute repository paths")
+    _write_text_atomic(out_report, report_text)
+    return run_result
+
+
 def run_s2_normalisation(
     *,
     repo_root: Path,
@@ -2309,6 +2949,18 @@ def run_s2_normalisation(
             policy_path=source_policy,
             expected_rows=(
                 EXPECTED_APTADB_ROWS if expected_rows is None else expected_rows
+            ),
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key == "riboaptamer":
+        return run_riboaptamer_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=source_policy,
+            expected_rows=(
+                EXPECTED_RIBOAPTAMER_ROWS if expected_rows is None else expected_rows
             ),
             check_deterministic_rerun=check_deterministic_rerun,
         )
@@ -2410,6 +3062,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_path = Path("config/source_normalisation/utexas.json")
         elif args.source == "aptadb":
             policy_path = Path("config/source_normalisation/aptadb.json")
+        elif args.source == "riboaptamer":
+            policy_path = Path("config/source_normalisation/riboaptamer.json")
         else:
             raise S2NormaliseError(
                 "--source-policy is required for unrecognised sources"
@@ -2430,6 +3084,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         AptaBaseS2Error,
         UTexasS2Error,
         AptaDBS2Error,
+        RiboAptamerS2Error,
         CorpusSchemaError,
     ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -2452,6 +3107,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"\nt_to_u_count={stats.t_to_u_count}"
             f"\ncore_differs_from_full={stats.core_differs_from_full}"
             f"\napplied_trims={stats.applied_trims}"
+        )
+    elif isinstance(stats, RiboAptamerS2Stats):
+        extra = (
+            f"\nmolecule_type_counts={dict(sorted(stats.molecule_type_counts.items()))}"
+            f"\nchemistry_counts={dict(sorted(stats.chemistry_counts.items()))}"
+            f"\nalphabet_counts={dict(sorted(stats.alphabet_counts.items()))}"
+            f"\nt_to_u_count={stats.t_to_u_count}"
+            f"\nknown_motif_detection_count={stats.known_motif_detection_count}"
+            f"\ncore_differs_from_full={stats.core_differs_from_full}"
+            f"\napplied_trims={stats.applied_trims}"
+            f"\ncontaining_ellipsis_count={stats.containing_ellipsis_count}"
         )
     print(
         f"source={result.source_key}\n"

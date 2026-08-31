@@ -3847,5 +3847,147 @@ RiboAptamer S2 has not started
 No RiboAptamer records are yet authorised for global S4
 ```
 
+## 2026-08-31 — RiboAptamer S2 sequence normalisation
+
+**Stage:** Aim 2 / data curation / S2 sequence normalisation only.
+RiboAptamer S3, CHECKPOINT-1, target extraction, and global S4 were not
+started.
+
+### What was done
+
+The 509 extracted RiboAptamer records were passed through the shared
+sequence-normalisation implementation. The source was treated as
+experimental RNA independently of the source `Type` target-class field.
+Alphabet provenance was preserved, and computational T→U transcription
+was applied only where a T-alphabet sequence was reported under that
+RNA contract. Normalised full and core sequences and lengths were
+computed under the current approved-trim architecture: known motifs
+were detected but not applied, so `sequence_core` equals
+`sequence_full` for every row. Group-wise constant-region inference
+was deliberately disabled. Technically problematic records (ambiguous
+bases, invalid characters, alignment gaps, and the remaining internal
+ellipsis) were retained with QC flags for S3/CHECKPOINT-1 rather than
+silently dropped or repaired.
+
+### Decisions made
+
+- Source `Type` (`Proteins` 344, `Small molecules` 122, `Cells` 26,
+  `Nucleic acids` 17) remains target-class metadata in the sidecar
+  only. It is not `molecule_type`, `chemistry`, canonical
+  `target_type`, or an S2/S3 parking rule.
+- `molecule_type = RNA` and `chemistry = RNA` come from the source
+  contract, not from alphabet and not from `Type`.
+- Known-motif detection only for this initial RiboAptamer lane. The
+  configured T7 motif library was scanned; detections are proposals
+  (`applied=false`) and do not mutate `sequence_core`.
+- No group-wise `(Aptamer Name, PubMed)` inference. No
+  `experiment_group_id` or `target_name_raw` was manufactured to
+  exploit an existing grouping mode.
+- Malformed, ambiguous, gapped, and truncated records are carried
+  forward with QC. Display-only terminal labels continue to be
+  stripped by the shared cleaner; remaining body hyphens, periods,
+  slashes, primes, and parenthetical notation are not repaired.
+- `(ms)`-style notation is not interpreted as modified-RNA chemistry.
+- Target, evidence, affinity, and PDB work remain deferred to global
+  S4 / CHECKPOINT-2.
+
+### Inputs used
+
+- `source_dataset = riboaptamer_full_2026-08`
+- S1 extracted path: `data/interim/extracted/riboaptamer_extracted.csv`
+- S1 sidecar: `data/interim/extracted/riboaptamer_source_metadata.csv`
+- Registered raw file: `data/raw/riboaptamer/all_sequences_509_rows.csv`
+- SHA-256:
+  `721d8c5ea81476c1f371ef8bfa814743f364eaf004c0a6eda2aabd6dc5d9a9fd`
+- Shared rules: `config/sequence_normalisation_rules.json`
+- Source policy: `config/source_normalisation/riboaptamer.json`
+
+### Outputs produced
+
+Ignored under `data/`:
+
+- `data/interim/normalised/riboaptamer_normalised.csv`
+- `data/interim/normalised/riboaptamer_s2_qc.csv`
+- `data/interim/normalised/riboaptamer_s2_review_candidates.csv`
+- `data/interim/normalised/detected_constants_riboaptamer.csv`
+- `data/interim/normalised/riboaptamer_s2_report.md`
+
+Tracked adapter, policy, tests, dispatcher changes, and this log
+entry. Nothing under `data/` is tracked.
+
+### Numbers
+
+509 in / 509 out; 0 dropped; 0 parked; 509 unique `record_id`; source
+order preserved; sidecar join one-to-one; `sequence_raw` unchanged.
+
+Normalised full length (not source `Length`): min / median / max =
+10 / 75 / 179. Buckets are descriptive only: `<20` 9; `20–25` 8;
+`26–89` 349; `90–100` 46; `>100` 97. Core lengths are identical
+because no trim was applied.
+
+Alphabet (shared vocabulary `RNA` / `DNA_T` / `mixed_T_U` /
+`ambiguous` / `invalid`, not a separate `RNA_U` token): `RNA` 498;
+`DNA_T` 1; `ambiguous` 4; `invalid` 6; mixed T/U 0.
+`t_to_u_applied=true` on 1 RNA record. That T-alphabet row remains
+`molecule_type=RNA`; it is not classified as ssDNA.
+
+QC flags (post-display-clean, not raw-character diagnostics):
+invalid character 6; ambiguous base 4; alignment gaps 1; truncated
+sequence / internal ellipsis 1; mixed T/U 0; core below min 9; core
+above max 95; known promoter detected 1; rows with any QC flag 114.
+Display cleaning: uppercase 4; whitespace removed 1; terminal 3′
+label stripped 1; T→U 1.
+
+The preflight found two raw records containing `-`. After shared
+display cleaning, one hyphen belonged to a genuine terminal 3′ label
+and was stripped (length 37→33, no remaining QC). The other remains
+on the internal-ellipsis record, which also contains digits, so S2
+classifies it as `invalid` plus `alignment_gaps` plus
+`truncated_sequence`. That is a raw-versus-display-clean distinction,
+not a dropped record. Two of the six invalid rows are longer than
+100 nt but do not carry `core_above_max_length` because the shared
+normaliser returns early on invalid alphabets; the length bucket
+still counts them (`>100` 97 versus flag 95).
+
+Constant regions: approved motif scanned = `t7_promoter_minimal`;
+known-motif detections = 1 (5′); records actually trimmed = 0;
+group-wise inference disabled.
+
+Truncation regressions (display-normalised; do not drop records):
+
+- A: `<1%` ending in `.` / `...` / `…` — PASS (0/509)
+- B: median full length > 20 nt — PASS (median 75)
+- C: ≤1 containing `...` or `…` anywhere — PASS (1/509)
+
+Raw SHA-256 unchanged before and after S2. Deterministic rerun:
+pass.
+
+### Open questions carried forward
+
+- CHECKPOINT-1 will adjudicate judgement-dependent sequence/trim
+  issues during S3, including the internal-ellipsis record (which is
+  also invalid/gapped), the six invalid-alphabet rows, the four
+  clean ambiguous-IUPAC rows, and the unapplied T7 detection.
+  S3 should honour `truncated_sequence` as a review reason even when
+  `invalid_character` or `alignment_gaps` co-occur, and should not
+  treat source `Type` as a parking rule.
+- Group-wise constant-region inference remains disabled unless later
+  evidence justifies a source-specific grouping mode.
+- Target extraction and Category/Type reconciliation remain S4 /
+  CHECKPOINT-2.
+- Length filtering (9 below 20 nt; ~97 above 100 nt) is deferred to
+  S3. The 20–25 and 90–100 bands should be reported, not silently
+  dropped.
+
+### Pipeline status
+
+```text
+RiboAptamer S0 complete
+RiboAptamer S1 complete
+RiboAptamer S2 complete
+RiboAptamer S3 has not started
+No RiboAptamer records are yet authorised for global S4
+```
+
 
 
