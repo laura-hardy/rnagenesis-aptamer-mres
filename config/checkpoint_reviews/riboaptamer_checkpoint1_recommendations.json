@@ -1,0 +1,24 @@
+{
+  "source_key": "riboaptamer",
+  "records": {},
+  "groups": {},
+  "audit_only": {
+    "review_recommendation": "keep_current_route",
+    "recommended_manual_decision": "keep",
+    "rationale": "Length-boundary and random-kept audit rows are technically eligible. Confirm the current route unless a separate scientific issue is visible.",
+    "requires_specific_human_decision": false
+  },
+  "known_motif": {
+    "review_recommendation": "decide_trim",
+    "recommended_manual_decision": "edit",
+    "recommended_trim_action": "approve",
+    "rationale": "S2 detected an approved 5-prime t7_promoter_minimal motif. It has not been applied. Approve, override, reject, or defer the proposed trim. sequence_core is currently unchanged.",
+    "requires_specific_human_decision": true
+  },
+  "judgement_dependent": {
+    "review_recommendation": "inspect_sequence",
+    "recommended_manual_decision": "",
+    "rationale": "Judgement-dependent technical condition. Truncation/alignment review takes precedence over overlapping automatic invalid-character context. Do not treat invalid_alphabet as a reason to skip this row.",
+    "requires_specific_human_decision": true
+  }
+}

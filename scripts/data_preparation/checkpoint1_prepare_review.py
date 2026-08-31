@@ -41,6 +41,18 @@ from adapters.aptadb_checkpoint1_review import (  # noqa: E402
     read_csv_rows,
     validate_review_package,
 )
+from adapters.riboaptamer_checkpoint1_review import (  # noqa: E402
+    DEFAULT_RECOMMENDATIONS_REL as RIBOAPTAMER_RECOMMENDATIONS_REL,
+    RiboAptamerCheckpoint1ReviewError,
+    build_review_readme as build_riboaptamer_review_readme,
+    format_riboaptamer_validation_markdown,
+    load_review_recommendations as load_riboaptamer_recommendations,
+    populate_riboaptamer_recommendations,
+)
+from adapters.riboaptamer_s3 import (  # noqa: E402
+    DEFAULT_RIBOAPTAMER_BATCHES,
+    LOCAL_DETAIL_COLUMNS as RIBOAPTAMER_LOCAL_DETAIL_COLUMNS,
+)
 from adapters.aptadb_s3 import (  # noqa: E402
     DEFAULT_APTADB_BATCHES,
     LOCAL_DETAIL_COLUMNS as APTADB_LOCAL_DETAIL_COLUMNS,
@@ -107,6 +119,15 @@ APTADB_PIPELINE_STOP_STATEMENT = (
     "The pipeline is stopped awaiting Laura CHECKPOINT-1 review."
 )
 APTADB_PERMITTED_DECISIONS: tuple[str, ...] = ("keep", "drop", "edit")
+RIBOAPTAMER_EXPECTED_TOTAL_ROWS = 509
+RIBOAPTAMER_BATCH_ORDER: tuple[str, ...] = DEFAULT_RIBOAPTAMER_BATCHES
+RIBOAPTAMER_PIPELINE_STOP_STATEMENT = (
+    "CHECKPOINT-1 package generated.\n"
+    "No human decisions applied.\n"
+    "No RiboAptamer record is authorised for S4 yet.\n"
+    "The pipeline is stopped awaiting Laura CHECKPOINT-1 review."
+)
+RIBOAPTAMER_PERMITTED_DECISIONS: tuple[str, ...] = ("keep", "drop", "edit")
 
 UTEXAS_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
     "review_batch",
@@ -168,6 +189,30 @@ APTADB_INDEX_COLUMNS: tuple[str, ...] = tuple(
     column
     for column in APTADB_MANUAL_REVIEW_COLUMNS
     if column not in APTADB_SEQUENCE_COLUMNS
+)
+
+RIBOAPTAMER_SEQUENCE_COLUMNS: tuple[str, ...] = (
+    "sequence_raw",
+    "sequence_full",
+    "sequence_core",
+    "manual_sequence_corrected",
+    "recommended_sequence_corrected",
+)
+
+RIBOAPTAMER_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
+    ("review_order",)
+    + RIBOAPTAMER_LOCAL_DETAIL_COLUMNS
+    + tuple(
+        column
+        for column in RECOMMENDATION_FIELDS
+        if column not in RIBOAPTAMER_LOCAL_DETAIL_COLUMNS
+    )
+)
+
+RIBOAPTAMER_INDEX_COLUMNS: tuple[str, ...] = tuple(
+    column
+    for column in RIBOAPTAMER_MANUAL_REVIEW_COLUMNS
+    if column not in RIBOAPTAMER_SEQUENCE_COLUMNS
 )
 
 UTEXAS_INDEX_COLUMNS: tuple[str, ...] = tuple(
@@ -1605,6 +1650,432 @@ def prepare_aptadb_checkpoint1_review(
     return result
 
 
+def build_riboaptamer_manual_review_row(
+    *,
+    review_row: Mapping[str, str],
+    local_detail: Mapping[str, str],
+    review_batch: str,
+    review_order: int,
+) -> dict[str, str]:
+    """Build one RiboAptamer sequence-bearing active-review row."""
+    if review_row["record_id"] != local_detail["record_id"]:
+        raise Checkpoint1ReviewError("Joined record_id mismatch")
+    for field_name in (
+        "proposed_decision",
+        "primary_reason",
+        "secondary_reasons",
+        "manual_review_priority",
+        "checkpoint_review_reasons",
+    ):
+        if review_row.get(field_name, "") != local_detail.get(field_name, ""):
+            raise Checkpoint1ReviewError(
+                f"Checkpoint field mismatch for {field_name!r} on "
+                f"{review_row['record_id']!r}"
+            )
+    row = {column: "" for column in RIBOAPTAMER_MANUAL_REVIEW_COLUMNS}
+    for column in RIBOAPTAMER_LOCAL_DETAIL_COLUMNS:
+        row[column] = local_detail.get(column, "")
+    row["review_batch"] = review_batch
+    row["review_order"] = str(review_order)
+    row["record_id"] = review_row["record_id"]
+    for name in MANUAL_FIELDS:
+        row[name] = ""
+    return row
+
+
+def build_riboaptamer_index_row(queue_row: Mapping[str, str]) -> dict[str, str]:
+    return {column: queue_row.get(column, "") for column in RIBOAPTAMER_INDEX_COLUMNS}
+
+
+def riboaptamer_review_package_sort_key(
+    row: Mapping[str, str],
+) -> tuple[int, int, str, str]:
+    batch = row.get("review_batch", "")
+    try:
+        batch_rank = RIBOAPTAMER_BATCH_ORDER.index(batch)
+    except ValueError:
+        batch_rank = len(RIBOAPTAMER_BATCH_ORDER)
+    return (
+        batch_rank,
+        _priority_rank(row.get("manual_review_priority", "none")),
+        row.get("primary_reason", ""),
+        row.get("record_id", ""),
+    )
+
+
+def build_riboaptamer_review_summary(
+    *,
+    repo_root: Path,
+    result: ReviewPackageResult,
+) -> str:
+    stats = result.stats
+    lines = [
+        "# RiboAptamer CHECKPOINT-1 manual-review package",
+        "",
+        "## Totals",
+        "",
+        f"- Total checkpoint records: `{stats.total_checkpoint_records}`",
+        f"- Active review rows: `{stats.active_review_rows}`",
+        f"- No-review records: `{stats.no_review_records}`",
+        f"- Human decisions recorded: `0`",
+        "",
+        "## Review model",
+        "",
+        "- `review_model` = `single_reviewer`",
+        "- Permitted `manual_decision` values: `keep` / `drop` / `edit`",
+        "- Permitted `manual_trim_action` values: `approve` / `override` / `reject` / `defer`",
+        "- `manual_*` fields are blank until Laura completes review.",
+        "- Machine `proposed_decision` and `review_recommendation` are not human decisions.",
+        "",
+        "## What S3 automatically excluded",
+        "",
+        "Automatic technical rejects (length out of range, ambiguous bases,",
+        "invalid alphabet without a judgement-dependent overlap, mixed T/U,",
+        "missing sequence) are in the rejection log. They are not in this",
+        "active queue unless a judgement-dependent condition also applies.",
+        "",
+        "## What requires human judgement",
+        "",
+        "- Judgement-dependent technical rows: truncation, alignment gaps,",
+        "  primer-like / library-template if present, and trim-induced cases.",
+        "  Truncation/alignment review takes precedence over overlapping",
+        "  invalid-character context. The SelB ellipsis record is in this batch.",
+        "- The known T7 motif is an unapplied trim proposal. Detection",
+        "  confidence is the approved motif library. `sequence_core` is unchanged.",
+        "- Trim-induced length failures: currently zero because no trim was applied.",
+        "- Length-boundary retained records (20–25 nt and 90–100 nt) are for",
+        "  eyeballing, not rejection.",
+        "- A deterministic random kept sample of 30 technically eligible records.",
+        "",
+        "Group-wise constant-region inference was disabled for the RiboAptamer",
+        "S2/S3 run. Target/evidence/non-protein routing remains deferred to S4.",
+        "",
+        "## Counts by review batch",
+        "",
+    ]
+    for batch in RIBOAPTAMER_BATCH_ORDER:
+        count = stats.batch_counts.get(batch, 0)
+        lines.append(f"- `{batch}`: `{count}`")
+
+    lines.extend(["", "## Counts by proposed decision", ""])
+    for name, count in sorted(stats.decision_counts.items()):
+        lines.append(f"- `{name}`: `{count}`")
+
+    lines.extend(["", "## Counts by primary reason", ""])
+    for name, count in sorted(stats.primary_reason_counts.items()):
+        lines.append(f"- `{name}`: `{count}`")
+
+    lines.extend(["", "## Counts by review priority", ""])
+    for name in PRIORITY_ORDER:
+        if name in stats.priority_counts:
+            lines.append(f"- `{name}`: `{stats.priority_counts[name]}`")
+
+    lines.extend(
+        [
+            "",
+            "## Permitted reviewer decisions",
+            "",
+        ]
+    )
+    for action in RIBOAPTAMER_PERMITTED_DECISIONS:
+        lines.append(f"- `{action}`")
+
+    lines.extend(
+        [
+            "",
+            "## How edit / sequence correction / trim work",
+            "",
+            "- `keep` retains the current technical route.",
+            "- `drop` is a human-reviewed exclusion. Do not combine it with",
+            "  sequence/molecule/trim edits.",
+            "- `edit` requires a corrected sequence, molecule/chemistry override,",
+            "  or an explicit trim action.",
+            "- `sequence_raw` remains the original source sequence even if a",
+            "  corrected technical sequence is supplied.",
+            "- Trim lengths are nucleotide counts removed from reviewed",
+            "  `sequence_full`. Approve, override, reject, or defer the T7",
+            "  proposal; do not paste a new core sequence unless using `edit`.",
+            "",
+            "## Completion requirements",
+            "",
+            "- `manual_decision` must be nonempty for every active row before apply.",
+            "- Trim actions, molecule overrides and sequence corrections are structured fields.",
+            "- Recommendations must not be copied blindly into `manual_*` fields.",
+            "- No human decision has yet been recorded.",
+            "- The apply stage will fail closed until required review decisions are resolved.",
+            "- Do not apply constant-region trims during this review step.",
+            "- Do not infer UniProt, target families, evidence scores or leakage.",
+            "",
+            "## Outputs",
+            "",
+            f"- Sequence-bearing review queue: "
+            f"`{_relative_display(result.output_queue, repo_root)}`",
+            f"- Sequence-free review index: "
+            f"`{_relative_display(result.output_index, repo_root)}`",
+        ]
+    )
+    if result.output_group_review is not None:
+        lines.append(
+            f"- Group-level constant review: "
+            f"`{_relative_display(result.output_group_review, repo_root)}`"
+        )
+    if result.output_bulk_confirmation is not None:
+        lines.append(
+            f"- Bulk audit confirmation: "
+            f"`{_relative_display(result.output_bulk_confirmation, repo_root)}`"
+        )
+    if result.output_readme is not None:
+        lines.append(
+            f"- README: `{_relative_display(result.output_readme, repo_root)}`"
+        )
+    if result.output_validation is not None:
+        lines.append(
+            f"- Validation: `{_relative_display(result.output_validation, repo_root)}`"
+        )
+    lines.extend(
+        [
+            f"- This summary: `{_relative_display(result.output_summary, repo_root)}`",
+            "",
+            "## Local-detail warning",
+            "",
+            "WARNING: the record-level review CSV contains source sequences.",
+            "It must remain under ignored `data/` and must never be staged.",
+            "",
+            "## Pipeline stop",
+            "",
+            RIBOAPTAMER_PIPELINE_STOP_STATEMENT,
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def prepare_riboaptamer_checkpoint1_review(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    expected_active_rows: int | None = None,
+    expected_total_rows: int | None = RIBOAPTAMER_EXPECTED_TOTAL_ROWS,
+) -> ReviewPackageResult:
+    """Build the RiboAptamer CHECKPOINT-1 active manual-review package."""
+    repo_root = repo_root.resolve()
+    checkpoint_dir = _resolve_under_repo(repo_root, checkpoint_dir)
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+
+    review_path = checkpoint_dir / "riboaptamer_checkpoint1_review.csv"
+    local_detail_path = checkpoint_dir / "riboaptamer_checkpoint1_local_detail.csv"
+    for path, label in (
+        (review_path, "checkpoint review"),
+        (local_detail_path, "local-detail"),
+    ):
+        if not path.is_file():
+            raise Checkpoint1ReviewError(f"Missing {label} input: {path.name}")
+
+    review_hash_before = _sha256_file(review_path)
+    local_detail_hash_before = _sha256_file(local_detail_path)
+
+    review_rows = _read_csv(review_path, label="checkpoint review")
+    local_detail_rows = _read_csv(local_detail_path, label="local-detail")
+    paired = _join_review_and_local_detail(review_rows, local_detail_rows)
+
+    if expected_total_rows is not None and len(paired) != expected_total_rows:
+        raise Checkpoint1ReviewError(
+            f"Checkpoint row count must be {expected_total_rows}; got {len(paired)}"
+        )
+
+    stats = ReviewPackageStats()
+    stats.total_checkpoint_records = len(paired)
+
+    active_pairs: list[tuple[dict[str, str], dict[str, str], str]] = []
+    for review_row, detail_row in paired:
+        required = (review_row.get("manual_review_required") or "").strip()
+        if required not in {"true", "false"}:
+            raise Checkpoint1ReviewError(
+                "manual_review_required must be lowercase true/false; "
+                f"got {required!r} for {review_row['record_id']!r}"
+            )
+        if required == "false":
+            stats.no_review_records += 1
+            if review_row.get("review_batch"):
+                raise Checkpoint1ReviewError(
+                    "No-review RiboAptamer row must not carry review_batch: "
+                    f"{review_row['record_id']!r}"
+                )
+            continue
+        if (
+            review_row.get("proposed_decision") == "proposed_reject"
+            and review_row.get("primary_reason") == "missing_sequence"
+        ):
+            raise Checkpoint1ReviewError(
+                "Missing-sequence reject must not enter the active review queue: "
+                f"{review_row['record_id']!r}"
+            )
+        batch = (review_row.get("review_batch") or "").strip()
+        if not batch:
+            raise Checkpoint1ReviewError(
+                "Review-required RiboAptamer row missing review_batch: "
+                f"{review_row['record_id']!r}"
+            )
+        if batch not in RIBOAPTAMER_BATCH_ORDER:
+            raise Checkpoint1ReviewError(
+                f"Unknown RiboAptamer review_batch {batch!r} for "
+                f"{review_row['record_id']!r}"
+            )
+        detail_batch = (detail_row.get("review_batch") or "").strip()
+        if detail_batch and detail_batch != batch:
+            raise Checkpoint1ReviewError(
+                f"review_batch mismatch for {review_row['record_id']!r}"
+            )
+        if detail_row.get("manual_decision"):
+            raise Checkpoint1ReviewError(
+                "Prepared review must not pre-fill manual_decision: "
+                f"{review_row['record_id']!r}"
+            )
+        active_pairs.append((review_row, detail_row, batch))
+
+    if expected_active_rows is not None and len(active_pairs) != expected_active_rows:
+        raise Checkpoint1ReviewError(
+            f"Active review row count must be {expected_active_rows}; "
+            f"got {len(active_pairs)}"
+        )
+
+    recommendations_path = repo_root / RIBOAPTAMER_RECOMMENDATIONS_REL
+    recommendations: dict[str, object] = {
+        "records": {},
+        "groups": {},
+        "audit_only": {},
+        "known_motif": {},
+        "judgement_dependent": {},
+    }
+    if recommendations_path.is_file():
+        try:
+            recommendations = load_riboaptamer_recommendations(recommendations_path)
+        except RiboAptamerCheckpoint1ReviewError as exc:
+            raise Checkpoint1ReviewError(str(exc)) from exc
+
+    draft_rows: list[dict[str, str]] = []
+    for review_row, detail_row, batch in active_pairs:
+        built = build_riboaptamer_manual_review_row(
+            review_row=review_row,
+            local_detail=detail_row,
+            review_batch=batch,
+            review_order=0,
+        )
+        try:
+            built = populate_riboaptamer_recommendations(
+                built, recommendations=recommendations
+            )
+        except RiboAptamerCheckpoint1ReviewError as exc:
+            raise Checkpoint1ReviewError(str(exc)) from exc
+        draft_rows.append(built)
+
+    draft_rows.sort(key=riboaptamer_review_package_sort_key)
+    queue_rows: list[dict[str, str]] = []
+    for index, row in enumerate(draft_rows, start=1):
+        ordered = dict(row)
+        ordered["review_order"] = str(index)
+        if any(ordered.get(name) for name in MANUAL_FIELDS):
+            raise Checkpoint1ReviewError(
+                "Reviewer fields must be empty in the prepared package"
+            )
+        queue_rows.append(ordered)
+        batch = ordered["review_batch"]
+        stats.batch_counts[batch] = stats.batch_counts.get(batch, 0) + 1
+        decision = ordered["proposed_decision"]
+        stats.decision_counts[decision] = stats.decision_counts.get(decision, 0) + 1
+        primary = ordered["primary_reason"]
+        stats.primary_reason_counts[primary] = (
+            stats.primary_reason_counts.get(primary, 0) + 1
+        )
+        priority = ordered["manual_review_priority"]
+        stats.priority_counts[priority] = stats.priority_counts.get(priority, 0) + 1
+
+    stats.active_review_rows = len(queue_rows)
+    if len({row["record_id"] for row in queue_rows}) != len(queue_rows):
+        raise Checkpoint1ReviewError("Active review queue has duplicate record_id")
+
+    index_rows = [build_riboaptamer_index_row(row) for row in queue_rows]
+    if any(column in RIBOAPTAMER_INDEX_COLUMNS for column in RIBOAPTAMER_SEQUENCE_COLUMNS):
+        raise Checkpoint1ReviewError("Sequence columns leaked into index schema")
+
+    bulk_row = build_bulk_confirmation_row(queue_rows)
+    try:
+        validation = validate_review_package(
+            queue_rows=queue_rows,
+            group_rows=[],
+            bulk_confirmation=bulk_row,
+        )
+    except AptaDBCheckpoint1ReviewError as exc:
+        raise Checkpoint1ReviewError(str(exc)) from exc
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_queue = output_dir / "riboaptamer_checkpoint1_manual_review.csv"
+    out_index = output_dir / "riboaptamer_checkpoint1_manual_review_index.csv"
+    out_summary = output_dir / "riboaptamer_checkpoint1_manual_review_summary.md"
+    out_group = output_dir / "riboaptamer_checkpoint1_constant_group_review.csv"
+    out_bulk = output_dir / "riboaptamer_checkpoint1_bulk_audit_confirmation.csv"
+    out_readme = output_dir / "README.md"
+    out_validation = output_dir / "riboaptamer_checkpoint1_validation.md"
+
+    write_csv_atomic(out_queue, RIBOAPTAMER_MANUAL_REVIEW_COLUMNS, queue_rows)
+    write_csv_atomic(out_index, RIBOAPTAMER_INDEX_COLUMNS, index_rows)
+    write_csv_atomic(out_group, GROUP_REVIEW_COLUMNS, [])
+    write_csv_atomic(out_bulk, BULK_CONFIRMATION_COLUMNS, [bulk_row])
+    _write_text_atomic(out_readme, build_riboaptamer_review_readme())
+    _write_text_atomic(
+        out_validation, format_riboaptamer_validation_markdown(validation)
+    )
+
+    review_hash_after = _sha256_file(review_path)
+    local_detail_hash_after = _sha256_file(local_detail_path)
+    inputs_unchanged = (
+        review_hash_before == review_hash_after
+        and local_detail_hash_before == local_detail_hash_after
+    )
+    if not inputs_unchanged:
+        raise Checkpoint1ReviewError(
+            "CHECKPOINT-1 inputs were modified during review-package preparation"
+        )
+
+    result = ReviewPackageResult(
+        source_key="riboaptamer",
+        stats=stats,
+        output_queue=out_queue,
+        output_index=out_index,
+        output_summary=out_summary,
+        review_hash_before=review_hash_before,
+        review_hash_after=review_hash_after,
+        local_detail_hash_before=local_detail_hash_before,
+        local_detail_hash_after=local_detail_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        output_group_review=out_group,
+        output_bulk_confirmation=out_bulk,
+        output_readme=out_readme,
+        output_validation=out_validation,
+    )
+    summary_text = build_riboaptamer_review_summary(
+        repo_root=repo_root, result=result
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in summary_text:
+        raise Checkpoint1ReviewError(
+            "Review summary must not contain absolute repository paths"
+        )
+    if RIBOAPTAMER_PIPELINE_STOP_STATEMENT not in summary_text:
+        raise Checkpoint1ReviewError("Review summary missing pipeline stop statement")
+    if "No human decision has yet been recorded." not in summary_text:
+        raise Checkpoint1ReviewError(
+            "Review summary must state that no human decision has been recorded"
+        )
+    if "fail closed" not in summary_text.lower():
+        raise Checkpoint1ReviewError(
+            "Review summary must state that apply will fail closed"
+        )
+    _write_text_atomic(out_summary, summary_text)
+    return result
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -1615,7 +2086,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptabase, utexas, or aptadb)",
+        help="Source key (aptabase, utexas, aptadb, or riboaptamer)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -1663,10 +2134,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     try:
-        if args.source not in {"aptabase", "utexas", "aptadb"}:
+        if args.source not in {"aptabase", "utexas", "aptadb", "riboaptamer"}:
             raise Checkpoint1ReviewError(
                 f"Unsupported source_key={args.source!r}; "
-                "supported: aptabase, utexas, aptadb"
+                "supported: aptabase, utexas, aptadb, riboaptamer"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -1680,6 +2151,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             default_checkpoint = Path("data/interim/checkpoints/utexas_cp1")
         elif args.source == "aptadb":
             default_checkpoint = Path("data/interim/checkpoints/aptadb_cp1")
+        elif args.source == "riboaptamer":
+            default_checkpoint = Path("data/interim/checkpoints/riboaptamer_cp1")
         else:
             default_checkpoint = Path("data/interim/checkpoints/aptabase_cp1")
         checkpoint_dir = (
@@ -1712,6 +2185,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 expected_active_rows=args.expected_active_rows,
                 expected_total_rows=(
                     APTADB_EXPECTED_TOTAL_ROWS
+                    if args.expected_total_rows is None
+                    else args.expected_total_rows
+                ),
+            )
+        elif args.source == "riboaptamer":
+            result = prepare_riboaptamer_checkpoint1_review(
+                repo_root=repo_root,
+                checkpoint_dir=checkpoint_dir,
+                output_dir=output_dir,
+                expected_active_rows=args.expected_active_rows,
+                expected_total_rows=(
+                    RIBOAPTAMER_EXPECTED_TOTAL_ROWS
                     if args.expected_total_rows is None
                     else args.expected_total_rows
                 ),
@@ -1750,6 +2235,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         batch_order = UTEXAS_BATCH_ORDER
     elif result.source_key == "aptadb":
         batch_order = APTADB_BATCH_ORDER
+    elif result.source_key == "riboaptamer":
+        batch_order = RIBOAPTAMER_BATCH_ORDER
     else:
         batch_order = BATCH_ORDER
     for batch in batch_order:

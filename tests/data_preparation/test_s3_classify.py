@@ -447,7 +447,7 @@ def test_56_unknown_source_adapter_rejected(tmp_path: Path) -> None:
     with pytest.raises(S3ClassifyError, match="Unknown S3 source_key"):
         run_s3_classification(
             repo_root=repo,
-            source_key="riboaptamer",
+            source_key="not_a_source",
             input_dir=input_dir,
             source_metadata_dir=meta_dir,
             leakage_set=leak,

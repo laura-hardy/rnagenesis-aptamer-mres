@@ -58,6 +58,27 @@ from adapters.aptadb_s3 import (  # noqa: E402
     refresh_stats_after_audit as refresh_aptadb_stats_after_audit,
     update_stats_from_row as update_aptadb_stats_from_row,
 )
+from adapters.riboaptamer_s3 import (  # noqa: E402
+    DECISION_COLUMNS as RIBOAPTAMER_DECISION_COLUMNS,
+    LOCAL_DETAIL_COLUMNS as RIBOAPTAMER_LOCAL_DETAIL_COLUMNS,
+    PARK_COLUMNS as RIBOAPTAMER_PARK_COLUMNS,
+    PRIMARY_ROUTE_ELIGIBLE as RIBOAPTAMER_PRIMARY_ROUTE_ELIGIBLE,
+    PRIMARY_ROUTE_REJECT as RIBOAPTAMER_PRIMARY_ROUTE_REJECT,
+    PRIMARY_ROUTE_SSDNA as RIBOAPTAMER_PRIMARY_ROUTE_SSDNA,
+    REASON_COUNT_COLUMNS as RIBOAPTAMER_REASON_COUNT_COLUMNS,
+    REASON_PRIORITY_RULE,
+    REJECTION_COLUMNS as RIBOAPTAMER_REJECTION_COLUMNS,
+    RiboAptamerS3Error,
+    RiboAptamerS3Stats,
+    apply_random_accept_audit as apply_riboaptamer_random_accept_audit,
+    assert_riboaptamer_accept_invariants,
+    assert_riboaptamer_reject_park_invariants,
+    build_local_detail_row as build_riboaptamer_local_detail_row,
+    classify_riboaptamer_record,
+    index_constant_proposals as index_riboaptamer_constant_proposals,
+    refresh_stats_after_audit as refresh_riboaptamer_stats_after_audit,
+    update_stats_from_row as update_riboaptamer_stats_from_row,
+)
 from adapters.utexas_s3 import (  # noqa: E402
     DECISION_COLUMNS as UTEXAS_DECISION_COLUMNS,
     LOCAL_DETAIL_COLUMNS as UTEXAS_LOCAL_DETAIL_COLUMNS,
@@ -104,6 +125,11 @@ EXPECTED_APTABASE_ROWS = 610
 EXPECTED_UTEXAS_ROWS = 1894
 EXPECTED_APTADB_ROWS = 1350
 EXPECTED_APTADB_UNLINKED = 37
+EXPECTED_RIBOAPTAMER_ROWS = 509
+EXPECTED_RIBOAPTAMER_SOURCE_DATASET = "riboaptamer_full_2026-08"
+EXPECTED_RIBOAPTAMER_RAW_SHA256 = (
+    "721d8c5ea81476c1f371ef8bfa814743f364eaf004c0a6eda2aabd6dc5d9a9fd"
+)
 EXPECTED_APTADB_MOLECULE = {"RNA": 289, "ssDNA": 1061}
 EXPECTED_UTEXAS_MISSING = 399
 EXPECTED_UTEXAS_NONEMPTY = 1495
@@ -127,6 +153,12 @@ APTADB_PIPELINE_STOP_STATEMENT = (
     "No AptaDB record is authorised for S4 yet.\n"
     "The pipeline is stopped awaiting Laura CHECKPOINT-1 review."
 )
+RIBOAPTAMER_PIPELINE_STOP_STATEMENT = (
+    "CHECKPOINT-1 package generated.\n"
+    "No human decisions applied.\n"
+    "No RiboAptamer record is authorised for S4 yet.\n"
+    "The pipeline is stopped awaiting Laura CHECKPOINT-1 review."
+)
 
 
 class S3ClassifyError(ValueError):
@@ -138,7 +170,7 @@ class S3RunResult:
     """Aggregate outcome of one S3 classification run."""
 
     source_key: str
-    stats: AptaBaseS3Stats | UTexasS3Stats | AptaDBS3Stats
+    stats: AptaBaseS3Stats | UTexasS3Stats | AptaDBS3Stats | RiboAptamerS3Stats
     output_canonical: Path
     output_decisions: Path
     output_review: Path
@@ -2306,6 +2338,684 @@ def run_aptadb_s3(
     return run_result
 
 
+def _assert_riboaptamer_s2_invariants(
+    canonical_rows: Sequence[dict[str, str]],
+) -> None:
+    """Hard-fail if the RiboAptamer S2 starting invariants no longer reconcile."""
+    if len(canonical_rows) != EXPECTED_RIBOAPTAMER_ROWS:
+        raise S3ClassifyError(
+            f"S3 input rows must be {EXPECTED_RIBOAPTAMER_ROWS}; "
+            f"got {len(canonical_rows)}"
+        )
+    record_ids = [row["record_id"] for row in canonical_rows]
+    if len(set(record_ids)) != EXPECTED_RIBOAPTAMER_ROWS:
+        raise S3ClassifyError("RiboAptamer S2 record_id values are not unique")
+    molecule_counts: dict[str, int] = {}
+    chemistry_counts: dict[str, int] = {}
+    for row in canonical_rows:
+        if row.get("source_db") != "riboaptamer":
+            raise S3ClassifyError("S2 row source_db must be riboaptamer")
+        if row.get("source_dataset") != EXPECTED_RIBOAPTAMER_SOURCE_DATASET:
+            raise S3ClassifyError(
+                "S2 row source_dataset must be "
+                f"{EXPECTED_RIBOAPTAMER_SOURCE_DATASET}"
+            )
+        if row.get("sequence_core") != row.get("sequence_full"):
+            raise S3ClassifyError(
+                "RiboAptamer S2 must enter S3 with sequence_core == sequence_full"
+            )
+        molecule = row.get("molecule_type") or "unknown"
+        molecule_counts[molecule] = molecule_counts.get(molecule, 0) + 1
+        chemistry = row.get("chemistry") or "unknown"
+        chemistry_counts[chemistry] = chemistry_counts.get(chemistry, 0) + 1
+    if molecule_counts != {"RNA": EXPECTED_RIBOAPTAMER_ROWS}:
+        raise S3ClassifyError(
+            f"S2 molecule_type counts drifted: {molecule_counts}"
+        )
+    if chemistry_counts != {"RNA": EXPECTED_RIBOAPTAMER_ROWS}:
+        raise S3ClassifyError(
+            f"S2 chemistry counts drifted: {chemistry_counts}"
+        )
+
+
+def build_riboaptamer_checkpoint1_summary(
+    *,
+    repo_root: Path,
+    result: S3RunResult,
+    policy_path: Path,
+) -> str:
+    """Build an aggregate-only Markdown CHECKPOINT-1 summary (no sequences)."""
+    stats = result.stats
+    if not isinstance(stats, RiboAptamerS3Stats):
+        raise S3ClassifyError("RiboAptamer summary requires RiboAptamerS3Stats")
+
+    def _count(mapping: Mapping[str, int], key: str) -> int:
+        return int(mapping.get(key, 0))
+
+    rejected = _count(stats.primary_route_counts, RIBOAPTAMER_PRIMARY_ROUTE_REJECT)
+    parked_ssdna = _count(stats.primary_route_counts, RIBOAPTAMER_PRIMARY_ROUTE_SSDNA)
+    eligible = _count(stats.primary_route_counts, RIBOAPTAMER_PRIMARY_ROUTE_ELIGIBLE)
+    routed_sum = rejected + parked_ssdna + eligible
+
+    lines = [
+        "# RiboAptamer S3 / CHECKPOINT-1 summary",
+        "",
+        "## Reconciliation",
+        "",
+        f"- rows in = `{stats.s2_rows}`",
+        f"- technical rejects = `{rejected}`",
+        f"- parked ssDNA = `{parked_ssdna}`",
+        f"- parked non-protein = `{stats.non_protein_parked_count}`",
+        f"- technically eligible RNA = `{eligible}`",
+        f"- pending human review (unique records) = "
+        f"`{stats.unique_checkpoint_review_records}`",
+        f"- sum of primary routes = `{routed_sum}`",
+        f"- Unique record IDs: `{stats.unique_record_ids}`",
+        f"- Unique native IDs: `{stats.unique_native_ids}`",
+        f"- S2 order preserved: `{'pass' if stats.order_preserved else 'fail'}`",
+        "",
+        "Judgement-dependent records are provisional technical rejects and also",
+        "enter CHECKPOINT-1. They are counted once in the reject route and once",
+        "in the unique review-record count; they are not a separate disappearing",
+        "bucket. Automatic-only rejects do not enter CHECKPOINT-1.",
+        "",
+        f"`{stats.s2_rows}` = `{rejected}` rejected + `{parked_ssdna}` parked + "
+        f"`{eligible}` eligible.",
+        "",
+        "## Reason-priority rule",
+        "",
+        REASON_PRIORITY_RULE,
+        "",
+        "A single canonical `rejection_reason` is emitted. Overlaps are retained",
+        "in `secondary_reasons`, `qc_flags`, and `checkpoint_review_reasons`.",
+        "",
+        "## Technical rejection breakdown (primary reason)",
+        "",
+        f"- `missing_sequence`: `{_count(stats.primary_reason_counts, 'missing_sequence')}`",
+        f"- `length_out_of_range`: `{_count(stats.primary_reason_counts, 'length_out_of_range')}`",
+        f"- `mixed_T_and_U`: `{_count(stats.primary_reason_counts, 'mixed_T_and_U')}`",
+        f"- `alignment_gaps`: `{_count(stats.primary_reason_counts, 'alignment_gaps')}`",
+        f"- `invalid_alphabet`: `{_count(stats.primary_reason_counts, 'invalid_alphabet')}`",
+        f"- `ambiguous_bases`: `{_count(stats.primary_reason_counts, 'ambiguous_bases')}`",
+        f"- `primer_like`: `{_count(stats.primary_reason_counts, 'primer_like')}`",
+        f"- `library_template`: `{_count(stats.primary_reason_counts, 'library_template')}`",
+        f"- `truncated_sequence`: `{_count(stats.primary_reason_counts, 'truncated_sequence')}`",
+        "",
+        "Condition tallies (a record may contribute to more than one):",
+        "",
+        f"- missing-sequence condition: `{stats.missing_sequence_count}`",
+        f"- mixed T/U condition: `{stats.mixed_t_u_count}`",
+        f"- alignment-gaps condition: `{stats.alignment_gaps_count}`",
+        f"- invalid-alphabet condition: `{stats.invalid_alphabet_count}`",
+        f"- ambiguous-bases condition: `{stats.ambiguous_bases_count}`",
+        f"- length-out-of-range condition: `{stats.length_out_of_range_count}`",
+        f"  - actual core `<20`: `{stats.length_below_min_count}`",
+        f"  - actual core `>100`: `{stats.length_above_max_count}`",
+        f"- primer_like condition: `{stats.primer_like_count}`",
+        f"- library_template condition: `{stats.library_template_count}`",
+        f"- truncated_sequence condition: `{stats.truncated_sequence_count}`",
+        "",
+        "## Overlaps",
+        "",
+        f"- invalid alphabet AND length out of range: `{stats.invalid_and_length_count}`",
+        f"- truncated AND invalid alphabet: `{stats.truncated_and_invalid_count}`",
+        f"- truncated AND alignment gaps: `{stats.truncated_and_alignment_count}`",
+        f"- ambiguous bases AND length out of range: `{stats.ambiguous_and_length_count}`",
+        f"- length-boundary records with another technical failure: "
+        f"`{stats.boundary_with_other_technical_count}`",
+        f"- trim-pushed length out of range: `{stats.trim_pushed_length_count}`",
+        f"- known-motif detections inside 20–100 nt: "
+        f"`{stats.known_motif_in_length_window_count}`",
+        f"- records with more than one reason: `{stats.multiple_reasons_count}`",
+        "",
+        "Length is computed from `len(sequence_core)`, not from S2",
+        "`core_above_max_length` / `core_below_min_length` flags. Invalid-alphabet",
+        "rows that returned early from the S2 normaliser are still length-checked.",
+        "",
+        "## Parking",
+        "",
+        f"- parked ssDNA = `{parked_ssdna}`",
+        f"- parked non-protein (source Type unused) = `{stats.non_protein_parked_count}`",
+        f"- source Type used for parking: `{str(stats.source_type_used_for_parking).lower()}`",
+        "",
+        "Source `Type` is review-context metadata only. Empty `target_name_raw`",
+        "does not reject. Canonical target type is not populated.",
+        "",
+        "## CHECKPOINT-1",
+        "",
+        f"- unique review records: `{stats.unique_checkpoint_review_records}`",
+        f"- judgement-dependent technical records: "
+        f"`{stats.judgement_dependent_review_count}`",
+        f"- constant-proposal / known-motif records in review: "
+        f"`{stats.constant_review_count}`",
+        f"- known-motif proposal records: `{stats.known_motif_proposal_record_count}`",
+        f"- group-consensus proposal records: "
+        f"`{stats.group_consensus_proposal_record_count}`",
+        f"- trim-induced length failures presented: `{stats.trim_pushed_length_count}`",
+        f"- boundary-length records in review: `{stats.boundary_review_count}`",
+        f"- lower-boundary (20–25 nt) condition: `{stats.boundary_low_count}`",
+        f"- upper-boundary (90–100 nt) condition: `{stats.boundary_high_count}`",
+        f"- random kept audit sampled: `{stats.random_accept_audit_count}`",
+        f"- random kept audit pool: `{stats.random_accept_audit_pool_size}`",
+        f"- random kept audit shortfall: `{stats.random_accept_audit_shortfall}`",
+        "",
+        "Overlapping review reasons share one review row. A record is not",
+        "duplicated across batches; the primary batch follows judgement >",
+        "constant-region > length-boundary > random-kept-audit.",
+        "",
+        "### Counts by checkpoint review reason",
+        "",
+    ]
+    if stats.checkpoint_review_reason_counts:
+        for name, count in _count_sorted(stats.checkpoint_review_reason_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+
+    lines.extend(["", "### Counts by review batch", ""])
+    for batch in (
+        "01_judgement_dependent_technical",
+        "02_constant_region_proposal",
+        "03_length_boundary",
+        "04_random_kept_audit",
+    ):
+        lines.append(f"- `{batch}`: `{_count(stats.review_batch_counts, batch)}`")
+
+    lines.extend(
+        [
+            "",
+            "## Constant-region / T7 status",
+            "",
+            "- Group-wise constant-region inference was disabled for the",
+            "  RiboAptamer S2/S3 run.",
+            "- Known T7 motif detections are unapplied proposals.",
+            "- `sequence_core` has not been trimmed.",
+            "- Detection confidence is the configured approved-motif library",
+            "  (`t7_promoter_minimal`), not a medium-confidence consensus.",
+            f"- known-motif proposal count: `{stats.known_motif_proposal_record_count}`",
+            f"- group-consensus proposal count: "
+            f"`{stats.group_consensus_proposal_record_count}`",
+            "",
+            "## Deferred to S4 / CHECKPOINT-2",
+            "",
+            "Target identity, canonical target type, source `Type` protein vs",
+            "non-protein routing, evidence/affinity scoring, the E4 threshold,",
+            "and leakage exclusion remain deferred. This is an architecture",
+            "decision, not an accidental omission.",
+            "",
+            "- Target type inferred: `no`",
+            "- Evidence scored: `no`",
+            "- Leakage exclusions applied: `no`",
+            "- Constant-region proposals applied: `no`",
+            "- Human CHECKPOINT-1 decisions applied: `no`",
+            "- S4 started: `no`",
+            "",
+            "## Integrity",
+            "",
+            f"- S2 canonical hash before: `{result.s2_hash_before}`",
+            f"- S2 canonical hash after: `{result.s2_hash_after}`",
+            f"- S2 QC hash before: `{result.qc_hash_before}`",
+            f"- S2 QC hash after: `{result.qc_hash_after}`",
+            f"- Source-metadata hash before: `{result.sidecar_hash_before}`",
+            f"- Source-metadata hash after: `{result.sidecar_hash_after}`",
+            f"- S2 input integrity: "
+            f"`{'pass' if result.s2_integrity_ok else 'fail'}`",
+            f"- Inputs unchanged: "
+            f"`{'pass' if result.inputs_unchanged else 'fail'}`",
+            (
+                f"- Deterministic rerun result: "
+                f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+                if result.deterministic_rerun_ok is not None
+                else "- Deterministic rerun result: `not_checked`"
+            ),
+            f"- Raw SHA-256 before: `{result.raw_sha_before or 'not_checked'}`",
+            f"- Raw SHA-256 after: `{result.raw_sha_after or 'not_checked'}`",
+            "",
+            "## Inputs",
+            "",
+            f"- Eligibility policy: `{_relative_display(policy_path, repo_root)}`",
+            "",
+            "## Outputs",
+            "",
+            f"- Canonical: `{_relative_display(result.output_canonical, repo_root)}`",
+            f"- Decisions: `{_relative_display(result.output_decisions, repo_root)}`",
+            f"- Checkpoint review (sequence-free index of all rows): "
+            f"`{_relative_display(result.output_review, repo_root)}`",
+            f"- Checkpoint local detail (sequence-bearing scientific review): "
+            f"`{_relative_display(result.output_local_detail, repo_root)}`",
+            f"- Reason counts: "
+            f"`{_relative_display(result.output_reason_counts, repo_root)}`",
+        ]
+    )
+    if result.output_rejected is not None:
+        lines.append(
+            f"- Rejection log: `{_relative_display(result.output_rejected, repo_root)}`"
+        )
+    if result.output_parked_ssdna is not None:
+        lines.append(
+            f"- Parked ssDNA: "
+            f"`{_relative_display(result.output_parked_ssdna, repo_root)}`"
+        )
+    lines.extend(
+        [
+            f"- Summary: `{_relative_display(result.output_summary, repo_root)}`",
+            "",
+            "## Local-detail warning",
+            "",
+            "WARNING: `riboaptamer_checkpoint1_local_detail.csv` and",
+            "`rejected_riboaptamer.csv` contain source sequences. They must remain",
+            "beneath ignored `data/` and must never be staged or tracked.",
+            "",
+            "## Pipeline stop",
+            "",
+            RIBOAPTAMER_PIPELINE_STOP_STATEMENT,
+            "",
+            "CHECKPOINT-1 generated = yes",
+            "CHECKPOINT-1 human decisions applied = no",
+            "records authorised_for_s4 = 0",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_riboaptamer_s3(
+    *,
+    repo_root: Path,
+    input_dir: Path,
+    source_metadata_dir: Path,
+    eligibility_policy: Path,
+    output_dir: Path,
+    expected_rows: int | None = EXPECTED_RIBOAPTAMER_ROWS,
+    check_deterministic_rerun: bool = False,
+) -> S3RunResult:
+    """Execute RiboAptamer S3 technical eligibility and CHECKPOINT-1."""
+    repo_root = repo_root.resolve()
+    input_dir = (
+        input_dir if input_dir.is_absolute() else (repo_root / input_dir)
+    ).resolve()
+    source_metadata_dir = (
+        source_metadata_dir
+        if source_metadata_dir.is_absolute()
+        else (repo_root / source_metadata_dir)
+    ).resolve()
+    eligibility_policy = (
+        eligibility_policy
+        if eligibility_policy.is_absolute()
+        else (repo_root / eligibility_policy)
+    ).resolve()
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+
+    canonical_path = input_dir / "riboaptamer_normalised.csv"
+    qc_path = input_dir / "riboaptamer_s2_qc.csv"
+    sidecar_path = source_metadata_dir / "riboaptamer_source_metadata.csv"
+    proposals_path = input_dir / "detected_constants_riboaptamer.csv"
+    for path, label in (
+        (canonical_path, "S2 canonical"),
+        (qc_path, "S2 QC"),
+        (sidecar_path, "source-metadata"),
+        (proposals_path, "S2 constant-region proposals"),
+    ):
+        if not path.is_file():
+            raise S3ClassifyError(f"Missing {label} input: {path.name}")
+
+    raw_path = repo_root / "data" / "raw" / "riboaptamer" / "all_sequences_509_rows.csv"
+    raw_sha_before = ""
+    check_raw = expected_rows == EXPECTED_RIBOAPTAMER_ROWS
+    if check_raw:
+        if not raw_path.is_file():
+            raise S3ClassifyError("Missing registered RiboAptamer raw file")
+        raw_sha_before = _sha256_file(raw_path)
+        if raw_sha_before != EXPECTED_RIBOAPTAMER_RAW_SHA256:
+            raise S3ClassifyError(
+                "RiboAptamer raw SHA-256 does not match registry expectation"
+            )
+
+    s2_hash_before = _sha256_file(canonical_path)
+    qc_hash_before = _sha256_file(qc_path)
+    sidecar_hash_before = _sha256_file(sidecar_path)
+    proposals_hash_before = _sha256_file(proposals_path)
+
+    policy = load_eligibility_policy(eligibility_policy)
+    if policy.source_key != "riboaptamer":
+        raise S3ClassifyError(
+            f"Eligibility policy source_key must be riboaptamer; "
+            f"got {policy.source_key!r}"
+        )
+    if not policy.defer_target_classification or not policy.defer_evidence_scoring:
+        raise S3ClassifyError(
+            "RiboAptamer S3 policy must defer target classification and "
+            "evidence scoring"
+        )
+    if (
+        policy.sequence_leakage_matching_enabled
+        or policy.target_leakage_matching_enabled
+        or not policy.defer_leakage_exclusion
+    ):
+        raise S3ClassifyError("RiboAptamer S3 must not apply leakage exclusions")
+
+    canonical_rows = _read_corpus_csv(canonical_path)
+    qc_rows = _read_sidecar_csv(qc_path, label="S2 QC")
+    sidecar_rows = _read_sidecar_csv(sidecar_path, label="source-metadata")
+    proposal_rows = _read_plain_csv(proposals_path, label="S2 constant-region proposals")
+    aligned_qc = _match_sidecar_one_to_one(
+        canonical_rows, qc_rows, label="S2 QC"
+    )
+    aligned_sidecar = _match_sidecar_one_to_one(
+        canonical_rows, sidecar_rows, label="source-metadata"
+    )
+    proposal_index = index_riboaptamer_constant_proposals(
+        canonical_rows, proposal_rows
+    )
+
+    if expected_rows is not None and len(canonical_rows) != expected_rows:
+        raise S3ClassifyError(
+            f"S2 row count must be {expected_rows}; got {len(canonical_rows)}"
+        )
+    if expected_rows == EXPECTED_RIBOAPTAMER_ROWS:
+        _assert_riboaptamer_s2_invariants(canonical_rows)
+
+    stats = RiboAptamerS3Stats()
+    stats.s2_rows = len(canonical_rows)
+    stats.order_preserved = True
+    stats.group_inference_disabled = True
+    stats.source_type_used_for_parking = False
+
+    s3_canonical: list[dict[str, str]] = []
+    decision_rows: list[dict[str, str]] = []
+    rejection_rows: list[dict[str, str]] = []
+    parked_ssdna_rows: list[dict[str, str]] = []
+    local_detail_by_id: dict[str, dict[str, str]] = {}
+    core_by_id = {row["record_id"]: row["sequence_core"] for row in canonical_rows}
+
+    for s2_row, qc_row, meta_row in zip(
+        canonical_rows, aligned_qc, aligned_sidecar, strict=True
+    ):
+        classified = classify_riboaptamer_record(
+            s2_row,
+            qc_row,
+            meta_row,
+            policy=policy,
+            proposals=proposal_index.get(s2_row["record_id"], ()),
+        )
+        if classified.canonical["record_id"] != s2_row["record_id"]:
+            stats.order_preserved = False
+            raise S3ClassifyError("S3 altered record_id or row identity")
+        for column in CORPUS_COLUMNS:
+            if classified.canonical[column] != s2_row[column]:
+                raise S3ClassifyError(
+                    f"S3 altered S2 canonical field {column!r}"
+                )
+        s3_canonical.append(classified.canonical)
+        decision_rows.append(classified.decision)
+        if classified.rejection_row is not None:
+            rejection_rows.append(classified.rejection_row)
+        if classified.park_row is not None:
+            raise S3ClassifyError(
+                "RiboAptamer S3 must not emit park rows under the RNA contract"
+            )
+        local_detail_by_id[classified.canonical["record_id"]] = (
+            build_riboaptamer_local_detail_row(
+                canonical=classified.canonical,
+                s2_qc=qc_row,
+                source_metadata=meta_row,
+                decision=classified.decision,
+            )
+        )
+        update_riboaptamer_stats_from_row(stats, classified)
+
+    sampled, pool, shortfall = apply_riboaptamer_random_accept_audit(
+        decision_rows,
+        local_detail_by_id,
+        seed=policy.random_seed,
+        sample_size=policy.random_accept_audit_size,
+    )
+    stats.random_accept_audit_pool_size = pool
+    stats.random_accept_audit_shortfall = shortfall
+    refresh_riboaptamer_stats_after_audit(stats, decision_rows)
+
+    stats.s3_rows = len(s3_canonical)
+    stats.unique_record_ids = len({row["record_id"] for row in s3_canonical})
+    stats.unique_native_ids = len({row["native_id"] for row in s3_canonical})
+
+    if stats.s3_rows != len(canonical_rows):
+        raise S3ClassifyError("S3 must preserve every S2 row")
+    if stats.unique_record_ids != len(s3_canonical):
+        raise S3ClassifyError("S3 record_id values are not unique")
+    if len({row["record_id"] for row in decision_rows}) != len(decision_rows):
+        raise S3ClassifyError("Decision sidecar contains duplicate record_id values")
+
+    rejected_n = stats.primary_route_counts.get(RIBOAPTAMER_PRIMARY_ROUTE_REJECT, 0)
+    parked_ssdna_n = stats.primary_route_counts.get(RIBOAPTAMER_PRIMARY_ROUTE_SSDNA, 0)
+    eligible_n = stats.primary_route_counts.get(RIBOAPTAMER_PRIMARY_ROUTE_ELIGIBLE, 0)
+    if rejected_n + parked_ssdna_n + eligible_n != stats.s3_rows:
+        raise S3ClassifyError(
+            "technical_rejects + parked_ssdna + technically_eligible "
+            "does not equal S3 rows"
+        )
+    if len(rejection_rows) != rejected_n:
+        raise S3ClassifyError(
+            "Rejection log count does not match technical_reject route"
+        )
+    if parked_ssdna_n != 0 or parked_ssdna_rows:
+        raise S3ClassifyError("RiboAptamer S3 ssDNA parking must remain zero")
+    if stats.non_protein_parked_count != 0:
+        raise S3ClassifyError("RiboAptamer S3 must not park from source Type")
+    if sampled != stats.random_accept_audit_count:
+        raise S3ClassifyError("Random-accept audit count mismatch")
+    if stats.trim_pushed_length_count != 0:
+        raise S3ClassifyError(
+            "RiboAptamer S3 unexpectedly found trim-pushed length failures"
+        )
+    if stats.group_consensus_proposal_record_count != 0:
+        raise S3ClassifyError(
+            "RiboAptamer S3 unexpectedly found group-consensus proposals"
+        )
+
+    for row in decision_rows:
+        if not row["primary_reason"]:
+            raise S3ClassifyError("Decision row missing primary_reason")
+        if row.get("primary_reason") == "missing_target":
+            raise S3ClassifyError("RiboAptamer S3 must not reject missing_target")
+
+    assert_riboaptamer_accept_invariants(decision_rows)
+    assert_riboaptamer_reject_park_invariants(decision_rows)
+
+    reason_count_rows: list[dict[str, str]] = []
+    combo_counts: dict[tuple[str, str], int] = {}
+    for row in decision_rows:
+        key = (row["proposed_decision"], row["primary_reason"])
+        combo_counts[key] = combo_counts.get(key, 0) + 1
+    for (decision, reason), count in sorted(combo_counts.items()):
+        reason_count_rows.append(
+            {
+                "proposed_decision": decision,
+                "primary_reason": reason,
+                "record_count": str(count),
+            }
+        )
+    if sum(int(row["record_count"]) for row in reason_count_rows) != len(decision_rows):
+        raise S3ClassifyError("Reason counts do not reconcile to decision rows")
+
+    review_rows = sorted(decision_rows, key=review_sort_key)
+    local_detail_rows: list[dict[str, str]] = []
+    for review_row in review_rows:
+        record_id = review_row["record_id"]
+        if record_id not in local_detail_by_id:
+            raise S3ClassifyError(
+                f"Missing local-detail row for record_id={record_id!r}"
+            )
+        detail = local_detail_by_id[record_id]
+        if detail["sequence_core"] != core_by_id[record_id]:
+            raise S3ClassifyError("CHECKPOINT-1 must not apply constant-region trims")
+        if detail.get("manual_decision"):
+            raise S3ClassifyError("Local-detail must not pre-fill manual_decision")
+        for field_name in (
+            "manual_sequence_corrected",
+            "manual_molecule_type_override",
+            "manual_trim_action",
+        ):
+            if detail.get(field_name):
+                raise S3ClassifyError(
+                    f"Local-detail must not pre-fill {field_name}"
+                )
+        local_detail_rows.append(detail)
+    for review_row, detail_row in zip(review_rows, local_detail_rows, strict=True):
+        if review_row["record_id"] != detail_row["record_id"]:
+            raise S3ClassifyError(
+                "Local-detail ordering does not match sequence-free review"
+            )
+        if review_row["review_batch"] != detail_row.get("review_batch", ""):
+            raise S3ClassifyError("Local-detail review_batch mismatch")
+
+    forbidden_seq_cols = {"sequence_raw", "sequence_full", "sequence_core"}
+    for col in forbidden_seq_cols:
+        if col in RIBOAPTAMER_DECISION_COLUMNS or col in RIBOAPTAMER_PARK_COLUMNS:
+            raise S3ClassifyError(f"Sequence column leaked into sidecar schema: {col}")
+    for col in ("sequence_raw", "sequence_full", "sequence_core"):
+        if col not in RIBOAPTAMER_LOCAL_DETAIL_COLUMNS:
+            raise S3ClassifyError(
+                f"Local-detail schema missing required sequence column: {col}"
+            )
+
+    review_ids = [
+        row["record_id"]
+        for row in review_rows
+        if row.get("manual_review_required") == "true"
+    ]
+    if len(review_ids) != len(set(review_ids)):
+        raise S3ClassifyError("CHECKPOINT-1 review rows are duplicated")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_canonical = output_dir / "riboaptamer_s3_canonical.csv"
+    out_decisions = output_dir / "riboaptamer_s3_decisions.csv"
+    out_review = output_dir / "riboaptamer_checkpoint1_review.csv"
+    out_local_detail = output_dir / "riboaptamer_checkpoint1_local_detail.csv"
+    out_reason_counts = output_dir / "riboaptamer_checkpoint1_reason_counts.csv"
+    out_rejected = output_dir / "rejected_riboaptamer.csv"
+    out_parked_ssdna = output_dir / "riboaptamer_s3_parked_ssdna.csv"
+    out_summary = output_dir / "riboaptamer_checkpoint1_summary.md"
+
+    write_corpus_csv_atomic(out_canonical, s3_canonical)
+    write_csv_atomic(out_decisions, RIBOAPTAMER_DECISION_COLUMNS, decision_rows)
+    write_csv_atomic(out_review, RIBOAPTAMER_DECISION_COLUMNS, review_rows)
+    write_csv_atomic(
+        out_local_detail, RIBOAPTAMER_LOCAL_DETAIL_COLUMNS, local_detail_rows
+    )
+    write_csv_atomic(
+        out_reason_counts, RIBOAPTAMER_REASON_COUNT_COLUMNS, reason_count_rows
+    )
+    write_csv_atomic(out_rejected, RIBOAPTAMER_REJECTION_COLUMNS, rejection_rows)
+    write_csv_atomic(out_parked_ssdna, RIBOAPTAMER_PARK_COLUMNS, parked_ssdna_rows)
+
+    s2_hash_after = _sha256_file(canonical_path)
+    qc_hash_after = _sha256_file(qc_path)
+    sidecar_hash_after = _sha256_file(sidecar_path)
+    proposals_hash_after = _sha256_file(proposals_path)
+    raw_sha_after = raw_sha_before
+    if check_raw:
+        raw_sha_after = _sha256_file(raw_path)
+        if raw_sha_after != EXPECTED_RIBOAPTAMER_RAW_SHA256:
+            raise S3ClassifyError("RiboAptamer raw SHA-256 changed during S3")
+    inputs_unchanged = (
+        s2_hash_before == s2_hash_after
+        and qc_hash_before == qc_hash_after
+        and sidecar_hash_before == sidecar_hash_after
+        and proposals_hash_before == proposals_hash_after
+        and (not check_raw or raw_sha_before == raw_sha_after)
+    )
+    if not inputs_unchanged:
+        raise S3ClassifyError("S2/source inputs were modified during S3 execution")
+
+    s2_integrity_ok = True
+    if _sha256_file(out_canonical) != s2_hash_before:
+        raise S3ClassifyError(
+            "S3 canonical output is not byte-identical to S2 normalised input"
+        )
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        first_hashes = {
+            "canonical": _sha256_file(out_canonical),
+            "decisions": _sha256_file(out_decisions),
+            "review": _sha256_file(out_review),
+            "local_detail": _sha256_file(out_local_detail),
+            "reason_counts": _sha256_file(out_reason_counts),
+            "rejected": _sha256_file(out_rejected),
+            "parked_ssdna": _sha256_file(out_parked_ssdna),
+        }
+        second = run_riboaptamer_s3(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            source_metadata_dir=source_metadata_dir,
+            eligibility_policy=eligibility_policy,
+            output_dir=output_dir,
+            expected_rows=expected_rows,
+            check_deterministic_rerun=False,
+        )
+        second_hashes = {
+            "canonical": _sha256_file(second.output_canonical),
+            "decisions": _sha256_file(second.output_decisions),
+            "review": _sha256_file(second.output_review),
+            "local_detail": _sha256_file(second.output_local_detail),
+            "reason_counts": _sha256_file(second.output_reason_counts),
+            "rejected": _sha256_file(second.output_rejected),
+            "parked_ssdna": _sha256_file(second.output_parked_ssdna),
+        }
+        deterministic_ok = first_hashes == second_hashes
+        if not deterministic_ok:
+            raise S3ClassifyError(
+                "S3 outputs were not byte-identical across deterministic rerun"
+            )
+
+    run_result = S3RunResult(
+        source_key="riboaptamer",
+        stats=stats,
+        output_canonical=out_canonical,
+        output_decisions=out_decisions,
+        output_review=out_review,
+        output_local_detail=out_local_detail,
+        output_summary=out_summary,
+        output_reason_counts=out_reason_counts,
+        output_leakage_matches=None,
+        s2_hash_before=s2_hash_before,
+        s2_hash_after=s2_hash_after,
+        qc_hash_before=qc_hash_before,
+        qc_hash_after=qc_hash_after,
+        sidecar_hash_before=sidecar_hash_before,
+        sidecar_hash_after=sidecar_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        deterministic_rerun_ok=deterministic_ok,
+        s2_integrity_ok=s2_integrity_ok,
+        output_rejected=out_rejected,
+        output_parks=None,
+        output_parked_ssdna=out_parked_ssdna,
+        output_parked_non_protein=None,
+        raw_sha_before=raw_sha_before,
+        raw_sha_after=raw_sha_after,
+    )
+    summary_text = build_riboaptamer_checkpoint1_summary(
+        repo_root=repo_root,
+        result=run_result,
+        policy_path=eligibility_policy,
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in summary_text:
+        raise S3ClassifyError(
+            "CHECKPOINT-1 summary must not contain absolute repository paths"
+        )
+    if RIBOAPTAMER_PIPELINE_STOP_STATEMENT not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary missing pipeline stop statement")
+    if "group-wise constant-region inference was disabled" not in summary_text.lower():
+        raise S3ClassifyError(
+            "CHECKPOINT-1 summary must state that group-wise inference was disabled"
+        )
+    if "Evidence scored" not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary missing evidence deferral")
+    _write_text_atomic(out_summary, summary_text)
+    return run_result
+
+
 def run_s3_classification(
     *,
     repo_root: Path,
@@ -2355,6 +3065,18 @@ def run_s3_classification(
             output_dir=output_dir,
             expected_rows=(
                 EXPECTED_APTADB_ROWS if expected_rows is None else expected_rows
+            ),
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key == "riboaptamer":
+        return run_riboaptamer_s3(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            source_metadata_dir=source_metadata_dir,
+            eligibility_policy=eligibility_policy,
+            output_dir=output_dir,
+            expected_rows=(
+                EXPECTED_RIBOAPTAMER_ROWS if expected_rows is None else expected_rows
             ),
             check_deterministic_rerun=check_deterministic_rerun,
         )
@@ -2476,6 +3198,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_path = Path("config/source_eligibility/utexas.json")
         elif args.source == "aptadb":
             policy_path = Path("config/source_eligibility/aptadb.json")
+        elif args.source == "riboaptamer":
+            policy_path = Path("config/source_eligibility/riboaptamer.json")
         else:
             raise S3ClassifyError(
                 "--eligibility-policy is required for unknown sources"
@@ -2486,6 +3210,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_dir = Path("data/interim/checkpoints/utexas_cp1")
         elif args.source == "aptadb":
             output_dir = Path("data/interim/checkpoints/aptadb_cp1")
+        elif args.source == "riboaptamer":
+            output_dir = Path("data/interim/checkpoints/riboaptamer_cp1")
         else:
             output_dir = Path("data/interim/checkpoints/aptabase_cp1")
 
@@ -2506,6 +3232,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         AptaBaseS3Error,
         UTexasS3Error,
         AptaDBS3Error,
+        RiboAptamerS3Error,
         EligibilityError,
         CorpusSchemaError,
     ) as exc:

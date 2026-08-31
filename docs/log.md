@@ -3989,5 +3989,210 @@ RiboAptamer S3 has not started
 No RiboAptamer records are yet authorised for global S4
 ```
 
+## 2026-08-31 — RiboAptamer S3 technical filtering and CHECKPOINT-1
 
+**Stage:** Aim 2 / data curation / S3 technical eligibility and
+CHECKPOINT-1 package preparation only. Human review decisions were not
+applied. CHECKPOINT-1 is not closed. Constant-region proposals were not
+applied. Target extraction and global S4 were not started.
+
+### What was done
+
+The 509 S2-normalised RiboAptamer records were classified with the
+shared eligibility implementation under a source policy that defers
+target classification, evidence scoring, and leakage exclusion. Length
+eligibility used the actual computed `sequence_core` length (20–100 nt),
+not S2 length QC flags. Every record received a closed-vocabulary
+decision and, where excluded, a rejection-log entry. Structured
+CHECKPOINT-1 review artefacts were generated and validated. The apply
+stage was confirmed fail-closed on the blank review. No human decisions
+were filled or applied.
+
+### Decisions / implementation rules
+
+- Source `Type` (`Proteins`, `Small molecules`, `Cells`, `Nucleic acids`)
+  was not used for protein / non-protein parking. It remains sidecar
+  review-context metadata for later S4 / CHECKPOINT-2.
+- Empty `target_name_raw` does not reject. Canonical target type is not
+  populated. Evidence / E4 and leakage matching were not applied.
+- S3 eligibility was calculated from `len(sequence_core)`, not solely
+  from S2 `core_above_max_length` / `core_below_min_length` flags. That
+  is required because the S2 normaliser can return early on invalid
+  alphabets before emitting a length QC flag.
+- Judgement-dependent truncation / alignment / primer / library
+  conditions take CHECKPOINT-1 review precedence when they overlap
+  generic automatic reasons such as `invalid_alphabet`. A single
+  canonical `rejection_reason` is emitted; overlaps are retained in
+  `secondary_reasons`, `qc_flags`, and `checkpoint_review_reasons`.
+- The known T7 `t7_promoter_minimal` motif remains an unapplied trim
+  proposal. Detection confidence is the approved motif library.
+  `sequence_core` is unchanged. Group-wise constant-region inference
+  remains disabled; no medium-confidence consensus trims appeared.
+- ssDNA parking remains zero under the experimental-RNA source
+  contract. An unexpected DNA molecule type would hard-fail rather than
+  be silently parked.
+- Judgement-dependent records are provisional technical rejects and
+  also enter CHECKPOINT-1. They are counted once in the reject route
+  and once in the unique review-record count. They are not a separate
+  disappearing bucket. Automatic-only rejects do not enter the active
+  review queue.
+
+### Inputs used
+
+- `source_dataset = riboaptamer_full_2026-08`
+- S2 canonical: `data/interim/normalised/riboaptamer_normalised.csv`
+- S2 QC: `data/interim/normalised/riboaptamer_s2_qc.csv`
+- S2 proposals: `data/interim/normalised/detected_constants_riboaptamer.csv`
+- S1 sidecar: `data/interim/extracted/riboaptamer_source_metadata.csv`
+- Registered raw file: `data/raw/riboaptamer/all_sequences_509_rows.csv`
+- SHA-256:
+  `721d8c5ea81476c1f371ef8bfa814743f364eaf004c0a6eda2aabd6dc5d9a9fd`
+- Eligibility policy: `config/source_eligibility/riboaptamer.json`
+- Review recommendations:
+  `config/checkpoint_reviews/riboaptamer_checkpoint1_recommendations.json`
+
+### Outputs produced
+
+Ignored under `data/interim/checkpoints/riboaptamer_cp1/`:
+
+- `riboaptamer_s3_canonical.csv` (byte-identical to S2)
+- `riboaptamer_s3_decisions.csv`
+- `riboaptamer_checkpoint1_review.csv`
+- `riboaptamer_checkpoint1_local_detail.csv`
+- `riboaptamer_checkpoint1_reason_counts.csv`
+- `rejected_riboaptamer.csv`
+- `riboaptamer_s3_parked_ssdna.csv` (header only)
+- `riboaptamer_checkpoint1_summary.md`
+
+Ignored under
+`data/interim/checkpoints/riboaptamer_cp1/manual_review/`:
+
+- `riboaptamer_checkpoint1_manual_review.csv`
+- `riboaptamer_checkpoint1_manual_review_index.csv`
+- `riboaptamer_checkpoint1_manual_review_summary.md`
+- `riboaptamer_checkpoint1_constant_group_review.csv` (0 data rows)
+- `riboaptamer_checkpoint1_bulk_audit_confirmation.csv`
+- `README.md`
+- `riboaptamer_checkpoint1_validation.md`
+
+Tracked adapter, policy, schema note, tests, dispatcher changes, and
+this log entry. Nothing under `data/` is tracked.
+
+### Numbers
+
+```text
+rows in = 509
+technical rejects = 112
+parked ssDNA = 0
+parked non-protein = 0
+technically eligible RNA = 397
+pending human review (unique records) = 85
+509 = 112 rejected + 0 parked + 397 eligible
+```
+
+Primary rejection reasons (112 unique records; one reason each):
+
+- `length_out_of_range`: 102
+- `invalid_alphabet`: 5
+- `ambiguous_bases`: 4
+- `truncated_sequence`: 1
+- `missing_sequence`: 0
+- `mixed_T_and_U`: 0
+- `primer_like`: 0
+- `library_template`: 0
+- `alignment_gaps` as primary: 0 (the one gapped record is SelB,
+  primary `truncated_sequence`)
+
+Condition tallies (a record may contribute to more than one):
+
+- actual core `<20`: 9
+- actual core `>100`: 97
+- length-out-of-range condition: 106 (9 + 97)
+- invalid-alphabet condition: 6
+- ambiguous-bases condition: 4
+- alignment-gaps condition: 1
+- truncated-sequence condition: 1
+- mixed T/U: 0
+- missing sequence: 0
+
+Overlaps (not additive):
+
+- invalid alphabet AND length out of range: 2
+  (`riboaptamer:251` length 120; `riboaptamer:252` length 124).
+  These two lack S2 `core_above_max_length` because the normaliser
+  returned early on invalid alphabet; S3 still length-checked them.
+  Primary reason remains `invalid_alphabet`.
+- truncated AND invalid alphabet: 1 (`riboaptamer:169`, SelB)
+- truncated AND alignment gaps: 1 (same SelB record)
+- ambiguous bases AND length out of range: 2
+  (`riboaptamer:185` length 112; `riboaptamer:214` length 133)
+- length-boundary records with another technical failure: 0
+- trim-pushed length out of range: 0
+- known-motif detections inside 20–100 nt: 1
+- records with more than one reason: 59
+
+The four length-condition records whose primary reason is not
+`length_out_of_range` are the two invalid+long and two
+ambiguous+long rows above (106 − 102 = 4).
+
+CHECKPOINT-1 unique review records = 85, with no row duplication:
+
+- judgement-dependent technical: 1 (`riboaptamer:169`, Sequence Name
+  `Elongation factor SelB_clone 488`; primary `truncated_sequence`;
+  secondary `alignment_gaps|invalid_alphabet`; core length 38)
+- constant-region / known-motif proposal: 1 (`riboaptamer:382`,
+  IL-17A / Apt21-2; unapplied 5′ `t7_promoter_minimal` length 17;
+  core length 96, so also in the 90–100 review band; batch is
+  `02_constant_region_proposal` by precedence)
+- length-boundary retained: 54 condition rows (8 at 20–25 nt; 46 at
+  90–100 nt). One of those 54 is the T7 record, so batch
+  `03_length_boundary` contains 53 unique remaining boundary rows.
+- random kept audit: 30 (seed 42; pool 343; shortfall 0)
+- trim-induced length failures presented: 0
+- group-consensus proposals: 0
+- unique review = 1 + 1 + 53 + 30 = 85
+
+Active review queue proposed decisions: 84 `proposed_accept` + 1
+`proposed_reject` (SelB). Blank `manual_*` fields. Apply refused
+with 85 unresolved decisions, 83 unconfirmed audit-only rows, 0
+ready for application, 168 blocking issues.
+
+Raw SHA-256 unchanged before and after S3. S3 canonical output is
+byte-identical to S2. Deterministic rerun: pass. No trim applied.
+
+### Open questions carried forward
+
+CHECKPOINT-1 now requires Laura's manual review before the
+RiboAptamer lane may progress. Decisions have not been made.
+
+Scientific judgement that particularly needs review:
+
+- SelB clone 488 (`riboaptamer:169`): internal ellipsis, alignment
+  gap, and invalid-character context on a 38 nt core. Truncation /
+  alignment review takes precedence over automatic
+  `invalid_alphabet`.
+- The unapplied T7 proposal on `riboaptamer:382` (96 nt core, also
+  in the 90–100 eyeball band). Approve, override, reject, or defer;
+  do not treat detection as an automatic trim or `primer_like`
+  reject.
+- The five automatic invalid-alphabet rejects that did not enter
+  the active queue (native IDs 118, 251, 252, 307, 367), and the
+  four automatic ambiguous-base rejects (185, 214, 259, 345).
+- Length-boundary eyeballing of the remaining 53 retained 20–25 /
+  90–100 records, plus the 30 random kept audit rows.
+
+Group-wise constant-region inference remains disabled. Target
+extraction, source `Type` protein / non-protein routing, evidence
+scoring, and leakage exclusion remain S4 / CHECKPOINT-2.
+
+### Pipeline status
+
+```text
+RiboAptamer S0 complete
+RiboAptamer S1 complete
+RiboAptamer S2 complete
+RiboAptamer S3 provisional technical classification complete
+RiboAptamer CHECKPOINT-1 prepared; awaiting Laura's review
+No RiboAptamer records are yet authorised for global S4
+```
 

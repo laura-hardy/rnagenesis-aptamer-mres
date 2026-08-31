@@ -94,12 +94,31 @@ def test_load_aptadb_eligibility_policy() -> None:
     assert policy.random_seed == 42
     assert policy.ssdna_decision == "proposed_park"
     assert policy.non_protein_target_decision == "proposed_park"
-    assert policy.decision_precedence[0] == "missing_sequence"
-    assert "ssdna_parked" in policy.decision_precedence
-    assert "non_protein_target_parked" in policy.decision_precedence
-    assert policy.decision_precedence.index("ssdna_parked") < (
-        policy.decision_precedence.index("non_protein_target_parked")
+
+
+def test_load_riboaptamer_eligibility_policy() -> None:
+    policy = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "riboaptamer.json"
     )
+    assert policy.source_key == "riboaptamer"
+    assert policy.defer_target_classification is True
+    assert policy.defer_evidence_scoring is True
+    assert policy.defer_leakage_exclusion is True
+    assert policy.sequence_leakage_matching_enabled is False
+    assert policy.use_plan_reason_vocabulary is True
+    assert policy.random_accept_audit_size == 30
+    assert policy.random_seed == 42
+    assert policy.core_length_min == 20
+    assert policy.core_length_max == 100
+    assert policy.decision_precedence[0] == "missing_sequence"
+    assert policy.decision_precedence.index("truncated_sequence") < (
+        policy.decision_precedence.index("invalid_alphabet")
+    )
+    assert policy.decision_precedence.index("alignment_gaps") < (
+        policy.decision_precedence.index("invalid_alphabet")
+    )
+    assert "ssdna_parked" in policy.decision_precedence
+    assert "non_protein_target_parked" not in policy.decision_precedence
 
 
 def test_load_utexas_eligibility_policy() -> None:

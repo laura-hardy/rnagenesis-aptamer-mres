@@ -2884,7 +2884,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "checkpoint with tracked sequence-free resolution artefacts."
         )
     )
-    parser.add_argument("--source", required=True, help="Source key (aptabase, utexas, or aptadb)")
+    parser.add_argument("--source", required=True, help="Source key (aptabase, utexas, aptadb, or riboaptamer)")
     parser.add_argument(
         "--checkpoint-dir",
         type=Path,
@@ -2965,15 +2965,102 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def run_riboaptamer_checkpoint1_apply(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path | None = None,
+    dry_run: bool = False,
+) -> None:
+    """Apply or dry-run RiboAptamer CHECKPOINT-1. Fail-closed if unresolved."""
+    from adapters.riboaptamer_checkpoint1_dry_run import DRY_RUN_BANNER
+    from adapters.riboaptamer_checkpoint1_review import (
+        RiboAptamerCheckpoint1ReviewError,
+        apply_riboaptamer_checkpoint1_package,
+        load_default_policy,
+        read_csv_rows,
+        validate_review_package,
+    )
+    from adapters.riboaptamer_s3 import index_constant_proposals
+
+    if not Path(checkpoint_dir).is_absolute():
+        checkpoint_dir = repo_root / checkpoint_dir
+    checkpoint_dir = Path(checkpoint_dir).resolve()
+    review_dir = checkpoint_dir / "manual_review"
+    queue_path = review_dir / "riboaptamer_checkpoint1_manual_review.csv"
+    group_path = review_dir / "riboaptamer_checkpoint1_constant_group_review.csv"
+    bulk_path = review_dir / "riboaptamer_checkpoint1_bulk_audit_confirmation.csv"
+    canonical_path = checkpoint_dir / "riboaptamer_s3_canonical.csv"
+    if not queue_path.is_file():
+        raise Checkpoint1ApplyError(
+            "Missing RiboAptamer CHECKPOINT-1 review CSV; prepare first"
+        )
+    queue_rows = read_csv_rows(queue_path)
+    group_rows = read_csv_rows(group_path) if group_path.is_file() else []
+    bulk_rows = read_csv_rows(bulk_path) if bulk_path.is_file() else []
+    bulk = bulk_rows[0] if bulk_rows else None
+    report = validate_review_package(
+        queue_rows=queue_rows,
+        group_rows=group_rows,
+        bulk_confirmation=bulk,
+    )
+    if not report.ok:
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 cannot be applied while required human decisions "
+            f"remain unresolved ({len(report.blocking_issues)} blocking issues)"
+        )
+    policy = load_default_policy(repo_root)
+    canonical_by_id = {
+        row["record_id"]: row for row in read_csv_rows(canonical_path)
+    } if canonical_path.is_file() else {}
+    qc_path = repo_root / "data" / "interim" / "normalised" / "riboaptamer_s2_qc.csv"
+    sidecar_path = (
+        repo_root / "data" / "interim" / "extracted" / "riboaptamer_source_metadata.csv"
+    )
+    proposals_path = (
+        repo_root / "data" / "interim" / "normalised" / "detected_constants_riboaptamer.csv"
+    )
+    s2_qc_by_id = {
+        row["record_id"]: row for row in read_csv_rows(qc_path)
+    } if qc_path.is_file() else {}
+    source_metadata_by_id = {
+        row["record_id"]: row for row in read_csv_rows(sidecar_path)
+    } if sidecar_path.is_file() else {}
+    proposals = read_csv_rows(proposals_path) if proposals_path.is_file() else []
+    proposals_by_record = index_constant_proposals(
+        list(canonical_by_id.values()), proposals
+    ) if canonical_by_id else {}
+    try:
+        apply_riboaptamer_checkpoint1_package(
+            queue_rows=queue_rows,
+            group_rows=group_rows,
+            canonical_by_id=canonical_by_id,
+            source_metadata_by_id=source_metadata_by_id,
+            s2_qc_by_id=s2_qc_by_id,
+            policy=policy,
+            proposals_by_record=proposals_by_record,
+            bulk_confirmation=bulk,
+        )
+    except RiboAptamerCheckpoint1ReviewError as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+    if dry_run:
+        print(DRY_RUN_BANNER)
+        return
+    raise Checkpoint1ApplyError(
+        "RiboAptamer CHECKPOINT-1 apply is implemented and fail-closed, but "
+        "production application is not authorised until Laura completes review"
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     try:
-        if args.source not in {"aptabase", "utexas", "aptadb"}:
+        if args.source not in {"aptabase", "utexas", "aptadb", "riboaptamer"}:
             raise Checkpoint1ApplyError(
                 f"Unsupported source_key={args.source!r}; "
-                "supported: aptabase, utexas, aptadb"
+                "supported: aptabase, utexas, aptadb, riboaptamer"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -3034,6 +3121,24 @@ def main(argv: Sequence[str] | None = None) -> int:
                 tracked_manifest=tracked_manifest,
                 metadata_out=metadata_out,
                 check_deterministic_rerun=not args.skip_deterministic_rerun,
+            )
+            return 0
+        if args.source == "riboaptamer":
+            checkpoint_dir = (
+                args.checkpoint_dir
+                if args.checkpoint_dir is not None
+                else Path("data/interim/checkpoints/riboaptamer_cp1")
+            )
+            output_dir = (
+                args.output_dir
+                if args.output_dir is not None
+                else Path(checkpoint_dir) / ("dry_run" if args.dry_run else "resolved")
+            )
+            run_riboaptamer_checkpoint1_apply(
+                repo_root=repo_root,
+                checkpoint_dir=Path(checkpoint_dir),
+                output_dir=Path(output_dir),
+                dry_run=args.dry_run,
             )
             return 0
         if args.source == "utexas":
