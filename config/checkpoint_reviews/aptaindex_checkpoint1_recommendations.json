@@ -1,0 +1,60 @@
+{
+  "source_key": "aptaindex",
+  "records": {},
+  "groups": {},
+  "audit_only": {
+    "review_recommendation": "keep_current_route",
+    "recommended_manual_decision": "keep",
+    "rationale": "Length-boundary and random-kept audit rows are otherwise technically eligible. Confirm the current route unless a separate scientific issue is visible. Audit only; no chemistry judgement is required.",
+    "requires_specific_human_decision": false
+  },
+  "known_motif": {
+    "review_recommendation": "decide_trim",
+    "recommended_manual_decision": "edit",
+    "recommended_trim_action": "defer",
+    "rationale": "S2 detected a known-motif constant-region proposal. It has not been applied. Approve, override, reject, or defer the proposed trim. sequence_core is currently unchanged. Do not auto-approve.",
+    "requires_specific_human_decision": true
+  },
+  "unsupported_chemical_notation": {
+    "review_recommendation": "review_defer",
+    "recommended_manual_decision": "",
+    "rationale": "Unsupported or unparseable chemical notation. The production parser failed closed and did not emit a partial nucleotide sequence. Do not auto-edit or relabel as invalid_alphabet. Inspect the redacted syntax class and decide keep, drop, edit, or defer.",
+    "requires_specific_human_decision": true
+  },
+  "source_type_token_disagreement": {
+    "review_recommendation": "review_no_silent_override",
+    "recommended_manual_decision": "",
+    "rationale": "Source Type and parsed token family disagree. Do not silently prefer source metadata or token syntax. Preserve both lines of evidence until a human decision is recorded.",
+    "requires_specific_human_decision": true
+  },
+  "l_rna_stereochemistry": {
+    "review_recommendation": "review_preserve_stereochemistry",
+    "recommended_manual_decision": "",
+    "rationale": "Source Type is L-RNA. Stereochemistry is biologically meaningful. Do not flatten to ordinary RNA eligibility.",
+    "requires_specific_human_decision": true
+  },
+  "l_dna_stereochemistry": {
+    "review_recommendation": "review_preserve_stereochemistry",
+    "recommended_manual_decision": "",
+    "rationale": "Source Type is L-DNA. Stereochemistry is biologically meaningful. Do not flatten to ordinary ssDNA parking.",
+    "requires_specific_human_decision": true
+  },
+  "chimeric_molecule": {
+    "review_recommendation": "review_preserve_evidence",
+    "recommended_manual_decision": "",
+    "rationale": "Source Type is Chimeric. Do not auto-include or auto-park from an inferred dominant token family. Preserve source Type and token-family evidence.",
+    "requires_specific_human_decision": true
+  },
+  "mixed_t_u": {
+    "review_recommendation": "review_no_silent_convert",
+    "recommended_manual_decision": "",
+    "rationale": "Parsed nucleotide letters contain both T and U after chemical tokenisation. Shared policy classifies mixed T/U, but AptaIndex mixed chemistry may be intentional. Do not silently convert T→U or U→T.",
+    "requires_specific_human_decision": true
+  },
+  "judgement_dependent": {
+    "review_recommendation": "inspect_sequence",
+    "recommended_manual_decision": "",
+    "rationale": "Judgement-dependent technical or chemistry condition. Do not treat this row as an automatic closed-vocabulary reject that can skip review.",
+    "requires_specific_human_decision": true
+  }
+}

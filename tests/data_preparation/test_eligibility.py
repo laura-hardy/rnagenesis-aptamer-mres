@@ -143,6 +143,48 @@ def test_load_utexas_eligibility_policy() -> None:
     assert policy.decision_precedence[1] == "non_rna_molecule"
 
 
+def test_load_aptaindex_eligibility_policy() -> None:
+    policy = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "aptaindex.json"
+    )
+    assert policy.source_key == "aptaindex"
+    assert policy.defer_target_classification is True
+    assert policy.defer_evidence_scoring is True
+    assert policy.defer_leakage_exclusion is True
+    assert policy.sequence_leakage_matching_enabled is False
+    assert policy.target_leakage_matching_enabled is False
+    assert policy.use_plan_reason_vocabulary is True
+    assert policy.random_accept_audit_size == 30
+    assert policy.random_seed == 42
+    assert policy.ssdna_decision == "proposed_park"
+    assert policy.non_nucleic_acid_molecule_decision == "proposed_reject"
+    assert policy.unknown_molecule_decision == "proposed_park"
+    assert policy.decision_precedence[0] == "missing_sequence"
+    assert policy.decision_precedence[1] == "non_nucleic_acid_molecule"
+    assert "unsupported_chemical_notation" in policy.decision_precedence
+    assert "l_rna_stereochemistry" in policy.decision_precedence
+    assert "ssdna_parked" in policy.decision_precedence
+    assert "non_protein_target_parked" not in policy.decision_precedence
+
+
+def test_non_nucleic_acid_molecule_is_closed_reason_without_changing_completed_sources() -> None:
+    assert EligibilityReason.NON_NUCLEIC_ACID_MOLECULE.value == (
+        "non_nucleic_acid_molecule"
+    )
+    aptadb = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "aptadb.json"
+    )
+    ribo = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "riboaptamer.json"
+    )
+    utexas = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "utexas.json"
+    )
+    for policy in (aptadb, ribo, utexas):
+        assert "non_nucleic_acid_molecule" not in policy.decision_precedence
+        assert policy.non_nucleic_acid_molecule_decision == "proposed_reject"
+
+
 def test_60_unknown_decision_value_fails(tmp_path: Path) -> None:
     payload = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
     payload["decision_values"] = [

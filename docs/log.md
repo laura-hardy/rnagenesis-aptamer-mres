@@ -4509,3 +4509,126 @@ CHECKPOINT-1 has not been generated
 No AptaIndex records are yet authorised for global S4
 ```
 
+## 2026-09-02 — AptaIndex S3 technical classification and CHECKPOINT-1 preparation
+
+**Stage:** Aim 2 / data curation / AptaIndex S3 + CHECKPOINT-1 preparation.
+Human review decisions were not applied. CHECKPOINT-1 is not closed.
+AptaIndex is not authorised for global S4. Global S4 was not run.
+
+### What was done
+
+The 1,050 S2-normalised AptaIndex records were classified with the
+shared eligibility implementation under a source-specific policy.
+Deterministic technical outcomes were applied where already justified.
+ssDNA was parked, not rejected and not T→U converted. Source-declared
+peptide aptamer/molecule records were excluded with an explicit
+`non_nucleic_acid_molecule` reason rather than being forced through RNA
+normalisation or parked as non-protein targets. Unsupported chemical
+notation, Type/token disagreements, L-RNA, L-DNA, Chimeric constructs,
+and mixed T/U after chemical parsing were routed to structured
+CHECKPOINT-1 rather than flattened or silently labelled
+`invalid_alphabet`. Length 20–100 nt was applied to successfully parsed
+nucleotide `sequence_core`. Target canonicalisation, Target Type
+protein/non-protein routing, evidence scoring, affinity normalisation,
+leakage exclusion, and deduplication were not started. Structured
+CHECKPOINT-1 review was prepared and validated as unresolved. The apply
+stage was not run.
+
+### Peptide-molecule vocabulary
+
+The closed rejection vocabulary had no existing reason that meant
+“source record is not a nucleic-acid aptamer”. The smallest coherent
+extension is `non_nucleic_acid_molecule` (`proposed_reject`). This is
+not `non_protein_target_parked`, `ssdna_parked`, or `invalid_alphabet`.
+Peptide *targets* (`Target Type = Peptide` on a nucleic-acid molecule)
+do not trigger it. Completed-source policies are unchanged.
+
+### Technical routing
+
+- Missing sequence (31): automatic `missing_sequence` reject; not queued
+  for CHECKPOINT-1.
+- Straightforward ssDNA: parked (`ssdna_parked`); T retained.
+- Straightforward RNA and 2′-F-RNA: technically eligible at S3 if they
+  pass shared alphabet/length rules.
+- Peptide molecules (57): `non_nucleic_acid_molecule` reject.
+- Length `<20` or `>100` on parsed nucleotide cores: `length_out_of_range`
+  (70; 27 below 20 nt and 43 above 100 nt). No trim-pushed exception
+  occurred (S2 applied 0 trims).
+- Unsupported chemical notation (39): parked for chemistry review;
+  parser failed closed; no partial nucleotide repair.
+- L-RNA (9 parsed; 1 missing sequence), L-DNA (4), Chimeric (11), and
+  Type/token disagreement (28): CHECKPOINT-1 judgement, not auto-mapped
+  to ordinary RNA/ssDNA eligibility.
+- Mixed T/U (5): shared `mixed_T_and_U` is collected after chemical
+  parsing. All five are mixed-chemistry constructs, so chemistry-review
+  parking takes precedence over automatic-only mixed-T/U rejection.
+  They enter CHECKPOINT-1. No silent T↔U conversion.
+- Blank raw Target (28): deferred; S3 `missing_target` rejects = 0.
+  Current classified-row architecture (AptaDB interaction stream /
+  UTexas / RiboAptamer) does not auto-reject blank `target_name_raw`
+  at S3.
+- Multi-target copies are not S3 conflicts. Grain is one
+  `(sequence, target)` pair. Nonempty raw Sequence strings with >1
+  Target: 24 (preflight ~25). Nonempty `sequence_core` values with >1
+  Target after S2 parsing: 36. Neither count was treated as an error.
+
+### Numbers (aggregate only)
+
+`1050` = `199` technically eligible RNA/2F-RNA + `603` parked ssDNA +
+`90` parked chemistry-review + `158` rejected.
+
+Rejections by primary reason: `length_out_of_range` 70;
+`non_nucleic_acid_molecule` 57; `missing_sequence` 31.
+
+CHECKPOINT-1 active queue: 213 unique records (one row each).
+Batches: judgement-dependent technical 90; constant-region proposal 3;
+length-boundary 90; random kept audit 30 (seed 42, size 30).
+Judgement-required 93; audit-only 120. Length-boundary reason flag 97
+(7 overlap a higher-priority batch). Mixed T/U review 5. Automatic
+rejects not requiring review: 158. Parked ssDNA: 603. Peptide
+molecules: 57.
+
+Source Type disposition: DNA 673 (603 parked ssDNA / 34 chemistry
+review / 36 reject); RNA 200 (141 eligible / 26 chemistry review /
+33 reject); 2′-F-RNA 71 (58 eligible / 6 chemistry review / 7 reject);
+Peptide 57 (all `non_nucleic_acid_molecule`); Chimeric 11 (all
+chemistry review); L-RNA 10 (9 chemistry review / 1 missing sequence);
+L-DNA 4 (all chemistry review); blank 24 (all missing sequence).
+
+Known-motif proposals 3, unapplied; group-wise inference remained
+disabled; `sequence_core` unchanged.
+
+### CHECKPOINT-1
+
+Local review package (gitignored under `data/`):
+
+- `data/interim/checkpoints/aptaindex_cp1/manual_review/aptaindex_checkpoint1_manual_review.csv`
+
+Machine recommendations are populated. `manual_*` fields are blank.
+The validator reports the package structurally readable and not closed
+(213 unresolved decisions; not ready for application). Apply was not
+run.
+
+### Integrity / determinism
+
+- Raw SHA-256 unchanged:
+  `912b8e554fa2bb2ed3a9e9bdf1cfbe4f757d8c7a00c401629e5bcb5e5c2877a8`
+- S1 extracted hash unchanged:
+  `b74f6cc852ab342a6a28eafdbe97ee51cf325d5419c67ac6456d560753530552`
+- S2 normalised / S3 canonical hash unchanged:
+  `08004a065f02ce0d618c449f61198a94306e57e9af833a69fd0bc1097d56bbaa`
+- S2 QC hash unchanged:
+  `7d67d9ad31e1ceb0b103a0c8e7b31a482b246b029612becbd8a52e19f0cdbfe4`
+- `data/raw/` unchanged
+- Independent S3 + CHECKPOINT-1 reruns: byte-identical artefacts
+- AptaIndex CSVs that may contain source CR characters use `QUOTE_ALL`
+
+### Pipeline stop
+
+```text
+CHECKPOINT-1 package generated.
+No human decisions applied.
+No AptaIndex record is authorised for S4 yet.
+The pipeline is stopped awaiting Laura CHECKPOINT-1 review.
+```
+

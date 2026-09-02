@@ -107,6 +107,13 @@ class EligibilityReason(str, Enum):
     TRUNCATED_SEQUENCE = "truncated_sequence"
     CONSTANT_REGION_PROPOSAL = "constant_region_proposal"
     KNOWN_MOTIF_PROPOSAL = "known_motif_proposal"
+    # AptaIndex S3: source-declared non-nucleic-acid aptamer/molecule records.
+    NON_NUCLEIC_ACID_MOLECULE = "non_nucleic_acid_molecule"
+    UNSUPPORTED_CHEMICAL_NOTATION = "unsupported_chemical_notation"
+    L_RNA_STEREOCHEMISTRY = "l_rna_stereochemistry"
+    L_DNA_STEREOCHEMISTRY = "l_dna_stereochemistry"
+    CHIMERIC_MOLECULE = "chimeric_molecule"
+    SOURCE_TYPE_TOKEN_DISAGREEMENT = "source_type_token_disagreement"
 
 
 class ManualReviewPriority(str, Enum):
@@ -205,6 +212,7 @@ class EligibilityPolicy:
     active_review_batches: tuple[str, ...] = ()
     unresolved_trim_blocks_eligibility: bool = True
     non_protein_target_decision: str = "proposed_park"
+    non_nucleic_acid_molecule_decision: str = "proposed_reject"
 
 
 @dataclass(frozen=True)
@@ -510,6 +518,9 @@ def load_eligibility_policy(path: str | Path) -> EligibilityPolicy:
         ),
         non_protein_target_decision=_optional_decision(
             data, "non_protein_target_decision", "proposed_park"
+        ),
+        non_nucleic_acid_molecule_decision=_optional_decision(
+            data, "non_nucleic_acid_molecule_decision", "proposed_reject"
         ),
     )
 

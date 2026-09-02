@@ -21,7 +21,7 @@ from adapters.aptadb_checkpoint1_review import (  # noqa: E402
 )
 from s0_build_registry import find_repo_root  # noqa: E402
 
-SUPPORTED_SOURCES = ("aptadb", "riboaptamer")
+SUPPORTED_SOURCES = ("aptadb", "riboaptamer", "aptaindex")
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -31,7 +31,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptadb or riboaptamer)",
+        help="Source key (aptadb, riboaptamer, or aptaindex)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -68,6 +68,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         queue_name = "riboaptamer_checkpoint1_manual_review.csv"
         group_name = "riboaptamer_checkpoint1_constant_group_review.csv"
         bulk_name = "riboaptamer_checkpoint1_bulk_audit_confirmation.csv"
+    elif args.source == "aptaindex":
+        default_checkpoint = Path("data/interim/checkpoints/aptaindex_cp1")
+        queue_name = "aptaindex_checkpoint1_manual_review.csv"
+        group_name = "aptaindex_checkpoint1_constant_group_review.csv"
+        bulk_name = "aptaindex_checkpoint1_bulk_audit_confirmation.csv"
     else:
         default_checkpoint = Path("data/interim/checkpoints/aptadb_cp1")
         queue_name = "aptadb_checkpoint1_manual_review.csv"
