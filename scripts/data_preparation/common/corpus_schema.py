@@ -464,11 +464,16 @@ def write_corpus_csv_atomic(
     records: Iterable[Mapping[str, Any]],
     *,
     columns: Sequence[str] | None = None,
+    quoting: int = csv.QUOTE_MINIMAL,
 ) -> None:
     """Atomically write a corpus CSV with Unix newlines and a trailing newline.
 
     Missing values are empty strings. Partial final outputs are not left behind
     on failure. Output is deterministic for identical record sequences.
+
+    Default quoting is ``QUOTE_MINIMAL``. Callers whose source fields contain
+    bare CR characters (``\\r``) should pass ``quoting=csv.QUOTE_ALL`` so
+    those characters remain inside quoted fields rather than splitting rows.
     """
     fieldnames = list(columns) if columns is not None else list(CORPUS_COLUMNS)
     if columns is None:
@@ -490,6 +495,7 @@ def write_corpus_csv_atomic(
                 fieldnames=fieldnames,
                 lineterminator="\n",
                 extrasaction="raise",
+                quoting=quoting,
             )
             writer.writeheader()
             for record in records:

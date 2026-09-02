@@ -209,6 +209,18 @@ def test_atomic_deterministic_csv_writing(tmp_path: Path) -> None:
     assert "<NA>" not in loaded[0].values()
 
 
+def test_quote_all_preserves_embedded_cr_as_one_logical_row(tmp_path: Path) -> None:
+    path = tmp_path / "cr.csv"
+    row = _s1_populated()
+    row["publication"] = "citation line1\rstill same record"
+    write_corpus_csv_atomic(path, [row], quoting=csv.QUOTE_ALL)
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        loaded = list(csv.DictReader(handle))
+    assert len(loaded) == 1
+    assert loaded[0]["publication"] == "citation line1\rstill same record"
+    assert loaded[0]["record_id"] == row["record_id"]
+
+
 def _s2_populated() -> dict[str, str]:
     record = _s1_populated()
     record.update(

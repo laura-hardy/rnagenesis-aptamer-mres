@@ -4318,3 +4318,109 @@ RiboAptamer CHECKPOINT-1 closed
 RiboAptamer prepared for later global S4 (not run)
 ```
 
+## 2026-09-02 — AptaIndex registration and S1 extraction
+
+**Stage:** Aim 2 / data curation / AptaIndex S0-S1.
+AptaIndex S2, S3, CHECKPOINT-1, and global S4 were not started.
+
+### What was done
+
+The 22 July 2026 AptaIndex snapshot was registered as a restricted
+Tier-1 source and frozen by SHA-256 and expected row count. A
+source-specific S1 adapter then extracted every registered row into
+the canonical corpus schema, with a complete source-metadata sidecar.
+All 1050 source records and all 14 raw source columns were retained.
+Deterministic row-based source IDs were used because `Title` is not
+unique. Chemical-notation parsing, target/evidence/affinity
+interpretation, eligibility filtering, parking, leakage checks, and
+deduplication were deliberately deferred to their specified later
+stages.
+
+### Decisions made
+
+- `native_id` uses the zero-padded 1-based source CSV data-row number
+  (`0001`…`1050`) because `Title` is duplicated (21 duplicate keys
+  affecting 48 rows). `record_id` is `aptaindex:{native_id}`.
+  `Title` is preserved verbatim in the sidecar only.
+- AptaIndex sequences are not parsed at S1. Chemical notation, token
+  grammar, T→U conversion, alphabet classification, and molecule/chemistry
+  inference are deferred to S2.
+- Source `Type`, `Target Type`, and affinity columns remain sidecar-only
+  metadata. They do not populate canonical `molecule_type`, `chemistry`,
+  `target_type`, or affinity/evidence fields.
+- `Target` is copied verbatim into `target_name_raw`, including blanks.
+  Target normalisation and type classification remain a later global-S4
+  task.
+- `Reference` is copied verbatim into `publication`, matching the
+  AptaBase `reference` / UTexas `Citation` S1 precedent. AptaIndex has
+  no dedicated DOI/PMID columns, so `doi` and `pubmed_id` are left
+  empty rather than adding a source-specific citation parser.
+- `redistribution_status = restricted` under the Aptagen/AptaIndex
+  Data Use Agreement. The DUA PDF is documentation only and is not
+  registered as a corpus input.
+- Written canonical and sidecar CSVs use `QUOTE_ALL` so embedded CR
+  characters inside quoted source fields remain one logical row.
+
+### Inputs used
+
+- `source_dataset = aptaindex_export_2026-07-22`
+- `data/raw/AptaIndex/aptamers-export-2026-07-22.csv`
+- SHA-256:
+  `912b8e554fa2bb2ed3a9e9bdf1cfbe4f757d8c7a00c401629e5bcb5e5c2877a8`
+- 1050 logical rows; 14-column UTF-8 CSV with BOM
+- Snapshot date: `2026-07-22`; tier `1`;
+  `redistribution_status = restricted`
+
+### Outputs produced
+
+Ignored under `/data/`:
+
+- `data/interim/registry/source_registry.csv` (operational S0 registry;
+  12 validated registered files, exactly one `aptaindex` entry)
+- `data/interim/extracted/aptaindex_extracted.csv` (1050 rows)
+- `data/interim/extracted/aptaindex_source_metadata.csv` (1050 rows)
+- `data/interim/extracted/aptaindex_s1_report.md`
+
+Tracked scripts, tests and this log entry. Nothing under `data/` is
+tracked.
+
+### Numbers
+
+- 1050 rows input
+- 1050 extracted; 1050 unique `record_id`; 1050 unique `native_id`
+- first native ID `0001`; last native ID `1050`
+- 0 S1 rejections, parking, or filtering
+- 14 raw metadata columns preserved in the sidecar; one-to-one join
+  to canonical rows
+- `sequence_raw` is text-equivalent to source `Sequence`; source order
+  preserved
+- known blank Sequence rows retained: 31
+- known blank Target rows retained: 28
+- nonempty publication (verbatim Reference): 1013; DOI/PMID: 0
+- unique `Title` values: 1023; duplicate keys: 21; rows in those
+  groups: 48
+- source Type retained as sidecar diagnostics only: DNA 673, RNA 200,
+  2′-F-RNA 71, Peptide 57, Chimeric 11, L-RNA 10, L-DNA 4, blank 24
+- source raw hash unchanged before and after S0/S1:
+  `912b8e554fa2bb2ed3a9e9bdf1cfbe4f757d8c7a00c401629e5bcb5e5c2877a8`
+- S0: 12 registered, 12 validated; existing AptaBase inventory-override
+  warnings only; DUA PDF not registered
+- Deterministic S1 rerun: byte-identical canonical and sidecar CSVs
+
+### Open questions carried forward
+
+- S2 full-consumption chemical parser.
+- L-RNA / L-DNA / Chimeric chemistry handling.
+- Token/type disagreements and unparseable chemical notation.
+- CHECKPOINT-1 later, including blank sequences/targets and conflicting
+  targets for the same sequence.
+
+### Pipeline status
+
+```text
+AptaIndex S0 complete
+AptaIndex S1 complete
+AptaIndex S2 has not started
+No AptaIndex records are yet authorised for global S4
+```
+
