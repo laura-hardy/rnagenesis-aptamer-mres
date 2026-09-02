@@ -4196,3 +4196,125 @@ RiboAptamer CHECKPOINT-1 prepared; awaiting Laura's review
 No RiboAptamer records are yet authorised for global S4
 ```
 
+## 2026-09-02 — RiboAptamer CHECKPOINT-1 review applied
+
+**Stage:** Aim 2 / data curation / RiboAptamer CHECKPOINT-1 closure and
+global-S4 handoff preparation only. Target extraction was not performed.
+Global S4 was not run. Evidence scoring, protein/non-protein routing,
+leakage exclusion, deduplication, clustering, balancing and partitioning
+were not performed.
+
+### What was done
+
+Laura reviewed all 85 RiboAptamer CHECKPOINT-1 records. Human decisions
+were validated fail-closed and applied through the existing apply path.
+The truncated SelB source record was rejected because its missing
+sequence could not be reconstructed from source evidence. The known 5′
+T7 promoter on the IL-17A aptamer was approved for removal and the
+resulting core was revalidated inside the 20–100 nt window. All other
+reviewed sequences were retained. Human review also identified strong
+and weaker patterns of unresolved terminal construct sequence on a
+subset of records; these were retained without speculative trimming and
+explicitly flagged. RiboAptamer is now closed through S3 and prepared
+as one input to later corpus-wide S4 target normalisation.
+
+Laura's as-saved Excel/MacRoman review CSV was preserved, then exported
+to the canonical UTF-8 review path without changing decision semantics.
+Informal `manual_trim_action=trim` on the T7 row was mapped to schema
+`approve` of the existing known-motif proposal. Trim lengths were not
+invented.
+
+### Decisions and reasoning
+
+- Truncated/gapped SelB record (`riboaptamer:169`) dropped rather than
+  repaired. No corrected sequence was invented. Rejection reason remains
+  `truncated_sequence`, with the human drop recorded in the rejection
+  detail and notes.
+- Known high-confidence 17-nt 5′ T7 promoter trim on `riboaptamer:382`
+  approved. `sequence_raw` and `sequence_full` unchanged; `sequence_core`
+  became 79 nt; `trim_status=t7_removed`; `trim_confidence=high`.
+- No group-wise automatic constant inference was retroactively added.
+- Strong terminal similarities observed during human review were flagged
+  `constants_suspected_unresolved` from `manual_notes` prefixes, not
+  converted into guessed trims. `trim_confidence` remains `n/a`.
+- Weaker possible similarities were preserved as a separate warning
+  class (`possible_constants_unresolved`) with
+  `trim_status=no_constants_detected`.
+- Preserving rather than guessing construct boundaries maintains
+  auditability and reversibility.
+- Clone-label chemistry such as `t44-OMe` (`riboaptamer:157`) was not
+  inferred during this checkpoint. `chemistry=RNA` is unchanged.
+- Target extraction, target-type routing, evidence and leakage remain
+  deferred to S4.
+
+### Inputs
+
+- `source_dataset = riboaptamer_full_2026-08`
+- Completed review (canonical UTF-8 path):
+  `data/interim/checkpoints/riboaptamer_cp1/manual_review/riboaptamer_checkpoint1_manual_review.csv`
+- Human as-saved copy:
+  `data/interim/checkpoints/riboaptamer_cp1/manual_review/human_source/riboaptamer_checkpoint1_manual_review.as_saved.csv`
+- Registered raw file: `data/raw/riboaptamer/all_sequences_509_rows.csv`
+- SHA-256:
+  `721d8c5ea81476c1f371ef8bfa814743f364eaf004c0a6eda2aabd6dc5d9a9fd`
+
+### Outputs
+
+Tracked:
+
+- `config/checkpoint_reviews/riboaptamer_checkpoint1_resolutions.csv`
+- `config/checkpoint_reviews/riboaptamer_checkpoint1_metadata.json`
+- `config/global_s4_sources/riboaptamer.json`
+- `docs/data_curation/riboaptamer_checkpoint1_review_schema.md`
+
+Ignored under `data/`:
+
+- `data/interim/checkpoints/riboaptamer_cp1/resolved/riboaptamer_checkpoint1_applied_canonical.csv`
+- `data/interim/checkpoints/riboaptamer_cp1/resolved/riboaptamer_checkpoint1_applied_rejection.csv`
+- `data/interim/checkpoints/riboaptamer_cp1/resolved/riboaptamer_checkpoint1_s4_authorised_ids.csv`
+- `data/interim/checkpoints/riboaptamer_cp1/resolved/riboaptamer_checkpoint1_decision_audit.csv`
+- `data/interim/checkpoints/riboaptamer_cp1/resolved/riboaptamer_checkpoint1_resolution_summary.md`
+- `data/interim/global_s4_ready/riboaptamer_global_s4_input.csv`
+- `data/interim/global_s4_ready/riboaptamer_global_s4_handoff_summary.md`
+
+### Numbers
+
+- Source records: 509
+- Reviewed: 85 / 85 decisions consumed
+- Human keep / edit / drop: 83 / 1 / 1
+- Approved known T7 trims: 1
+- Rejected/deferred known proposals: 0
+- Group-consensus proposals: 0
+- Strong unresolved-constant flags: 35
+- Weak possible-constant flags: 3
+- Speculative numeric trims outside approved proposals: 0
+- Final retained (technically eligible / authorised for later S4): 397
+- Final rejected: 112
+- Parked ssDNA / non-protein: 0 / 0
+- Unresolved review decisions: 0
+- Blocking issues: 0
+- Raw SHA-256 unchanged
+
+### Open questions carried forward
+
+- Target extraction/normalisation occurs later in global S4 /
+  CHECKPOINT-2.
+- Source Category/Type versus resolved target type must be reconciled
+  then. Type is a target-class prior, not canonical truth.
+- Modified-chemistry metadata such as clone labels containing `OMe` may
+  require later source-level confirmation.
+- Unresolved construct flags remain available for sensitivity analyses
+  or future library-design research. They are human CHECKPOINT-1
+  observations, not S2 consensus trims.
+
+### Pipeline status
+
+```text
+RiboAptamer S0 complete
+RiboAptamer S1 complete
+RiboAptamer S2 complete
+RiboAptamer S3 complete
+RiboAptamer CHECKPOINT-1 closed
+RiboAptamer prepared for later global S4 (not run)
+```
+

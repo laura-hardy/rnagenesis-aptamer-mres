@@ -89,7 +89,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise AptaDBCheckpoint1ReviewError(
                 "Missing record-level review CSV; prepare CHECKPOINT-1 first"
             )
-        queue_rows = read_csv_rows(queue_path)
+        if args.source == "riboaptamer":
+            from adapters.riboaptamer_checkpoint1_review import (
+                normalise_riboaptamer_review_rows,
+                read_riboaptamer_review_csv,
+            )
+
+            queue_rows = normalise_riboaptamer_review_rows(
+                read_riboaptamer_review_csv(queue_path)
+            )
+        else:
+            queue_rows = read_csv_rows(queue_path)
         group_rows = read_csv_rows(group_path) if group_path.is_file() else []
         bulk_rows = read_csv_rows(bulk_path) if bulk_path.is_file() else []
         bulk = bulk_rows[0] if bulk_rows else None
@@ -110,11 +120,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"unresolved_exceptions={report.unresolved_exceptions}\n"
         f"audit_only_unconfirmed={report.audit_only_unconfirmed}\n"
         f"ready_for_application={report.ready_for_application}\n"
-        f"blocking_issues={len(report.blocking_issues)}\n"
-        "CHECKPOINT-1 is not closed\n"
-        "No human decisions have been applied\n"
-        "S4 remains blocked"
+        f"blocking_issues={len(report.blocking_issues)}"
     )
+    metadata_rel = Path(
+        f"config/checkpoint_reviews/{args.source}_checkpoint1_metadata.json"
+    )
+    metadata_path = repo_root / metadata_rel
+    if metadata_path.is_file():
+        import json
+
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+        closed = bool(payload.get("checkpoint_closed"))
+        print(f"checkpoint_closed={str(closed).lower()}")
+        print(f"s4_started={str(bool(payload.get('s4_started'))).lower()}")
+        if closed and report.ok:
+            print("CHECKPOINT-1 CLOSED: human review has been applied and validated")
+            print("S4 remains blocked until a later global handoff is executed")
+            return 0
+    print("CHECKPOINT-1 is not closed")
+    print("No human decisions have been applied")
+    print("S4 remains blocked")
     return 0 if report.ok else 2
 
 

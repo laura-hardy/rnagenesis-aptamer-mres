@@ -2970,49 +2970,114 @@ def run_riboaptamer_checkpoint1_apply(
     repo_root: Path,
     checkpoint_dir: Path,
     output_dir: Path | None = None,
+    tracked_manifest: Path | None = None,
+    metadata_out: Path | None = None,
     dry_run: bool = False,
+    check_deterministic_rerun: bool = True,
+    expected_source_rows: int | None = 509,
 ) -> None:
     """Apply or dry-run RiboAptamer CHECKPOINT-1. Fail-closed if unresolved."""
-    from adapters.riboaptamer_checkpoint1_dry_run import DRY_RUN_BANNER
+    from adapters.riboaptamer_checkpoint1_apply import (
+        RIBOAPTAMER_CHECKPOINT_CLOSED_STATEMENT,
+        RIBOAPTAMER_TRACKED_RESOLUTION_COLUMNS,
+        build_tracked_resolutions,
+        count_manual_decisions,
+        count_trim_actions,
+        format_closure_markdown,
+    )
+    from adapters.riboaptamer_checkpoint1_dry_run import (
+        CHANGE_REPORT_COLUMNS,
+        DECISION_AUDIT_COLUMNS,
+        DRY_RUN_BANNER,
+        ELIGIBLE_COLUMNS,
+        serialise_riboaptamer_simulation,
+        simulate_riboaptamer_checkpoint1_application,
+    )
     from adapters.riboaptamer_checkpoint1_review import (
         RiboAptamerCheckpoint1ReviewError,
-        apply_riboaptamer_checkpoint1_package,
         load_default_policy,
+        normalise_riboaptamer_review_rows,
+        preserve_human_review_source,
         read_csv_rows,
+        read_riboaptamer_review_csv,
         validate_review_package,
+        write_canonical_utf8_review_csv,
     )
-    from adapters.riboaptamer_s3 import index_constant_proposals
+    from adapters.riboaptamer_s3 import (
+        DECISION_COLUMNS,
+        PARK_COLUMNS,
+        REJECTION_COLUMNS,
+        index_constant_proposals,
+    )
+    from common.corpus_schema import CORPUS_COLUMNS, write_corpus_csv_atomic
 
     if not Path(checkpoint_dir).is_absolute():
         checkpoint_dir = repo_root / checkpoint_dir
     checkpoint_dir = Path(checkpoint_dir).resolve()
+    if output_dir is None:
+        output_dir = Path(checkpoint_dir) / ("dry_run" if dry_run else "resolved")
+    if not Path(output_dir).is_absolute():
+        output_dir = repo_root / output_dir
+    output_dir = _assert_output_dir_allowed(repo_root, Path(output_dir))
+    if tracked_manifest is None:
+        tracked_manifest = Path(
+            "config/checkpoint_reviews/riboaptamer_checkpoint1_resolutions.csv"
+        )
+    if metadata_out is None:
+        metadata_out = Path(
+            "config/checkpoint_reviews/riboaptamer_checkpoint1_metadata.json"
+        )
+    if not dry_run:
+        tracked_manifest = _assert_tracked_path_allowed(repo_root, tracked_manifest)
+        metadata_out = _assert_tracked_path_allowed(repo_root, metadata_out)
+
     review_dir = checkpoint_dir / "manual_review"
     queue_path = review_dir / "riboaptamer_checkpoint1_manual_review.csv"
     group_path = review_dir / "riboaptamer_checkpoint1_constant_group_review.csv"
     bulk_path = review_dir / "riboaptamer_checkpoint1_bulk_audit_confirmation.csv"
     canonical_path = checkpoint_dir / "riboaptamer_s3_canonical.csv"
+    decision_path = checkpoint_dir / "riboaptamer_s3_decisions.csv"
+    rejection_path = checkpoint_dir / "rejected_riboaptamer.csv"
+    parked_ssdna_path = checkpoint_dir / "riboaptamer_s3_parked_ssdna.csv"
     if not queue_path.is_file():
         raise Checkpoint1ApplyError(
             "Missing RiboAptamer CHECKPOINT-1 review CSV; prepare first"
         )
-    queue_rows = read_csv_rows(queue_path)
+    human_source_path = preserve_human_review_source(queue_path)
+    queue_rows = normalise_riboaptamer_review_rows(
+        read_riboaptamer_review_csv(queue_path)
+    )
+    write_canonical_utf8_review_csv(queue_path, queue_rows)
     group_rows = read_csv_rows(group_path) if group_path.is_file() else []
     bulk_rows = read_csv_rows(bulk_path) if bulk_path.is_file() else []
     bulk = bulk_rows[0] if bulk_rows else None
-    report = validate_review_package(
-        queue_rows=queue_rows,
-        group_rows=group_rows,
-        bulk_confirmation=bulk,
-    )
+    try:
+        report = validate_review_package(
+            queue_rows=queue_rows,
+            group_rows=group_rows,
+            bulk_confirmation=bulk,
+        )
+    except Exception as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
     if not report.ok:
         raise Checkpoint1ApplyError(
             "CHECKPOINT-1 cannot be applied while required human decisions "
             f"remain unresolved ({len(report.blocking_issues)} blocking issues)"
         )
+    if report.unresolved_manual_decisions or report.unresolved_exceptions:
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for CHECKPOINT-1 application"
+        )
+
     policy = load_default_policy(repo_root)
-    canonical_by_id = {
-        row["record_id"]: row for row in read_csv_rows(canonical_path)
-    } if canonical_path.is_file() else {}
+    if not canonical_path.is_file() or not decision_path.is_file():
+        raise Checkpoint1ApplyError("Missing RiboAptamer S3 canonical/decision files")
+    canonical_rows = read_csv_rows(canonical_path)
+    decision_rows = read_csv_rows(decision_path)
+    rejection_rows = read_csv_rows(rejection_path) if rejection_path.is_file() else []
+    parked_ssdna = (
+        read_csv_rows(parked_ssdna_path) if parked_ssdna_path.is_file() else []
+    )
     qc_path = repo_root / "data" / "interim" / "normalised" / "riboaptamer_s2_qc.csv"
     sidecar_path = (
         repo_root / "data" / "interim" / "extracted" / "riboaptamer_source_metadata.csv"
@@ -3020,36 +3085,306 @@ def run_riboaptamer_checkpoint1_apply(
     proposals_path = (
         repo_root / "data" / "interim" / "normalised" / "detected_constants_riboaptamer.csv"
     )
-    s2_qc_by_id = {
-        row["record_id"]: row for row in read_csv_rows(qc_path)
-    } if qc_path.is_file() else {}
-    source_metadata_by_id = {
-        row["record_id"]: row for row in read_csv_rows(sidecar_path)
-    } if sidecar_path.is_file() else {}
-    proposals = read_csv_rows(proposals_path) if proposals_path.is_file() else []
-    proposals_by_record = index_constant_proposals(
-        list(canonical_by_id.values()), proposals
-    ) if canonical_by_id else {}
-    try:
-        apply_riboaptamer_checkpoint1_package(
-            queue_rows=queue_rows,
-            group_rows=group_rows,
-            canonical_by_id=canonical_by_id,
-            source_metadata_by_id=source_metadata_by_id,
-            s2_qc_by_id=s2_qc_by_id,
-            policy=policy,
-            proposals_by_record=proposals_by_record,
-            bulk_confirmation=bulk,
-        )
-    except RiboAptamerCheckpoint1ReviewError as exc:
-        raise Checkpoint1ApplyError(str(exc)) from exc
+    rec_json = (
+        repo_root
+        / "config"
+        / "checkpoint_reviews"
+        / "riboaptamer_checkpoint1_recommendations.json"
+    )
+    s2_path = repo_root / "data" / "interim" / "normalised" / "riboaptamer_normalised.csv"
+    raw_path = repo_root / "data" / "raw" / "riboaptamer" / "all_sequences_509_rows.csv"
+    qc_rows = read_csv_rows(qc_path) if qc_path.is_file() else []
+    sidecar_rows = read_csv_rows(sidecar_path) if sidecar_path.is_file() else []
+    proposal_rows = read_csv_rows(proposals_path) if proposals_path.is_file() else []
+    s2_qc_by_id = {row["record_id"]: row for row in qc_rows}
+    source_metadata_by_id = {row["record_id"]: row for row in sidecar_rows}
+    proposals_by_record = index_constant_proposals(canonical_rows, proposal_rows)
+
+    hashes_before = {
+        "queue": sha256_file(queue_path),
+        "groups": sha256_file(group_path) if group_path.is_file() else "",
+        "bulk": sha256_file(bulk_path) if bulk_path.is_file() else "",
+        "s2": sha256_file(s2_path) if s2_path.is_file() else "",
+        "s3": sha256_file(canonical_path),
+        "sidecar": sha256_file(sidecar_path) if sidecar_path.is_file() else "",
+        "rec_json": sha256_file(rec_json) if rec_json.is_file() else "",
+        "raw": sha256_file(raw_path) if raw_path.is_file() else "",
+        "human_source": sha256_file(human_source_path),
+    }
+
+    def _simulate():
+        try:
+            return simulate_riboaptamer_checkpoint1_application(
+                queue_rows=queue_rows,
+                group_rows=group_rows,
+                canonical_rows=canonical_rows,
+                decision_rows=decision_rows,
+                source_metadata_by_id=source_metadata_by_id,
+                s2_qc_by_id=s2_qc_by_id,
+                policy=policy,
+                proposals_by_record=proposals_by_record,
+                bulk_confirmation=bulk,
+                existing_rejection_rows=rejection_rows,
+                existing_parked_ssdna=parked_ssdna,
+                expected_source_rows=expected_source_rows,
+            )
+        except RiboAptamerCheckpoint1ReviewError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    simulation = _simulate()
+    deterministic_ok = False
+    if check_deterministic_rerun:
+        second = _simulate()
+        if serialise_riboaptamer_simulation(
+            simulation
+        ) != serialise_riboaptamer_simulation(second):
+            raise Checkpoint1ApplyError(
+                "RiboAptamer CHECKPOINT-1 application was not byte-identical "
+                "across deterministic in-memory rerun"
+            )
+        deterministic_ok = True
+
     if dry_run:
         print(DRY_RUN_BANNER)
         return
-    raise Checkpoint1ApplyError(
-        "RiboAptamer CHECKPOINT-1 apply is implemented and fail-closed, but "
-        "production application is not authorised until Laura completes review"
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_corpus_csv_atomic(
+        output_dir / "riboaptamer_checkpoint1_applied_canonical.csv",
+        simulation.preview_canonical,
+        columns=CORPUS_COLUMNS,
     )
+    write_csv_atomic(
+        output_dir / "riboaptamer_checkpoint1_applied_routing.csv",
+        DECISION_COLUMNS,
+        simulation.preview_decisions,
+    )
+    write_csv_atomic(
+        output_dir / "riboaptamer_checkpoint1_applied_rejection.csv",
+        REJECTION_COLUMNS,
+        simulation.preview_rejections,
+    )
+    write_csv_atomic(
+        output_dir / "riboaptamer_checkpoint1_applied_parked_ssdna.csv",
+        PARK_COLUMNS,
+        simulation.preview_parked_ssdna,
+    )
+    write_csv_atomic(
+        output_dir / "riboaptamer_checkpoint1_applied_eligible.csv",
+        ELIGIBLE_COLUMNS,
+        simulation.preview_eligible,
+    )
+    write_csv_atomic(
+        output_dir / "riboaptamer_checkpoint1_applied_change_report.csv",
+        CHANGE_REPORT_COLUMNS,
+        simulation.change_report,
+    )
+    write_csv_atomic(
+        output_dir / "riboaptamer_checkpoint1_decision_audit.csv",
+        DECISION_AUDIT_COLUMNS,
+        simulation.decision_audit,
+    )
+
+    record_decisions = count_manual_decisions(queue_rows)
+    trim_actions = count_trim_actions(queue_rows)
+    tracked_rows = build_tracked_resolutions(
+        decisions=simulation.preview_decisions,
+        queue_rows=queue_rows,
+        route_changed_ids=simulation.route_changed_ids,
+    )
+    s4_rows = [
+        {
+            "record_id": row["record_id"],
+            "resolved_decision": "accept",
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+        }
+        for row in tracked_rows
+        if row["authorised_for_s4"] == "true"
+    ]
+    rejected_id_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["manual_decision"],
+        }
+        for row in tracked_rows
+        if row["primary_route"] == "technical_reject"
+    ]
+    parked_id_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["manual_decision"],
+        }
+        for row in tracked_rows
+        if row["primary_route"] == "parked_ssdna"
+    ]
+    write_csv_atomic(
+        tracked_manifest, RIBOAPTAMER_TRACKED_RESOLUTION_COLUMNS, tracked_rows
+    )
+    write_csv_atomic(
+        output_dir / "riboaptamer_checkpoint1_s4_authorised_ids.csv",
+        S4_ID_COLUMNS,
+        s4_rows,
+    )
+    write_csv_atomic(
+        output_dir / "riboaptamer_checkpoint1_rejected_ids.csv",
+        REJECTED_ID_COLUMNS,
+        rejected_id_rows,
+    )
+    write_csv_atomic(
+        output_dir / "riboaptamer_checkpoint1_parked_ids.csv",
+        PARKED_ID_COLUMNS,
+        parked_id_rows,
+    )
+
+    applied_names = [
+        "riboaptamer_checkpoint1_applied_canonical.csv",
+        "riboaptamer_checkpoint1_applied_routing.csv",
+        "riboaptamer_checkpoint1_applied_rejection.csv",
+        "riboaptamer_checkpoint1_applied_parked_ssdna.csv",
+        "riboaptamer_checkpoint1_applied_eligible.csv",
+        "riboaptamer_checkpoint1_applied_change_report.csv",
+        "riboaptamer_checkpoint1_decision_audit.csv",
+        "riboaptamer_checkpoint1_s4_authorised_ids.csv",
+        "riboaptamer_checkpoint1_rejected_ids.csv",
+        "riboaptamer_checkpoint1_parked_ids.csv",
+    ]
+    output_hashes = {
+        Path(name).stem.replace("riboaptamer_checkpoint1_", ""): sha256_file(
+            output_dir / name
+        )
+        for name in applied_names
+    }
+    output_hashes["tracked_manifest"] = sha256_file(tracked_manifest)
+
+    if check_deterministic_rerun:
+        determinism_dir = checkpoint_dir / "closure_validation" / "determinism"
+        determinism_dir = _assert_output_dir_allowed(repo_root, determinism_dir)
+        determinism_dir.mkdir(parents=True, exist_ok=True)
+        third = _simulate()
+        if serialise_riboaptamer_simulation(
+            simulation
+        ) != serialise_riboaptamer_simulation(third):
+            raise Checkpoint1ApplyError(
+                "Deterministic verification rerun diverged from the "
+                "authoritative in-memory payload"
+            )
+        write_corpus_csv_atomic(
+            determinism_dir / "riboaptamer_checkpoint1_applied_canonical.csv",
+            third.preview_canonical,
+            columns=CORPUS_COLUMNS,
+        )
+        if sha256_file(
+            output_dir / "riboaptamer_checkpoint1_applied_canonical.csv"
+        ) != sha256_file(
+            determinism_dir / "riboaptamer_checkpoint1_applied_canonical.csv"
+        ):
+            raise Checkpoint1ApplyError(
+                "Deterministic verification mismatch for applied canonical"
+            )
+
+    summary_text = format_closure_markdown(
+        simulation,
+        review_hashes=hashes_before,
+        integrity={
+            "s2": hashes_before["s2"],
+            "s3": hashes_before["s3"],
+            "sidecar": hashes_before["sidecar"],
+            "raw": hashes_before["raw"],
+        },
+        output_hashes=output_hashes,
+        record_decisions=record_decisions,
+        trim_actions=trim_actions,
+        deterministic_ok=deterministic_ok,
+        human_source_preserved=human_source_path.is_file(),
+    )
+    if RIBOAPTAMER_CHECKPOINT_CLOSED_STATEMENT not in summary_text:
+        raise Checkpoint1ApplyError(
+            "Resolution summary missing checkpoint-closed statement"
+        )
+    if str(repo_root.resolve()) in summary_text:
+        raise Checkpoint1ApplyError(
+            "Resolution summary must not contain absolute repository paths"
+        )
+    summary_path = output_dir / "riboaptamer_checkpoint1_resolution_summary.md"
+    _write_text_atomic(summary_path, summary_text)
+    _write_text_atomic(
+        output_dir / "README.md",
+        "CHECKPOINT-1 CLOSED.\n"
+        "These files are the authoritative RiboAptamer post-review artefacts.\n"
+        "They must not overwrite S2 or pre-review S3 snapshots.\n"
+        "S4 has not started.\n",
+    )
+    output_hashes["summary"] = sha256_file(summary_path)
+
+    metadata = {
+        "source_key": "riboaptamer",
+        "checkpoint": "CHECKPOINT-1",
+        "review_model": "single_reviewer",
+        "checkpoint_status": "closed",
+        "checkpoint_closed": True,
+        "s4_started": False,
+        "next_stage": "global_S4_handoff",
+        "reviewed_records": int(simulation.stats["reviewed_records"]),
+        "record_decisions": record_decisions,
+        "trim_actions": trim_actions,
+        "human_reviewed_drops": int(simulation.stats["human_reviewed_drops"]),
+        "technical_rejects_after_review": int(
+            simulation.stats["technical_rejects_after_review"]
+        ),
+        "parked_ssdna": int(simulation.stats["parked_ssdna"]),
+        "parked_non_protein": 0,
+        "technically_eligible": int(simulation.stats["technically_eligible"]),
+        "authorised_for_s4": int(simulation.stats["authorised_for_s4"]),
+        "records_trimmed": int(simulation.stats["records_trimmed"]),
+        "approved_known_t7_trims": int(simulation.stats["approved_known_t7_trims"]),
+        "group_consensus_proposals": 0,
+        "strong_unresolved_constant_flags": int(
+            simulation.stats["strong_unresolved_constant_flags"]
+        ),
+        "weak_possible_constant_flags": int(
+            simulation.stats["weak_possible_constant_flags"]
+        ),
+        "unconsumed_decisions": 0,
+        "review_file_sha256": hashes_before["queue"],
+        "human_source_sha256": hashes_before["human_source"],
+        "s2_sha256": hashes_before["s2"],
+        "s3_sha256": hashes_before["s3"],
+        "sidecar_sha256": hashes_before["sidecar"],
+        "raw_sha256": hashes_before["raw"],
+        "output_hashes": output_hashes,
+        "deterministic_rerun_ok": deterministic_ok,
+        "application_mode": "apply",
+    }
+    _write_json_atomic(metadata_out, metadata)
+
+    hashes_after = {
+        "s2": sha256_file(s2_path) if s2_path.is_file() else "",
+        "s3": sha256_file(canonical_path),
+        "sidecar": sha256_file(sidecar_path) if sidecar_path.is_file() else "",
+        "raw": sha256_file(raw_path) if raw_path.is_file() else "",
+        "human_source": sha256_file(human_source_path),
+    }
+    for key in ("s2", "s3", "sidecar", "raw", "human_source"):
+        if hashes_after[key] != hashes_before[key]:
+            raise Checkpoint1ApplyError(
+                f"CHECKPOINT-1 apply mutated immutable input artefact {key}"
+            )
+
+    stats = dict(simulation.stats)
+    stats["checkpoint_closed"] = True
+    print(
+        "source=riboaptamer\n"
+        f"reviewed_records={stats['reviewed_records']}\n"
+        f"decisions_consumed={stats['decisions_consumed']}\n"
+        f"technically_eligible={stats['technically_eligible']}\n"
+        f"technical_rejects_after_review={stats['technical_rejects_after_review']}\n"
+        f"authorised_for_s4={stats['authorised_for_s4']}\n"
+        "CHECKPOINT-1 CLOSED\n"
+        "S4 has not started"
+    )
+
 
 
 def main(argv: Sequence[str] | None = None) -> int:

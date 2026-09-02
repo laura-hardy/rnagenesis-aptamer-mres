@@ -1,0 +1,71 @@
+{
+  "source_key": "riboaptamer",
+  "handoff_status": "ready_for_global_s4",
+  "authoritative_stage": "CHECKPOINT-1",
+  "checkpoint_status": "closed",
+  "canonical_input": "data/interim/checkpoints/riboaptamer_cp1/resolved/riboaptamer_checkpoint1_applied_canonical.csv",
+  "resolution_manifest": "config/checkpoint_reviews/riboaptamer_checkpoint1_resolutions.csv",
+  "authorised_ids_input": "data/interim/checkpoints/riboaptamer_cp1/resolved/riboaptamer_checkpoint1_s4_authorised_ids.csv",
+  "authorisation_field": "authorised_for_s4",
+  "expected_authorised_records": 397,
+  "global_s4_handoff_output": "data/interim/global_s4_ready/riboaptamer_global_s4_input.csv",
+  "global_s4_handoff_summary": "data/interim/global_s4_ready/riboaptamer_global_s4_handoff_summary.md",
+  "handoff_ready_statement": "RiboAptamer is ready to be retrieved as one input to the future corpus-wide S4 merge. Target identity must be extracted from descriptive source metadata. Category is a prior only. Source Type is a source target-class prior and must be checked against the resolved target rather than treated as canonical truth. Target-type disagreements belong at CHECKPOINT-2. mmCIF URL supports later E1/PDB extraction. Affinity text supports E2 where parseable; otherwise RiboAptamer may support E4. Protein/non-protein routing happens only after target resolution. Leakage exclusion happens globally at S4.",
+  "emit_target_evidence_boundary": true,
+  "handoff_extra_fields": [
+    "riboaptamer_sequence_name",
+    "riboaptamer_aptamer_name",
+    "riboaptamer_category",
+    "riboaptamer_type",
+    "riboaptamer_article_name",
+    "riboaptamer_description",
+    "riboaptamer_affinity_kd",
+    "riboaptamer_pubmed_link",
+    "riboaptamer_mmcif_download_url"
+  ],
+  "authorised_for_s4_meaning": "Technically eligible after RiboAptamer sequence/molecule CHECKPOINT-1 and eligible to enter the future corpus-wide target-normalisation stage. Does not mean protein target confirmed, target canonicalised, UniProt resolved, evidence threshold passed, leakage check passed globally, globally deduplicated, balanced, or CHECKPOINT-2 approved. Source Type and Category are priors only.",
+  "target_metadata": {
+    "canonical_raw_field": "target_name_raw",
+    "source_specific_field": "riboaptamer_sequence_name",
+    "source_general_field": "riboaptamer_type",
+    "source_general_is_categorical": true,
+    "source_type_prior_field": "riboaptamer_type",
+    "specific_target_present_in_authorised_records": null,
+    "specific_target_missing_in_authorised_records": null,
+    "source_metadata_path": "data/interim/extracted/riboaptamer_source_metadata.csv",
+    "uniprot_source_columns_present": false,
+    "pdb_source_columns_present": false,
+    "pfam_source_columns_present": false,
+    "family_source_columns_present": false,
+    "mmcif_url_field": "riboaptamer_mmcif_download_url",
+    "affinity_text_field": "riboaptamer_affinity_kd"
+  },
+  "provisional_source_observations": {
+    "Proteins": 286,
+    "Small molecules": 82,
+    "Cells": 22,
+    "Nucleic acids": 7
+  },
+  "s4_semantics": {
+    "target_identity_from_descriptive_source_metadata": true,
+    "category_is_prior_only": true,
+    "source_type_is_target_class_prior": true,
+    "source_type_must_be_checked_against_resolved_target": true,
+    "target_type_disagreements_belong_at_checkpoint2": true,
+    "mmcif_url_supports_e1_pdb_extraction": true,
+    "affinity_text_supports_e2_where_parseable": true,
+    "otherwise_may_support_e4": true,
+    "protein_non_protein_routing_after_target_resolution": true,
+    "leakage_exclusion_global_at_s4": true,
+    "canonical_s4_fields_populated_here": false
+  },
+  "global_s4_rules": {
+    "final_target_normalisation_performed_here": false,
+    "final_target_type_assignment_performed_here": false,
+    "uniprot_resolution_performed_here": false,
+    "target_family_assignment_performed_here": false,
+    "evidence_threshold_performed_here": false,
+    "global_leakage_application_performed_here": false,
+    "checkpoint2_emitted_here": false
+  }
+}

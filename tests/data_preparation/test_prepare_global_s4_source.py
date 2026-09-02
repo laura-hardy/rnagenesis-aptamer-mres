@@ -690,3 +690,117 @@ def test_handoff_joins_sequence_safe_source_metadata(tmp_path: Path) -> None:
     assert "target_name remains unresolved" in text
     assert "Kd/Affinity evidence not scored" in text
     assert SEQ_LEAK_RE.search(text) is None
+
+
+def test_riboaptamer_handoff_uses_applied_canonical_and_preserves_source_metadata(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _make_tree(tmp_path)
+    canonical, _resolutions, authorised = _base_records()
+    applied_dir = repo / "data/interim/checkpoints/riboaptamer_cp1/resolved"
+    applied_dir.mkdir(parents=True)
+    sidecar_dir = repo / "data/interim/extracted"
+    sidecar_dir.mkdir(parents=True)
+    applied_path = applied_dir / "riboaptamer_checkpoint1_applied_canonical.csv"
+    pre_review = (
+        repo
+        / "data/interim/checkpoints/riboaptamer_cp1/riboaptamer_s3_canonical.csv"
+    )
+    pre_review.parent.mkdir(parents=True, exist_ok=True)
+    _write_csv(applied_path, list(CORPUS_COLUMNS), canonical)
+    mutated = []
+    for row in canonical:
+        copy = dict(row)
+        if row["record_id"] == authorised[0]:
+            copy["sequence_core"] = "AAAAAAAA"
+        mutated.append(copy)
+    _write_csv(pre_review, list(CORPUS_COLUMNS), mutated)
+    _write_csv(
+        sidecar_dir / "riboaptamer_source_metadata.csv",
+        [
+            "record_id",
+            "riboaptamer_sequence_name",
+            "riboaptamer_aptamer_name",
+            "riboaptamer_category",
+            "riboaptamer_type",
+            "riboaptamer_article_name",
+            "riboaptamer_description",
+            "riboaptamer_affinity_kd",
+            "riboaptamer_pubmed_link",
+            "riboaptamer_mmcif_download_url",
+            "riboaptamer_sequence",
+        ],
+        [
+            {
+                "record_id": row["record_id"],
+                "riboaptamer_sequence_name": f"seq-{row['record_id']}",
+                "riboaptamer_aptamer_name": f"name-{row['record_id']}",
+                "riboaptamer_category": "Mammalian",
+                "riboaptamer_type": "Proteins",
+                "riboaptamer_article_name": "Demo article",
+                "riboaptamer_description": "descriptive target text",
+                "riboaptamer_affinity_kd": "Kd: 1 nM",
+                "riboaptamer_pubmed_link": "https://pubmed.ncbi.nlm.nih.gov/1",
+                "riboaptamer_mmcif_download_url": "https://example.invalid/a.cif",
+                "riboaptamer_sequence": "GGCCGGCC",
+            }
+            for row in canonical
+        ],
+    )
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["source_key"] = "riboaptamer"
+    payload["canonical_input"] = (
+        "data/interim/checkpoints/riboaptamer_cp1/resolved/"
+        "riboaptamer_checkpoint1_applied_canonical.csv"
+    )
+    payload["emit_target_evidence_boundary"] = True
+    payload["handoff_extra_fields"] = [
+        "riboaptamer_sequence_name",
+        "riboaptamer_aptamer_name",
+        "riboaptamer_category",
+        "riboaptamer_type",
+        "riboaptamer_article_name",
+        "riboaptamer_description",
+        "riboaptamer_affinity_kd",
+        "riboaptamer_pubmed_link",
+        "riboaptamer_mmcif_download_url",
+    ]
+    payload["target_metadata"]["source_metadata_path"] = (
+        "data/interim/extracted/riboaptamer_source_metadata.csv"
+    )
+    payload["handoff_ready_statement"] = (
+        "RiboAptamer is ready to be retrieved as one input to the future "
+        "corpus-wide S4 merge. Category is a prior only. Source Type is a "
+        "target-class prior and must be checked against the resolved target."
+    )
+    config_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    bad = dict(payload)
+    bad["handoff_extra_fields"] = list(payload["handoff_extra_fields"]) + [
+        "riboaptamer_sequence"
+    ]
+    bad_path = repo / "config/global_s4_sources/demo_bad.json"
+    _write_json(bad_path, bad)
+    with pytest.raises(GlobalS4HandoffError, match="sequence-bearing"):
+        prepare_global_s4_source(source_config=bad_path, repo_root=repo)
+
+    result = prepare_global_s4_source(source_config=config_path, repo_root=repo)
+    rows = list(csv.DictReader(result.output_csv.open(encoding="utf-8")))
+    by_id = {row["record_id"]: row for row in canonical}
+    assert rows[0]["sequence_core"] == by_id[rows[0]["record_id"]]["sequence_core"]
+    assert rows[0]["sequence_core"] != "AAAAAAAA"
+    assert rows[0]["riboaptamer_sequence_name"].startswith("seq-")
+    assert rows[0]["riboaptamer_type"] == "Proteins"
+    assert rows[0]["riboaptamer_affinity_kd"] == "Kd: 1 nM"
+    assert "riboaptamer_sequence" not in rows[0]
+    assert rows[0]["target_name"] == ""
+    assert rows[0]["target_type"] == ""
+    assert rows[0]["binding_evidence_score"] == ""
+    text = result.output_summary.read_text(encoding="utf-8")
+    assert "target_name remains unresolved" in text
+    assert "protein/non-protein filtering not performed" in text
+    assert "leakage not applied" in text
+    assert SEQ_LEAK_RE.search(text) is None
+    assert "applied_canonical" in payload["canonical_input"]

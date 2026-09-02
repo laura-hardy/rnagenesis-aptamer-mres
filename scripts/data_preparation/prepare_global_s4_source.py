@@ -85,6 +85,7 @@ SEQUENCE_BEARING_HANDOFF_EXTRAS: frozenset[str] = frozenset(
         "sequence_full",
         "sequence_core",
         "aptamer_sequence",
+        "riboaptamer_sequence",
     }
 )
 

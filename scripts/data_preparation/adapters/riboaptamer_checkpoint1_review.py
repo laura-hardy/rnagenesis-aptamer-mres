@@ -8,6 +8,7 @@ decisions.
 
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 from typing import Any, Final, Mapping, Sequence
@@ -41,7 +42,7 @@ from adapters.aptadb_checkpoint1_review import (
 )
 from adapters.riboaptamer_s3 import classify_riboaptamer_record
 from common.corpus_schema import S3_FORBIDDEN_FIELDS, format_qc_flags
-from common.eligibility import EligibilityPolicy, load_eligibility_policy
+from common.eligibility import EligibilityPolicy, load_eligibility_policy, parse_qc_flags
 from common.sequence_normalisation import (
     TRIM_CONFIDENCE_HIGH,
     TRIM_CONFIDENCE_NA,
@@ -53,9 +54,205 @@ DEFAULT_RECOMMENDATIONS_REL: Final[str] = (
 )
 DEFAULT_POLICY_REL: Final[str] = "config/source_eligibility/riboaptamer.json"
 
+# Human-review notes prefixes. Authoritative signal for unresolved constants.
+CP1_FLAG_STRONG: Final[str] = "CP1_FLAG:constants_suspected_unresolved"
+CP1_FLAG_WEAK: Final[str] = "CP1_FLAG:possible_constants_unresolved"
+QC_FLAG_STRONG: Final[str] = "constants_suspected_unresolved"
+QC_FLAG_WEAK: Final[str] = "possible_constants_unresolved"
+TRIM_STATUS_STRONG: Final[str] = "constants_suspected_unresolved"
+TRIM_STATUS_T7: Final[str] = "t7_removed"
+
+# Laura recorded the T7 approval as informal ``trim``. Schema equivalent is
+# ``approve`` of the existing known-motif proposal. Do not invent lengths.
+RIBOAPTAMER_TRIM_ACTION_SYNONYMS: Final[Mapping[str, str]] = {"trim": "approve"}
+
+HUMAN_SOURCE_DIRNAME: Final[str] = "human_source"
+HUMAN_SOURCE_FILENAME: Final[str] = (
+    "riboaptamer_checkpoint1_manual_review.as_saved.csv"
+)
+
 
 class RiboAptamerCheckpoint1ReviewError(ValueError):
     """Invalid RiboAptamer CHECKPOINT-1 review schema, validation, or apply."""
+
+
+def decode_mixed_utf8_macroman_bytes(raw: bytes) -> str:
+    """Decode a review CSV that mixes UTF-8 with MacRoman em-dashes.
+
+    Excel on macOS may leave original UTF-8 sequences intact while storing
+    newly typed em-dashes as MacRoman ``0xD1``. Preserve UTF-8 semantics;
+    map only lone MacRoman em-dash bytes. Do not invent review decisions.
+    """
+    out = bytearray()
+    index = 0
+    length = len(raw)
+    while index < length:
+        byte = raw[index]
+        if byte < 0x80:
+            out.append(byte)
+            index += 1
+            continue
+        if (
+            0xC2 <= byte <= 0xDF
+            and index + 1 < length
+            and 0x80 <= raw[index + 1] <= 0xBF
+        ):
+            out.extend(raw[index : index + 2])
+            index += 2
+            continue
+        if (
+            0xE0 <= byte <= 0xEF
+            and index + 2 < length
+            and 0x80 <= raw[index + 1] <= 0xBF
+            and 0x80 <= raw[index + 2] <= 0xBF
+        ):
+            out.extend(raw[index : index + 3])
+            index += 3
+            continue
+        if (
+            0xF0 <= byte <= 0xF4
+            and index + 3 < length
+            and all(0x80 <= raw[index + offset] <= 0xBF for offset in range(1, 4))
+        ):
+            out.extend(raw[index : index + 4])
+            index += 4
+            continue
+        if byte == 0xD1:
+            out.extend("—".encode("utf-8"))
+            index += 1
+            continue
+        raise RiboAptamerCheckpoint1ReviewError(
+            f"Unrecognised non-UTF-8 byte 0x{byte:02x} at position {index} "
+            "in RiboAptamer CHECKPOINT-1 review CSV"
+        )
+    return out.decode("utf-8")
+
+
+def read_riboaptamer_review_csv(path: Path) -> list[dict[str, str]]:
+    """Read a RiboAptamer review CSV, recovering Excel MacRoman if needed."""
+    raw = Path(path).read_bytes()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = decode_mixed_utf8_macroman_bytes(raw)
+    rows = list(csv.DictReader(text.splitlines()))
+    for row in rows:
+        for key, value in list(row.items()):
+            row[key] = "" if value is None else value
+    return rows
+
+
+def normalise_riboaptamer_trim_action(action: str) -> str:
+    """Map informal RiboAptamer trim vocabulary onto the shared schema."""
+    blank = _blank(action)
+    return RIBOAPTAMER_TRIM_ACTION_SYNONYMS.get(blank, blank)
+
+
+def normalise_riboaptamer_review_rows(
+    rows: Sequence[Mapping[str, str]],
+) -> list[dict[str, str]]:
+    """Copy review rows and map informal trim actions. Never fill blanks."""
+    normalised: list[dict[str, str]] = []
+    for row in rows:
+        out = dict(row)
+        out["manual_trim_action"] = normalise_riboaptamer_trim_action(
+            out.get("manual_trim_action", "")
+        )
+        normalised.append(out)
+    return normalised
+
+
+def parse_cp1_constant_flag(manual_notes: str) -> str:
+    """Return the unresolved-constant class encoded in human notes, if any."""
+    text = manual_notes or ""
+    if CP1_FLAG_STRONG in text:
+        return QC_FLAG_STRONG
+    if CP1_FLAG_WEAK in text:
+        return QC_FLAG_WEAK
+    return ""
+
+
+def _append_note_parts(original: str, *parts: str) -> str:
+    """Append unique note tokens without replacing source notes."""
+    existing = [part for part in (original or "").split("|") if part]
+    seen = set(existing)
+    for part in parts:
+        token = (part or "").strip()
+        if not token or token in seen:
+            continue
+        existing.append(token)
+        seen.add(token)
+    return "|".join(existing)
+
+
+def _sanitize_reviewer_note(text: str) -> str:
+    return (text or "").replace("|", ";").strip()
+
+
+def _reviewer_notes_token(manual_notes: str) -> str:
+    cleaned = _sanitize_reviewer_note(manual_notes)
+    if not cleaned:
+        return ""
+    return f"checkpoint1_reviewer_notes={cleaned}"
+
+
+def known_motif_machine_trim(
+    review_row: Mapping[str, str],
+    proposals: Sequence[Mapping[str, str]] = (),
+) -> tuple[int, int]:
+    """Return proposed 5'/3' nt from known-motif proposals, else review fields."""
+    five = 0
+    three = 0
+    for proposal in proposals:
+        if proposal.get("proposal_source") != "known_motif":
+            continue
+        length_raw = str(proposal.get("motif_length") or "").strip()
+        if not length_raw.isdigit():
+            continue
+        length = int(length_raw)
+        side = _blank(proposal.get("side"))
+        if side == "five_prime":
+            five = length
+        elif side == "three_prime":
+            three = length
+    if five or three:
+        return five, three
+    length_raw = _blank(review_row.get("constant_proposed_trim_length", ""))
+    if not length_raw.isdigit():
+        return 0, 0
+    length = int(length_raw)
+    sides = _blank(review_row.get("constant_proposal_sides", ""))
+    if "five_prime" in sides:
+        five = length
+    if "three_prime" in sides:
+        three = length
+    return five, three
+
+
+def preserve_human_review_source(queue_path: Path) -> Path:
+    """Copy Laura's as-saved review bytes before any canonical rewrite."""
+    source_dir = queue_path.parent / HUMAN_SOURCE_DIRNAME
+    source_dir.mkdir(parents=True, exist_ok=True)
+    dest = source_dir / HUMAN_SOURCE_FILENAME
+    if not dest.is_file():
+        dest.write_bytes(queue_path.read_bytes())
+    return dest
+
+
+def write_canonical_utf8_review_csv(
+    path: Path, rows: Sequence[Mapping[str, str]]
+) -> None:
+    if not rows:
+        raise RiboAptamerCheckpoint1ReviewError("Cannot write empty review CSV")
+    fieldnames = list(rows[0].keys())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle, fieldnames=fieldnames, lineterminator="\n", extrasaction="raise"
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({column: row.get(column, "") for column in fieldnames})
 
 
 def load_review_recommendations(path: str | Path) -> dict[str, Any]:
@@ -135,25 +332,31 @@ def apply_reviewed_record(
     """
     record_id = canonical["record_id"]
     original_raw = canonical["sequence_raw"]
+    original_notes = canonical.get("notes", "")
     original_molecule = canonical.get("molecule_type", "")
     original_chemistry = canonical.get("chemistry", "")
     route_before = review_row.get("primary_route", "")
-    decision = _blank(review_row.get("manual_decision"))
+    working_review = dict(review_row)
+    working_review["manual_trim_action"] = normalise_riboaptamer_trim_action(
+        working_review.get("manual_trim_action", "")
+    )
+    decision = _blank(working_review.get("manual_decision"))
     if decision not in {"keep", "drop", "edit"}:
         raise RiboAptamerCheckpoint1ReviewError(
             f"Cannot apply unresolved manual_decision for {record_id!r}"
         )
+    constant_flag = parse_cp1_constant_flag(working_review.get("manual_notes", ""))
+    reviewer_note = _reviewer_notes_token(working_review.get("manual_notes", ""))
     if decision == "drop":
         updated = _corpus_only(canonical)
         for field_name in S3_FORBIDDEN_FIELDS:
             updated[field_name] = ""
-        note_parts = [
+        updated["notes"] = _append_note_parts(
+            original_notes,
             "checkpoint1_manual_decision=drop",
             "human_reviewed_exclusion=true",
-        ]
-        if review_row.get("manual_notes"):
-            note_parts.append("reviewer_notes_present=true")
-        updated["notes"] = "|".join(part for part in note_parts if part)
+            reviewer_note,
+        )
         return AppliedRecordResult(
             record_id=record_id,
             sequence_raw=original_raw,
@@ -171,15 +374,18 @@ def apply_reviewed_record(
             primary_route_after=route_before,
             notes=updated["notes"],
             canonical=updated,
-            proposed_decision=review_row.get("proposed_decision", ""),
-            primary_reason=review_row.get("primary_reason", ""),
+            proposed_decision=working_review.get("proposed_decision", ""),
+            primary_reason=working_review.get("primary_reason", ""),
         )
 
-    working_input = _blank(review_row.get("manual_sequence_corrected")) or original_raw
-    molecule = (
-        _blank(review_row.get("manual_molecule_type_override")) or original_molecule
+    working_input = (
+        _blank(working_review.get("manual_sequence_corrected")) or original_raw
     )
-    chemistry = _blank(review_row.get("manual_chemistry_override"))
+    molecule = (
+        _blank(working_review.get("manual_molecule_type_override"))
+        or original_molecule
+    )
+    chemistry = _blank(working_review.get("manual_chemistry_override"))
     if not chemistry:
         chemistry = (
             default_chemistry_for_molecule(molecule)
@@ -187,10 +393,15 @@ def apply_reviewed_record(
             else original_chemistry
         )
 
-    trim_action = _blank(review_row.get("manual_trim_action"))
+    trim_action = _blank(working_review.get("manual_trim_action"))
     if trim_action == "defer":
         raise RiboAptamerCheckpoint1ReviewError(
             f"Deferred trim cannot be applied for {record_id!r}"
+        )
+
+    if not machine_five and not machine_three:
+        machine_five, machine_three = known_motif_machine_trim(
+            working_review, proposals
         )
 
     norm = normalise_sequence(working_input, molecule_type=molecule)
@@ -204,7 +415,7 @@ def apply_reviewed_record(
     large_trim_human_approved = False
     try:
         effective = resolve_effective_trim(
-            review_row,
+            working_review,
             group_row,
             machine_five=machine_five,
             machine_three=machine_three,
@@ -212,6 +423,10 @@ def apply_reviewed_record(
     except AptaDBCheckpoint1ReviewError as exc:
         raise RiboAptamerCheckpoint1ReviewError(str(exc)) from exc
     if effective is not None:
+        if effective.five_nt == 0 and effective.three_nt == 0:
+            raise RiboAptamerCheckpoint1ReviewError(
+                f"Approved trim for {record_id!r} has no 5'/3' nucleotide lengths"
+            )
         human_authorised = is_explicit_human_trim_authorisation(effective.action)
         try:
             sequence_core = apply_numeric_terminal_trim(
@@ -234,11 +449,11 @@ def apply_reviewed_record(
                 len(sequence_full), applied_five, applied_three
             )
         )
-        source = review_row.get("constant_proposal_sources", "")
+        source = working_review.get("constant_proposal_sources", "")
         if source == "known_motif" or "known_motif" in source:
             trim_confidence = TRIM_CONFIDENCE_HIGH
             trim_status = (
-                "t7_removed"
+                TRIM_STATUS_T7
                 if applied_five and not applied_three
                 else (
                     "t7_and_primers_removed"
@@ -248,6 +463,13 @@ def apply_reviewed_record(
             )
         else:
             trim_status = "primers_removed"
+    elif constant_flag == QC_FLAG_STRONG:
+        trim_status = TRIM_STATUS_STRONG
+        trim_confidence = TRIM_CONFIDENCE_NA
+    elif constant_flag == QC_FLAG_WEAK:
+        if trim_status == TRIM_STATUS_STRONG:
+            trim_status = "no_constants_detected"
+        trim_confidence = TRIM_CONFIDENCE_NA
     if sequence_full and sequence_core and sequence_core not in sequence_full:
         raise RiboAptamerCheckpoint1ReviewError(
             f"sequence_core is not a contiguous substring of reviewed "
@@ -266,9 +488,25 @@ def apply_reviewed_record(
     updated["t_to_u_applied"] = "true" if norm.t_to_u_applied else "false"
     updated["trim_status"] = trim_status
     updated["trim_confidence"] = trim_confidence
-    qc_flag_values = list(norm.qc_flags)
+    qc_flag_values = list(parse_qc_flags(canonical.get("qc_flags", "")))
+    qc_flag_values.extend(list(norm.qc_flags))
+    if effective is not None:
+        qc_flag_values = [
+            flag
+            for flag in qc_flag_values
+            if flag not in {"trim_requires_review", QC_FLAG_STRONG}
+        ]
+        if "known_promoter_detected" not in qc_flag_values and (
+            "known_motif" in (working_review.get("constant_proposal_sources") or "")
+        ):
+            qc_flag_values.append("known_promoter_detected")
     if large_trim_human_approved:
         qc_flag_values.append(LARGE_TRIM_HUMAN_APPROVED_FLAG)
+    if constant_flag == QC_FLAG_STRONG and effective is None:
+        qc_flag_values.append(QC_FLAG_STRONG)
+    elif constant_flag == QC_FLAG_WEAK:
+        qc_flag_values.append(QC_FLAG_WEAK)
+        qc_flag_values = [flag for flag in qc_flag_values if flag != QC_FLAG_STRONG]
     updated["qc_flags"] = format_qc_flags(qc_flag_values)
     for field_name in S3_FORBIDDEN_FIELDS:
         updated[field_name] = ""
@@ -295,20 +533,20 @@ def apply_reviewed_record(
     )
     route_after = classified.decision["primary_route"]
 
-    note_parts = [f"checkpoint1_manual_decision={decision}"]
+    extra_notes = [f"checkpoint1_manual_decision={decision}"]
     if working_input != original_raw:
-        note_parts.append("manual_sequence_correction_applied")
+        extra_notes.append("manual_sequence_correction_applied")
     mol_note = _source_molecule_note(original_molecule, molecule)
     if mol_note:
-        note_parts.append(mol_note)
+        extra_notes.append(mol_note)
     if effective is not None:
-        note_parts.append(
+        extra_notes.append(
             f"manual_trim_action={effective.action};"
             f"applied_5p={applied_five};applied_3p={applied_three};"
             f"trim_source={effective.source};group={effective.group_id}"
         )
     if large_trim_human_approved:
-        note_parts.append(
+        extra_notes.append(
             format_large_trim_provenance(
                 fraction=trim_frac,
                 trim_source=effective.source if effective is not None else "",
@@ -319,11 +557,19 @@ def apply_reviewed_record(
                 group_id=effective.group_id if effective is not None else "",
             )
         )
-    if review_row.get("manual_notes"):
-        note_parts.append("reviewer_notes_present=true")
-    updated["notes"] = "|".join(part for part in note_parts if part)
+    if constant_flag:
+        extra_notes.append(f"checkpoint1_constant_flag={constant_flag}")
+    extra_notes.append(reviewer_note)
+    updated["notes"] = _append_note_parts(original_notes, *extra_notes)
     classified.canonical["notes"] = updated["notes"]
     classified.canonical["sequence_raw"] = original_raw
+    classified.canonical["qc_flags"] = updated["qc_flags"]
+    classified.canonical["trim_status"] = trim_status
+    classified.canonical["trim_confidence"] = trim_confidence
+    classified.decision["notes"] = updated["notes"]
+    classified.decision["qc_flags"] = updated["qc_flags"]
+    classified.decision["trim_status"] = trim_status
+    classified.decision["trim_confidence"] = trim_confidence
 
     return AppliedRecordResult(
         record_id=record_id,
@@ -373,6 +619,7 @@ def apply_riboaptamer_checkpoint1_package(
 
     Fail-closed: unresolved, deferred (unless allowed), or invalid fields raise.
     """
+    queue_rows = normalise_riboaptamer_review_rows(queue_rows)
     report = validate_review_package(
         queue_rows=queue_rows,
         group_rows=group_rows,
@@ -402,6 +649,10 @@ def apply_riboaptamer_checkpoint1_package(
                 int(group["machine_trim_3p_nt"] or 0)
                 if str(group.get("machine_trim_3p_nt") or "").isdigit()
                 else 0
+            )
+        if not machine_five and not machine_three:
+            machine_five, machine_three = known_motif_machine_trim(
+                row, list(proposals_by_record.get(record_id, ()))
             )
         applied.append(
             apply_reviewed_record(

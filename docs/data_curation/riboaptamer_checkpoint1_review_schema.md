@@ -25,5 +25,16 @@ values are guidance only and must never be treated as `manual_decision`.
 
 ## Status
 
-CHECKPOINT-1 has been prepared and is awaiting Laura's manual review.
-Decisions have not been applied. S4 has not begun.
+CHECKPOINT-1 is closed. Laura's 85-record review has been validated and
+applied fail-closed. Group-wise constant-region inference remained
+disabled. S4 has not begun. Target extraction has not been performed.
+
+Human unresolved-constant observations are preserved from `manual_notes`:
+
+- `CP1_FLAG:constants_suspected_unresolved` → `trim_status=constants_suspected_unresolved`
+  with QC flag `constants_suspected_unresolved`. Sequence unchanged.
+- `CP1_FLAG:possible_constants_unresolved` → warning QC flag
+  `possible_constants_unresolved` with `trim_status=no_constants_detected`.
+
+Informal `manual_trim_action=trim` is treated as schema `approve` of the
+existing known-motif proposal. Trim lengths are not invented.
