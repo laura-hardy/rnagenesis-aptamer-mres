@@ -1,0 +1,56 @@
+{
+  "source_key": "aptaindex",
+  "contract_version": "1.0",
+  "source_type_field": "aptaindex_type",
+  "alphabet_as_reported_nucleic_acid": "chemical_notation",
+  "peptide_source_type": "Peptide",
+  "apply_approved_trims": false,
+  "group_inference_key": "disabled",
+  "do_not_infer_molecule_from_alphabet": true,
+  "unmapped_molecule_type": "unknown",
+  "unmapped_chemistry": "unknown",
+  "known_source_types": [
+    "DNA",
+    "RNA",
+    "2'-F-RNA",
+    "Peptide",
+    "Chimeric",
+    "L-RNA",
+    "L-DNA",
+    ""
+  ],
+  "do_not_auto_resolve_source_types": [
+    "L-RNA",
+    "L-DNA",
+    "Chimeric"
+  ],
+  "straightforward_mappings": [
+    {
+      "source_type": "DNA",
+      "token_families": ["d"],
+      "allow_l_prefix": false,
+      "molecule_type": "ssDNA",
+      "chemistry": "DNA",
+      "mapping_class": "straightforward_dna",
+      "notes": "Source Type DNA with chemically consistent d-only tokens. T is retained. No T→U."
+    },
+    {
+      "source_type": "RNA",
+      "token_families": ["r"],
+      "allow_l_prefix": false,
+      "molecule_type": "RNA",
+      "chemistry": "RNA",
+      "mapping_class": "straightforward_rna",
+      "notes": "Source Type RNA with chemically consistent r-only tokens. Parsed T is converted to U."
+    },
+    {
+      "source_type": "2'-F-RNA",
+      "token_families": ["f", "r"],
+      "allow_l_prefix": false,
+      "molecule_type": "RNA",
+      "chemistry": "2F-RNA",
+      "mapping_class": "straightforward_2f_rna",
+      "notes": "Source Type 2'-F-RNA with the observed consistent f+r token family. Experimental molecule is RNA; chemistry is 2F-RNA."
+    }
+  ]
+}

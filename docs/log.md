@@ -4424,3 +4424,88 @@ AptaIndex S2 has not started
 No AptaIndex records are yet authorised for global S4
 ```
 
+## 2026-09-02 — AptaIndex S2 chemical-notation parsing and normalisation
+
+**Stage:** Aim 2 / data curation / AptaIndex S2.
+AptaIndex S3, CHECKPOINT-1, and global S4 were not started.
+
+### What was done
+
+AptaIndex Sequence values are chemical notation, not nucleotide letters.
+A source-specific full-consumption parser tokenises the entire string
+before shared nucleotide normalisation. Raw notation remains in
+`sequence_raw`. Unknown or incomplete syntax fails closed: no partial
+nucleotide sequence is emitted. Source-declared peptide rows are
+recognised as outside the nucleotide parser and are retained, not
+excluded. `alphabet_as_reported = chemical_notation` records the
+alphabet representation as supplied (governing-plan DECIDED value, not
+a new scientific decision). Deterministic Type/token-supported
+molecule/chemistry mappings were applied only where justified.
+Unusual, modified, and mismatch cases remain flagged for
+S3/CHECKPOINT-1. No target, evidence, affinity, leakage, parking, or
+eligibility decisions were made.
+
+### Parser
+
+- Module: `scripts/data_preparation/adapters/aptaindex_sequence_parser.py`
+- Adapter: `scripts/data_preparation/adapters/aptaindex_s2.py`
+- Policy: `config/source_normalisation/aptaindex.json`
+- Supported tokens: optional `L` + prefix `d`/`r`/`m`/`f`/`n` + base
+  `A`/`C`/`G`/`T`/`U`/`I`; internucleotide linkages `p`/`s`; optional
+  trailing terminal phosphate; 5′/3′ markers with ASCII `'`, Unicode
+  right single quote, or prime, including quote-before-digit order;
+  token-separating whitespace.
+- Fail-closed: `/` prefix, thiol decoration, `Dsp`, `Xlk`, IUPAC `N`,
+  brace labels, unprefixed stretches, omitted chemistry prefixes,
+  3′→5′ terminal order, and other unconsumed material.
+- Peptide `Type` is parser-not-applicable, not a parser bug.
+
+### Schema
+
+`chemical_notation` was added to the allowed `alphabet_as_reported`
+vocabulary. Existing source values (`RNA`, `DNA_T`, `mixed_T_U`,
+`ambiguous`, `invalid`, `missing`) are unchanged. Empty remains
+allowed for source-declared peptide rows.
+
+### Numbers (aggregate only)
+
+- S1 rows 1050 → S2 rows 1050; records lost 0; unique IDs 1050
+- Sequence missing 31; peptide 57; nonempty nucleic-acid 962
+- Successful complete nucleic-acid parses 923
+- Unsupported/unparseable nucleic-acid rows 39
+- Preflight experimental split was 927 / 35. Production is four
+  successes lower because 3′→5′ terminal order is treated as reverse
+  orientation (fail closed; 3 rows) and because one further row that a
+  slightly more permissive experimental grammar accepted is left for
+  review. Lower coverage is accepted; the production parser is more
+  conservative, not more permissive.
+- Straightforward DNA (`Type` DNA, `d`-only, no L): 635; `ssDNA` / `DNA`;
+  T retained
+- Straightforward RNA (`Type` RNA, `r`-only, no L): 172; `RNA` / `RNA`
+- Straightforward 2F-RNA (`Type` 2′-F-RNA, `f+r`): 65; `RNA` / `2F-RNA`
+- L-RNA 9 parsed (+1 missing); L-DNA 4 parsed; Chimeric 10 parsed
+  (+1 unsupported); not auto-resolved
+- Type/token disagreements flagged: 28
+- `alphabet_as_reported`: chemical_notation 962; missing 31; empty
+  (peptide) 57
+- `t_to_u_applied=true`: 1; mixed T+U retained: 5
+- Length (parsed nucleic-acid): min/median/max 11 / 60 / 201;
+  <20: 27; 20–25: 29; 90–100: 68; >100: 43. Not rejected at S2.
+- Known-motif proposals 3 (unapplied); no group-wise inference;
+  `sequence_core == sequence_full` for all rows; trim-to-short 0
+- ssDNA rows remain in the canonical table (635); peptides remain (57)
+- Deterministic rerun: byte-identical normalised, QC, review, proposals
+- Raw SHA-256 unchanged:
+  `912b8e554fa2bb2ed3a9e9bdf1cfbe4f757d8c7a00c401629e5bcb5e5c2877a8`
+
+### Pipeline status
+
+```text
+AptaIndex S0 complete
+AptaIndex S1 complete
+AptaIndex S2 complete
+AptaIndex S3 has not started
+CHECKPOINT-1 has not been generated
+No AptaIndex records are yet authorised for global S4
+```
+

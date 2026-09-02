@@ -20,6 +20,13 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from common.sequence_normalisation import (  # noqa: E402
+    ALPHABET_CHEMICAL_NOTATION,
+    ALPHABET_DNA_T,
+    ALPHABET_INVALID,
+    ALPHABET_MISSING,
+    ALPHABET_MIXED_T_U,
+    ALPHABET_RNA,
+    ALPHABET_VOCABULARY,
     ConfigurationError,
     TrimMismatchError,
     TrimProposal,
@@ -37,6 +44,31 @@ from common.sequence_normalisation import (  # noqa: E402
 @pytest.fixture(scope="module")
 def rules():
     return load_normalisation_rules()
+
+
+def test_alphabet_vocabulary_includes_chemical_notation_without_removing_live_values() -> None:
+    """chemical_notation is an additive DECIDED plan value (AptaIndex)."""
+    assert ALPHABET_CHEMICAL_NOTATION == "chemical_notation"
+    assert ALPHABET_CHEMICAL_NOTATION in ALPHABET_VOCABULARY
+    for existing in (
+        ALPHABET_RNA,
+        ALPHABET_DNA_T,
+        ALPHABET_MIXED_T_U,
+        ALPHABET_MISSING,
+        ALPHABET_INVALID,
+        "ambiguous",
+    ):
+        assert existing in ALPHABET_VOCABULARY
+
+
+def test_classify_alphabet_still_reports_rna_and_dna_t_for_nucleotide_letters(rules) -> None:
+    """Existing source lanes keep RNA/DNA_T; chemical_notation is not inferred here."""
+    rna = classify_alphabet("ACGU", rules=rules, molecule_type="RNA")
+    dna = classify_alphabet("ACGT", rules=rules, molecule_type="ssDNA")
+    assert rna.alphabet == ALPHABET_RNA
+    assert dna.alphabet == ALPHABET_DNA_T
+    assert rna.alphabet != ALPHABET_CHEMICAL_NOTATION
+    assert dna.alphabet != ALPHABET_CHEMICAL_NOTATION
 
 
 def test_01_missing_and_textual_null(rules) -> None:

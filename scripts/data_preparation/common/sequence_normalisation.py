@@ -34,6 +34,20 @@ ALPHABET_DNA_T: Final[str] = "DNA_T"
 ALPHABET_MIXED_T_U: Final[str] = "mixed_T_U"
 ALPHABET_AMBIGUOUS: Final[str] = "ambiguous"
 ALPHABET_INVALID: Final[str] = "invalid"
+# Plan §2.4 / §7: AptaIndex chemical notation as supplied, not inferred
+# RNA/DNA_T from parsed base letters. Existing sources keep RNA/DNA_T.
+ALPHABET_CHEMICAL_NOTATION: Final[str] = "chemical_notation"
+ALPHABET_VOCABULARY: Final[frozenset[str]] = frozenset(
+    {
+        ALPHABET_MISSING,
+        ALPHABET_RNA,
+        ALPHABET_DNA_T,
+        ALPHABET_MIXED_T_U,
+        ALPHABET_AMBIGUOUS,
+        ALPHABET_INVALID,
+        ALPHABET_CHEMICAL_NOTATION,
+    }
+)
 
 # Plan §2.4: remaining ``-`` and ``.`` after terminal-label stripping are
 # alignment gaps. They are retained and flagged, never silently deleted.

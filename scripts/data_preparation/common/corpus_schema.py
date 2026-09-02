@@ -129,6 +129,24 @@ CHEMISTRY_VOCABULARY: Final[frozenset[str]] = frozenset(
     }
 )
 
+# Canonical alphabet_as_reported vocabulary.
+# Live shared values are RNA / DNA_T / mixed_T_U / ambiguous / invalid /
+# missing. ``chemical_notation`` is the explicit DECIDED governing-plan
+# value for AptaIndex source chemical notation (plan §2.4 / §7), not a
+# new scientific decision. Empty remains allowed (e.g. source-declared
+# peptide rows, where the Sequence is not nucleotide notation).
+ALPHABET_AS_REPORTED_VOCABULARY: Final[frozenset[str]] = frozenset(
+    {
+        "RNA",
+        "DNA_T",
+        "mixed_T_U",
+        "ambiguous",
+        "invalid",
+        "missing",
+        "chemical_notation",
+    }
+)
+
 # Canonical fields that may become nonempty at S2.
 # ``chemistry`` is authorised at S2 by the curation plan (molecule/chemistry
 # classification before constant-region handling). Earlier AptaBase-era stage
@@ -361,6 +379,13 @@ def validate_s2_record(
         raise CorpusSchemaError(
             f"chemistry must be empty or one of {sorted(CHEMISTRY_VOCABULARY)}; "
             f"got {chemistry!r}"
+        )
+
+    alphabet = normalised["alphabet_as_reported"]
+    if alphabet != "" and alphabet not in ALPHABET_AS_REPORTED_VOCABULARY:
+        raise CorpusSchemaError(
+            "alphabet_as_reported must be empty or one of "
+            f"{sorted(ALPHABET_AS_REPORTED_VOCABULARY)}; got {alphabet!r}"
         )
 
     if s1_record is not None:

@@ -33,6 +33,19 @@ from adapters.aptabase_s2 import (  # noqa: E402
     normalise_aptabase_record,
     update_stats_from_row,
 )
+from adapters.aptaindex_s2 import (  # noqa: E402
+    CONSTANT_PROPOSAL_COLUMNS as APTAINDEX_CONSTANT_PROPOSAL_COLUMNS,
+    S2_QC_COLUMNS as APTAINDEX_S2_QC_COLUMNS,
+    AptaIndexS2Error,
+    AptaIndexS2Stats,
+    assert_genuine_proposals as assert_aptaindex_genuine_proposals,
+    build_known_motif_proposals as build_aptaindex_known_motif_proposals,
+    is_review_candidate as aptaindex_is_review_candidate,
+    load_aptaindex_policy,
+    normalise_aptaindex_record,
+    summarise_lengths as summarise_aptaindex_lengths,
+    update_stats_from_row as update_aptaindex_stats_from_row,
+)
 from adapters.aptadb_s2 import (  # noqa: E402
     CONSTANT_PROPOSAL_COLUMNS as APTADB_CONSTANT_PROPOSAL_COLUMNS,
     S2_QC_COLUMNS as APTADB_S2_QC_COLUMNS,
@@ -156,6 +169,12 @@ EXPECTED_RIBOAPTAMER_RAW_SHA256 = (
 )
 EXPECTED_RIBOAPTAMER_SOURCE_DATASET = "riboaptamer_full_2026-08"
 
+EXPECTED_APTAINDEX_ROWS = 1050
+EXPECTED_APTAINDEX_SOURCE_DATASET = "aptaindex_export_2026-07-22"
+EXPECTED_APTAINDEX_RAW_SHA256 = (
+    "912b8e554fa2bb2ed3a9e9bdf1cfbe4f757d8c7a00c401629e5bcb5e5c2877a8"
+)
+
 
 class S2NormaliseError(ValueError):
     """Hard failure during S2 normalisation orchestration."""
@@ -166,7 +185,13 @@ class S2RunResult:
     """Aggregate outcome of one S2 normalisation run."""
 
     source_key: str
-    stats: AptaBaseS2Stats | UTexasS2Stats | AptaDBS2Stats | RiboAptamerS2Stats
+    stats: (
+        AptaBaseS2Stats
+        | UTexasS2Stats
+        | AptaDBS2Stats
+        | RiboAptamerS2Stats
+        | AptaIndexS2Stats
+    )
     output_normalised: Path
     output_qc: Path
     output_review: Path
@@ -2904,6 +2929,571 @@ def run_riboaptamer_s2(
     return run_result
 
 
+def build_aptaindex_s2_report(
+    *,
+    repo_root: Path,
+    result: S2RunResult,
+    rules_path: Path,
+    policy_path: Path,
+) -> str:
+    """Build an aggregate-only Markdown AptaIndex S2 report (no sequences)."""
+    stats = result.stats
+    if not isinstance(stats, AptaIndexS2Stats):
+        raise S2NormaliseError("AptaIndex report requires AptaIndexS2Stats")
+    full_min, full_med, full_max = summarise_aptaindex_lengths(
+        stats.length_full_values
+    )
+    core_min, core_med, core_max = summarise_aptaindex_lengths(
+        stats.length_core_values
+    )
+    scanned = (
+        ", ".join(f"`{name}`" for name in stats.known_motifs_scanned) or "(none)"
+    )
+    lines = [
+        "# AptaIndex S2 normalisation report",
+        "",
+        "Aggregate counts only. Restricted AptaIndex sequences are not included.",
+        "",
+        "## Reconciliation",
+        "",
+        f"- Source key: `aptaindex`",
+        f"- Source dataset: `{EXPECTED_APTAINDEX_SOURCE_DATASET}`",
+        f"- S1 canonical rows: `{stats.s1_rows}`",
+        f"- Source-metadata rows: `{stats.source_metadata_rows}`",
+        f"- S2 output rows: `{stats.s2_rows}`",
+        f"- Records dropped: `{stats.records_dropped}`",
+        f"- Records parked: `{stats.records_parked}`",
+        f"- Unique record_id values: `{stats.unique_record_ids}`",
+        f"- Unique native_id values: `{stats.unique_native_ids}`",
+        f"- Row disappearance: `{stats.s1_rows - stats.s2_rows}`",
+        f"- S1 row order preserved: `{'pass' if stats.order_preserved else 'fail'}`",
+        f"- S1 provenance preserved: "
+        f"`{'pass' if stats.provenance_preserved else 'fail'}`",
+        f"- sequence_raw unchanged: "
+        f"`{'pass' if stats.sequence_raw_unchanged else 'fail'}`",
+        f"- target_name_raw unchanged: "
+        f"`{'pass' if stats.target_name_raw_unchanged else 'fail'}`",
+        f"- notes unchanged: `{'pass' if stats.notes_unchanged else 'fail'}`",
+        f"- Shared rules: `{_relative_display(rules_path, repo_root)}`",
+        f"- Source policy: `{_relative_display(policy_path, repo_root)}`",
+        "",
+        "## Sequence status",
+        "",
+        f"- Sequence missing: `{stats.missing_sequence_rows}`",
+        f"- Peptide molecule rows (parser not applicable): `{stats.peptide_rows}`",
+        f"- Non-empty nucleic-acid rows: `{stats.nonempty_nucleic_acid_rows}`",
+        "",
+        "## Parser coverage",
+        "",
+        "Full-consumption success requires that the entire source Sequence is",
+        "accounted for by explicitly supported terminal, token, linkage,",
+        "optional terminal-phosphate, or token-separating whitespace syntax.",
+        "Unknown material fails closed. No partial nucleotide sequence is",
+        "emitted for failed parses.",
+        "",
+        f"- Successful complete nucleic-acid parses: `{stats.successful_parses}`",
+        f"- Unsupported/unparseable nucleic-acid rows: "
+        f"`{stats.unsupported_nucleic_parses}`",
+        f"- Preflight experimental split (not an acceptance gate): `927` / `35`",
+        "",
+        "### Parser status",
+        "",
+    ]
+    for name, count in _count_sorted(stats.parser_status_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Parser reason category", ""])
+    for name, count in _count_sorted(stats.parser_reason_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Source Type distribution",
+            "",
+            "Counts are read from the S1 sidecar (`aptaindex_type`). They are",
+            "not hard-coded acceptance criteria.",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.source_type_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Type × token-family (successful parses)",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.type_token_family_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Mapping class", ""])
+    for name, count in _count_sorted(stats.mapping_class_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Canonical molecule_type", ""])
+    for name, count in _count_sorted(stats.molecule_type_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Canonical chemistry", ""])
+    for name, count in _count_sorted(stats.chemistry_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### alphabet_as_reported", ""])
+    for name, count in _count_sorted(stats.alphabet_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "Non-empty nucleic-acid chemical notation uses",
+            "`alphabet_as_reported = chemical_notation` (governing-plan DECIDED",
+            "value). Missing Sequence uses the shared `missing` contract.",
+            "Source-declared peptide rows leave `alphabet_as_reported` empty",
+            "because the source Sequence is amino-acid notation, not nucleotide",
+            "chemical notation.",
+            "",
+            "## T / U",
+            "",
+            "Counts below are from successfully parsed nucleic-acid base strings",
+            "before T→U conversion.",
+            "",
+            f"- T-only parsed representations: `{stats.parsed_t_only}`",
+            f"- U-only parsed representations: `{stats.parsed_u_only}`",
+            f"- Neither T nor U: `{stats.parsed_neither_t_u}`",
+            f"- Mixed T+U: `{stats.mixed_t_u_count}`",
+            f"- `t_to_u_applied=true`: `{stats.t_to_u_count}`",
+            "",
+            "## Lengths (successfully parsed / normalised nucleic-acid rows)",
+            "",
+            "Lengths are `len(sequence_full)` / `len(sequence_core)` only.",
+            "Source Molecular Weight is not used. Length is not an S2 reject.",
+            "",
+            f"- sequence_length_full min/median/max: `{full_min}` / `{full_med}` / `{full_max}`",
+            f"- sequence_length_core min/median/max: `{core_min}` / `{core_med}` / `{core_max}`",
+            "",
+            "### sequence_length_full buckets",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.length_full_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### sequence_length_core buckets", ""])
+    for name, count in _count_sorted(stats.length_core_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Trimming",
+            "",
+            "AptaIndex has no source-specific library design in this milestone.",
+            "Group-wise constant-region inference is disabled. Known-motif",
+            "detections are proposals only and are not applied.",
+            "",
+            f"- Known motifs scanned: {scanned}",
+            f"- No constants detected: `{stats.no_constants_detected_count}`",
+            f"- Known-motif detection rows: `{stats.known_motif_detection_count}`",
+            f"- Known-motif proposals (unapplied): `{stats.constant_region_proposals}`",
+            f"- Medium-confidence group inference proposals: "
+            f"`{stats.medium_confidence_inference_count}`",
+            f"- Trim-to-short outcomes: `{stats.trim_to_short_count}`",
+            f"- sequence_core differs from sequence_full: `{stats.core_differs_from_full}`",
+            f"- Applied trims: `{stats.applied_trims}`",
+            f"- Constant-region reason: `{stats.constant_region_reason}`",
+            "",
+            "### construct_scope",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.construct_scope_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### trim_status", ""])
+    for name, count in _count_sorted(stats.trim_status_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Other diagnostics",
+            "",
+            f"- L-nucleotide syntax: `{stats.l_nucleotide_count}`",
+            f"- Inosine base: `{stats.inosine_count}`",
+            f"- Phosphorothioate linkage: `{stats.linkage_phosphorothioate_count}`",
+            f"- Mixed internucleotide linkage: `{stats.linkage_mixed_count}`",
+            f"- Source Type / token disagreement: "
+            f"`{stats.source_type_disagreement_count}`",
+            f"- Unsupported/new source Type: `{stats.source_type_unsupported_count}`",
+            f"- Review-candidate rows: `{stats.review_candidate_rows}`",
+            "",
+            "### qc_flags",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.qc_flag_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Integrity",
+            "",
+            f"- Deterministic rerun: "
+            f"`{'pass' if result.deterministic_rerun_ok else ('not_run' if result.deterministic_rerun_ok is None else 'fail')}`",
+            f"- S1 inputs unchanged: `{'pass' if result.inputs_unchanged else 'fail'}`",
+            f"- S1 canonical hash before: `{result.s1_hash_before}`",
+            f"- S1 canonical hash after: `{result.s1_hash_after}`",
+            f"- Source-metadata hash before: `{result.sidecar_hash_before}`",
+            f"- Source-metadata hash after: `{result.sidecar_hash_after}`",
+            (
+                f"- Raw SHA-256: `{result.raw_sha256}`"
+                if result.raw_sha256
+                else "- Raw SHA-256: `not_checked`"
+            ),
+            "",
+            "## Outputs",
+            "",
+            f"- Normalised: "
+            f"`{_relative_display(result.output_normalised, repo_root)}`",
+            f"- QC: `{_relative_display(result.output_qc, repo_root)}`",
+            f"- Review candidates: "
+            f"`{_relative_display(result.output_review, repo_root)}`",
+            f"- Detected constants / proposals: "
+            f"`{_relative_display(result.output_proposals, repo_root)}`",
+            f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+            "",
+            "## Stage boundary",
+            "",
+            "AptaIndex S2 chemical-notation parsing and sequence normalisation",
+            "only.",
+            "",
+            "- No record was rejected or parked.",
+            "- ssDNA was not parked.",
+            "- Peptide records were retained, not rejected.",
+            "- No target canonicalisation was performed.",
+            "- No affinity/evidence decision was performed.",
+            "- No leakage, clustering, balancing or partitioning was performed.",
+            "- S3 has not started.",
+            "- CHECKPOINT-1 was not generated.",
+            "- Known-motif detections were not applied as trims.",
+            "- group-wise inference disabled for AptaIndex in this run.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_aptaindex_s2(
+    *,
+    repo_root: Path,
+    input_dir: Path,
+    output_dir: Path,
+    rules_path: Path,
+    policy_path: Path,
+    expected_rows: int | None = EXPECTED_APTAINDEX_ROWS,
+    check_deterministic_rerun: bool = False,
+) -> S2RunResult:
+    """Execute AptaIndex S2 normalisation."""
+    repo_root = repo_root.resolve()
+    input_dir = input_dir if input_dir.is_absolute() else (repo_root / input_dir)
+    input_dir = input_dir.resolve()
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    rules_path = (
+        rules_path if rules_path.is_absolute() else (repo_root / rules_path)
+    ).resolve()
+    policy_path = (
+        policy_path if policy_path.is_absolute() else (repo_root / policy_path)
+    ).resolve()
+
+    canonical_path = input_dir / "aptaindex_extracted.csv"
+    sidecar_path = input_dir / "aptaindex_source_metadata.csv"
+    if not canonical_path.is_file():
+        raise S2NormaliseError(f"Missing S1 canonical input: {canonical_path.name}")
+    if not sidecar_path.is_file():
+        raise S2NormaliseError(f"Missing S1 sidecar input: {sidecar_path.name}")
+
+    raw_path = (
+        repo_root / "data" / "raw" / "AptaIndex" / "aptamers-export-2026-07-22.csv"
+    )
+    raw_sha_before: str | None = None
+    if expected_rows == EXPECTED_APTAINDEX_ROWS:
+        if not raw_path.is_file():
+            raise S2NormaliseError("Missing registered AptaIndex raw file")
+        digest = _sha256_file(raw_path)
+        if digest != EXPECTED_APTAINDEX_RAW_SHA256:
+            raise S2NormaliseError(
+                "AptaIndex raw SHA-256 does not match registry expectation"
+            )
+        raw_sha_before = digest
+
+    s1_hash_before = _sha256_file(canonical_path)
+    sidecar_hash_before = _sha256_file(sidecar_path)
+
+    rules = load_normalisation_rules(rules_path)
+    policy = load_aptaindex_policy(policy_path)
+    if policy.apply_approved_trims:
+        raise S2NormaliseError("AptaIndex S2 must not apply approved trims")
+    if policy.group_inference_key != "disabled":
+        raise S2NormaliseError(
+            "AptaIndex S2 must keep group-wise inference disabled"
+        )
+
+    canonical_rows = _read_corpus_csv(canonical_path)
+    sidecar_rows = _read_sidecar_csv(sidecar_path)
+    aligned_sidecar = _match_sidecar_one_to_one(canonical_rows, sidecar_rows)
+
+    if expected_rows is not None and len(canonical_rows) != expected_rows:
+        raise S2NormaliseError(
+            f"S1 row count must be {expected_rows}; got {len(canonical_rows)}"
+        )
+
+    for index, row in enumerate(canonical_rows, start=1):
+        if row["source_db"] != "aptaindex":
+            raise S2NormaliseError(f"row {index}: source_db must be aptaindex")
+        if expected_rows == EXPECTED_APTAINDEX_ROWS:
+            if row["source_dataset"] != EXPECTED_APTAINDEX_SOURCE_DATASET:
+                raise S2NormaliseError(
+                    f"row {index}: source_dataset must be "
+                    f"{EXPECTED_APTAINDEX_SOURCE_DATASET}"
+                )
+
+    stats = AptaIndexS2Stats()
+    stats.s1_rows = len(canonical_rows)
+    stats.source_metadata_rows = len(aligned_sidecar)
+    stats.order_preserved = True
+    stats.provenance_preserved = True
+    stats.sequence_raw_unchanged = True
+    stats.target_name_raw_unchanged = True
+    stats.notes_unchanged = True
+    stats.known_motifs_scanned = tuple(
+        motif.name for motif in rules.known_non_core_motifs
+    )
+    stats.constant_region_reason = (
+        "group-wise inference disabled for AptaIndex in this run; "
+        "known_motif_detection_only_not_applied"
+    )
+
+    normalised_rows: list[dict[str, str]] = []
+    qc_rows: list[dict[str, str]] = []
+    review_rows: list[dict[str, str]] = []
+    row_results: list = []
+
+    for s1_row, meta_row in zip(canonical_rows, aligned_sidecar, strict=True):
+        result = normalise_aptaindex_record(
+            s1_row,
+            meta_row,
+            policy=policy,
+            rules=rules,
+        )
+        if result.canonical["record_id"] != s1_row["record_id"]:
+            stats.order_preserved = False
+            raise S2NormaliseError("S2 altered record_id or row identity")
+        if result.canonical["native_id"] != s1_row["native_id"]:
+            raise S2NormaliseError("S2 altered native_id")
+        if result.canonical["sequence_raw"] != s1_row["sequence_raw"]:
+            stats.sequence_raw_unchanged = False
+            raise S2NormaliseError("S2 must not alter sequence_raw")
+        if result.canonical["target_name_raw"] != s1_row["target_name_raw"]:
+            stats.target_name_raw_unchanged = False
+            raise S2NormaliseError("S2 must not alter target_name_raw")
+        if result.canonical["notes"] != s1_row["notes"]:
+            stats.notes_unchanged = False
+            raise S2NormaliseError("S2 must not alter notes")
+        if result.canonical["source_db"] != s1_row["source_db"]:
+            stats.provenance_preserved = False
+            raise S2NormaliseError("S2 must not alter source_db")
+        if result.canonical["source_dataset"] != s1_row["source_dataset"]:
+            stats.provenance_preserved = False
+            raise S2NormaliseError("S2 must not alter source_dataset")
+        if result.canonical["sequence_core"] != result.canonical["sequence_full"]:
+            raise S2NormaliseError(
+                "AptaIndex S2 must not apply trims; sequence_core must equal "
+                "sequence_full"
+            )
+        for field in (
+            "target_name",
+            "target_uniprot",
+            "target_type",
+            "binding_evidence_type",
+            "binding_evidence_score",
+            "affinity_value",
+            "affinity_unit",
+            "affinity_type",
+            "cluster_id",
+            "partition",
+        ):
+            if result.canonical[field] != "":
+                raise S2NormaliseError(
+                    f"AptaIndex S2 must not populate later-stage field {field}"
+                )
+        length_full = result.canonical["sequence_length_full"]
+        if length_full != "":
+            if int(length_full) != len(result.canonical["sequence_full"]):
+                raise S2NormaliseError(
+                    "sequence_length_full must equal len(sequence_full)"
+                )
+            if int(result.canonical["sequence_length_core"]) != len(
+                result.canonical["sequence_core"]
+            ):
+                raise S2NormaliseError(
+                    "sequence_length_core must equal len(sequence_core)"
+                )
+        if (
+            result.qc.get("parser_status") != "success"
+            and result.canonical["sequence_full"] != ""
+        ):
+            raise S2NormaliseError(
+                "parser failures must not emit a nucleotide sequence_full"
+            )
+        normalised_rows.append(result.canonical)
+        qc_rows.append(result.qc)
+        row_results.append(result)
+        if aptaindex_is_review_candidate(result.canonical["qc_flags"]):
+            review_rows.append(result.qc)
+        update_aptaindex_stats_from_row(stats, result)
+
+    stats.s2_rows = len(normalised_rows)
+    stats.unique_record_ids = len({row["record_id"] for row in normalised_rows})
+    stats.unique_native_ids = len({row["native_id"] for row in normalised_rows})
+    stats.records_dropped = 0
+    stats.records_parked = 0
+
+    if expected_rows == EXPECTED_APTAINDEX_ROWS:
+        if stats.s2_rows != EXPECTED_APTAINDEX_ROWS:
+            raise S2NormaliseError(
+                f"S2 must preserve {EXPECTED_APTAINDEX_ROWS} rows; "
+                f"got {stats.s2_rows}"
+            )
+        if stats.unique_record_ids != EXPECTED_APTAINDEX_ROWS:
+            raise S2NormaliseError("S2 record_id values are not unique")
+        if stats.unique_native_ids != EXPECTED_APTAINDEX_ROWS:
+            raise S2NormaliseError("S2 native_id values are not unique")
+        if stats.s1_rows - stats.s2_rows != 0:
+            raise S2NormaliseError("S2 row disappearance must be 0")
+        if stats.core_differs_from_full != 0:
+            raise S2NormaliseError(
+                "AptaIndex S2 applied a trim; sequence_core must equal "
+                "sequence_full"
+            )
+        s1_ids = [row["record_id"] for row in canonical_rows]
+        s2_ids = [row["record_id"] for row in normalised_rows]
+        if s1_ids != s2_ids:
+            raise S2NormaliseError("S2 record_id order does not match S1")
+        s1_native = [row["native_id"] for row in canonical_rows]
+        s2_native = [row["native_id"] for row in normalised_rows]
+        if s1_native != s2_native:
+            raise S2NormaliseError("S2 native_id order does not match S1")
+
+    known_motif_proposals = build_aptaindex_known_motif_proposals(row_results)
+    assert_aptaindex_genuine_proposals(known_motif_proposals)
+
+    stats.constant_region_proposals = len(known_motif_proposals)
+    stats.groups_considered = 0
+    stats.groups_meeting_min_size = 0
+    stats.five_prime_proposals = sum(
+        1 for row in known_motif_proposals if row["side"] == "five_prime"
+    )
+    stats.three_prime_proposals = sum(
+        1 for row in known_motif_proposals if row["side"] == "three_prime"
+    )
+    stats.records_with_medium_confidence_proposal = 0
+    stats.high_confidence_trims_applied = 0
+    stats.applied_trims = 0
+    for row in known_motif_proposals:
+        source = row["proposal_source"]
+        stats.proposal_source_counts[source] = (
+            stats.proposal_source_counts.get(source, 0) + 1
+        )
+
+    for row in normalised_rows:
+        if row["sequence_core"] != row["sequence_full"]:
+            raise S2NormaliseError(
+                "known-motif detections must not mutate sequence_core"
+            )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_normalised = output_dir / "aptaindex_normalised.csv"
+    out_qc = output_dir / "aptaindex_s2_qc.csv"
+    out_review = output_dir / "aptaindex_s2_review_candidates.csv"
+    out_proposals = output_dir / "detected_constants_aptaindex.csv"
+    out_report = output_dir / "aptaindex_s2_report.md"
+
+    write_corpus_csv_atomic(
+        out_normalised, normalised_rows, quoting=csv.QUOTE_ALL
+    )
+    write_csv_atomic(out_qc, APTAINDEX_S2_QC_COLUMNS, qc_rows)
+    write_csv_atomic(out_review, APTAINDEX_S2_QC_COLUMNS, review_rows)
+    write_csv_atomic(
+        out_proposals, APTAINDEX_CONSTANT_PROPOSAL_COLUMNS, known_motif_proposals
+    )
+
+    s1_hash_after = _sha256_file(canonical_path)
+    sidecar_hash_after = _sha256_file(sidecar_path)
+    inputs_unchanged = (
+        s1_hash_before == s1_hash_after
+        and sidecar_hash_before == sidecar_hash_after
+    )
+    if not inputs_unchanged:
+        raise S2NormaliseError("S1 inputs were modified during S2 execution")
+
+    raw_sha_after: str | None = None
+    raw_sha_unchanged: bool | None = None
+    if raw_sha_before is not None:
+        digest = _sha256_file(raw_path)
+        if digest != raw_sha_before:
+            raise S2NormaliseError("AptaIndex raw SHA changed during S2")
+        raw_sha_after = digest
+        raw_sha_unchanged = True
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        first_hashes = {
+            "normalised": _sha256_file(out_normalised),
+            "qc": _sha256_file(out_qc),
+            "review": _sha256_file(out_review),
+            "proposals": _sha256_file(out_proposals),
+        }
+        second = run_aptaindex_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=policy_path,
+            expected_rows=expected_rows,
+            check_deterministic_rerun=False,
+        )
+        deterministic_ok = (
+            first_hashes["normalised"] == _sha256_file(second.output_normalised)
+            and first_hashes["qc"] == _sha256_file(second.output_qc)
+            and first_hashes["review"] == _sha256_file(second.output_review)
+            and first_hashes["proposals"] == _sha256_file(second.output_proposals)
+        )
+        if not deterministic_ok:
+            raise S2NormaliseError(
+                "S2 outputs were not byte-identical across deterministic rerun"
+            )
+
+    run_result = S2RunResult(
+        source_key="aptaindex",
+        stats=stats,
+        output_normalised=out_normalised,
+        output_qc=out_qc,
+        output_review=out_review,
+        output_proposals=out_proposals,
+        output_report=out_report,
+        s1_hash_before=s1_hash_before,
+        s1_hash_after=s1_hash_after,
+        sidecar_hash_before=sidecar_hash_before,
+        sidecar_hash_after=sidecar_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        deterministic_rerun_ok=deterministic_ok,
+        raw_sha256=raw_sha_after,
+        raw_sha_unchanged=raw_sha_unchanged,
+    )
+    report_text = build_aptaindex_s2_report(
+        repo_root=repo_root,
+        result=run_result,
+        rules_path=rules_path,
+        policy_path=policy_path,
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in report_text:
+        raise S2NormaliseError("S2 report must not contain absolute repository paths")
+    _write_text_atomic(out_report, report_text)
+    return run_result
+
+
 def run_s2_normalisation(
     *,
     repo_root: Path,
@@ -2961,6 +3551,18 @@ def run_s2_normalisation(
             policy_path=source_policy,
             expected_rows=(
                 EXPECTED_RIBOAPTAMER_ROWS if expected_rows is None else expected_rows
+            ),
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key == "aptaindex":
+        return run_aptaindex_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=source_policy,
+            expected_rows=(
+                EXPECTED_APTAINDEX_ROWS if expected_rows is None else expected_rows
             ),
             check_deterministic_rerun=check_deterministic_rerun,
         )
@@ -3064,6 +3666,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_path = Path("config/source_normalisation/aptadb.json")
         elif args.source == "riboaptamer":
             policy_path = Path("config/source_normalisation/riboaptamer.json")
+        elif args.source == "aptaindex":
+            policy_path = Path("config/source_normalisation/aptaindex.json")
         else:
             raise S2NormaliseError(
                 "--source-policy is required for unrecognised sources"
@@ -3085,6 +3689,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         UTexasS2Error,
         AptaDBS2Error,
         RiboAptamerS2Error,
+        AptaIndexS2Error,
         CorpusSchemaError,
     ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -3118,6 +3723,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"\ncore_differs_from_full={stats.core_differs_from_full}"
             f"\napplied_trims={stats.applied_trims}"
             f"\ncontaining_ellipsis_count={stats.containing_ellipsis_count}"
+        )
+    elif isinstance(stats, AptaIndexS2Stats):
+        extra = (
+            f"\nmissing_sequence_rows={stats.missing_sequence_rows}"
+            f"\npeptide_rows={stats.peptide_rows}"
+            f"\nnonempty_nucleic_acid_rows={stats.nonempty_nucleic_acid_rows}"
+            f"\nsuccessful_parses={stats.successful_parses}"
+            f"\nunsupported_nucleic_parses={stats.unsupported_nucleic_parses}"
+            f"\nmolecule_type_counts={dict(sorted(stats.molecule_type_counts.items()))}"
+            f"\nchemistry_counts={dict(sorted(stats.chemistry_counts.items()))}"
+            f"\nalphabet_counts={dict(sorted(stats.alphabet_counts.items()))}"
+            f"\nmapping_class_counts={dict(sorted(stats.mapping_class_counts.items()))}"
+            f"\nt_to_u_count={stats.t_to_u_count}"
+            f"\nmixed_t_u_count={stats.mixed_t_u_count}"
+            f"\ncore_differs_from_full={stats.core_differs_from_full}"
+            f"\napplied_trims={stats.applied_trims}"
         )
     print(
         f"source={result.source_key}\n"
