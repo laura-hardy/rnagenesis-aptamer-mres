@@ -158,7 +158,7 @@ EXPECTED_APTAINDEX_RAW_SHA256 = (
     "912b8e554fa2bb2ed3a9e9bdf1cfbe4f757d8c7a00c401629e5bcb5e5c2877a8"
 )
 EXPECTED_APTAINDEX_S2_HASH = (
-    "08004a065f02ce0d618c449f61198a94306e57e9af833a69fd0bc1097d56bbaa"
+    "4a41c90c102d5dc5b9d9e469c6b636014d27c428868d1b3230b8fb2b1c4412da"
 )
 EXPECTED_APTADB_MOLECULE = {"RNA": 289, "ssDNA": 1061}
 EXPECTED_UTEXAS_MISSING = 399
@@ -3281,10 +3281,11 @@ def build_aptaindex_checkpoint1_summary(
             "## Mixed T/U policy",
             "",
             "Shared eligibility still classifies mixed T/U after chemical",
-            "parsing (`mixed_T_and_U`). Because AptaIndex mixed T/U occurs in",
-            "tokenised mixed-chemistry constructs, those rows also enter",
-            "CHECKPOINT-1 rather than automatic-only rejection. No silent T↔U",
-            "conversion is applied at S3.",
+            "parsing (`mixed_T_and_U`). Mixed T/U rows enter CHECKPOINT-1:",
+            "chemistry-review when a higher-precedence chemistry reason is",
+            "present, otherwise a judgement-dependent `mixed_T_and_U` reject.",
+            "They are not automatic-only rejects. No silent T↔U conversion is",
+            "applied at S3.",
             "",
             "## Deferred to global S4",
             "",

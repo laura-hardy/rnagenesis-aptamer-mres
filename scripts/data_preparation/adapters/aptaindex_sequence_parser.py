@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, Mapping
 
 STATUS_MISSING: Final[str] = "missing"
 STATUS_NOT_APPLICABLE_PEPTIDE: Final[str] = "not_applicable_peptide"
@@ -56,6 +56,28 @@ _END_5_QUOTE_RE: Final[re.Pattern[str]] = re.compile(
 _END_QUOTE_5_RE: Final[re.Pattern[str]] = re.compile(
     rf"\s*[-–—:]?\s*[{_QUOTE_CLASS}]5$"
 )
+
+# Allowlisted 5′ decorations only. Not a generic brace/label stripper.
+_FIVE_PRIME_PHOSPHATE_BRACE_RE: Final[re.Pattern[str]] = re.compile(
+    r"^\{5'/Phosphate\}-?"
+)
+_FIVE_PRIME_P_HYPHEN_RE: Final[re.Pattern[str]] = re.compile(r"^P-")
+_FIVE_PRIME_THIOL_HEXYL_RE: Final[re.Pattern[str]] = re.compile(r"^SH-\(CH2\)6-")
+_DISPLAY_HYPHENS: Final[frozenset[str]] = frozenset({"-", "–", "—"})
+
+# Uniform-family omitted-prefix inheritance is permitted only when the unique
+# explicit chemistry prefix is compatible with source Type. Blank Type is
+# allowed in unit tests; Chimeric / L-* / unknown Types never inherit.
+_INHERIT_COMPATIBLE_PREFIXES: Final[Mapping[str, frozenset[str]]] = {
+    "DNA": frozenset({"d"}),
+    "RNA": frozenset({"r"}),
+    "2'-F-RNA": frozenset({"f"}),
+}
+
+SYNTAX_INHERITED_PREFIX: Final[str] = "inherited_token_prefix"
+SYNTAX_TERMINAL_PHOSPHATE: Final[str] = "terminal_phosphate_stripped"
+SYNTAX_THIOL_CAP: Final[str] = "terminal_thiol_cap_stripped"
+SYNTAX_DISPLAY_SEPARATOR: Final[str] = "display_separator_normalised"
 
 REASON_MISSING: Final[str] = "missing_sequence"
 REASON_PEPTIDE: Final[str] = "source_declared_peptide"
@@ -104,6 +126,8 @@ class AptaIndexParseResult:
     n_tokens: int = 0
     whitespace_skipped: bool = False
     unconsumed_class: str = ""
+    syntax_events: tuple[str, ...] = ()
+    inherited_token_prefix: str = ""
 
 
 def _empty_result(*, status: str, reason_category: str, unconsumed_class: str = "") -> AptaIndexParseResult:
@@ -185,12 +209,98 @@ def _strip_supported_terminals(text: str) -> tuple[str, str, str] | AptaIndexPar
     return inner, start_form, end_form
 
 
-def parse_chemical_notation(sequence: str | None) -> AptaIndexParseResult:
+def _strip_allowlisted_five_prime_decorations(
+    inner: str,
+) -> tuple[str, tuple[str, ...]]:
+    """Strip only known 5′ phosphate / thiol-hexyl decorations.
+
+    Arbitrary brace labels, internal spacers, and other SH- chemistry are
+    left in place so full-consumption tokenisation fails closed.
+    """
+    events: list[str] = []
+    match = _FIVE_PRIME_PHOSPHATE_BRACE_RE.match(inner)
+    if match:
+        inner = inner[match.end() :]
+        events.append(SYNTAX_TERMINAL_PHOSPHATE)
+        return inner, tuple(events)
+    match = _FIVE_PRIME_P_HYPHEN_RE.match(inner)
+    if match:
+        inner = inner[match.end() :]
+        events.append(SYNTAX_TERMINAL_PHOSPHATE)
+        return inner, tuple(events)
+    match = _FIVE_PRIME_THIOL_HEXYL_RE.match(inner)
+    if match:
+        inner = inner[match.end() :]
+        events.append(SYNTAX_THIOL_CAP)
+        return inner, tuple(events)
+    return inner, ()
+
+
+def _explicit_token_prefixes(inner: str) -> tuple[frozenset[str], bool]:
+    """Return chemistry prefixes of explicit tokens and whether any is L-."""
+    prefixes: set[str] = set()
+    has_l = False
+    for match in _TOKEN_RE.finditer(inner):
+        token = match.group(0)
+        body = token
+        if body.startswith("L"):
+            has_l = True
+            body = body[1:]
+        prefixes.add(body[0])
+    return frozenset(prefixes), has_l
+
+
+def _uniform_inherited_prefix(inner: str, source_type: str) -> str:
+    """Return the unique inherit-able prefix, or empty when the rule must not fire.
+
+    Requires a single explicit chemistry prefix, no L tokens, leftover
+    material that is only bare bases / linkage / whitespace / display
+    hyphens, and source Type that does not contradict that prefix.
+    Chemistry is never inferred from Type alone.
+    """
+    prefixes, has_l = _explicit_token_prefixes(inner)
+    if has_l or len(prefixes) != 1:
+        return ""
+    prefix = next(iter(prefixes))
+    if source_type:
+        allowed = _INHERIT_COMPATIBLE_PREFIXES.get(source_type)
+        if allowed is None or prefix not in allowed:
+            return ""
+    leftover_ok = True
+    pos = 0
+    n = len(inner)
+    while pos < n:
+        token_match = _TOKEN_RE.match(inner, pos)
+        if token_match:
+            pos = token_match.end()
+            continue
+        ch = inner[pos]
+        if (
+            ch.isspace()
+            or ch in LINKAGE_MARKERS
+            or ch in TOKEN_BASES
+            or ch in _DISPLAY_HYPHENS
+        ):
+            pos += 1
+            continue
+        leftover_ok = False
+        break
+    if not leftover_ok:
+        return ""
+    return prefix
+
+
+def parse_chemical_notation(
+    sequence: str | None,
+    *,
+    source_type: str = "",
+) -> AptaIndexParseResult:
     """Parse one AptaIndex chemical-notation string.
 
     Success requires that every character is accounted for by explicitly
-    supported terminal, token, linkage, optional terminal-phosphate, or
-    token-separating whitespace syntax.
+    supported terminal, token, linkage, optional terminal-phosphate,
+    allowlisted 5′ decoration, token-separating whitespace, or the
+    tightly guarded omitted-prefix / display-hyphen syntax below.
     """
     if sequence is None:
         return _empty_result(status=STATUS_MISSING, reason_category=REASON_MISSING)
@@ -209,17 +319,47 @@ def parse_chemical_notation(sequence: str | None) -> AptaIndexParseResult:
     else:
         terminal_form = f"{start_form}+{end_form}"
 
+    syntax_events: list[str] = []
+    inner, decoration_events = _strip_allowlisted_five_prime_decorations(inner)
+    syntax_events.extend(decoration_events)
+
     whitespace_skipped = original != stripped or any(ch.isspace() for ch in inner)
+    inherited_prefix = _uniform_inherited_prefix(inner, source_type)
 
     tokens: list[str] = []
     linkages: list[str] = []
     terminal_phosphate = ""
+    inherited_used = False
+    hyphen_skipped = False
     i = 0
     n = len(inner)
 
     def _skip_ws(pos: int) -> int:
         while pos < n and inner[pos].isspace():
             pos += 1
+        return pos
+
+    def _match_token(pos: int) -> re.Match[str] | tuple[str, int] | None:
+        token_match = _TOKEN_RE.match(inner, pos)
+        if token_match:
+            return token_match
+        if inherited_prefix and pos < n and inner[pos] in TOKEN_BASES:
+            return inherited_prefix + inner[pos], pos + 1
+        return None
+
+    def _skip_display_hyphen(pos: int) -> int:
+        nonlocal hyphen_skipped
+        if not tokens or pos >= n or inner[pos] not in _DISPLAY_HYPHENS:
+            return pos
+        nxt = _skip_ws(pos + 1)
+        if _match_token(nxt) is not None:
+            hyphen_skipped = True
+            return nxt
+        if nxt < n and inner[nxt] in LINKAGE_MARKERS:
+            after_link = _skip_ws(nxt + 1)
+            if _match_token(after_link) is not None:
+                hyphen_skipped = True
+                return nxt
         return pos
 
     i = _skip_ws(i)
@@ -232,25 +372,33 @@ def parse_chemical_notation(sequence: str | None) -> AptaIndexParseResult:
 
     while i < n:
         i = _skip_ws(i)
+        i = _skip_display_hyphen(i)
         if i >= n:
             break
 
-        token_match = _TOKEN_RE.match(inner, i)
-        if token_match:
+        matched = _match_token(i)
+        if matched is not None:
             if terminal_phosphate:
                 return _empty_result(
                     status=STATUS_UNSUPPORTED,
                     reason_category=REASON_UNCONSUMED_SUFFIX,
                     unconsumed_class="token_after_terminal_phosphate",
                 )
-            tokens.append(token_match.group(0))
-            i = token_match.end()
+            if isinstance(matched, tuple):
+                token_text, end = matched
+                tokens.append(token_text)
+                inherited_used = True
+                i = end
+            else:
+                tokens.append(matched.group(0))
+                i = matched.end()
             continue
 
         if inner[i] in LINKAGE_MARKERS:
             marker = inner[i]
             after = _skip_ws(i + 1)
-            next_token = _TOKEN_RE.match(inner, after) if after < n else None
+            after = _skip_display_hyphen(after) if tokens else after
+            next_token = _match_token(after) if after < n else None
             if next_token is not None:
                 if not tokens:
                     reason, klass = _classify_unconsumed(inner[i:])
@@ -263,7 +411,6 @@ def parse_chemical_notation(sequence: str | None) -> AptaIndexParseResult:
                 i = after
                 continue
             if after >= n:
-                # Trailing 3′-phosphate / phosphorothioate after the last token.
                 if not tokens:
                     reason, klass = _classify_unconsumed(inner[i:])
                     return _empty_result(
@@ -274,7 +421,6 @@ def parse_chemical_notation(sequence: str | None) -> AptaIndexParseResult:
                 terminal_phosphate = marker
                 i = after
                 continue
-            # Linkage followed by non-token material: omitted prefix or unknown.
             leftover = inner[after:]
             if leftover and leftover[0] in TOKEN_BASES:
                 return _empty_result(
@@ -320,6 +466,12 @@ def parse_chemical_notation(sequence: str | None) -> AptaIndexParseResult:
             unconsumed_class="no_tokens",
         )
 
+    if inherited_used:
+        syntax_events.append(SYNTAX_INHERITED_PREFIX)
+    if hyphen_skipped:
+        syntax_events.append(SYNTAX_DISPLAY_SEPARATOR)
+    ordered_events = tuple(dict.fromkeys(syntax_events))
+
     prefixes: list[str] = []
     has_l = False
     bases: list[str] = []
@@ -361,6 +513,8 @@ def parse_chemical_notation(sequence: str | None) -> AptaIndexParseResult:
         mixed_t_u=has_t and has_u,
         n_tokens=len(tokens),
         whitespace_skipped=whitespace_skipped,
+        syntax_events=ordered_events,
+        inherited_token_prefix=inherited_prefix if inherited_used else "",
     )
 
 
@@ -378,4 +532,4 @@ def parse_aptaindex_source_sequence(
             status=STATUS_NOT_APPLICABLE_PEPTIDE,
             reason_category=REASON_PEPTIDE,
         )
-    return parse_chemical_notation(sequence)
+    return parse_chemical_notation(sequence, source_type=source_type)

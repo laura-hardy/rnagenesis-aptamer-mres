@@ -19,6 +19,10 @@ from adapters.aptaindex_sequence_parser import (  # noqa: E402
     STATUS_NOT_APPLICABLE_PEPTIDE,
     STATUS_SUCCESS,
     STATUS_UNSUPPORTED,
+    SYNTAX_DISPLAY_SEPARATOR,
+    SYNTAX_INHERITED_PREFIX,
+    SYNTAX_TERMINAL_PHOSPHATE,
+    SYNTAX_THIOL_CAP,
     parse_aptaindex_source_sequence,
     parse_chemical_notation,
 )
@@ -241,3 +245,206 @@ def test_peptide_text_is_not_treated_as_malformed_rna() -> None:
     )
     assert result.status != STATUS_UNSUPPORTED
     assert result.status == STATUS_NOT_APPLICABLE_PEPTIDE
+
+
+def test_uniform_r_stream_inherits_prefix_for_one_bare_u() -> None:
+    result = parse_chemical_notation("5'-rAprUprGpUprC-3'")
+    assert result.status == STATUS_SUCCESS
+    assert result.base_string == "AUGUC"
+    assert result.token_family_summary == "r"
+    assert result.inherited_token_prefix == "r"
+    assert SYNTAX_INHERITED_PREFIX in result.syntax_events
+
+
+def test_uniform_r_stream_inherits_prefix_for_several_bare_bases() -> None:
+    result = parse_chemical_notation("5'-rApUprGpCprA-3'")
+    assert result.status == STATUS_SUCCESS
+    assert result.base_string == "AUGCA"
+    assert result.token_family_summary == "r"
+    assert SYNTAX_INHERITED_PREFIX in result.syntax_events
+
+
+def test_uniform_f_stream_inherits_prefix_for_one_bare_u() -> None:
+    result = parse_chemical_notation("5'-fApfUpfGpUfC-3'")
+    assert result.status == STATUS_SUCCESS
+    assert result.base_string == "AUGUC"
+    assert result.token_family_summary == "f"
+    assert result.inherited_token_prefix == "f"
+
+
+def test_leading_bare_base_inherits_uniform_f_prefix() -> None:
+    result = parse_chemical_notation("5'-UfAfCfG-3'")
+    assert result.status == STATUS_SUCCESS
+    assert result.base_string == "UACG"
+    assert result.token_family_summary == "f"
+    assert result.inherited_token_prefix == "f"
+    assert SYNTAX_INHERITED_PREFIX in result.syntax_events
+
+
+def test_leading_bare_base_with_source_type_2f_inherits_f() -> None:
+    result = parse_aptaindex_source_sequence(
+        "5'-UfAfCfG-3'",
+        source_type="2'-F-RNA",
+    )
+    assert result.status == STATUS_SUCCESS
+    assert result.token_family_summary == "f"
+
+
+def test_explicit_d_stream_with_source_type_rna_does_not_inherit() -> None:
+    result = parse_aptaindex_source_sequence(
+        "5'-dApUpdG-3'",
+        source_type="RNA",
+    )
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""
+
+
+def test_mixed_explicit_d_and_r_stream_does_not_infer_prefix() -> None:
+    result = parse_chemical_notation("5'-dAprUpUprG-3'")
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""
+
+
+def test_unknown_token_after_recoverable_bare_bases_still_fails() -> None:
+    result = parse_chemical_notation("5'-rApUprGXlk-3'")
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""
+
+
+def test_partial_consumption_remains_failure_with_inherit_candidate() -> None:
+    result = parse_chemical_notation("5'-rApUprG-extra-3'")
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""
+
+
+def test_terminal_phosphate_brace_then_rna_tokens_succeeds() -> None:
+    result = parse_chemical_notation("5'-{5'/Phosphate}-rAprUprG-3'")
+    assert result.status == STATUS_SUCCESS
+    assert result.base_string == "AUG"
+    assert result.token_family_summary == "r"
+    assert SYNTAX_TERMINAL_PHOSPHATE in result.syntax_events
+
+
+def test_leading_p_hyphen_then_rna_tokens_succeeds() -> None:
+    result = parse_chemical_notation("5'-P-rAprUprG-3'")
+    assert result.status == STATUS_SUCCESS
+    assert result.base_string == "AUG"
+    assert result.token_family_summary == "r"
+    assert SYNTAX_TERMINAL_PHOSPHATE in result.syntax_events
+
+
+def test_internal_spacer_brace_still_fails() -> None:
+    _assert_full_failure("5'-rAp{Spacer 18}rU-3'")
+
+
+def test_arbitrary_brace_label_still_fails() -> None:
+    _assert_full_failure("5'-{Label}rAprU-3'")
+    _assert_full_failure("5'-{FAM-dT}rAprU-3'")
+    _assert_full_failure("5'-{Dabcyl-dT}dApdT-3'")
+
+
+def test_allowlisted_thiol_hexyl_then_dna_tokens_succeeds() -> None:
+    result = parse_chemical_notation("5'-SH-(CH2)6-dApdTpdG-3'")
+    assert result.status == STATUS_SUCCESS
+    assert result.base_string == "ATG"
+    assert result.token_family_summary == "d"
+    assert SYNTAX_THIOL_CAP in result.syntax_events
+    assert result.n_tokens == 3
+
+
+def test_arbitrary_thiol_chemistry_still_fails() -> None:
+    _assert_full_failure("5'-SH-foo-dApdT-3'")
+    _assert_full_failure("5'-SH-(NH2)6-dApdT-3'")
+
+
+def test_safe_display_hyphen_inside_same_family_succeeds() -> None:
+    result = parse_chemical_notation("5'-rAprU-rGprC-3'")
+    assert result.status == STATUS_SUCCESS
+    assert result.base_string == "AUGC"
+    assert result.token_family_summary == "r"
+    assert SYNTAX_DISPLAY_SEPARATOR in result.syntax_events
+
+
+def test_hyphen_plus_inherited_bare_base_in_uniform_r_family_succeeds() -> None:
+    result = parse_chemical_notation("5'-rAprUp-U-rGprC-3'")
+    assert result.status == STATUS_SUCCESS
+    assert result.base_string == "AUUGC"
+    assert result.token_family_summary == "r"
+    assert SYNTAX_INHERITED_PREFIX in result.syntax_events
+    assert SYNTAX_DISPLAY_SEPARATOR in result.syntax_events
+
+
+def test_hyphen_r_n_insertion_still_fails() -> None:
+    _assert_full_failure("5'-dApdT-R-N-dG-3'")
+
+
+def test_hyphen_y_still_fails() -> None:
+    _assert_full_failure("5'-rAprU-Y-rG-3'")
+
+
+def test_hyphen_next_to_unknown_modification_still_fails() -> None:
+    result = parse_chemical_notation("5'-dAp-XlkdT-3'")
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""
+
+
+def test_regression_reverse_orientation_still_fails() -> None:
+    result = parse_chemical_notation("3'-dApdTpdG-5'")
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""
+    assert result.reason_category == "swapped_terminal_orientation"
+
+
+def test_regression_trailing_i_still_fails() -> None:
+    result = parse_chemical_notation("5'-dApdTpdGi-3'")
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""
+
+
+def test_regression_dn_nap_du_still_fails() -> None:
+    _assert_full_failure("5'-dNpdApdT-3'")
+    result = parse_chemical_notation("5'-dApdNpdT-3'")
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""
+
+
+def test_regression_dd_still_fails() -> None:
+    _assert_full_failure("5'-dDpdApdT-3'")
+    result = parse_chemical_notation("5'-dApdDpdT-3'")
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""
+
+
+def test_regression_btn_still_fails() -> None:
+    _assert_full_failure("5'-dApbTndT-3'")
+    result = parse_chemical_notation("5'-dApdTpbTndG-3'")
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""
+
+
+def test_regression_xlk_still_fails() -> None:
+    _assert_full_failure("5'-dApXlkdT-3'")
+
+
+def test_regression_brace_spacer_still_fails() -> None:
+    _assert_full_failure("5'-dAp{Internal/Spacer 18}dT-3'")
+
+
+def test_regression_mixed_incompatible_families_do_not_inherit() -> None:
+    result = parse_aptaindex_source_sequence(
+        "5'-dApUpdGpdC-3'",
+        source_type="2'-F-RNA",
+    )
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""
+
+
+def test_plain_unprefixed_string_still_fails() -> None:
+    _assert_full_failure("ATGCGC")
+    _assert_full_failure("5'-AUGCGC-3'")
+
+
+def test_lowercase_token_base_still_fails() -> None:
+    result = parse_chemical_notation("5'-dApdtpdG-3'")
+    assert result.status == STATUS_UNSUPPORTED
+    assert result.base_string == ""

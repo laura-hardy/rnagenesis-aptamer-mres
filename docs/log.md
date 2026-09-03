@@ -4697,3 +4697,82 @@ No AptaIndex record is authorised for S4 yet.
 The pipeline is stopped awaiting Laura CHECKPOINT-1 review.
 ```
 
+## 2026-09-03 — AptaIndex parser syntax refinement (pre-review)
+
+**Stage:** Aim 2 / data curation / AptaIndex parser refinement, then
+S2 → S3 → CHECKPOINT-1 regeneration.
+Human CHECKPOINT-1 decisions were not applied. CHECKPOINT-1 is not
+closed. AptaIndex is not authorised for global S4. Global S4 was not
+run.
+
+### What was done
+
+The read-only CHECKPOINT-1 decision-support audit found that a subset
+of AptaIndex parser failures were source-wide deterministic syntax
+issues rather than record-specific scientific ambiguities. The
+source-specific chemical parser was extended only for narrowly defined,
+full-consumption syntax: uniform-family omitted-prefix inheritance,
+allowlisted 5′ phosphate decorations (`{5'/Phosphate}` and `P-`),
+allowlisted 5′ thiol-hexyl cap `SH-(CH2)6-`, and display hyphens that
+separate already-valid nucleotide tokens. Reverse orientation, trailing
+`i`, Nap-dU / `dN`, BNA, Hachimoji, gemcitabine, spacers, IUPAC
+residues, generic brace stripping, generic unprefixed strings, and
+case-folding of token bases were not added. No `manual_*` field was
+populated. No real AptaIndex sequence was edited by hand.
+
+S2, S3, and CHECKPOINT-1 were regenerated from the unchanged S1 input
+before any human review. The previous review package contained no
+human decisions and was safely superseded.
+
+### Parser coverage
+
+- S1/S2 rows 1050; missing 31; peptide 57; nonempty nucleic-acid 962
+- Successful complete nucleic-acid parses 936 (previously 923)
+- Unsupported/unparseable nucleic-acid rows 26 (previously 39)
+- Newly parsed records 13, all by the explicit new syntax classes
+- Inherited-prefix rows 10; terminal-phosphate decorations 2;
+  thiol-hexyl cap 1; display-separator rows 1
+
+### S3 reconciliation
+
+`1050` = `207` technically eligible RNA/2F-RNA + `603` parked ssDNA +
+`80` parked chemistry-review + `160` rejected.
+
+Rejections by primary reason: `length_out_of_range` 71;
+`non_nucleic_acid_molecule` 57; `missing_sequence` 31;
+`mixed_T_and_U` 1.
+
+### CHECKPOINT-1
+
+Local review package (gitignored under `data/`):
+
+- `data/interim/checkpoints/aptaindex_cp1/manual_review/aptaindex_checkpoint1_manual_review.csv`
+
+Active queue 206 (previously 213). Batches: judgement-dependent
+technical 81; constant-region proposal 3; length-boundary 92;
+random kept audit 30. Judgement-required 84; audit-only 122.
+Machine recommendations are populated. `manual_*` decision fields are
+blank. Apply was not run.
+
+Known-motif proposals remain 0187, 0276, and 0605, unapplied.
+
+### Integrity / determinism
+
+- Raw SHA-256 unchanged:
+  `912b8e554fa2bb2ed3a9e9bdf1cfbe4f757d8c7a00c401629e5bcb5e5c2877a8`
+- S1 extracted hash unchanged:
+  `b74f6cc852ab342a6a28eafdbe97ee51cf325d5419c67ac6456d560753530552`
+- S2/S3 canonical hash:
+  `4a41c90c102d5dc5b9d9e469c6b636014d27c428868d1b3230b8fb2b1c4412da`
+- `data/raw/` unchanged
+- Independent S2, S3, and CHECKPOINT-1 reruns: byte-identical artefacts
+
+### Pipeline stop
+
+```text
+CHECKPOINT-1 package regenerated.
+No human decisions applied.
+No AptaIndex record is authorised for S4 yet.
+The pipeline is stopped awaiting Laura CHECKPOINT-1 review.
+```
+

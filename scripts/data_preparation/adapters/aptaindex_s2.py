@@ -49,6 +49,8 @@ S2_QC_COLUMNS: Final[tuple[str, ...]] = (
     "source_type",
     "parser_status",
     "parser_reason_category",
+    "parser_syntax_events",
+    "inherited_token_prefix",
     "mapping_class",
     "token_family_summary",
     "has_l_prefix",
@@ -245,6 +247,8 @@ class AptaIndexS2Stats:
         "group-wise inference disabled for AptaIndex in this run"
     )
     known_motifs_scanned: tuple[str, ...] = ()
+    parser_syntax_event_counts: dict[str, int] = field(default_factory=dict)
+    inherited_prefix_rows: int = 0
 
 
 def _require_mapping(value: Any, name: str) -> Mapping[str, Any]:
@@ -757,6 +761,8 @@ def normalise_aptaindex_record(
         "source_type": source_type,
         "parser_status": parse.status,
         "parser_reason_category": parse.reason_category,
+        "parser_syntax_events": QC_DELIMITER.join(parse.syntax_events),
+        "inherited_token_prefix": parse.inherited_token_prefix,
         "mapping_class": molchem.mapping_class,
         "token_family_summary": parse.token_family_summary,
         "has_l_prefix": "true" if parse.has_l_prefix else "false",
@@ -824,6 +830,18 @@ def update_stats_from_row(stats: AptaIndexS2Stats, row: AptaIndexS2RowResult) ->
             stats.successful_parses += 1
         elif parser_status == STATUS_UNSUPPORTED:
             stats.unsupported_nucleic_parses += 1
+
+    syntax_events = [
+        part
+        for part in (qc.get("parser_syntax_events") or "").split(QC_DELIMITER)
+        if part
+    ]
+    for event in syntax_events:
+        stats.parser_syntax_event_counts[event] = (
+            stats.parser_syntax_event_counts.get(event, 0) + 1
+        )
+    if qc.get("inherited_token_prefix"):
+        stats.inherited_prefix_rows += 1
 
     if canonical["sequence_length_full"] == "":
         stats.nonempty_sequence_rows += 0

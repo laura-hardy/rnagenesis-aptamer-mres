@@ -604,7 +604,7 @@ def test_production_1050_reconciles_without_embedding_sequences(tmp_path: Path) 
     assert stats.peptide_molecule_count == 57
     assert stats.missing_sequence_count == 31
     assert stats.missing_target_rejected_count == 0
-    assert stats.multi_target_sequence_count == 36
+    assert stats.multi_target_sequence_count == 38
     assert stats.multi_target_raw_sequence_count == 24
     assert stats.multi_target_treated_as_conflict is False
     assert stats.known_motif_proposal_record_count == 3

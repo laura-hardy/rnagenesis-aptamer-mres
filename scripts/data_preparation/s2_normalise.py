@@ -2987,14 +2987,17 @@ def build_aptaindex_s2_report(
         "",
         "Full-consumption success requires that the entire source Sequence is",
         "accounted for by explicitly supported terminal, token, linkage,",
-        "optional terminal-phosphate, or token-separating whitespace syntax.",
-        "Unknown material fails closed. No partial nucleotide sequence is",
-        "emitted for failed parses.",
+        "optional terminal-phosphate, allowlisted 5′ phosphate/thiol",
+        "decoration, token-separating whitespace, uniform-family omitted",
+        "prefix inheritance, or display-hyphen separators. Unknown material",
+        "fails closed. No partial nucleotide sequence is emitted for failed",
+        "parses. Syntax events are formatting/tokenisation provenance, not",
+        "chemistry claims.",
         "",
         f"- Successful complete nucleic-acid parses: `{stats.successful_parses}`",
         f"- Unsupported/unparseable nucleic-acid rows: "
         f"`{stats.unsupported_nucleic_parses}`",
-        f"- Preflight experimental split (not an acceptance gate): `927` / `35`",
+        f"- Inherited-prefix rows: `{stats.inherited_prefix_rows}`",
         "",
         "### Parser status",
         "",
@@ -3004,6 +3007,13 @@ def build_aptaindex_s2_report(
     lines.extend(["", "### Parser reason category", ""])
     for name, count in _count_sorted(stats.parser_reason_counts):
         lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Parser syntax events", ""])
+    syntax_counts = stats.parser_syntax_event_counts
+    if syntax_counts:
+        for name, count in _count_sorted(syntax_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- none")
     lines.extend(
         [
             "",

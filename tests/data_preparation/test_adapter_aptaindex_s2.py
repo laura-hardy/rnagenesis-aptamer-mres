@@ -328,6 +328,43 @@ def test_mixed_t_and_u_retained_not_rejected() -> None:
     assert result.qc["parser_status"] == "success"
 
 
+def test_inherited_prefix_syntax_event_in_qc_not_a_chemistry_claim() -> None:
+    result = _normalise(
+        sequence_raw="5'-rAprUprGpUprC-3'",
+        aptaindex_type="RNA",
+    )
+    assert result.qc["parser_status"] == "success"
+    assert result.qc["inherited_token_prefix"] == "r"
+    assert "inherited_token_prefix" in result.qc["parser_syntax_events"]
+    assert result.canonical["sequence_raw"] == "5'-rAprUprGpUprC-3'"
+    assert result.canonical["sequence_full"] == "AUGUC"
+    assert result.canonical["molecule_type"] == "RNA"
+    assert result.canonical["chemistry"] == "RNA"
+    assert result.qc["mapping_class"] == "straightforward_rna"
+
+
+def test_terminal_phosphate_syntax_event_in_qc() -> None:
+    result = _normalise(
+        sequence_raw="5'-{5'/Phosphate}-rAprUprG-3'",
+        aptaindex_type="RNA",
+    )
+    assert result.qc["parser_status"] == "success"
+    assert "terminal_phosphate_stripped" in result.qc["parser_syntax_events"]
+    assert result.canonical["sequence_raw"] == "5'-{5'/Phosphate}-rAprUprG-3'"
+    assert result.canonical["sequence_full"] == "AUG"
+
+
+def test_thiol_cap_syntax_event_does_not_enter_nucleotide_sequence() -> None:
+    result = _normalise(
+        sequence_raw="5'-SH-(CH2)6-dApdTpdG-3'",
+        aptaindex_type="DNA",
+    )
+    assert result.qc["parser_status"] == "success"
+    assert "terminal_thiol_cap_stripped" in result.qc["parser_syntax_events"]
+    assert result.canonical["sequence_full"] == "ATG"
+    assert result.canonical["molecule_type"] == "ssDNA"
+
+
 def test_no_canonical_s4_fields_populated() -> None:
     result = _normalise()
     for field in S2_FORBIDDEN_FIELDS:
