@@ -640,6 +640,12 @@ def test_no_row_silently_disappears_from_closed_reasons() -> None:
     assert "non_nucleic_acid_molecule" in PLAN_REJECTION_REASONS
     assert "non_nucleic_acid_molecule" not in APTADB_PLAN_REJECTION
     assert "non_nucleic_acid_molecule" not in RIBO_PLAN_REJECTION
+    plan = (REPO_ROOT / "docs" / "data_curation" / "rna_aptamer_corpus_curation_plan.md")
+    plan_text = plan.read_text(encoding="utf-8")
+    vocab_start = plan_text.index("**Rejection reason vocabulary (closed set):**")
+    vocab_block = plan_text[vocab_start : vocab_start + 900]
+    assert "`non_nucleic_acid_molecule`" in vocab_block
+    assert "source-declared non-nucleic-acid aptamer/molecule record" in vocab_block
 
 
 def test_group_consensus_proposals_are_forbidden() -> None:

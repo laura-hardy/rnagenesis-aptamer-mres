@@ -4632,3 +4632,68 @@ No AptaIndex record is authorised for S4 yet.
 The pipeline is stopped awaiting Laura CHECKPOINT-1 review.
 ```
 
+## 2026-09-03 — AptaIndex S3 specification alignment (pre-review)
+
+**Stage:** Aim 2 / data curation / AptaIndex specification repair only.
+Human CHECKPOINT-1 decisions were not applied. Global S4 was not run.
+AptaIndex is not authorised for S4.
+
+### Closed rejection vocabulary
+
+`non_nucleic_acid_molecule` was added to the governing closed
+rejection-reason vocabulary in
+`docs/data_curation/rna_aptamer_corpus_curation_plan.md`. Meaning:
+source-declared non-nucleic-acid aptamer/molecule record, e.g. peptide
+aptamer. This does not change the DECIDED exclusion of peptide
+aptamers; it supplies the previously missing auditable reason.
+Implemented AptaIndex S3 already used this reason (57 `Type = Peptide`
+automatic rejects). Peptide *targets* on nucleotide aptamers remain
+unaffected. The untracked duplicate plan was not edited.
+
+### Multi-target counts (25 vs 24 vs 36)
+
+Three diagnostics count the same 1,050 records under different equality
+keys. None is record loss and none is an S2 parsing error.
+
+- Preflight **25**: nonempty source Sequence after whitespace stripping
+  and uppercasing; >1 distinct nonempty Target after stripping and
+  lowercasing.
+- S3 report **24**: exact nonempty raw `sequence_raw` / Sequence
+  strings; >1 Target as stored (empty Target counts as a distinct
+  value).
+- Post-S2 **36**: nonempty parsed `sequence_core`; >1 raw Target as
+  stored.
+
+24 vs 25 is a key-definition difference, not a dropped row: two
+exact-raw groups are multi-target only because of a blank Target or a
+case/whitespace-only Target difference (excluded by the preflight
+nonempty-lower rule), and three further groups become multi-target only
+after whitespace is stripped from Sequence. 24 − 2 + 3 = 25.
+
+24 vs 36 is parse collapse, not loss: 23 of the 24 exact-raw groups
+remain multi-target on `sequence_core`; one unsupported-notation pair
+has an empty core (parser failed closed; both records retained).
+Thirteen additional cores become multi-target because two distinct
+chemical-notation strings tokenise to the same nucleotide core with
+different targets. 23 + 13 = 36. Empty cores = 127 (31 missing + 57
+peptide + 39 unsupported). Raw = S2 = S3 = 1,050 unique records.
+
+### Random-kept audit population
+
+CHECKPOINT-1 batch 04 was already sampled from technically eligible
+RNA/modified-RNA records pending later S4 (`proposed_accept`,
+`technically_eligible_rna`, `primary_route=technically_eligible`,
+`molecule_type=RNA`, not already queued). Pool 154, sample 30 (seed 42):
+21 straightforward RNA + 9 straightforward 2′-F-RNA. It does not
+include parked ssDNA, chemistry-review parks, peptide rejects, or other
+automatic rejects. No resampling was performed.
+
+### Pipeline stop
+
+```text
+CHECKPOINT-1 package generated.
+No human decisions applied.
+No AptaIndex record is authorised for S4 yet.
+The pipeline is stopped awaiting Laura CHECKPOINT-1 review.
+```
+
