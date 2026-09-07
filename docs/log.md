@@ -4832,3 +4832,149 @@ CHECKPOINT-1 is not closed.
 S4 remains blocked.
 ```
 
+## 2026-09-07 — AptaIndex CHECKPOINT-1 review applied
+
+**Stage:** Aim 2 / data curation / AptaIndex S1–S3 + CHECKPOINT-1 closed.
+Target normalisation was not performed. Target-type routing was not
+performed. Evidence scoring was not performed. Affinity normalisation
+was not performed. Leakage exclusion was not performed. Global S4 was
+not run.
+
+### What was done
+
+AptaIndex was previously registered and extracted verbatim at S1.
+Chemical notation was parsed deterministically at S2. Parser refinements
+were completed before human review. S3 assigned technical eligibility
+and local parking. Laura completed structured CHECKPOINT-1 review of
+all 206 queued records, including literature-supported resolution of
+chemistry/sequence ambiguities and audit-only confirmation of the
+remaining keep-current-route rows.
+
+The locked review package was re-validated fail-closed
+(`unresolved_manual_decisions=0`, `audit_only_unconfirmed=0`,
+`blocking_issues=0`, `ready_for_application=206`). A final production
+dry-run was GO. Actual CHECKPOINT-1 apply was then run once through the
+shared dispatcher, using the same `apply_reviewed_record` transformation
+already exercised by the dry-run. Applied outputs were byte-identical to
+the locked dry-run preview (0 semantic mismatches). Pre-review S2/S3
+snapshots were not overwritten. Tracked sequence-free resolutions and
+checkpoint metadata were written. A future global-S4 handoff config was
+added following the RiboAptamer/AptaBase/UTexas closure convention.
+Global S4 itself was not run.
+
+`0754` is a faithful 19-nt RNA / 2F-RNA aptamer. The governing corpus
+length range remains 20–100 nt, so it stays `length_out_of_range`. No
+special length exception was introduced.
+
+### Methods
+
+- source registered and S1 extracted verbatim
+- chemical notation parsed deterministically at S2
+- parser refinements completed before human review
+- S3 technical eligibility/routing
+- structured CHECKPOINT-1 review
+- literature-supported resolution of chemistry/sequence ambiguities
+- audit-only confirmation
+- apply dry-run
+- actual apply
+- dry-run/apply parity
+
+### Decisions and reasoning
+
+- Keep (142): pre-review technical route preserved.
+- Drop (22): excluded through the established `manual_reject` route.
+- Edit (42): reclassified from the resolved nucleotide/molecule/chemistry
+  state under current S3 policy. Ordinary RNA edits are technically
+  eligible. 2F-RNA edits are technically eligible unless length fails.
+  2NH2-RNA, 2OMe-RNA, and mixed remain chemistry-review. ssDNA parks.
+- Trim reject on 0187 and 0605: no additional machine 17-nt trim.
+  Final lengths remain 51 nt (2F-RNA, eligible) and 58 nt (RNA,
+  eligible).
+- Corrected orientation DNA (0412, 0518, 0519) and plain/inverted-dT
+  DNA (0492, 0753, 0960) park as ssDNA. No reverse-complement and no
+  T→U were applied to those DNA corrections.
+- Human molecule/chemistry overrides supersede stale S2 mapping/source
+  classes. AptaIndex `sequence_raw` remains chemical notation and is
+  never passed to generic nucleotide normalisation.
+
+### Inputs
+
+- Completed review:
+  `data/interim/checkpoints/aptaindex_cp1/manual_review/aptaindex_checkpoint1_manual_review.csv`
+- Review SHA-256:
+  `843946d525a1bb269e9d5c399db30faa6a5b626beef8470eb6469e1529fc02fd`
+- Bulk-confirmation SHA-256:
+  `df65efea68aa787c51a19e90af29f07d19a63f6d8c6e16c6e85c154302a87457`
+- Raw SHA-256:
+  `912b8e554fa2bb2ed3a9e9bdf1cfbe4f757d8c7a00c401629e5bcb5e5c2877a8`
+- S1 SHA-256:
+  `b74f6cc852ab342a6a28eafdbe97ee51cf325d5419c67ac6456d560753530552`
+- Pre-review S2/S3 canonical SHA-256:
+  `4a41c90c102d5dc5b9d9e469c6b636014d27c428868d1b3230b8fb2b1c4412da`
+
+### Outputs
+
+Tracked:
+
+- `config/checkpoint_reviews/aptaindex_checkpoint1_resolutions.csv`
+- `config/checkpoint_reviews/aptaindex_checkpoint1_metadata.json`
+- `config/global_s4_sources/aptaindex.json`
+
+Ignored under `data/`:
+
+- `data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_canonical.csv`
+- `data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_routing.csv`
+- `data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_eligible.csv`
+- `data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_parked_ssdna.csv`
+- `data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_parked_chemistry.csv`
+- `data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_rejection.csv`
+- `data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_s4_authorised_ids.csv`
+- `data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_resolution_summary.md`
+
+### Numbers
+
+Source funnel after apply:
+
+- Total: 1050
+- Technically eligible (authorised for later global S4): 221
+- Parked ssDNA: 614
+- Chemistry-review/local park: 33
+- Technical reject: 182
+
+`221 + 614 + 33 + 182 = 1050`
+
+Human decisions: 42 edit / 22 drop / 142 keep. Reviewed-206 post-state:
+91 eligible, 59 parked ssDNA, 33 chemistry-review, 23 technical reject
+(includes 22 manual rejects). Edit routes: 16 eligible, 12 ssDNA, 13
+chemistry-review, 1 technical reject (`0754` length). Unresolved
+decisions: 0. Blocking issues: 0. Dry-run/apply mismatches: 0.
+Deterministic verification: pass. S4-forbidden fields remain empty.
+
+`authorised_for_s4=true` on a record means RNA/2F-RNA technical
+eligibility after AptaIndex CHECKPOINT-1. Source-level closure means
+this source may proceed to later global-S4 preparation under those
+routing rules. It does not authorise parked ssDNA, chemistry-review
+parks, or rejects, and it does not mean target canonicalisation,
+evidence, affinity, or leakage work has been done.
+
+### Boundary
+
+- Target normalisation deferred
+- Target-type routing deferred
+- Evidence scoring deferred
+- Affinity normalisation deferred
+- Leakage deferred
+- The 25/38 multi-target phenomena remain untouched
+- Global S4 not run
+
+### Pipeline status
+
+```text
+AptaIndex S0 complete
+AptaIndex S1 complete
+AptaIndex S2 complete
+AptaIndex S3 complete
+AptaIndex CHECKPOINT-1 closed
+AptaIndex prepared for later global S4 (not run)
+```
+

@@ -1,0 +1,73 @@
+{
+  "source_key": "aptaindex",
+  "handoff_status": "ready_for_global_s4",
+  "authoritative_stage": "CHECKPOINT-1",
+  "checkpoint_status": "closed",
+  "canonical_input": "data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_canonical.csv",
+  "resolution_manifest": "config/checkpoint_reviews/aptaindex_checkpoint1_resolutions.csv",
+  "authorised_ids_input": "data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_s4_authorised_ids.csv",
+  "authorisation_field": "authorised_for_s4",
+  "expected_authorised_records": 221,
+  "global_s4_handoff_output": "data/interim/global_s4_ready/aptaindex_global_s4_input.csv",
+  "global_s4_handoff_summary": "data/interim/global_s4_ready/aptaindex_global_s4_handoff_summary.md",
+  "handoff_ready_statement": "AptaIndex CHECKPOINT-1 is closed and this source may proceed to the later global-S4 preparation stage under its routing rules. authorised_for_s4 marks technically eligible RNA/2F-RNA records only. Parked ssDNA, chemistry-review parks, and rejects are not included. Target identity must be extracted from descriptive source metadata. Target Type is a source target-class prior and must be checked against the resolved target rather than treated as canonical truth. Affinity text supports E2 where parseable. Protein/non-protein routing happens only after target resolution. Leakage exclusion happens globally at S4.",
+  "emit_target_evidence_boundary": true,
+  "handoff_extra_fields": [
+    "aptaindex_title",
+    "aptaindex_type",
+    "aptaindex_target",
+    "aptaindex_target_type",
+    "aptaindex_affinity_type",
+    "aptaindex_affinity",
+    "aptaindex_affinity_units",
+    "aptaindex_reference",
+    "aptaindex_comments",
+    "aptaindex_binding_conditions",
+    "aptaindex_refolding_protocol",
+    "aptaindex_temp"
+  ],
+  "authorised_for_s4_meaning": "Technically eligible after AptaIndex sequence/molecule CHECKPOINT-1 and eligible to enter the future corpus-wide target-normalisation stage. Does not mean every AptaIndex record is included in S4, nor protein target confirmed, target canonicalised, UniProt resolved, evidence threshold passed, leakage check passed globally, globally deduplicated, balanced, or CHECKPOINT-2 approved. Source Type and Target Type are priors only.",
+  "target_metadata": {
+    "canonical_raw_field": "target_name_raw",
+    "source_specific_field": "aptaindex_target",
+    "source_general_field": "aptaindex_target_type",
+    "source_general_is_categorical": true,
+    "source_type_prior_field": "aptaindex_target_type",
+    "specific_target_present_in_authorised_records": 221,
+    "specific_target_missing_in_authorised_records": 0,
+    "source_metadata_path": "data/interim/extracted/aptaindex_source_metadata.csv",
+    "uniprot_source_columns_present": false,
+    "pdb_source_columns_present": false,
+    "pfam_source_columns_present": false,
+    "family_source_columns_present": false,
+    "affinity_text_field": "aptaindex_affinity"
+  },
+  "provisional_source_observations": {
+    "Protein": 129,
+    "Small Organic": 67,
+    "Cells": 12,
+    "Other": 8,
+    "Peptide": 4,
+    "Tissue": 1
+  },
+  "s4_semantics": {
+    "target_identity_from_descriptive_source_metadata": true,
+    "category_is_prior_only": true,
+    "source_type_is_target_class_prior": true,
+    "source_type_must_be_checked_against_resolved_target": true,
+    "target_type_disagreements_belong_at_checkpoint2": true,
+    "affinity_text_supports_e2_where_parseable": true,
+    "protein_non_protein_routing_after_target_resolution": true,
+    "leakage_exclusion_global_at_s4": true,
+    "canonical_s4_fields_populated_here": false
+  },
+  "global_s4_rules": {
+    "final_target_normalisation_performed_here": false,
+    "final_target_type_assignment_performed_here": false,
+    "uniprot_resolution_performed_here": false,
+    "target_family_assignment_performed_here": false,
+    "evidence_threshold_performed_here": false,
+    "global_leakage_application_performed_here": false,
+    "checkpoint2_emitted_here": false
+  }
+}

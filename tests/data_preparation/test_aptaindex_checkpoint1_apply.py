@@ -272,13 +272,23 @@ def test_dispatcher_recognises_aptaindex_dry_run(tmp_path: Path) -> None:
     assert "Missing dry-run input" in message or "does not exist" in message
 
 
-def test_dispatcher_refuses_actual_apply_without_dry_run() -> None:
+def test_dispatcher_actual_apply_without_inputs_fails_closed(tmp_path: Path) -> None:
     stdout = io.StringIO()
     stderr = io.StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):
-        code = main(["--source", "aptaindex"])
+        code = main(
+            [
+                "--source",
+                "aptaindex",
+                "--repo-root",
+                str(tmp_path),
+            ]
+        )
     assert code == 1
-    assert "pass --dry-run" in stderr.getvalue()
+    message = stderr.getvalue()
+    assert "pass --dry-run" not in message
+    assert "not authorised" not in message
+    assert "Missing apply input" in message or "does not exist" in message
 
 
 def test_dry_run_accepts_fully_resolved_review() -> None:
@@ -1034,3 +1044,421 @@ def test_unresolved_edit_fails_closed() -> None:
     canonical = _canonical(native_id="2023")
     with pytest.raises(AptaIndexCheckpoint1ReviewError):
         _apply(canonical, _review(canonical, decision=""))
+
+
+def _install_mini_aptaindex(
+    tmp_path: Path,
+    *,
+    canonical_rows: list[dict[str, str]],
+    decision_rows: list[dict[str, str]],
+    queue_rows: list[dict[str, str]],
+    qc_rows: list[dict[str, str]] | None = None,
+    meta_rows: list[dict[str, str]] | None = None,
+    rejection_rows: list[dict[str, str]] | None = None,
+) -> Path:
+    import shutil
+
+    from adapters.aptadb_checkpoint1_review import (
+        BULK_CONFIRMATION_COLUMNS,
+        GROUP_REVIEW_COLUMNS,
+    )
+    from adapters.aptaindex_s2 import S2_QC_COLUMNS
+    from adapters.aptaindex_s3 import DECISION_COLUMNS, PARK_COLUMNS, REJECTION_COLUMNS
+    from checkpoint1_prepare_review import write_csv_atomic
+    from common.corpus_schema import CORPUS_COLUMNS, write_corpus_csv_atomic
+
+    checkpoint = tmp_path / "data" / "interim" / "checkpoints" / "aptaindex_cp1"
+    review_dir = checkpoint / "manual_review"
+    normalised = tmp_path / "data" / "interim" / "normalised"
+    extracted = tmp_path / "data" / "interim" / "extracted"
+    config_elig = tmp_path / "config" / "source_eligibility"
+    config_rev = tmp_path / "config" / "checkpoint_reviews"
+    for path in (review_dir, normalised, extracted, config_elig, config_rev):
+        path.mkdir(parents=True, exist_ok=True)
+    shutil.copy(
+        REPO_ROOT / "config" / "source_eligibility" / "aptaindex.json",
+        config_elig / "aptaindex.json",
+    )
+    (config_rev / "aptaindex_checkpoint1_recommendations.json").write_text(
+        '{"source_key":"aptaindex","records":{},"groups":{}}\n',
+        encoding="utf-8",
+    )
+    write_corpus_csv_atomic(
+        checkpoint / "aptaindex_s3_canonical.csv",
+        canonical_rows,
+        columns=CORPUS_COLUMNS,
+        quoting=__import__("csv").QUOTE_ALL,
+    )
+    write_corpus_csv_atomic(
+        normalised / "aptaindex_normalised.csv",
+        canonical_rows,
+        columns=CORPUS_COLUMNS,
+        quoting=__import__("csv").QUOTE_ALL,
+    )
+    write_csv_atomic(
+        checkpoint / "aptaindex_s3_decisions.csv",
+        DECISION_COLUMNS,
+        decision_rows,
+        quoting=__import__("csv").QUOTE_ALL,
+    )
+    write_csv_atomic(
+        checkpoint / "rejected_aptaindex.csv",
+        REJECTION_COLUMNS,
+        rejection_rows or [],
+        quoting=__import__("csv").QUOTE_ALL,
+    )
+    write_csv_atomic(
+        checkpoint / "aptaindex_s3_parked_ssdna.csv",
+        PARK_COLUMNS,
+        [],
+        quoting=__import__("csv").QUOTE_ALL,
+    )
+    write_csv_atomic(
+        checkpoint / "aptaindex_s3_parks.csv",
+        PARK_COLUMNS,
+        [],
+        quoting=__import__("csv").QUOTE_ALL,
+    )
+    write_csv_atomic(
+        review_dir / "aptaindex_checkpoint1_manual_review.csv",
+        list(queue_rows[0].keys()),
+        queue_rows,
+        quoting=__import__("csv").QUOTE_ALL,
+    )
+    write_csv_atomic(
+        review_dir / "aptaindex_checkpoint1_constant_group_review.csv",
+        GROUP_REVIEW_COLUMNS,
+        [],
+        quoting=__import__("csv").QUOTE_ALL,
+    )
+    write_csv_atomic(
+        review_dir / "aptaindex_checkpoint1_bulk_audit_confirmation.csv",
+        BULK_CONFIRMATION_COLUMNS,
+        [],
+        quoting=__import__("csv").QUOTE_ALL,
+    )
+    qc_rows = qc_rows or [_qc(row) for row in canonical_rows]
+    write_csv_atomic(
+        normalised / "aptaindex_s2_qc.csv",
+        S2_QC_COLUMNS,
+        qc_rows,
+        quoting=__import__("csv").QUOTE_ALL,
+    )
+    meta_rows = meta_rows or [_meta(row) for row in canonical_rows]
+    write_csv_atomic(
+        extracted / "aptaindex_source_metadata.csv",
+        list(meta_rows[0].keys()),
+        meta_rows,
+        quoting=__import__("csv").QUOTE_ALL,
+    )
+    return checkpoint
+
+
+def test_apply_refuses_unresolved_review(tmp_path: Path) -> None:
+    from checkpoint1_apply_review import (
+        Checkpoint1ApplyError,
+        run_aptaindex_checkpoint1_apply,
+    )
+
+    canonical = _canonical(native_id="3001")
+    queue = [_review(canonical, decision="")]
+    checkpoint = _install_mini_aptaindex(
+        tmp_path,
+        canonical_rows=[canonical],
+        decision_rows=[
+            _decision_row(
+                canonical, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna"
+            )
+        ],
+        queue_rows=queue,
+    )
+    with pytest.raises(Checkpoint1ApplyError, match="unresolved|not ready"):
+        run_aptaindex_checkpoint1_apply(
+            repo_root=tmp_path,
+            checkpoint_dir=checkpoint,
+            output_dir=checkpoint / "resolved",
+            tracked_manifest=(
+                tmp_path / "config" / "checkpoint_reviews" / "resolutions.csv"
+            ),
+            metadata_out=tmp_path / "config" / "checkpoint_reviews" / "metadata.json",
+            check_deterministic_rerun=False,
+            expected_source_rows=1,
+            verify_production_hashes=False,
+            compare_to_preview=False,
+        )
+
+
+def test_apply_consumes_locked_review_hash(tmp_path: Path) -> None:
+    from checkpoint1_apply_review import (
+        Checkpoint1ApplyError,
+        run_aptaindex_checkpoint1_apply,
+    )
+
+    canonical = _canonical(native_id="3002")
+    checkpoint = _install_mini_aptaindex(
+        tmp_path,
+        canonical_rows=[canonical],
+        decision_rows=[
+            _decision_row(
+                canonical, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna"
+            )
+        ],
+        queue_rows=[_review(canonical, decision="keep")],
+    )
+    with pytest.raises(Checkpoint1ApplyError, match="locked human review"):
+        run_aptaindex_checkpoint1_apply(
+            repo_root=tmp_path,
+            checkpoint_dir=checkpoint,
+            output_dir=checkpoint / "resolved",
+            tracked_manifest=(
+                tmp_path / "config" / "checkpoint_reviews" / "resolutions.csv"
+            ),
+            metadata_out=tmp_path / "config" / "checkpoint_reviews" / "metadata.json",
+            check_deterministic_rerun=False,
+            expected_source_rows=1,
+            verify_production_hashes=True,
+            compare_to_preview=False,
+        )
+
+
+def test_aptaindex_live_apply_matches_dry_run_and_closes(tmp_path: Path) -> None:
+    import hashlib
+    import json
+
+    from adapters.aptaindex_checkpoint1_apply import (
+        APTAINDEX_TRACKED_RESOLUTION_COLUMNS,
+        TRACKED_SEQUENCE_COLUMN_FRAGMENTS,
+    )
+    from checkpoint1_apply_review import (
+        run_aptaindex_checkpoint1_apply,
+        run_aptaindex_checkpoint1_dry_run,
+    )
+    from common.corpus_schema import S3_FORBIDDEN_FIELDS
+
+    eligible = _canonical(native_id="0610", sequence=_rna(76))
+    dna = _canonical(
+        native_id="0412",
+        sequence="",
+        molecule_type="unknown",
+        chemistry="unknown",
+        sequence_full="",
+        sequence_core="",
+        sequence_length_full="",
+        sequence_length_core="",
+        qc_flags="unsupported_notation|molecule_type_unknown",
+    )
+    short_2f = _canonical(
+        native_id="0754",
+        sequence="",
+        molecule_type="unknown",
+        chemistry="unknown",
+        sequence_full="",
+        sequence_core="",
+        sequence_length_full="",
+        sequence_length_core="",
+        qc_flags="unsupported_notation|molecule_type_unknown",
+    )
+    mature = _canonical(
+        native_id="0187",
+        sequence=_rna(68),
+        qc_flags="known_promoter_detected|trim_requires_review",
+    )
+    rna_58 = _canonical(
+        native_id="0605",
+        sequence=_rna(75),
+        qc_flags="known_promoter_detected|trim_requires_review",
+    )
+    rows = [eligible, dna, short_2f, mature, rna_58]
+    queue = [
+        _review(eligible, decision="keep"),
+        _review(
+            dna,
+            decision="edit",
+            route=PRIMARY_ROUTE_CHEMISTRY_REVIEW,
+            reason="unsupported_chemical_notation",
+            proposed="proposed_park",
+            manual_sequence_corrected=_dna(40),
+            aptaindex_type="DNA",
+        ),
+        _review(
+            short_2f,
+            decision="edit",
+            route=PRIMARY_ROUTE_CHEMISTRY_REVIEW,
+            reason="unsupported_chemical_notation",
+            proposed="proposed_park",
+            manual_sequence_corrected=_rna(19),
+            manual_molecule_type_override="RNA",
+            manual_chemistry_override="2F-RNA",
+        ),
+        _review(
+            mature,
+            decision="edit",
+            manual_sequence_corrected=_rna(51),
+            manual_molecule_type_override="RNA",
+            manual_chemistry_override="2F-RNA",
+            manual_trim_action="reject",
+            constant_proposal_sources="known_motif",
+            constant_proposal_sides="five_prime",
+            constant_proposed_trim_length="17",
+        ),
+        _review(
+            rna_58,
+            decision="edit",
+            manual_sequence_corrected=_rna(58),
+            manual_molecule_type_override="RNA",
+            manual_chemistry_override="RNA",
+            manual_trim_action="reject",
+            constant_proposal_sources="known_motif",
+            constant_proposal_sides="five_prime",
+            constant_proposed_trim_length="17",
+        ),
+    ]
+    decisions = [
+        _decision_row(
+            eligible, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna"
+        ),
+        _decision_row(
+            dna, route=PRIMARY_ROUTE_CHEMISTRY_REVIEW, reason="unsupported_chemical_notation"
+        ),
+        _decision_row(
+            short_2f,
+            route=PRIMARY_ROUTE_CHEMISTRY_REVIEW,
+            reason="unsupported_chemical_notation",
+        ),
+        _decision_row(
+            mature, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna"
+        ),
+        _decision_row(
+            rna_58, route=PRIMARY_ROUTE_ELIGIBLE, reason="technically_eligible_rna"
+        ),
+    ]
+    qc_rows = [
+        _qc(eligible),
+        _qc(
+            dna,
+            mapping_class="unsupported_notation",
+            parser_status="unsupported",
+            source_type="DNA",
+        ),
+        _qc(
+            short_2f,
+            mapping_class="unsupported_notation",
+            parser_status="unsupported",
+        ),
+        _qc(mature),
+        _qc(rna_58),
+    ]
+    meta_rows = [
+        _meta(eligible),
+        _meta(dna, aptaindex_type="DNA"),
+        _meta(short_2f),
+        _meta(mature),
+        _meta(rna_58),
+    ]
+    checkpoint = _install_mini_aptaindex(
+        tmp_path,
+        canonical_rows=rows,
+        decision_rows=decisions,
+        queue_rows=queue,
+        qc_rows=qc_rows,
+        meta_rows=meta_rows,
+    )
+    preview_dir = checkpoint / "dry_run"
+    run_aptaindex_checkpoint1_dry_run(
+        repo_root=tmp_path,
+        checkpoint_dir=checkpoint,
+        output_dir=preview_dir,
+        check_deterministic_rerun=True,
+        expected_source_rows=5,
+        verify_production_hashes=False,
+    )
+    preview_canonical = preview_dir / "aptaindex_checkpoint1_dry_run_canonical_preview.csv"
+    preview_hash = hashlib.sha256(preview_canonical.read_bytes()).hexdigest()
+    s3_hash = hashlib.sha256(
+        (checkpoint / "aptaindex_s3_canonical.csv").read_bytes()
+    ).hexdigest()
+
+    result = run_aptaindex_checkpoint1_apply(
+        repo_root=tmp_path,
+        checkpoint_dir=checkpoint,
+        output_dir=checkpoint / "resolved",
+        tracked_manifest=(
+            tmp_path / "config" / "checkpoint_reviews" / "aptaindex_checkpoint1_resolutions.csv"
+        ),
+        metadata_out=(
+            tmp_path / "config" / "checkpoint_reviews" / "aptaindex_checkpoint1_metadata.json"
+        ),
+        preview_dir=preview_dir,
+        check_deterministic_rerun=True,
+        expected_source_rows=5,
+        verify_production_hashes=False,
+        compare_to_preview=True,
+    )
+    applied_canonical = (
+        checkpoint / "resolved" / "aptaindex_checkpoint1_applied_canonical.csv"
+    )
+    assert result.checkpoint_closed is True
+    assert result.preview_comparison_ok is True
+    assert result.deterministic_rerun_ok is True
+    assert result.semantic_mismatches == 0
+    assert applied_canonical.read_bytes() == preview_canonical.read_bytes()
+    assert hashlib.sha256(preview_canonical.read_bytes()).hexdigest() == preview_hash
+    assert (
+        hashlib.sha256((checkpoint / "aptaindex_s3_canonical.csv").read_bytes()).hexdigest()
+        == s3_hash
+    )
+
+    import csv as csv_mod
+
+    with applied_canonical.open(newline="") as handle:
+        applied_rows = {row["native_id"]: row for row in csv_mod.DictReader(handle)}
+    assert applied_rows["0412"]["sequence_length_core"] == "40"
+    assert applied_rows["0412"]["molecule_type"] == "ssDNA"
+    assert applied_rows["0412"]["chemistry"] == "DNA"
+    assert applied_rows["0754"]["sequence_length_core"] == "19"
+    assert applied_rows["0754"]["molecule_type"] == "RNA"
+    assert applied_rows["0754"]["chemistry"] == "2F-RNA"
+    assert applied_rows["0187"]["sequence_length_core"] == "51"
+    assert applied_rows["0605"]["sequence_length_core"] == "58"
+    for row in applied_rows.values():
+        for field_name in S3_FORBIDDEN_FIELDS:
+            assert row.get(field_name, "") == ""
+
+    with (checkpoint / "resolved" / "aptaindex_checkpoint1_applied_routing.csv").open(
+        newline=""
+    ) as handle:
+        routes = {row["native_id"]: row for row in csv_mod.DictReader(handle)}
+    assert routes["0412"]["primary_route"] == PRIMARY_ROUTE_SSDNA
+    assert routes["0754"]["primary_route"] == PRIMARY_ROUTE_REJECT
+    assert routes["0754"]["primary_reason"] == "length_out_of_range"
+    assert routes["0187"]["primary_route"] == PRIMARY_ROUTE_ELIGIBLE
+    assert routes["0605"]["primary_route"] == PRIMARY_ROUTE_ELIGIBLE
+    assert routes["0610"]["primary_route"] == PRIMARY_ROUTE_ELIGIBLE
+
+    resolutions_path = (
+        tmp_path / "config" / "checkpoint_reviews" / "aptaindex_checkpoint1_resolutions.csv"
+    )
+    metadata_path = (
+        tmp_path / "config" / "checkpoint_reviews" / "aptaindex_checkpoint1_metadata.json"
+    )
+    with resolutions_path.open(newline="") as handle:
+        resolution_rows = list(csv_mod.DictReader(handle))
+    assert list(resolution_rows[0].keys()) == list(APTAINDEX_TRACKED_RESOLUTION_COLUMNS)
+    joined = " ".join(resolution_rows[0].keys())
+    for fragment in TRACKED_SEQUENCE_COLUMN_FRAGMENTS:
+        assert fragment not in joined
+    for row in resolution_rows:
+        for value in row.values():
+            assert "ACGU" not in value
+            assert "ACGT" not in value
+            assert CHEMICAL_RAW not in value
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["checkpoint_closed"] is True
+    assert metadata["s4_started"] is False
+    assert metadata["source_key"] == "aptaindex"
+    assert metadata["application_mode"] == "apply"
+    assert metadata["preview_comparison_ok"] is True
+    metadata_text = json.dumps(metadata)
+    assert CHEMICAL_RAW not in metadata_text
+    assert "sequence_raw" not in metadata
+    assert "sequence_full" not in metadata
