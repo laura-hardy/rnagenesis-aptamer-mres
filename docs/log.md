@@ -4776,3 +4776,59 @@ No AptaIndex record is authorised for S4 yet.
 The pipeline is stopped awaiting Laura CHECKPOINT-1 review.
 ```
 
+## 2026-09-07 — AptaIndex CHECKPOINT-1 apply adapter and dry-run (unapplied)
+
+Human CHECKPOINT-1 review is complete: 206/206 resolved decisions
+(42 edit / 22 drop / 142 keep; judgement 84; audit-only 122
+`keep_current_route`). The fail-closed validator reports
+`ready_for_application=206` and zero blockers.
+
+An AptaIndex-specific CHECKPOINT-1 apply/dry-run adapter was added to
+the shared dispatcher. AptaIndex `sequence_raw` remains chemical
+notation and is never passed to generic nucleotide normalisation. Keep
+preserves the pre-review S3 route. Drop uses shared `manual_reject`.
+Edit reclassifies from the resolved human molecule/chemistry/sequence
+state, including trim `reject` (no additional machine trim). Actual
+apply is refused without `--dry-run`.
+
+A production dry-run was run twice against the locked review
+(`f8012c241972159d70e46b2727921da3c7694bb9abde267dc05eade781824a77`)
+and was byte-identical. Sequence-free local report:
+
+`data/interim/checkpoints/aptaindex_cp1/dry_run/aptaindex_checkpoint1_dry_run_report.md`
+
+SHA-256:
+`2ba6f16549f950e896a2c724b5b29f8e620488a9f38079d621a2c5fec50f7469`
+
+Projected post-review 1050-row reconciliation:
+
+`221` technically eligible + `611` parked ssDNA + `33` chemistry-review
++ `185` technical rejects (`22` manual + `4` after edit + `159`
+remaining automatic) = `1050`.
+
+All 142 keeps preserved route. All 22 drops became `manual_reject`.
+Edits (42): 16 eligible, 9 ssDNA park, 13 chemistry-review, 4 technical
+reject. 0187 remained 51 nt 2F-RNA with no second trim. 0605 became
+58 nt RNA with no second trim. 0754 is a faithful 19-nt 2F-RNA and
+routes as `length_out_of_range` under the current 20–100 rule. 0412,
+0518, and 0519 received DNA identity; they did not park as ssDNA
+because the corrected strings are not technically valid plain
+nucleotides (and exceed 100 nt). `t_to_u_applied` records only whether
+this apply step's nucleotide normaliser converted T→U. S4 fields were
+not populated. Sequence corrections remain restricted/local.
+
+Actual CHECKPOINT apply was **not** performed. No tracked resolutions
+or closure metadata were written. CHECKPOINT-1 is not closed.
+AptaIndex is not authorised for global S4. Global S4 was not run.
+Raw / S1 / S2 / S3 hashes were unchanged.
+
+### Pipeline stop
+
+```text
+CHECKPOINT-1 human review is complete.
+AptaIndex apply/dry-run adapter implemented.
+Dry-run complete. Actual apply was not run.
+CHECKPOINT-1 is not closed.
+S4 remains blocked.
+```
+

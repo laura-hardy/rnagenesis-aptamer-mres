@@ -1051,6 +1051,7 @@ def test_unknown_source_fails() -> None:
         code = main(["--source", "ena"])
     assert code == 1
     assert "Unsupported source_key" in stderr.getvalue()
+    assert "aptaindex" in stderr.getvalue()
 
 
 def test_input_files_remain_byte_identical(tmp_path: Path) -> None:
