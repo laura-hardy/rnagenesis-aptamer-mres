@@ -14,6 +14,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+from adapters.ena_checkpoint1_review import (  # noqa: E402
+    EnaCheckpoint1ReviewError,
+    read_csv_rows as read_ena_csv_rows,
+    validate_ena_review_package,
+)
 from adapters.aptadb_checkpoint1_review import (  # noqa: E402
     AptaDBCheckpoint1ReviewError,
     read_csv_rows,
@@ -21,7 +26,7 @@ from adapters.aptadb_checkpoint1_review import (  # noqa: E402
 )
 from s0_build_registry import find_repo_root  # noqa: E402
 
-SUPPORTED_SOURCES = ("aptadb", "riboaptamer", "aptaindex")
+SUPPORTED_SOURCES = ("aptadb", "riboaptamer", "aptaindex", "ena")
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -31,7 +36,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptadb, riboaptamer, or aptaindex)",
+        help="Source key (aptadb, riboaptamer, aptaindex, or ena)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -63,6 +68,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.repo_root is not None
         else find_repo_root(Path(__file__).resolve())
     )
+    exception_name = ""
+    reconciliation_name = ""
     if args.source == "riboaptamer":
         default_checkpoint = Path("data/interim/checkpoints/riboaptamer_cp1")
         queue_name = "riboaptamer_checkpoint1_manual_review.csv"
@@ -73,6 +80,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         queue_name = "aptaindex_checkpoint1_manual_review.csv"
         group_name = "aptaindex_checkpoint1_constant_group_review.csv"
         bulk_name = "aptaindex_checkpoint1_bulk_audit_confirmation.csv"
+    elif args.source == "ena":
+        default_checkpoint = Path("data/interim/checkpoints/ena_cp1")
+        queue_name = "ena_checkpoint1_manual_review.csv"
+        group_name = "ena_checkpoint1_constant_rule_review.csv"
+        bulk_name = "ena_checkpoint1_bulk_audit_confirmation.csv"
+        exception_name = "ena_checkpoint1_constant_exceptions.csv"
+        reconciliation_name = "ena_checkpoint1_legacy_collapse_reconciliation.csv"
     else:
         default_checkpoint = Path("data/interim/checkpoints/aptadb_cp1")
         queue_name = "aptadb_checkpoint1_manual_review.csv"
@@ -94,26 +108,49 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise AptaDBCheckpoint1ReviewError(
                 "Missing record-level review CSV; prepare CHECKPOINT-1 first"
             )
-        if args.source == "riboaptamer":
-            from adapters.riboaptamer_checkpoint1_review import (
-                normalise_riboaptamer_review_rows,
-                read_riboaptamer_review_csv,
+        if args.source == "ena":
+            queue_rows = read_ena_csv_rows(queue_path)
+            group_rows = read_ena_csv_rows(group_path) if group_path.is_file() else []
+            bulk_rows = read_ena_csv_rows(bulk_path) if bulk_path.is_file() else []
+            exception_path = review_dir / exception_name
+            reconciliation_path = review_dir / reconciliation_name
+            exception_rows = (
+                read_ena_csv_rows(exception_path) if exception_path.is_file() else []
             )
-
-            queue_rows = normalise_riboaptamer_review_rows(
-                read_riboaptamer_review_csv(queue_path)
+            reconciliation_rows = (
+                read_ena_csv_rows(reconciliation_path)
+                if reconciliation_path.is_file()
+                else []
+            )
+            bulk = bulk_rows[0] if bulk_rows else None
+            report = validate_ena_review_package(
+                queue_rows=queue_rows,
+                rule_rows=group_rows,
+                exception_rows=exception_rows,
+                reconciliation_rows=reconciliation_rows,
+                bulk_confirmation=bulk,
             )
         else:
-            queue_rows = read_csv_rows(queue_path)
-        group_rows = read_csv_rows(group_path) if group_path.is_file() else []
-        bulk_rows = read_csv_rows(bulk_path) if bulk_path.is_file() else []
-        bulk = bulk_rows[0] if bulk_rows else None
-        report = validate_review_package(
-            queue_rows=queue_rows,
-            group_rows=group_rows,
-            bulk_confirmation=bulk,
-        )
-    except AptaDBCheckpoint1ReviewError as exc:
+            if args.source == "riboaptamer":
+                from adapters.riboaptamer_checkpoint1_review import (
+                    normalise_riboaptamer_review_rows,
+                    read_riboaptamer_review_csv,
+                )
+
+                queue_rows = normalise_riboaptamer_review_rows(
+                    read_riboaptamer_review_csv(queue_path)
+                )
+            else:
+                queue_rows = read_csv_rows(queue_path)
+            group_rows = read_csv_rows(group_path) if group_path.is_file() else []
+            bulk_rows = read_csv_rows(bulk_path) if bulk_path.is_file() else []
+            bulk = bulk_rows[0] if bulk_rows else None
+            report = validate_review_package(
+                queue_rows=queue_rows,
+                group_rows=group_rows,
+                bulk_confirmation=bulk,
+            )
+    except (AptaDBCheckpoint1ReviewError, EnaCheckpoint1ReviewError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
@@ -127,6 +164,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"ready_for_application={report.ready_for_application}\n"
         f"blocking_issues={len(report.blocking_issues)}"
     )
+    if args.source == "ena":
+        print(
+            "unresolved_reconciliation_groups="
+            f"{getattr(report, 'unresolved_reconciliation_groups', 0)}"
+        )
     metadata_rel = Path(
         f"config/checkpoint_reviews/{args.source}_checkpoint1_metadata.json"
     )

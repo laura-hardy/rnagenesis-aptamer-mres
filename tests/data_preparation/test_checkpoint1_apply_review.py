@@ -1048,10 +1048,11 @@ def test_unknown_source_fails() -> None:
     stdout = io.StringIO()
     stderr = io.StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):
-        code = main(["--source", "ena"])
+        code = main(["--source", "not_a_source"])
     assert code == 1
     assert "Unsupported source_key" in stderr.getvalue()
     assert "aptaindex" in stderr.getvalue()
+    assert "ena" in stderr.getvalue()
 
 
 def test_input_files_remain_byte_identical(tmp_path: Path) -> None:

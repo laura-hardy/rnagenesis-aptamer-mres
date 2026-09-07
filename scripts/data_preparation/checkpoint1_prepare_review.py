@@ -25,6 +25,31 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from s0_build_registry import find_repo_root  # noqa: E402
+from adapters.ena_checkpoint1_review import (  # noqa: E402
+    BULK_CONFIRMATION_COLUMNS as ENA_BULK_CONFIRMATION_COLUMNS,
+    EXCEPTION_COLUMNS as ENA_EXCEPTION_COLUMNS,
+    MANUAL_FIELDS as ENA_MANUAL_FIELDS,
+    RECOMMENDATION_FIELDS as ENA_RECOMMENDATION_FIELDS,
+    RECONCILIATION_COLUMNS as ENA_RECONCILIATION_COLUMNS,
+    RECONCILIATION_INDEX_COLUMNS as ENA_RECONCILIATION_INDEX_COLUMNS,
+    RULE_MEMBERSHIP_COLUMNS as ENA_RULE_MEMBERSHIP_COLUMNS,
+    RULE_REVIEW_COLUMNS as ENA_RULE_REVIEW_COLUMNS,
+    RULE_SEQUENCE_COLUMNS as ENA_RULE_SEQUENCE_COLUMNS,
+    EnaCheckpoint1ReviewError,
+    build_bulk_confirmation_row as build_ena_bulk_confirmation_row,
+    build_legacy_collapse_reconciliation,
+    build_review_readme as build_ena_review_readme,
+    build_rule_review_tables,
+    format_validation_markdown as format_ena_validation_markdown,
+    populate_record_recommendations as populate_ena_record_recommendations,
+    read_csv_rows as read_ena_csv_rows,
+    rule_summary_markdown as ena_rule_summary_markdown,
+    validate_ena_review_package,
+)
+from adapters.ena_s3 import (  # noqa: E402
+    DEFAULT_ENA_BATCHES,
+    LOCAL_DETAIL_COLUMNS as ENA_LOCAL_DETAIL_COLUMNS,
+)
 from adapters.aptadb_checkpoint1_review import (  # noqa: E402
     BULK_CONFIRMATION_COLUMNS,
     DEFAULT_RECOMMENDATIONS_REL,
@@ -148,6 +173,16 @@ APTAINDEX_PIPELINE_STOP_STATEMENT = (
     "The pipeline is stopped awaiting Laura CHECKPOINT-1 review."
 )
 APTAINDEX_PERMITTED_DECISIONS: tuple[str, ...] = ("keep", "drop", "edit")
+ENA_EXPECTED_TOTAL_ROWS = 679
+ENA_BATCH_ORDER: tuple[str, ...] = DEFAULT_ENA_BATCHES
+ENA_PIPELINE_STOP_STATEMENT = (
+    "CHECKPOINT-1 package generated.\n"
+    "No human decisions applied.\n"
+    "No ENA record is authorised for S4 yet.\n"
+    "The pipeline is stopped awaiting Laura CHECKPOINT-1 review.\n"
+    "Global S4 has not been run."
+)
+ENA_PERMITTED_DECISIONS: tuple[str, ...] = ("keep", "drop", "edit")
 
 UTEXAS_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
     "review_batch",
@@ -257,6 +292,32 @@ APTAINDEX_INDEX_COLUMNS: tuple[str, ...] = tuple(
     column
     for column in APTAINDEX_MANUAL_REVIEW_COLUMNS
     if column not in APTAINDEX_SEQUENCE_COLUMNS
+)
+
+ENA_SEQUENCE_COLUMNS: tuple[str, ...] = (
+    "sequence_raw",
+    "sequence_full",
+    "sequence_core",
+    "detected_constant_5p",
+    "detected_constant_3p",
+    "manual_sequence_corrected",
+    "recommended_sequence_corrected",
+)
+
+ENA_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
+    ("review_order",)
+    + ENA_LOCAL_DETAIL_COLUMNS
+    + tuple(
+        column
+        for column in ENA_RECOMMENDATION_FIELDS
+        if column not in ENA_LOCAL_DETAIL_COLUMNS
+    )
+)
+
+ENA_INDEX_COLUMNS: tuple[str, ...] = tuple(
+    column
+    for column in ENA_MANUAL_REVIEW_COLUMNS
+    if column not in ENA_SEQUENCE_COLUMNS
 )
 
 UTEXAS_INDEX_COLUMNS: tuple[str, ...] = tuple(
@@ -415,6 +476,10 @@ class ReviewPackageResult:
     output_bulk_confirmation: Path | None = None
     output_readme: Path | None = None
     output_validation: Path | None = None
+    output_rule_membership: Path | None = None
+    output_exceptions: Path | None = None
+    output_reconciliation: Path | None = None
+    output_reconciliation_index: Path | None = None
 
 
 def assert_no_legacy_cleaner_import() -> None:
@@ -2538,6 +2603,404 @@ def prepare_aptaindex_checkpoint1_review(
     return result
 
 
+def build_ena_manual_review_row(
+    *,
+    review_row: Mapping[str, str],
+    local_detail: Mapping[str, str],
+    review_batch: str,
+    review_order: int,
+) -> dict[str, str]:
+    """Build one ENA sequence-bearing active-review row."""
+    if review_row["record_id"] != local_detail["record_id"]:
+        raise Checkpoint1ReviewError("Joined record_id mismatch")
+    for field_name in (
+        "proposed_decision",
+        "primary_reason",
+        "secondary_reasons",
+        "manual_review_priority",
+        "checkpoint_review_reasons",
+    ):
+        if review_row.get(field_name, "") != local_detail.get(field_name, ""):
+            raise Checkpoint1ReviewError(
+                f"Checkpoint field mismatch for {field_name!r} on "
+                f"{review_row['record_id']!r}"
+            )
+    row = {column: "" for column in ENA_MANUAL_REVIEW_COLUMNS}
+    for column in ENA_LOCAL_DETAIL_COLUMNS:
+        row[column] = local_detail.get(column, "")
+    row["review_batch"] = review_batch
+    row["review_order"] = str(review_order)
+    row["record_id"] = review_row["record_id"]
+    for name in ENA_MANUAL_FIELDS:
+        row[name] = ""
+    return row
+
+
+def build_ena_index_row(queue_row: Mapping[str, str]) -> dict[str, str]:
+    return {column: queue_row.get(column, "") for column in ENA_INDEX_COLUMNS}
+
+
+def ena_review_package_sort_key(
+    row: Mapping[str, str],
+) -> tuple[int, int, str, str]:
+    batch = row.get("review_batch", "")
+    try:
+        batch_rank = ENA_BATCH_ORDER.index(batch)
+    except ValueError:
+        batch_rank = len(ENA_BATCH_ORDER)
+    try:
+        order = int(row.get("review_order") or "0")
+    except ValueError:
+        order = 0
+    return (batch_rank, order, row.get("primary_reason", ""), row.get("record_id", ""))
+
+
+def build_ena_review_summary(
+    *,
+    repo_root: Path,
+    result: ReviewPackageResult,
+    rule_rows: Sequence[Mapping[str, str]],
+    exception_rows: Sequence[Mapping[str, str]],
+    reconciliation_rows: Sequence[Mapping[str, str]],
+    validation_ready: int,
+) -> str:
+    stats = result.stats
+    lines = [
+        "# ENA CHECKPOINT-1 manual-review package",
+        "",
+        f"- total checkpoint records: `{stats.total_checkpoint_records}`",
+        f"- active record-level review rows: `{stats.active_review_rows}`",
+        f"- no record-level review: `{stats.no_review_records}`",
+        "",
+        "## Record-level batches",
+        "",
+    ]
+    for batch in ENA_BATCH_ORDER:
+        lines.append(f"- `{batch}`: `{stats.batch_counts.get(batch, 0)}`")
+    lines.extend(
+        [
+            "",
+            ena_rule_summary_markdown(rule_rows),
+            "",
+            f"- record-level constant-region exceptions: `{len(exception_rows)}`",
+            f"- 679-versus-676 reconciliation groups: `{len(reconciliation_rows)}`",
+            f"- validator ready_for_application: `{validation_ready}`",
+            "",
+            "Human decision fields are blank. Machine recommendations are not",
+            "human decisions. Apply will fail closed.",
+            "",
+            "No human decision has yet been recorded.",
+            "",
+            ENA_PIPELINE_STOP_STATEMENT,
+        ]
+    )
+    text = "\n".join(lines) + "\n"
+    abs_root = str(repo_root.resolve())
+    if abs_root in text:
+        raise Checkpoint1ReviewError(
+            "Review summary must not contain absolute repository paths"
+        )
+    return text
+
+
+def prepare_ena_checkpoint1_review(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    expected_active_rows: int | None = None,
+    expected_total_rows: int | None = ENA_EXPECTED_TOTAL_ROWS,
+) -> ReviewPackageResult:
+    """Build the ENA CHECKPOINT-1 structured manual-review package."""
+    repo_root = repo_root.resolve()
+    checkpoint_dir = _resolve_under_repo(repo_root, checkpoint_dir)
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+
+    review_path = checkpoint_dir / "ena_checkpoint1_review.csv"
+    local_detail_path = checkpoint_dir / "ena_checkpoint1_local_detail.csv"
+    canonical_path = checkpoint_dir / "ena_s3_canonical.csv"
+    for path, label in (
+        (review_path, "checkpoint review"),
+        (local_detail_path, "local-detail"),
+        (canonical_path, "S3 canonical"),
+    ):
+        if not path.is_file():
+            raise Checkpoint1ReviewError(f"Missing {label} input: {path.name}")
+
+    review_hash_before = _sha256_file(review_path)
+    local_detail_hash_before = _sha256_file(local_detail_path)
+    canonical_hash_before = _sha256_file(canonical_path)
+
+    review_rows = _read_csv(review_path, label="checkpoint review")
+    local_detail_rows = _read_csv(local_detail_path, label="local-detail")
+    paired = _join_review_and_local_detail(review_rows, local_detail_rows)
+    if expected_total_rows is not None and len(paired) != expected_total_rows:
+        raise Checkpoint1ReviewError(
+            f"Checkpoint row count must be {expected_total_rows}; got {len(paired)}"
+        )
+
+    stats = ReviewPackageStats()
+    stats.total_checkpoint_records = len(paired)
+    active_pairs: list[tuple[dict[str, str], dict[str, str], str]] = []
+    for review_row, detail_row in paired:
+        required = (review_row.get("manual_review_required") or "").strip()
+        if required not in {"true", "false"}:
+            raise Checkpoint1ReviewError(
+                "manual_review_required must be lowercase true/false; "
+                f"got {required!r} for {review_row['record_id']!r}"
+            )
+        if required == "false":
+            stats.no_review_records += 1
+            if review_row.get("review_batch"):
+                raise Checkpoint1ReviewError(
+                    "No-review ENA row must not carry review_batch: "
+                    f"{review_row['record_id']!r}"
+                )
+            continue
+        batch = (review_row.get("review_batch") or "").strip()
+        if not batch:
+            raise Checkpoint1ReviewError(
+                "Review-required ENA row missing review_batch: "
+                f"{review_row['record_id']!r}"
+            )
+        if batch not in ENA_BATCH_ORDER:
+            raise Checkpoint1ReviewError(
+                f"Unknown ENA review_batch {batch!r} for {review_row['record_id']!r}"
+            )
+        if detail_row.get("manual_decision"):
+            raise Checkpoint1ReviewError(
+                "Prepared review must not pre-fill manual_decision: "
+                f"{review_row['record_id']!r}"
+            )
+        active_pairs.append((review_row, detail_row, batch))
+
+    if expected_active_rows is not None and len(active_pairs) != expected_active_rows:
+        raise Checkpoint1ReviewError(
+            f"Active review row count must be {expected_active_rows}; "
+            f"got {len(active_pairs)}"
+        )
+
+    draft_rows: list[dict[str, str]] = []
+    for review_row, detail_row, batch in active_pairs:
+        built = build_ena_manual_review_row(
+            review_row=review_row,
+            local_detail=detail_row,
+            review_batch=batch,
+            review_order=0,
+        )
+        try:
+            built = populate_ena_record_recommendations(built)
+        except EnaCheckpoint1ReviewError as exc:
+            raise Checkpoint1ReviewError(str(exc)) from exc
+        draft_rows.append(built)
+
+    draft_rows.sort(key=ena_review_package_sort_key)
+    queue_rows: list[dict[str, str]] = []
+    for index, row in enumerate(draft_rows, start=1):
+        ordered = dict(row)
+        ordered["review_order"] = str(index)
+        if any(ordered.get(name) for name in ENA_MANUAL_FIELDS):
+            raise Checkpoint1ReviewError(
+                "Reviewer fields must be empty in the prepared package"
+            )
+        queue_rows.append(ordered)
+        batch = ordered["review_batch"]
+        stats.batch_counts[batch] = stats.batch_counts.get(batch, 0) + 1
+        decision = ordered["proposed_decision"]
+        stats.decision_counts[decision] = stats.decision_counts.get(decision, 0) + 1
+        primary = ordered["primary_reason"]
+        stats.primary_reason_counts[primary] = (
+            stats.primary_reason_counts.get(primary, 0) + 1
+        )
+        priority = ordered["manual_review_priority"]
+        stats.priority_counts[priority] = stats.priority_counts.get(priority, 0) + 1
+    stats.active_review_rows = len(queue_rows)
+    if len({row["record_id"] for row in queue_rows}) != len(queue_rows):
+        raise Checkpoint1ReviewError("Active review queue has duplicate record_id")
+
+    index_rows = [build_ena_index_row(row) for row in queue_rows]
+    if any(column in ENA_INDEX_COLUMNS for column in ENA_SEQUENCE_COLUMNS):
+        raise Checkpoint1ReviewError("Sequence columns leaked into index schema")
+
+    proposals_path = (
+        repo_root / "data" / "interim" / "normalised" / "ena_constant_region_proposals.csv"
+    )
+    membership_path = (
+        repo_root
+        / "data"
+        / "interim"
+        / "normalised"
+        / "ena_constant_region_membership.csv"
+    )
+    sidecar_path = (
+        repo_root / "data" / "interim" / "extracted" / "ena_source_metadata.csv"
+    )
+    processed_path = (
+        repo_root / "data" / "processed" / "ena" / "ena_aptamer_supplement_clean.csv"
+    )
+    proposals = read_ena_csv_rows(proposals_path) if proposals_path.is_file() else []
+    membership = read_ena_csv_rows(membership_path) if membership_path.is_file() else []
+    canonical_rows = read_ena_csv_rows(canonical_path)
+    canonical_by_id = {row["record_id"]: row for row in canonical_rows}
+    decision_by_id = {row["record_id"]: row for row, _detail in paired}
+    try:
+        rule_rows, membership_out, exception_rows = build_rule_review_tables(
+            proposals=proposals,
+            membership_rows=membership,
+            canonical_by_id=canonical_by_id,
+            decision_by_id=decision_by_id,
+        )
+    except EnaCheckpoint1ReviewError as exc:
+        raise Checkpoint1ReviewError(str(exc)) from exc
+    for col in ENA_RULE_SEQUENCE_COLUMNS:
+        if col in ENA_RULE_REVIEW_COLUMNS:
+            raise Checkpoint1ReviewError(
+                f"Motif/sequence column leaked into rule review schema: {col}"
+            )
+        if col in ENA_RECONCILIATION_COLUMNS:
+            raise Checkpoint1ReviewError(
+                f"Sequence column leaked into reconciliation schema: {col}"
+            )
+
+    sidecar_rows = read_ena_csv_rows(sidecar_path) if sidecar_path.is_file() else []
+    processed_rows = read_ena_csv_rows(processed_path) if processed_path.is_file() else []
+    if expected_total_rows == ENA_EXPECTED_TOTAL_ROWS and not processed_path.is_file():
+        raise Checkpoint1ReviewError(
+            "ENA CHECKPOINT-1 reconciliation requires "
+            "data/processed/ena/ena_aptamer_supplement_clean.csv"
+        )
+    try:
+        reconciliation_rows = build_legacy_collapse_reconciliation(
+            canonical_rows=canonical_rows,
+            sidecar_rows=sidecar_rows,
+            processed_rows=processed_rows,
+            decision_by_id=decision_by_id,
+        )
+    except EnaCheckpoint1ReviewError as exc:
+        raise Checkpoint1ReviewError(str(exc)) from exc
+    if expected_total_rows == ENA_EXPECTED_TOTAL_ROWS and len(reconciliation_rows) != 3:
+        raise Checkpoint1ReviewError(
+            "ENA CHECKPOINT-1 expected 3 legacy collapse groups; got "
+            f"{len(reconciliation_rows)}"
+        )
+    collapse_ids: set[str] = set()
+    for row in reconciliation_rows:
+        collapse_ids.add(row["record_id_a"])
+        collapse_ids.add(row["record_id_b"])
+    if expected_total_rows == ENA_EXPECTED_TOTAL_ROWS and len(collapse_ids) != 6:
+        raise Checkpoint1ReviewError(
+            "ENA CHECKPOINT-1 expected six records across three collapse pairs"
+        )
+    present = {row["record_id"] for row, _detail in paired}
+    missing = collapse_ids - present
+    if missing:
+        raise Checkpoint1ReviewError(
+            "Legacy collapse members disappeared from the 679-row S3 set"
+        )
+
+    bulk_row = build_ena_bulk_confirmation_row(queue_rows)
+    try:
+        validation = validate_ena_review_package(
+            queue_rows=queue_rows,
+            rule_rows=rule_rows,
+            exception_rows=exception_rows,
+            reconciliation_rows=reconciliation_rows,
+            bulk_confirmation=bulk_row,
+        )
+    except EnaCheckpoint1ReviewError as exc:
+        raise Checkpoint1ReviewError(str(exc)) from exc
+    if validation.ready_for_application != 0:
+        raise Checkpoint1ReviewError(
+            "Blank CHECKPOINT-1 package must not be ready_for_application"
+        )
+    if validation.unresolved_manual_decisions == 0 and queue_rows:
+        raise Checkpoint1ReviewError(
+            "Blank CHECKPOINT-1 package must retain unresolved human decisions"
+        )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_queue = output_dir / "ena_checkpoint1_manual_review.csv"
+    out_index = output_dir / "ena_checkpoint1_manual_review_index.csv"
+    out_summary = output_dir / "ena_checkpoint1_manual_review_summary.md"
+    out_group = output_dir / "ena_checkpoint1_constant_rule_review.csv"
+    out_membership = output_dir / "ena_checkpoint1_constant_rule_membership.csv"
+    out_exceptions = output_dir / "ena_checkpoint1_constant_exceptions.csv"
+    out_reconciliation = output_dir / "ena_checkpoint1_legacy_collapse_reconciliation.csv"
+    out_reconciliation_index = (
+        output_dir / "ena_checkpoint1_legacy_collapse_reconciliation_index.csv"
+    )
+    out_bulk = output_dir / "ena_checkpoint1_bulk_audit_confirmation.csv"
+    out_readme = output_dir / "README.md"
+    out_validation = output_dir / "ena_checkpoint1_validation.md"
+
+    write_csv_atomic(out_queue, ENA_MANUAL_REVIEW_COLUMNS, queue_rows)
+    write_csv_atomic(out_index, ENA_INDEX_COLUMNS, index_rows)
+    write_csv_atomic(out_group, ENA_RULE_REVIEW_COLUMNS, rule_rows)
+    write_csv_atomic(out_membership, ENA_RULE_MEMBERSHIP_COLUMNS, membership_out)
+    write_csv_atomic(out_exceptions, ENA_EXCEPTION_COLUMNS, exception_rows)
+    write_csv_atomic(out_reconciliation, ENA_RECONCILIATION_COLUMNS, reconciliation_rows)
+    write_csv_atomic(
+        out_reconciliation_index, ENA_RECONCILIATION_INDEX_COLUMNS, reconciliation_rows
+    )
+    write_csv_atomic(out_bulk, ENA_BULK_CONFIRMATION_COLUMNS, [bulk_row])
+    _write_text_atomic(out_readme, build_ena_review_readme())
+    _write_text_atomic(out_validation, format_ena_validation_markdown(validation))
+
+    review_hash_after = _sha256_file(review_path)
+    local_detail_hash_after = _sha256_file(local_detail_path)
+    canonical_hash_after = _sha256_file(canonical_path)
+    inputs_unchanged = (
+        review_hash_before == review_hash_after
+        and local_detail_hash_before == local_detail_hash_after
+        and canonical_hash_before == canonical_hash_after
+    )
+    if not inputs_unchanged:
+        raise Checkpoint1ReviewError(
+            "CHECKPOINT-1 inputs were modified during review-package preparation"
+        )
+
+    result = ReviewPackageResult(
+        source_key="ena",
+        stats=stats,
+        output_queue=out_queue,
+        output_index=out_index,
+        output_summary=out_summary,
+        review_hash_before=review_hash_before,
+        review_hash_after=review_hash_after,
+        local_detail_hash_before=local_detail_hash_before,
+        local_detail_hash_after=local_detail_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        output_group_review=out_group,
+        output_bulk_confirmation=out_bulk,
+        output_readme=out_readme,
+        output_validation=out_validation,
+        output_rule_membership=out_membership,
+        output_exceptions=out_exceptions,
+        output_reconciliation=out_reconciliation,
+        output_reconciliation_index=out_reconciliation_index,
+    )
+    summary_text = build_ena_review_summary(
+        repo_root=repo_root,
+        result=result,
+        rule_rows=rule_rows,
+        exception_rows=exception_rows,
+        reconciliation_rows=reconciliation_rows,
+        validation_ready=validation.ready_for_application,
+    )
+    if ENA_PIPELINE_STOP_STATEMENT not in summary_text:
+        raise Checkpoint1ReviewError("Review summary missing pipeline stop statement")
+    if "No human decision has yet been recorded." not in summary_text:
+        raise Checkpoint1ReviewError(
+            "Review summary must state that no human decision has been recorded"
+        )
+    if "fail closed" not in summary_text.lower():
+        raise Checkpoint1ReviewError(
+            "Review summary must state that apply will fail closed"
+        )
+    _write_text_atomic(out_summary, summary_text)
+    return result
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -2548,7 +3011,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptabase, utexas, aptadb, riboaptamer, or aptaindex)",
+        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, or ena)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -2602,10 +3065,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "aptadb",
             "riboaptamer",
             "aptaindex",
+            "ena",
         }:
             raise Checkpoint1ReviewError(
                 f"Unsupported source_key={args.source!r}; "
-                "supported: aptabase, utexas, aptadb, riboaptamer, aptaindex"
+                "supported: aptabase, utexas, aptadb, riboaptamer, aptaindex, ena"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -2623,6 +3087,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             default_checkpoint = Path("data/interim/checkpoints/riboaptamer_cp1")
         elif args.source == "aptaindex":
             default_checkpoint = Path("data/interim/checkpoints/aptaindex_cp1")
+        elif args.source == "ena":
+            default_checkpoint = Path("data/interim/checkpoints/ena_cp1")
         else:
             default_checkpoint = Path("data/interim/checkpoints/aptabase_cp1")
         checkpoint_dir = (
@@ -2683,6 +3149,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                     else args.expected_total_rows
                 ),
             )
+        elif args.source == "ena":
+            result = prepare_ena_checkpoint1_review(
+                repo_root=repo_root,
+                checkpoint_dir=checkpoint_dir,
+                output_dir=output_dir,
+                expected_active_rows=args.expected_active_rows,
+                expected_total_rows=(
+                    ENA_EXPECTED_TOTAL_ROWS
+                    if args.expected_total_rows is None
+                    else args.expected_total_rows
+                ),
+            )
         else:
             result = prepare_aptabase_checkpoint1_review(
                 repo_root=repo_root,
@@ -2700,7 +3178,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ),
                 enforce_expected_batch_counts=not args.skip_expected_batch_counts,
             )
-    except Checkpoint1ReviewError as exc:
+    except (Checkpoint1ReviewError, EnaCheckpoint1ReviewError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
@@ -2721,6 +3199,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         batch_order = RIBOAPTAMER_BATCH_ORDER
     elif result.source_key == "aptaindex":
         batch_order = APTAINDEX_BATCH_ORDER
+    elif result.source_key == "ena":
+        batch_order = ENA_BATCH_ORDER
     else:
         batch_order = BATCH_ORDER
     for batch in batch_order:

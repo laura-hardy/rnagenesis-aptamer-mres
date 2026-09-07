@@ -11,5 +11,5 @@ from typing import Final
 
 # Recognised S1 adapter keys. Dispatch lives in s1_extract.py.
 ADAPTER_KEYS: Final[frozenset[str]] = frozenset(
-    {"aptabase", "utexas", "aptadb", "riboaptamer", "aptaindex"}
+    {"aptabase", "utexas", "aptadb", "riboaptamer", "aptaindex", "ena"}
 )

@@ -2884,7 +2884,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "checkpoint with tracked sequence-free resolution artefacts."
         )
     )
-    parser.add_argument("--source", required=True, help="Source key (aptabase, utexas, aptadb, riboaptamer, or aptaindex)")
+    parser.add_argument(
+        "--source",
+        required=True,
+        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, or ena)",
+    )
     parser.add_argument(
         "--checkpoint-dir",
         type=Path,
@@ -4371,6 +4375,1317 @@ def run_aptaindex_checkpoint1_apply(
     )
 
 
+FROZEN_ENA_REVIEW_HASHES: dict[str, str] = {
+    "ena_checkpoint1_manual_review.csv": (
+        "27482ea0765905d01b9fb571393735ab75c4646bfe1d85bca091cdf4221d3588"
+    ),
+    "ena_checkpoint1_manual_review_index.csv": (
+        "8851302adb1930b34aeaa5838ff9c7a1abc0703f5c27b3853d5452c12caaaafe"
+    ),
+    "ena_checkpoint1_constant_rule_review.csv": (
+        "dee948714a5563158a596f37af2bccb537d4af7370220ce889f64d40eef847c4"
+    ),
+    "ena_checkpoint1_constant_exceptions.csv": (
+        "dd65eac66fd08e13696d2f439459a3675d1104abbb8ca0e41b2e7ae8954c48df"
+    ),
+    "ena_checkpoint1_legacy_collapse_reconciliation.csv": (
+        "e2efc138c26aa291611461a29c055f77ddf51fafe286a4167bd07472538d7be9"
+    ),
+    "ena_checkpoint1_legacy_collapse_reconciliation_index.csv": (
+        "e2efc138c26aa291611461a29c055f77ddf51fafe286a4167bd07472538d7be9"
+    ),
+    "ena_checkpoint1_bulk_audit_confirmation.csv": (
+        "36197eae089fc61762bf40c8106561c17ae4a973b882e3307c3363d535a56f19"
+    ),
+}
+
+FROZEN_ENA_PIPELINE_HASHES: dict[str, str] = {
+    "s1": "3d823f4007cde419e2c5cb4a71230c8febaefbeb237cf54e5888740c02578fac",
+    "sidecar": "977cf57be81152e2c5307db68928ccdfc9f66aa2c0a20f8999eab4c9ba78acad",
+    "s3_decisions": (
+        "14a70d3dc80dc7078d92a3eeaff45ee26c73467dd5131e4a2c2c4952a5dc857b"
+    ),
+}
+
+ACCEPTED_ENA_DRY_RUN_HASHES: dict[str, str] = {
+    "canonical": (
+        "3f8995e139478b43e322460906486f388aaaf79685460b07077757c7a6dc2005"
+    ),
+    "routing": "af919b719665d1162c5d1e1dbdb3d60a81e46a7b2cb6f88e6ac6e2e0603694e0",
+    "rejection": (
+        "e293cbb6231276940820250246facb9dd095fd783131d0db85ae9334f7a4fb41"
+    ),
+    "parked_construct": (
+        "a51eb535939fa48d92e15ae5892f18228c96e57cfb1ebcb7c794dda801865301"
+    ),
+    "eligible": "b94bcde4d52d4a20e70fa46f7acdc78dafc1fb81dc558e68ada931f94d780233",
+    "change_report": (
+        "6d38db8af2382468b6f40e6f7b1c43a95b12f71a81fe1e337e41e387eaf83aa9"
+    ),
+    "group_summary": (
+        "d889cdfcc93779bd2a31e491bf2c72bf35ca3deb3c0b4487663929efec2a4be5"
+    ),
+    "large_trim_human_approved": (
+        "63d363911a986fd8d68977fc67770266d6f22256c616b25908800bd0d6baace8"
+    ),
+    "guard_rail_failures": (
+        "9d8e87387be359b8521d0b9ecca6da3141408b8094b71d34de4f29332e7f0a83"
+    ),
+}
+
+
+@dataclass(frozen=True)
+class EnaApplyResult:
+    """Authoritative ENA CHECKPOINT-1 apply/closure result."""
+
+    output_dir: Path
+    metadata_out: Path
+    tracked_manifest: Path
+    summary_out: Path
+    output_hashes: dict[str, str]
+    stats: dict[str, int | str | bool | float]
+    preview_comparison_ok: bool
+    deterministic_rerun_ok: bool
+    semantic_mismatches: int
+    byte_identical: dict[str, bool]
+    checkpoint_closed: bool
+
+
+def _assert_ena_resolved_output(path: Path, *, checkpoint_dir: Path) -> Path:
+    resolved = path.resolve()
+    checkpoint_resolved = checkpoint_dir.resolve()
+    if resolved == checkpoint_resolved:
+        raise Checkpoint1ApplyError(
+            "Refusing to overwrite the ENA CHECKPOINT-1 snapshot directory"
+        )
+    dry_run_dir = (checkpoint_resolved / "dry_run").resolve()
+    if resolved == dry_run_dir:
+        raise Checkpoint1ApplyError(
+            "Refusing to overwrite the validated dry-run preview directory"
+        )
+    lowered = [part.lower() for part in resolved.parts]
+    if any(name in APPLY_FORBIDDEN_DIR_NAMES for name in lowered):
+        raise Checkpoint1ApplyError(
+            f"Resolved output must not use a dry-run/S2/S3/S4 directory: {resolved}"
+        )
+    return resolved
+
+
+def _write_ena_transform_csvs(output_dir: Path, simulation: object) -> dict[str, Path]:
+    from adapters.ena_checkpoint1_apply import (
+        CHANGE_REPORT_COLUMNS,
+        ELIGIBLE_PREVIEW_COLUMNS,
+        GROUP_SUMMARY_COLUMNS,
+        GUARD_RAIL_FAILURE_COLUMNS,
+        LARGE_TRIM_RECORD_COLUMNS,
+        EnaDryRunSimulation,
+    )
+    from adapters.ena_s3 import DECISION_COLUMNS, PARK_COLUMNS, REJECTION_COLUMNS
+    from common.corpus_schema import CORPUS_COLUMNS, write_corpus_csv_atomic
+
+    if not isinstance(simulation, EnaDryRunSimulation):
+        raise Checkpoint1ApplyError("Apply payload has unexpected type")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths = {
+        "canonical": output_dir / "ena_checkpoint1_applied_canonical.csv",
+        "routing": output_dir / "ena_checkpoint1_applied_routing.csv",
+        "rejection": output_dir / "ena_checkpoint1_applied_rejection.csv",
+        "parked_construct": output_dir / "ena_checkpoint1_applied_parked_construct.csv",
+        "eligible": output_dir / "ena_checkpoint1_applied_eligible.csv",
+        "change_report": output_dir / "ena_checkpoint1_applied_change_report.csv",
+        "group_summary": output_dir / "ena_checkpoint1_applied_group_summary.csv",
+        "large_trim_human_approved": (
+            output_dir / "ena_checkpoint1_applied_large_trim_human_approved.csv"
+        ),
+        "guard_rail_failures": (
+            output_dir / "ena_checkpoint1_applied_guard_rail_failures.csv"
+        ),
+    }
+    write_corpus_csv_atomic(
+        paths["canonical"], simulation.preview_canonical, columns=CORPUS_COLUMNS
+    )
+    write_csv_atomic(paths["routing"], DECISION_COLUMNS, simulation.preview_decisions)
+    write_csv_atomic(
+        paths["rejection"], REJECTION_COLUMNS, simulation.preview_rejections
+    )
+    write_csv_atomic(
+        paths["parked_construct"], PARK_COLUMNS, simulation.preview_parked_construct
+    )
+    write_csv_atomic(
+        paths["eligible"], ELIGIBLE_PREVIEW_COLUMNS, simulation.preview_eligible
+    )
+    write_csv_atomic(
+        paths["change_report"], CHANGE_REPORT_COLUMNS, simulation.change_report
+    )
+    write_csv_atomic(
+        paths["group_summary"], GROUP_SUMMARY_COLUMNS, simulation.group_summaries
+    )
+    write_csv_atomic(
+        paths["large_trim_human_approved"],
+        LARGE_TRIM_RECORD_COLUMNS,
+        simulation.large_trim_records,
+    )
+    write_csv_atomic(
+        paths["guard_rail_failures"],
+        GUARD_RAIL_FAILURE_COLUMNS,
+        simulation.guard_rail_failure_rows,
+    )
+    return paths
+
+
+def _ena_csv_scientific_mismatches(preview_path: Path, applied_path: Path) -> int:
+    """Count cell mismatches, ignoring checkpoint_status wrapper metadata."""
+    with preview_path.open("r", encoding="utf-8", newline="") as handle:
+        preview_reader = csv.DictReader(handle)
+        preview_fields = list(preview_reader.fieldnames or [])
+        preview_rows = list(preview_reader)
+    with applied_path.open("r", encoding="utf-8", newline="") as handle:
+        applied_reader = csv.DictReader(handle)
+        applied_fields = list(applied_reader.fieldnames or [])
+        applied_rows = list(applied_reader)
+    scientific_preview = [name for name in preview_fields if name != "checkpoint_status"]
+    scientific_applied = [name for name in applied_fields if name != "checkpoint_status"]
+    if scientific_preview != scientific_applied:
+        return max(len(preview_rows), len(applied_rows), 1)
+    if len(preview_rows) != len(applied_rows):
+        return abs(len(preview_rows) - len(applied_rows)) or 1
+    mismatches = 0
+    for left, right in zip(preview_rows, applied_rows, strict=True):
+        for field_name in scientific_preview:
+            if (left.get(field_name) or "") != (right.get(field_name) or ""):
+                mismatches += 1
+    return mismatches
+
+
+def _compare_ena_applied_to_preview(
+    *,
+    applied_paths: Mapping[str, Path],
+    preview_dir: Path,
+) -> tuple[dict[str, bool], int]:
+    from adapters.ena_checkpoint1_apply import PREVIEW_COMPARISON_FILES
+
+    missing = [
+        preview_name
+        for _key, preview_name, _applied in PREVIEW_COMPARISON_FILES
+        if not (preview_dir / preview_name).is_file()
+    ]
+    if missing:
+        raise Checkpoint1ApplyError(
+            "Validated dry-run preview is incomplete; refusing real apply: "
+            + ", ".join(missing)
+        )
+    byte_identical: dict[str, bool] = {}
+    semantic_total = 0
+    scientific_mismatches: list[str] = []
+    for key, preview_name, _applied_name in PREVIEW_COMPARISON_FILES:
+        preview_path = preview_dir / preview_name
+        applied_path = applied_paths[key]
+        identical = preview_path.read_bytes() == applied_path.read_bytes()
+        byte_identical[key] = identical
+        if identical:
+            continue
+        cell_mismatches = _ena_csv_scientific_mismatches(preview_path, applied_path)
+        semantic_total += cell_mismatches
+        if cell_mismatches:
+            scientific_mismatches.append(key)
+    if scientific_mismatches:
+        raise Checkpoint1ApplyError(
+            "Real application has scientific mismatches versus the validated "
+            "dry-run preview for: " + ", ".join(scientific_mismatches)
+        )
+    return byte_identical, semantic_total
+
+
+def run_ena_checkpoint1_apply(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    tracked_manifest: Path,
+    metadata_out: Path,
+    preview_dir: Path | None = None,
+    check_deterministic_rerun: bool = True,
+    expected_total_rows: int | None = 679,
+    verify_frozen_review: bool = True,
+    compare_to_pristine: bool = True,
+    skip_pipeline_integrity: bool = False,
+    compare_to_preview: bool | None = None,
+    expected_review_hashes: Mapping[str, str] | None = None,
+    expected_pipeline_hashes: Mapping[str, str] | None = None,
+    expected_dry_run_hashes: Mapping[str, str] | None = None,
+) -> EnaApplyResult:
+    """Apply completed ENA CHECKPOINT-1 review and close the checkpoint.
+
+    Uses the same ``simulate_ena_checkpoint1_application`` transform as
+    dry-run. Does not prepare a global-S4 handoff or start S4.
+    """
+    from adapters.ena_checkpoint1_apply import (
+        AUTHORISED_FOR_S4_MEANING,
+        CLOSURE_ONLY_FIELDS,
+        ENA_CHECKPOINT_CLOSED_STATEMENT,
+        ENA_TRACKED_RESOLUTION_COLUMNS,
+        PREVIEW_COMPARISON_FILES,
+        SOURCE_DATASET,
+        EnaCheckpoint1ApplyError,
+        build_tracked_resolutions,
+        compare_ena_package_to_pristine,
+        count_manual_decisions,
+        format_closure_markdown,
+        load_default_policy,
+        serialise_ena_simulation,
+        simulate_ena_checkpoint1_application,
+    )
+    from adapters.ena_checkpoint1_review import (
+        read_csv_rows,
+        validate_ena_review_package,
+    )
+    from adapters.ena_s3 import (
+        PRIMARY_ROUTE_CONSTRUCT,
+        PRIMARY_ROUTE_ELIGIBLE,
+        PRIMARY_ROUTE_REJECT,
+        index_constant_proposals,
+    )
+    from checkpoint1_prepare_review import prepare_ena_checkpoint1_review
+    from s3_classify import EXPECTED_ENA_RAW_SHA256, EXPECTED_ENA_S2_HASH
+
+    if not Path(checkpoint_dir).is_absolute():
+        checkpoint_dir = repo_root / checkpoint_dir
+    checkpoint_dir = Path(checkpoint_dir).resolve()
+    output_dir = _assert_ena_resolved_output(
+        output_dir, checkpoint_dir=checkpoint_dir
+    )
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    tracked_manifest = _assert_tracked_path_allowed(repo_root, tracked_manifest)
+    metadata_out = _assert_tracked_path_allowed(repo_root, metadata_out)
+    if preview_dir is None:
+        preview_dir = checkpoint_dir / "dry_run"
+    if not Path(preview_dir).is_absolute():
+        preview_dir = repo_root / preview_dir
+    preview_dir = preview_dir.resolve()
+    if compare_to_preview is None:
+        compare_to_preview = expected_total_rows == 679
+    if expected_review_hashes is None and verify_frozen_review:
+        expected_review_hashes = FROZEN_ENA_REVIEW_HASHES
+    if expected_pipeline_hashes is None and not skip_pipeline_integrity:
+        expected_pipeline_hashes = FROZEN_ENA_PIPELINE_HASHES
+    if expected_dry_run_hashes is None and compare_to_preview and expected_total_rows == 679:
+        expected_dry_run_hashes = ACCEPTED_ENA_DRY_RUN_HASHES
+
+    review_dir = checkpoint_dir / "manual_review"
+    queue_path = review_dir / "ena_checkpoint1_manual_review.csv"
+    index_path = review_dir / "ena_checkpoint1_manual_review_index.csv"
+    rule_path = review_dir / "ena_checkpoint1_constant_rule_review.csv"
+    membership_path = review_dir / "ena_checkpoint1_constant_rule_membership.csv"
+    exception_path = review_dir / "ena_checkpoint1_constant_exceptions.csv"
+    recon_path = review_dir / "ena_checkpoint1_legacy_collapse_reconciliation.csv"
+    recon_index_path = (
+        review_dir / "ena_checkpoint1_legacy_collapse_reconciliation_index.csv"
+    )
+    bulk_path = review_dir / "ena_checkpoint1_bulk_audit_confirmation.csv"
+    canonical_path = checkpoint_dir / "ena_s3_canonical.csv"
+    decision_path = checkpoint_dir / "ena_s3_decisions.csv"
+    rejection_path = checkpoint_dir / "rejected_ena.csv"
+    parked_path = checkpoint_dir / "ena_s3_parked_construct.csv"
+    s1_path = repo_root / "data" / "interim" / "extracted" / "ena_extracted.csv"
+    sidecar_path = repo_root / "data" / "interim" / "extracted" / "ena_source_metadata.csv"
+    s2_path = repo_root / "data" / "interim" / "normalised" / "ena_normalised.csv"
+    qc_path = repo_root / "data" / "interim" / "normalised" / "ena_s2_qc.csv"
+    proposals_path = (
+        repo_root / "data" / "interim" / "normalised" / "ena_constant_region_proposals.csv"
+    )
+    s2_membership_path = (
+        repo_root
+        / "data"
+        / "interim"
+        / "normalised"
+        / "ena_constant_region_membership.csv"
+    )
+    raw_path = (
+        repo_root
+        / "data"
+        / "raw"
+        / "ENA"
+        / "review_v2"
+        / "ena_selected_after_manual_review.csv"
+    )
+    handoff_json = repo_root / "config" / "global_s4_sources" / "ena.json"
+    handoff_csv = repo_root / "data" / "interim" / "global_s4_ready" / "ena_global_s4_input.csv"
+
+    required = [
+        queue_path,
+        rule_path,
+        exception_path,
+        recon_path,
+        bulk_path,
+        canonical_path,
+        decision_path,
+        s2_path,
+        qc_path,
+        sidecar_path,
+        proposals_path,
+    ]
+    for path in required:
+        if not path.is_file():
+            raise Checkpoint1ApplyError(f"Missing apply input: {path.name}")
+
+    preview_hash_paths = {
+        key: preview_dir / preview_name
+        for key, preview_name, _applied in PREVIEW_COMPARISON_FILES
+    }
+    preview_hashes_before = (
+        _hash_paths(preview_hash_paths) if compare_to_preview else {}
+    )
+    if expected_dry_run_hashes:
+        for key, expected in expected_dry_run_hashes.items():
+            actual = preview_hashes_before.get(key, "")
+            if actual != expected:
+                raise Checkpoint1ApplyError(
+                    f"Accepted dry-run hash mismatch for {key}"
+                )
+
+    review_hash_paths = {
+        "ena_checkpoint1_manual_review.csv": queue_path,
+        "ena_checkpoint1_manual_review_index.csv": index_path,
+        "ena_checkpoint1_constant_rule_review.csv": rule_path,
+        "ena_checkpoint1_constant_exceptions.csv": exception_path,
+        "ena_checkpoint1_legacy_collapse_reconciliation.csv": recon_path,
+        "ena_checkpoint1_legacy_collapse_reconciliation_index.csv": recon_index_path,
+        "ena_checkpoint1_bulk_audit_confirmation.csv": bulk_path,
+    }
+    hashes_before = {
+        name: sha256_file(path) if path.is_file() else ""
+        for name, path in review_hash_paths.items()
+    }
+    hashes_before.update(
+        {
+            "raw": sha256_file(raw_path) if raw_path.is_file() else "",
+            "s1": sha256_file(s1_path) if s1_path.is_file() else "",
+            "sidecar": sha256_file(sidecar_path),
+            "s2": sha256_file(s2_path),
+            "s3": sha256_file(canonical_path),
+            "s3_decisions": sha256_file(decision_path),
+            "qc": sha256_file(qc_path),
+            "proposals": sha256_file(proposals_path),
+            "membership": (
+                sha256_file(membership_path) if membership_path.is_file() else ""
+            ),
+        }
+    )
+    if verify_frozen_review:
+        if expected_review_hashes is None:
+            raise Checkpoint1ApplyError(
+                "Frozen ENA review hashes must be supplied as a run-time gate"
+            )
+        for name, expected in expected_review_hashes.items():
+            actual = hashes_before.get(name, "")
+            if actual != expected:
+                raise Checkpoint1ApplyError(
+                    f"Frozen review hash mismatch for {name}"
+                )
+    if not skip_pipeline_integrity:
+        if hashes_before["raw"] and hashes_before["raw"] != EXPECTED_ENA_RAW_SHA256:
+            raise Checkpoint1ApplyError("ENA raw SHA-256 does not match freeze")
+        if hashes_before["s2"] != EXPECTED_ENA_S2_HASH:
+            raise Checkpoint1ApplyError("ENA S2 SHA-256 does not match freeze")
+        if hashes_before["s3"] != EXPECTED_ENA_S2_HASH:
+            raise Checkpoint1ApplyError("ENA S3 canonical SHA-256 does not match freeze")
+        if expected_pipeline_hashes:
+            for key, expected in expected_pipeline_hashes.items():
+                if hashes_before.get(key, "") != expected:
+                    raise Checkpoint1ApplyError(
+                        f"ENA {key} SHA-256 does not match freeze"
+                    )
+
+    queue_rows = read_csv_rows(queue_path)
+    rule_rows = read_csv_rows(rule_path)
+    exception_rows = read_csv_rows(exception_path)
+    reconciliation_rows = read_csv_rows(recon_path)
+    membership_rows = (
+        read_csv_rows(membership_path) if membership_path.is_file() else []
+    )
+    bulk_rows = read_csv_rows(bulk_path)
+    bulk = bulk_rows[0] if bulk_rows else None
+    try:
+        report = validate_ena_review_package(
+            queue_rows=queue_rows,
+            rule_rows=rule_rows,
+            exception_rows=exception_rows,
+            reconciliation_rows=reconciliation_rows,
+            bulk_confirmation=bulk,
+        )
+    except Exception as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+    if not report.ok or report.blocking_issues:
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 cannot be applied while required human decisions "
+            f"remain unresolved ({len(report.blocking_issues)} blocking issues)"
+        )
+    if (
+        expected_total_rows == 679
+        and (
+            report.total_review_records != 77
+            or report.unresolved_manual_decisions != 0
+            or report.unresolved_constant_groups != 0
+            or report.unresolved_exceptions != 0
+            or report.unresolved_reconciliation_groups != 0
+            or report.audit_only_unconfirmed != 0
+            or report.ready_for_application != 77
+        )
+    ):
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for CHECKPOINT-1 application"
+        )
+
+    if compare_to_pristine:
+        pristine_dir = checkpoint_dir / "closure_validation" / "pristine"
+        if pristine_dir.resolve() == review_dir.resolve():
+            raise Checkpoint1ApplyError(
+                "Refusing to overwrite the completed human review with pristine"
+            )
+        prepare_ena_checkpoint1_review(
+            repo_root=repo_root,
+            checkpoint_dir=checkpoint_dir,
+            output_dir=pristine_dir,
+            expected_total_rows=expected_total_rows,
+        )
+        try:
+            compare_ena_package_to_pristine(
+                reviewed_queue=queue_rows,
+                pristine_queue=read_csv_rows(
+                    pristine_dir / "ena_checkpoint1_manual_review.csv"
+                ),
+                reviewed_rules=rule_rows,
+                pristine_rules=read_csv_rows(
+                    pristine_dir / "ena_checkpoint1_constant_rule_review.csv"
+                ),
+                reviewed_exceptions=exception_rows,
+                pristine_exceptions=read_csv_rows(
+                    pristine_dir / "ena_checkpoint1_constant_exceptions.csv"
+                ),
+                reviewed_reconciliation=reconciliation_rows,
+                pristine_reconciliation=read_csv_rows(
+                    pristine_dir / "ena_checkpoint1_legacy_collapse_reconciliation.csv"
+                ),
+                reviewed_bulk=bulk_rows,
+                pristine_bulk=read_csv_rows(
+                    pristine_dir / "ena_checkpoint1_bulk_audit_confirmation.csv"
+                ),
+                reviewed_membership=membership_rows,
+                pristine_membership=(
+                    read_csv_rows(
+                        pristine_dir / "ena_checkpoint1_constant_rule_membership.csv"
+                    )
+                    if (pristine_dir / "ena_checkpoint1_constant_rule_membership.csv").is_file()
+                    else []
+                ),
+            )
+        except EnaCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    canonical_rows = read_csv_rows(canonical_path)
+    decision_rows = read_csv_rows(decision_path)
+    rejection_rows = read_csv_rows(rejection_path) if rejection_path.is_file() else []
+    parked_rows = read_csv_rows(parked_path) if parked_path.is_file() else []
+    qc_rows = read_csv_rows(qc_path)
+    sidecar_rows = read_csv_rows(sidecar_path)
+    proposal_rows = read_csv_rows(proposals_path)
+    s2_membership = (
+        read_csv_rows(s2_membership_path) if s2_membership_path.is_file() else []
+    )
+    qc_by_id = _index_rows(qc_rows)
+    sidecar_by_id = _index_rows(sidecar_rows)
+    proposals_by_record = index_constant_proposals(
+        qc_rows, proposal_rows, s2_membership
+    )
+    policy = load_default_policy(repo_root)
+
+    def _simulate():
+        try:
+            return simulate_ena_checkpoint1_application(
+                queue_rows=queue_rows,
+                rule_rows=rule_rows,
+                exception_rows=exception_rows,
+                reconciliation_rows=reconciliation_rows,
+                canonical_rows=canonical_rows,
+                decision_rows=decision_rows,
+                source_metadata_by_id=sidecar_by_id,
+                s2_qc_by_id=qc_by_id,
+                policy=policy,
+                membership_rows=membership_rows,
+                proposals_by_record=proposals_by_record,
+                bulk_confirmation=bulk,
+                existing_rejection_rows=rejection_rows,
+                existing_parked_construct=parked_rows,
+                expected_total_rows=expected_total_rows,
+            )
+        except EnaCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    simulation = _simulate()
+    deterministic_ok = False
+    if check_deterministic_rerun:
+        second = _simulate()
+        if serialise_ena_simulation(simulation) != serialise_ena_simulation(second):
+            raise Checkpoint1ApplyError(
+                "ENA CHECKPOINT-1 application was not byte-identical "
+                "across deterministic in-memory rerun"
+            )
+        deterministic_ok = True
+
+    if int(simulation.stats.get("guard_rail_failures") or 0) != 0:
+        raise Checkpoint1ApplyError("Apply guard-rail failures are forbidden")
+    if int(simulation.stats.get("unresolved_after_consumption") or 0) != 0:
+        raise Checkpoint1ApplyError("Unresolved human review remains after apply")
+
+    compare_dir = checkpoint_dir / "closure_validation" / "apply_vs_preview"
+    compare_dir = _assert_output_dir_allowed(repo_root, compare_dir)
+    compare_paths = _write_ena_transform_csvs(compare_dir, simulation)
+    preview_comparison_ok = False
+    semantic_mismatches = 0
+    byte_identical: dict[str, bool] = {}
+    if compare_to_preview:
+        byte_identical, semantic_mismatches = _compare_ena_applied_to_preview(
+            applied_paths=compare_paths, preview_dir=preview_dir
+        )
+        preview_hashes_after_compare = _hash_paths(preview_hash_paths)
+        if preview_hashes_after_compare != preview_hashes_before:
+            raise Checkpoint1ApplyError(
+                "Dry-run preview files changed during real application"
+            )
+        preview_comparison_ok = True
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    applied_paths = _write_ena_transform_csvs(output_dir, simulation)
+    if compare_to_preview:
+        byte_identical, semantic_mismatches = _compare_ena_applied_to_preview(
+            applied_paths=applied_paths, preview_dir=preview_dir
+        )
+
+    eligible_n = int(simulation.stats["technically_eligible"])
+    simulation.stats["authorised_for_s4"] = eligible_n
+    simulation.stats["checkpoint_closed"] = True
+
+    record_decisions = count_manual_decisions(queue_rows)
+    tracked_rows = build_tracked_resolutions(
+        decisions=simulation.preview_decisions,
+        queue_rows=queue_rows,
+        route_changed_ids=simulation.route_changed_ids,
+    )
+    if any(
+        row["checkpoint1_resolution_status"] == "pending_checkpoint_1_review"
+        for row in tracked_rows
+    ):
+        raise Checkpoint1ApplyError(
+            "Resolved routing still contains pending_checkpoint_1_review"
+        )
+    s4_rows = [
+        {
+            "record_id": row["record_id"],
+            "resolved_decision": "accept",
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+        }
+        for row in tracked_rows
+        if row["authorised_for_s4"] == "true"
+    ]
+    parked_id_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["manual_decision"],
+        }
+        for row in tracked_rows
+        if row["primary_route"] == PRIMARY_ROUTE_CONSTRUCT
+    ]
+    rejected_id_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["manual_decision"],
+        }
+        for row in tracked_rows
+        if row["primary_route"] == PRIMARY_ROUTE_REJECT
+    ]
+    authorised_n = sum(1 for row in tracked_rows if row["authorised_for_s4"] == "true")
+    if authorised_n != eligible_n:
+        raise Checkpoint1ApplyError(
+            "authorised_for_s4 was not derived from the technical eligible route"
+        )
+    for row in tracked_rows:
+        if row["primary_route"] == PRIMARY_ROUTE_ELIGIBLE:
+            if row["authorised_for_s4"] != "true":
+                raise Checkpoint1ApplyError(
+                    "Eligible technical route must be authorised_for_s4"
+                )
+        elif row["authorised_for_s4"] != "false":
+            raise Checkpoint1ApplyError(
+                "Non-eligible technical routes must remain unauthorised for S4"
+            )
+
+    write_csv_atomic(
+        tracked_manifest, ENA_TRACKED_RESOLUTION_COLUMNS, tracked_rows
+    )
+    write_csv_atomic(
+        output_dir / "ena_checkpoint1_s4_authorised_ids.csv",
+        S4_ID_COLUMNS,
+        s4_rows,
+    )
+    write_csv_atomic(
+        output_dir / "ena_checkpoint1_parked_ids.csv",
+        PARKED_ID_COLUMNS,
+        parked_id_rows,
+    )
+    write_csv_atomic(
+        output_dir / "ena_checkpoint1_rejected_ids.csv",
+        REJECTED_ID_COLUMNS,
+        rejected_id_rows,
+    )
+
+    transform_hashes = {name: sha256_file(path) for name, path in applied_paths.items()}
+    closure_paths = {
+        "s4_authorised_ids": output_dir / "ena_checkpoint1_s4_authorised_ids.csv",
+        "parked_ids": output_dir / "ena_checkpoint1_parked_ids.csv",
+        "rejected_ids": output_dir / "ena_checkpoint1_rejected_ids.csv",
+        "tracked_manifest": tracked_manifest,
+    }
+    output_hashes = {
+        **transform_hashes,
+        **{name: sha256_file(path) for name, path in closure_paths.items()},
+    }
+
+    review_hashes = {
+        name: hashes_before[name]
+        for name in review_hash_paths
+        if hashes_before.get(name)
+    }
+    integrity = {
+        "raw": hashes_before["raw"],
+        "s1": hashes_before["s1"],
+        "sidecar": hashes_before["sidecar"],
+        "s2": hashes_before["s2"],
+        "s3": hashes_before["s3"],
+        "s3_decisions": hashes_before["s3_decisions"],
+        "deterministic_ok": "true" if deterministic_ok else "false",
+    }
+    summary_text = format_closure_markdown(
+        simulation,
+        review_hashes=review_hashes,
+        integrity=integrity,
+        output_hashes=output_hashes,
+        record_decisions=record_decisions,
+        deterministic_ok=deterministic_ok,
+        preview_comparison_ok=preview_comparison_ok or not compare_to_preview,
+        semantic_mismatches=semantic_mismatches,
+    )
+    if ENA_CHECKPOINT_CLOSED_STATEMENT not in summary_text:
+        raise Checkpoint1ApplyError(
+            "Resolution summary missing checkpoint-closed statement"
+        )
+    if str(repo_root.resolve()) in summary_text:
+        raise Checkpoint1ApplyError(
+            "Resolution summary must not contain absolute repository paths"
+        )
+    summary_path = output_dir / "ena_checkpoint1_resolution_summary.md"
+    _write_text_atomic(summary_path, summary_text)
+    _write_text_atomic(
+        output_dir / "README.md",
+        "CHECKPOINT-1 CLOSED.\n"
+        "These files are the authoritative ENA post-review artefacts.\n"
+        "They must not overwrite S2, pre-review S3, or dry-run previews.\n"
+        "S4 has not started. An ENA global-S4 handoff has not been prepared.\n",
+    )
+    output_hashes["summary"] = sha256_file(summary_path)
+
+    accepted_dry_run = dict(expected_dry_run_hashes or {})
+    metadata = {
+        "source": "ena",
+        "source_key": "ena",
+        "source_dataset": SOURCE_DATASET,
+        "checkpoint": "CHECKPOINT-1",
+        "review_model": "single_reviewer",
+        "checkpoint_status": "closed",
+        "checkpoint_closed": True,
+        "review_completion_status": "complete",
+        "application_status": "applied",
+        "s4_started": False,
+        "global_s4_handoff_prepared": False,
+        "global_s4_run": False,
+        "next_stage": "review_ena_closure_before_global_s4_handoff",
+        "reviewed_records": int(simulation.stats["record_decisions_consumed"]),
+        "record_decisions": record_decisions,
+        "technically_eligible": eligible_n,
+        "parked_construct_review": int(simulation.stats["parked_construct_review"]),
+        "technical_rejects": int(simulation.stats["technical_rejects"]),
+        "authorised_for_s4": int(simulation.stats["authorised_for_s4"]),
+        "authorised_for_s4_meaning": AUTHORISED_FOR_S4_MEANING,
+        "records_trimmed": int(simulation.stats["records_trimmed"]),
+        "large_trim_human_approved": int(
+            simulation.stats["large_trim_human_approved"]
+        ),
+        "guard_rail_failures": int(simulation.stats["guard_rail_failures"]),
+        "unresolved_after_consumption": 0,
+        "review_file_sha256": hashes_before["ena_checkpoint1_manual_review.csv"],
+        "review_index_sha256": hashes_before[
+            "ena_checkpoint1_manual_review_index.csv"
+        ],
+        "review_rules_sha256": hashes_before[
+            "ena_checkpoint1_constant_rule_review.csv"
+        ],
+        "review_exceptions_sha256": hashes_before[
+            "ena_checkpoint1_constant_exceptions.csv"
+        ],
+        "review_reconciliation_sha256": hashes_before[
+            "ena_checkpoint1_legacy_collapse_reconciliation.csv"
+        ],
+        "review_reconciliation_index_sha256": hashes_before[
+            "ena_checkpoint1_legacy_collapse_reconciliation_index.csv"
+        ],
+        "review_bulk_sha256": hashes_before[
+            "ena_checkpoint1_bulk_audit_confirmation.csv"
+        ],
+        "frozen_human_review_hashes": {
+            name: hashes_before[name]
+            for name in review_hash_paths
+            if hashes_before.get(name)
+        },
+        "raw_sha256": hashes_before["raw"],
+        "s1_sha256": hashes_before["s1"],
+        "sidecar_sha256": hashes_before["sidecar"],
+        "s2_sha256": hashes_before["s2"],
+        "s3_sha256": hashes_before["s3"],
+        "s3_decisions_sha256": hashes_before["s3_decisions"],
+        "accepted_dry_run_hashes": accepted_dry_run,
+        "accepted_dry_run_parity": preview_comparison_ok or not compare_to_preview,
+        "output_hashes": output_hashes,
+        "preview_comparison_ok": preview_comparison_ok or not compare_to_preview,
+        "semantic_mismatches": semantic_mismatches,
+        "byte_identical": byte_identical,
+        "deterministic_rerun_ok": deterministic_ok,
+        "code_identity": {
+            "apply_adapter": "adapters.ena_checkpoint1_apply",
+            "dispatcher": "scripts/data_preparation/checkpoint1_apply_review.py",
+            "eligibility_policy": "config/source_eligibility/ena.json",
+        },
+        "closure_only_fields": list(CLOSURE_ONLY_FIELDS),
+        "application_mode": "apply",
+    }
+    _write_json_atomic(metadata_out, metadata)
+    output_hashes["metadata"] = sha256_file(metadata_out)
+
+    if check_deterministic_rerun:
+        determinism_dir = checkpoint_dir / "closure_validation" / "determinism"
+        determinism_dir = _assert_output_dir_allowed(repo_root, determinism_dir)
+        third = _simulate()
+        verify_paths = _write_ena_transform_csvs(determinism_dir, third)
+        for name, path in applied_paths.items():
+            if sha256_file(path) != sha256_file(verify_paths[name]):
+                raise Checkpoint1ApplyError(
+                    f"Deterministic verification mismatch for {name}"
+                )
+
+    hashes_after = {
+        name: sha256_file(path) if path.is_file() else ""
+        for name, path in review_hash_paths.items()
+    }
+    hashes_after.update(
+        {
+            "raw": sha256_file(raw_path) if raw_path.is_file() else "",
+            "s1": sha256_file(s1_path) if s1_path.is_file() else "",
+            "sidecar": sha256_file(sidecar_path),
+            "s2": sha256_file(s2_path),
+            "s3": sha256_file(canonical_path),
+            "s3_decisions": sha256_file(decision_path),
+            "qc": sha256_file(qc_path),
+            "proposals": sha256_file(proposals_path),
+            "membership": (
+                sha256_file(membership_path) if membership_path.is_file() else ""
+            ),
+        }
+    )
+    if hashes_after != hashes_before:
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 apply mutated an immutable input artefact"
+        )
+    if handoff_json.is_file() or handoff_csv.is_file():
+        raise Checkpoint1ApplyError(
+            "ENA apply must not create a global-S4 source handoff"
+        )
+
+    stats = dict(simulation.stats)
+    print(
+        "source=ena\n"
+        "mode=apply\n"
+        "checkpoint_status=closed\n"
+        f"total_records={stats['total_records']}\n"
+        f"technically_eligible={stats['technically_eligible']}\n"
+        f"parked_construct_review={stats['parked_construct_review']}\n"
+        f"technical_rejects={stats['technical_rejects']}\n"
+        f"records_trimmed={stats['records_trimmed']}\n"
+        f"large_trim_human_approved={stats['large_trim_human_approved']}\n"
+        f"guard_rail_failures={stats['guard_rail_failures']}\n"
+        f"authorised_for_s4={stats['authorised_for_s4']}\n"
+        f"preview_comparison={'pass' if preview_comparison_ok or not compare_to_preview else 'fail'}\n"
+        f"semantic_mismatches={semantic_mismatches}\n"
+        f"deterministic_rerun={'pass' if deterministic_ok else 'skipped'}\n"
+        "CHECKPOINT-1 CLOSED\n"
+        "ENA global-S4 handoff has not been prepared\n"
+        "S4 has not started"
+    )
+    return EnaApplyResult(
+        output_dir=output_dir,
+        metadata_out=metadata_out,
+        tracked_manifest=tracked_manifest,
+        summary_out=summary_path,
+        output_hashes=output_hashes,
+        stats=stats,
+        preview_comparison_ok=preview_comparison_ok or not compare_to_preview,
+        deterministic_rerun_ok=deterministic_ok,
+        semantic_mismatches=semantic_mismatches,
+        byte_identical=byte_identical,
+        checkpoint_closed=True,
+    )
+
+
+def run_ena_checkpoint1_dry_run(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    check_deterministic_rerun: bool = True,
+    expected_total_rows: int | None = 679,
+    verify_frozen_review: bool = True,
+    compare_to_pristine: bool = True,
+    skip_pipeline_integrity: bool = False,
+    expected_review_hashes: Mapping[str, str] | None = None,
+    expected_pipeline_hashes: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Simulate ENA CHECKPOINT-1 application without closing it.
+
+    ``expected_review_hashes`` gates this completed-review instance at
+    run time. It is not a source-level ENA pipeline constant.
+    """
+    from adapters.ena_checkpoint1_apply import (
+        CHANGE_REPORT_COLUMNS,
+        DRY_RUN_BANNER,
+        ELIGIBLE_PREVIEW_COLUMNS,
+        GROUP_SUMMARY_COLUMNS,
+        GUARD_RAIL_FAILURE_COLUMNS,
+        LARGE_TRIM_RECORD_COLUMNS,
+        EnaCheckpoint1ApplyError,
+        compare_ena_package_to_pristine,
+        format_dry_run_markdown,
+        load_default_policy,
+        serialise_ena_simulation,
+        simulate_ena_checkpoint1_application,
+    )
+    from adapters.ena_checkpoint1_review import (
+        read_csv_rows,
+        validate_ena_review_package,
+    )
+    from adapters.ena_s3 import (
+        DECISION_COLUMNS,
+        PARK_COLUMNS,
+        REJECTION_COLUMNS,
+        index_constant_proposals,
+    )
+    from checkpoint1_prepare_review import prepare_ena_checkpoint1_review
+    from common.corpus_schema import CORPUS_COLUMNS, write_corpus_csv_atomic
+    from s3_classify import EXPECTED_ENA_RAW_SHA256, EXPECTED_ENA_S2_HASH
+
+    output_dir = _assert_aptadb_dry_run_output(output_dir)
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    review_dir = checkpoint_dir / "manual_review"
+    queue_path = review_dir / "ena_checkpoint1_manual_review.csv"
+    index_path = review_dir / "ena_checkpoint1_manual_review_index.csv"
+    rule_path = review_dir / "ena_checkpoint1_constant_rule_review.csv"
+    membership_path = review_dir / "ena_checkpoint1_constant_rule_membership.csv"
+    exception_path = review_dir / "ena_checkpoint1_constant_exceptions.csv"
+    recon_path = review_dir / "ena_checkpoint1_legacy_collapse_reconciliation.csv"
+    recon_index_path = (
+        review_dir / "ena_checkpoint1_legacy_collapse_reconciliation_index.csv"
+    )
+    bulk_path = review_dir / "ena_checkpoint1_bulk_audit_confirmation.csv"
+    canonical_path = checkpoint_dir / "ena_s3_canonical.csv"
+    decision_path = checkpoint_dir / "ena_s3_decisions.csv"
+    rejection_path = checkpoint_dir / "rejected_ena.csv"
+    parked_path = checkpoint_dir / "ena_s3_parked_construct.csv"
+    s1_path = repo_root / "data" / "interim" / "extracted" / "ena_extracted.csv"
+    sidecar_path = repo_root / "data" / "interim" / "extracted" / "ena_source_metadata.csv"
+    s2_path = repo_root / "data" / "interim" / "normalised" / "ena_normalised.csv"
+    qc_path = repo_root / "data" / "interim" / "normalised" / "ena_s2_qc.csv"
+    proposals_path = (
+        repo_root / "data" / "interim" / "normalised" / "ena_constant_region_proposals.csv"
+    )
+    s2_membership_path = (
+        repo_root
+        / "data"
+        / "interim"
+        / "normalised"
+        / "ena_constant_region_membership.csv"
+    )
+    raw_path = (
+        repo_root
+        / "data"
+        / "raw"
+        / "ENA"
+        / "review_v2"
+        / "ena_selected_after_manual_review.csv"
+    )
+
+    required = [
+        queue_path,
+        rule_path,
+        exception_path,
+        recon_path,
+        bulk_path,
+        canonical_path,
+        decision_path,
+        s2_path,
+        qc_path,
+        sidecar_path,
+        proposals_path,
+    ]
+    for path in required:
+        if not path.is_file():
+            raise Checkpoint1ApplyError(f"Missing dry-run input: {path.name}")
+
+    review_hash_paths = {
+        "ena_checkpoint1_manual_review.csv": queue_path,
+        "ena_checkpoint1_manual_review_index.csv": index_path,
+        "ena_checkpoint1_constant_rule_review.csv": rule_path,
+        "ena_checkpoint1_constant_exceptions.csv": exception_path,
+        "ena_checkpoint1_legacy_collapse_reconciliation.csv": recon_path,
+        "ena_checkpoint1_legacy_collapse_reconciliation_index.csv": recon_index_path,
+        "ena_checkpoint1_bulk_audit_confirmation.csv": bulk_path,
+    }
+    hashes_before = {
+        name: sha256_file(path) if path.is_file() else ""
+        for name, path in review_hash_paths.items()
+    }
+    hashes_before.update(
+        {
+            "raw": sha256_file(raw_path) if raw_path.is_file() else "",
+            "s1": sha256_file(s1_path) if s1_path.is_file() else "",
+            "sidecar": sha256_file(sidecar_path),
+            "s2": sha256_file(s2_path),
+            "s3": sha256_file(canonical_path),
+            "s3_decisions": sha256_file(decision_path),
+            "qc": sha256_file(qc_path),
+            "proposals": sha256_file(proposals_path),
+            "membership": (
+                sha256_file(membership_path) if membership_path.is_file() else ""
+            ),
+        }
+    )
+    if verify_frozen_review:
+        if expected_review_hashes is None:
+            raise Checkpoint1ApplyError(
+                "Frozen ENA review hashes must be supplied as a run-time gate"
+            )
+        for name, expected in expected_review_hashes.items():
+            actual = hashes_before.get(name, "")
+            if actual != expected:
+                raise Checkpoint1ApplyError(
+                    f"Frozen review hash mismatch for {name}"
+                )
+    if not skip_pipeline_integrity:
+        if hashes_before["raw"] and hashes_before["raw"] != EXPECTED_ENA_RAW_SHA256:
+            raise Checkpoint1ApplyError("ENA raw SHA-256 does not match freeze")
+        if hashes_before["s2"] != EXPECTED_ENA_S2_HASH:
+            raise Checkpoint1ApplyError("ENA S2 SHA-256 does not match freeze")
+        if hashes_before["s3"] != EXPECTED_ENA_S2_HASH:
+            raise Checkpoint1ApplyError("ENA S3 canonical SHA-256 does not match freeze")
+        if expected_pipeline_hashes:
+            for key, expected in expected_pipeline_hashes.items():
+                if hashes_before.get(key, "") != expected:
+                    raise Checkpoint1ApplyError(
+                        f"ENA {key} SHA-256 does not match freeze"
+                    )
+
+    queue_rows = read_csv_rows(queue_path)
+    rule_rows = read_csv_rows(rule_path)
+    exception_rows = read_csv_rows(exception_path)
+    reconciliation_rows = read_csv_rows(recon_path)
+    membership_rows = (
+        read_csv_rows(membership_path) if membership_path.is_file() else []
+    )
+    bulk_rows = read_csv_rows(bulk_path)
+    bulk = bulk_rows[0] if bulk_rows else None
+    try:
+        report = validate_ena_review_package(
+            queue_rows=queue_rows,
+            rule_rows=rule_rows,
+            exception_rows=exception_rows,
+            reconciliation_rows=reconciliation_rows,
+            bulk_confirmation=bulk,
+        )
+    except Exception as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+    if not report.ok or report.blocking_issues:
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for dry-run application"
+        )
+    if (
+        expected_total_rows == 679
+        and (
+            report.total_review_records != 77
+            or report.unresolved_manual_decisions != 0
+            or report.unresolved_constant_groups != 0
+            or report.unresolved_exceptions != 0
+            or report.unresolved_reconciliation_groups != 0
+            or report.audit_only_unconfirmed != 0
+            or report.ready_for_application != 77
+        )
+    ):
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for dry-run application"
+        )
+
+    if compare_to_pristine:
+        pristine_dir = output_dir / "pristine_reconstruction"
+        if pristine_dir.resolve() == review_dir.resolve():
+            raise Checkpoint1ApplyError(
+                "Refusing to overwrite the completed human review with pristine"
+            )
+        prepare_ena_checkpoint1_review(
+            repo_root=repo_root,
+            checkpoint_dir=checkpoint_dir,
+            output_dir=pristine_dir,
+            expected_total_rows=expected_total_rows,
+        )
+        try:
+            compare_ena_package_to_pristine(
+                reviewed_queue=queue_rows,
+                pristine_queue=read_csv_rows(
+                    pristine_dir / "ena_checkpoint1_manual_review.csv"
+                ),
+                reviewed_rules=rule_rows,
+                pristine_rules=read_csv_rows(
+                    pristine_dir / "ena_checkpoint1_constant_rule_review.csv"
+                ),
+                reviewed_exceptions=exception_rows,
+                pristine_exceptions=read_csv_rows(
+                    pristine_dir / "ena_checkpoint1_constant_exceptions.csv"
+                ),
+                reviewed_reconciliation=reconciliation_rows,
+                pristine_reconciliation=read_csv_rows(
+                    pristine_dir / "ena_checkpoint1_legacy_collapse_reconciliation.csv"
+                ),
+                reviewed_bulk=bulk_rows,
+                pristine_bulk=read_csv_rows(
+                    pristine_dir / "ena_checkpoint1_bulk_audit_confirmation.csv"
+                ),
+                reviewed_membership=membership_rows,
+                pristine_membership=(
+                    read_csv_rows(
+                        pristine_dir / "ena_checkpoint1_constant_rule_membership.csv"
+                    )
+                    if (pristine_dir / "ena_checkpoint1_constant_rule_membership.csv").is_file()
+                    else []
+                ),
+            )
+        except EnaCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    canonical_rows = read_csv_rows(canonical_path)
+    decision_rows = read_csv_rows(decision_path)
+    rejection_rows = read_csv_rows(rejection_path) if rejection_path.is_file() else []
+    parked_rows = read_csv_rows(parked_path) if parked_path.is_file() else []
+    qc_rows = read_csv_rows(qc_path)
+    sidecar_rows = read_csv_rows(sidecar_path)
+    proposal_rows = read_csv_rows(proposals_path)
+    s2_membership = (
+        read_csv_rows(s2_membership_path) if s2_membership_path.is_file() else []
+    )
+    qc_by_id = _index_rows(qc_rows)
+    sidecar_by_id = _index_rows(sidecar_rows)
+    proposals_by_record = index_constant_proposals(
+        qc_rows, proposal_rows, s2_membership
+    )
+    policy = load_default_policy(repo_root)
+
+    def _simulate():
+        try:
+            return simulate_ena_checkpoint1_application(
+                queue_rows=queue_rows,
+                rule_rows=rule_rows,
+                exception_rows=exception_rows,
+                reconciliation_rows=reconciliation_rows,
+                canonical_rows=canonical_rows,
+                decision_rows=decision_rows,
+                source_metadata_by_id=sidecar_by_id,
+                s2_qc_by_id=qc_by_id,
+                policy=policy,
+                membership_rows=membership_rows,
+                proposals_by_record=proposals_by_record,
+                bulk_confirmation=bulk,
+                existing_rejection_rows=rejection_rows,
+                existing_parked_construct=parked_rows,
+                expected_total_rows=expected_total_rows,
+            )
+        except EnaCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    simulation = _simulate()
+    deterministic_ok = False
+    if check_deterministic_rerun:
+        second = _simulate()
+        if serialise_ena_simulation(simulation) != serialise_ena_simulation(second):
+            raise Checkpoint1ApplyError(
+                "ENA CHECKPOINT-1 dry-run preview was not byte-identical "
+                "across deterministic rerun"
+            )
+        deterministic_ok = True
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_corpus_csv_atomic(
+        output_dir / "ena_checkpoint1_dry_run_canonical_preview.csv",
+        simulation.preview_canonical,
+        columns=CORPUS_COLUMNS,
+    )
+    write_csv_atomic(
+        output_dir / "ena_checkpoint1_dry_run_routing_preview.csv",
+        DECISION_COLUMNS,
+        simulation.preview_decisions,
+    )
+    write_csv_atomic(
+        output_dir / "ena_checkpoint1_dry_run_rejection_preview.csv",
+        REJECTION_COLUMNS,
+        simulation.preview_rejections,
+    )
+    write_csv_atomic(
+        output_dir / "ena_checkpoint1_dry_run_parked_construct_preview.csv",
+        PARK_COLUMNS,
+        simulation.preview_parked_construct,
+    )
+    write_csv_atomic(
+        output_dir / "ena_checkpoint1_dry_run_eligible_preview.csv",
+        ELIGIBLE_PREVIEW_COLUMNS,
+        simulation.preview_eligible,
+    )
+    write_csv_atomic(
+        output_dir / "ena_checkpoint1_dry_run_change_report.csv",
+        CHANGE_REPORT_COLUMNS,
+        simulation.change_report,
+    )
+    write_csv_atomic(
+        output_dir / "ena_checkpoint1_dry_run_group_summary.csv",
+        GROUP_SUMMARY_COLUMNS,
+        simulation.group_summaries,
+    )
+    write_csv_atomic(
+        output_dir / "ena_checkpoint1_dry_run_large_trim_human_approved.csv",
+        LARGE_TRIM_RECORD_COLUMNS,
+        simulation.large_trim_records,
+    )
+    write_csv_atomic(
+        output_dir / "ena_checkpoint1_dry_run_guard_rail_failures.csv",
+        GUARD_RAIL_FAILURE_COLUMNS,
+        simulation.guard_rail_failure_rows,
+    )
+    review_hashes = {
+        name: hashes_before[name]
+        for name in review_hash_paths
+        if hashes_before.get(name)
+    }
+    integrity = {
+        "raw": hashes_before["raw"],
+        "s1": hashes_before["s1"],
+        "sidecar": hashes_before["sidecar"],
+        "s2": hashes_before["s2"],
+        "s3": hashes_before["s3"],
+        "s3_decisions": hashes_before["s3_decisions"],
+        "deterministic_ok": "true" if deterministic_ok else "false",
+    }
+    report_text = format_dry_run_markdown(
+        simulation, review_hashes=review_hashes, integrity=integrity
+    )
+    _write_text_atomic(
+        output_dir / "ena_checkpoint1_dry_run_report.md", report_text
+    )
+    _write_text_atomic(
+        output_dir / "README.md",
+        DRY_RUN_BANNER
+        + "\n\nThese files are application previews only. They must not be "
+        "treated as resolved CHECKPOINT-1 outputs or an S4 handoff.\n",
+    )
+
+    hashes_after = {
+        name: sha256_file(path) if path.is_file() else ""
+        for name, path in review_hash_paths.items()
+    }
+    hashes_after.update(
+        {
+            "raw": sha256_file(raw_path) if raw_path.is_file() else "",
+            "s1": sha256_file(s1_path) if s1_path.is_file() else "",
+            "sidecar": sha256_file(sidecar_path),
+            "s2": sha256_file(s2_path),
+            "s3": sha256_file(canonical_path),
+            "s3_decisions": sha256_file(decision_path),
+            "qc": sha256_file(qc_path),
+            "proposals": sha256_file(proposals_path),
+            "membership": (
+                sha256_file(membership_path) if membership_path.is_file() else ""
+            ),
+        }
+    )
+    if hashes_after != hashes_before:
+        raise Checkpoint1ApplyError(
+            "Dry-run mutated an input artefact; aborting without treating "
+            "preview files as authoritative"
+        )
+
+    output_hash_names = [
+        "ena_checkpoint1_dry_run_canonical_preview.csv",
+        "ena_checkpoint1_dry_run_routing_preview.csv",
+        "ena_checkpoint1_dry_run_rejection_preview.csv",
+        "ena_checkpoint1_dry_run_parked_construct_preview.csv",
+        "ena_checkpoint1_dry_run_eligible_preview.csv",
+        "ena_checkpoint1_dry_run_change_report.csv",
+        "ena_checkpoint1_dry_run_group_summary.csv",
+        "ena_checkpoint1_dry_run_large_trim_human_approved.csv",
+        "ena_checkpoint1_dry_run_guard_rail_failures.csv",
+        "ena_checkpoint1_dry_run_report.md",
+    ]
+    output_hashes = {
+        name: sha256_file(output_dir / name)
+        for name in output_hash_names
+        if (output_dir / name).is_file()
+    }
+    hash_lines = [
+        "# ENA CHECKPOINT-1 dry-run output hashes (apply-parity reference)",
+        "",
+        DRY_RUN_BANNER,
+        "",
+    ]
+    for name, digest in output_hashes.items():
+        hash_lines.append(f"- `{name}`: `{digest}`")
+    _write_text_atomic(
+        output_dir / "ena_checkpoint1_dry_run_output_hashes.md",
+        "\n".join(hash_lines) + "\n",
+    )
+
+    stats = simulation.stats
+    if int(stats.get("guard_rail_failures") or 0) != 0:
+        raise Checkpoint1ApplyError("Dry-run guard-rail failures are forbidden")
+    print(
+        "source=ena\n"
+        "mode=dry_run\n"
+        "checkpoint_status=unapplied\n"
+        f"total_records={stats['total_records']}\n"
+        f"technically_eligible={stats['technically_eligible']}\n"
+        f"parked_construct_review={stats['parked_construct_review']}\n"
+        f"technical_rejects={stats['technical_rejects']}\n"
+        f"records_trimmed={stats['records_trimmed']}\n"
+        f"large_trim_human_approved={stats['large_trim_human_approved']}\n"
+        f"guard_rail_failures={stats['guard_rail_failures']}\n"
+        f"authorised_for_s4={stats['authorised_for_s4']}\n"
+        f"deterministic_rerun={'pass' if deterministic_ok else 'skipped'}\n"
+        "CHECKPOINT-1 is not closed\n"
+        "S4 remains blocked"
+    )
+    return output_hashes
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -4382,10 +5697,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "aptadb",
             "riboaptamer",
             "aptaindex",
+            "ena",
         }:
             raise Checkpoint1ApplyError(
                 f"Unsupported source_key={args.source!r}; "
-                "supported: aptabase, utexas, aptadb, riboaptamer, aptaindex"
+                "supported: aptabase, utexas, aptadb, riboaptamer, aptaindex, ena"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -4395,6 +5711,99 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not repo_root.is_dir():
             raise Checkpoint1ApplyError(f"Repository root does not exist: {repo_root}")
 
+        if args.source == "ena":
+            checkpoint_dir = (
+                args.checkpoint_dir
+                if args.checkpoint_dir is not None
+                else Path("data/interim/checkpoints/ena_cp1")
+            )
+            if not Path(checkpoint_dir).is_absolute():
+                checkpoint_dir = repo_root / checkpoint_dir
+            # Run-time gate for this completed-review instance only. Not a
+            # source-level ENA constant and not copied into adapters/ena.py.
+            expected_total = (
+                679
+                if args.expected_total_rows is None
+                else args.expected_total_rows
+            )
+            if args.dry_run:
+                output_dir = (
+                    args.output_dir
+                    if args.output_dir is not None
+                    else Path(checkpoint_dir) / "dry_run"
+                )
+                if not Path(output_dir).is_absolute():
+                    output_dir = repo_root / output_dir
+                run_ena_checkpoint1_dry_run(
+                    repo_root=repo_root,
+                    checkpoint_dir=Path(checkpoint_dir),
+                    output_dir=Path(output_dir),
+                    check_deterministic_rerun=not args.skip_deterministic_rerun,
+                    expected_total_rows=expected_total,
+                    verify_frozen_review=not args.skip_pipeline_integrity,
+                    compare_to_pristine=not args.skip_pipeline_integrity,
+                    skip_pipeline_integrity=args.skip_pipeline_integrity,
+                    expected_review_hashes=(
+                        None
+                        if args.skip_pipeline_integrity
+                        else FROZEN_ENA_REVIEW_HASHES
+                    ),
+                    expected_pipeline_hashes=(
+                        None
+                        if args.skip_pipeline_integrity
+                        else FROZEN_ENA_PIPELINE_HASHES
+                    ),
+                )
+                return 0
+            output_dir = (
+                args.output_dir
+                if args.output_dir is not None
+                else Path(checkpoint_dir) / "resolved"
+            )
+            if not Path(output_dir).is_absolute():
+                output_dir = repo_root / output_dir
+            tracked_manifest = (
+                args.tracked_manifest
+                if args.tracked_manifest is not None
+                else Path(
+                    "config/checkpoint_reviews/ena_checkpoint1_resolutions.csv"
+                )
+            )
+            metadata_out = (
+                args.metadata_out
+                if args.metadata_out is not None
+                else Path(
+                    "config/checkpoint_reviews/ena_checkpoint1_metadata.json"
+                )
+            )
+            run_ena_checkpoint1_apply(
+                repo_root=repo_root,
+                checkpoint_dir=Path(checkpoint_dir),
+                output_dir=Path(output_dir),
+                tracked_manifest=tracked_manifest,
+                metadata_out=metadata_out,
+                check_deterministic_rerun=not args.skip_deterministic_rerun,
+                expected_total_rows=expected_total,
+                verify_frozen_review=not args.skip_pipeline_integrity,
+                compare_to_pristine=not args.skip_pipeline_integrity,
+                skip_pipeline_integrity=args.skip_pipeline_integrity,
+                expected_review_hashes=(
+                    None
+                    if args.skip_pipeline_integrity
+                    else FROZEN_ENA_REVIEW_HASHES
+                ),
+                expected_pipeline_hashes=(
+                    None
+                    if args.skip_pipeline_integrity
+                    else FROZEN_ENA_PIPELINE_HASHES
+                ),
+                expected_dry_run_hashes=(
+                    None
+                    if args.skip_pipeline_integrity
+                    else ACCEPTED_ENA_DRY_RUN_HASHES
+                ),
+            )
+            return 0
         if args.source == "aptadb":
             checkpoint_dir = (
                 args.checkpoint_dir

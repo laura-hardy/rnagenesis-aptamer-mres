@@ -40,6 +40,12 @@ from adapters.aptaindex import (  # noqa: E402
     write_canonical_csv_atomic as write_aptaindex_canonical_csv_atomic,
     write_sidecar_csv_atomic as write_aptaindex_sidecar_csv_atomic,
 )
+from adapters.ena import (  # noqa: E402
+    EnaAdapterError,
+    EnaExtractionResult,
+    extract_ena,
+    write_sidecar_csv_atomic as write_ena_sidecar_csv_atomic,
+)
 from adapters.riboaptamer import (  # noqa: E402
     RiboAptamerAdapterError,
     RiboAptamerExtractionResult,
@@ -123,7 +129,8 @@ AdapterFn = Callable[
     AptaBaseExtractionResult
     | UTexasExtractionResult
     | RiboAptamerExtractionResult
-    | AptaIndexExtractionResult,
+    | AptaIndexExtractionResult
+    | EnaExtractionResult,
 ]
 
 
@@ -136,6 +143,8 @@ def _get_adapter(source_key: str) -> AdapterFn:
         return extract_riboaptamer
     if source_key == "aptaindex":
         return extract_aptaindex
+    if source_key == "ena":
+        return extract_ena
     raise S1ExtractError(f"Unknown S1 adapter for source_key={source_key!r}")
 
 
@@ -963,6 +972,167 @@ def build_aptaindex_s1_report(
     return "\n".join(lines)
 
 
+def build_ena_s1_report(
+    *,
+    repo_root: Path,
+    registry_row: RegistrySpecRow,
+    result: S1RunResult,
+) -> str:
+    """Build an aggregate-only Markdown ENA S1 report (no sequences)."""
+    stats = result.stats
+    lines = [
+        "# ENA S1 extraction report",
+        "",
+        "## Registered source",
+        "",
+        f"- Registered path: `{registry_row.path}`",
+        f"- Registered source dataset: `{registry_row.source_dataset}`",
+        f"- Registered SHA-256: `{registry_row.sha256}`",
+        f"- Observed SHA-256: `{result.observed_sha256}`",
+        f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+        f"- Registered n_rows_expected: `{registry_row.n_rows_expected}`",
+        f"- Redistribution status: `{registry_row.redistribution_status}`",
+        "",
+        "## Row counts",
+        "",
+        f"- Input rows: `{stats.input_rows}`",
+        f"- Canonical output rows: `{stats.canonical_rows}`",
+        f"- Sidecar rows: `{stats.sidecar_rows}`",
+        f"- Unique native IDs: `{stats.unique_native_ids}`",
+        f"- Unique canonical record IDs: `{stats.unique_record_ids}`",
+        f"- S1 records filtered, rejected, parked, or deduplicated: `0`",
+        "",
+        "## Native-ID strategy",
+        "",
+        f"- Strategy: `{stats.native_id_strategy}`",
+        "- `native_id` is the source `review_unit_id`.",
+        "- `record_id` is `ena:{review_unit_id}`.",
+        "- Supporting `review_unit_ids` remain sidecar provenance and are",
+        "  not used as identity and are not split.",
+        "",
+        "## Canonical mapping summary",
+        "",
+        "- Reviewed source `sequence` → `sequence_raw` (verbatim; no",
+        "  uppercase, whitespace strip, T→U, or alphabet inspection)",
+        "- Source `target` → `target_name_raw` (verbatim; no canonicalisation)",
+        "- `publication`, `doi`, and `pubmed_id` remain empty; source",
+        "  `representative_title`, `references`, `doi_values`, and",
+        "  `pubmed_values` stay in the sidecar",
+        "- Canonical `binding_evidence_type` / `binding_evidence_score` /",
+        "  affinity fields remain empty; source evidence fields stay in",
+        "  the sidecar for later global S4",
+        "- Canonical `experiment_group_id` and `near_duplicate_family_id`",
+        "  remain empty because those fields are forbidden at S1; primary",
+        "  grouping and family provenance are sidecar-only",
+        "",
+        "## Sequence and target retention (verbatim; no cleaning)",
+        "",
+        f"- Records with nonempty sequence_raw: `{stats.nonempty_sequences}`",
+        f"- Records with empty sequence_raw: `{stats.missing_sequences}`",
+        f"- Exact-copy validation for sequence_raw: "
+        f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+        f"- Records with nonempty target_name_raw: `{stats.nonempty_targets}`",
+        f"- Records with empty target_name_raw: `{stats.missing_targets}`",
+        f"- Exact-copy validation for target_name_raw: "
+        f"`{'pass' if stats.target_exact_copy_ok else 'fail'}`",
+        f"- Source sequence_corrected_applied=1 rows retained as sidecar "
+        f"provenance: `{stats.sequence_corrections_applied}`",
+        f"- Source target_corrected_applied=1 rows retained as sidecar "
+        f"provenance: `{stats.target_corrections_applied}`",
+        "",
+        "## Publication / evidence fields",
+        "",
+        f"- Nonempty canonical publication: `{stats.nonempty_publication}`",
+        f"- Nonempty canonical DOI: `{stats.nonempty_doi}`",
+        f"- Nonempty canonical PMID: `{stats.nonempty_pmid}`",
+        "",
+        "## Experiment-group provenance (sidecar only)",
+        "",
+        f"- Populated primary source experiment_group_id: "
+        f"`{stats.populated_primary_experiment_groups}`",
+        f"- Distinct primary experiment_group_id values: "
+        f"`{stats.distinct_primary_experiment_groups}`",
+        "- Supporting `experiment_group_ids` are preserved separately and",
+        "  are not treated as the primary grouping key.",
+        f"- Consolidated source rows (consolidated_from_n_units>1) retained "
+        f"unsplit: `{stats.consolidated_rows}`",
+        "",
+        "## Near-duplicate family provenance (sidecar only)",
+        "",
+        f"- Original blank source family IDs: `{stats.blank_source_family_ids}`",
+        f"- Original nonblank source family IDs: "
+        f"`{stats.nonblank_source_family_ids}`",
+        f"- Materialised singleton family IDs: "
+        f"`{stats.materialised_singleton_family_ids}`",
+        f"- Unique materialised singleton family IDs: "
+        f"`{stats.unique_materialised_singleton_ids}`",
+        f"- Pipe-delimited consolidated source family rows retained unsplit: "
+        f"`{stats.pipe_family_rows}`",
+        "- Blank source family means singleton, not unknown. Effective IDs",
+        "  use `ena_singleton_{review_unit_id}` with family size 1.",
+        "- Original source family ID/size values are not rewritten.",
+        "",
+        "## Source-metadata sidecar",
+        "",
+        f"- Sidecar rows: `{stats.sidecar_rows}`",
+        "- Sidecar retains all 37 original ENA columns verbatim plus",
+        "  `record_id` and three derived family-provenance fields:",
+        "  effective family ID, effective family size, and original",
+        "  family-ID missingness.",
+        "",
+        "## Validation results",
+        "",
+        f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+        f"- Row retention (rows_in == rows_out == "
+        f"{registry_row.n_rows_expected}): "
+        f"`{'pass' if stats.canonical_rows == registry_row.n_rows_expected else 'fail'}`",
+        f"- Unique native/record IDs: "
+        f"`{'pass' if stats.unique_native_ids == stats.canonical_rows and stats.unique_record_ids == stats.canonical_rows else 'fail'}`",
+        f"- Sequence exact-copy: "
+        f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+        f"- Target exact-copy: "
+        f"`{'pass' if stats.target_exact_copy_ok else 'fail'}`",
+        "",
+        "## Integrity / raw-data immutability",
+        "",
+        f"- Source-input hash before: `{result.input_hash_before}`",
+        f"- Source-input hash after: `{result.input_hash_after}`",
+        f"- Source-input pre/post hash result: "
+        f"`{'pass' if result.input_hash_unchanged else 'fail'}`",
+        (
+            f"- Deterministic rerun result: "
+            f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+            if result.deterministic_rerun_ok is not None
+            else "- Deterministic rerun result: `not_checked`"
+        ),
+        "",
+        "## Outputs",
+        "",
+        f"- Canonical: `{_relative_display(result.output_canonical, repo_root)}`",
+        f"- Sidecar: `{_relative_display(result.output_sidecar, repo_root)}`",
+        f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+        "",
+        "## Stage boundary",
+        "",
+        "- S1 only: no T→U conversion, sequence normalisation, molecule or",
+        "  chemistry classification, length filtering, trimming, target",
+        "  canonicalisation, evidence scoring, parking, eligibility",
+        "  filtering, leakage, clustering, balancing, or deduplication",
+        "  was performed.",
+        "- The 679-versus-676 processed-export difference is deferred to",
+        "  ENA CHECKPOINT-1.",
+        "- No S2 normalisation was started.",
+        "",
+        "## Pipeline status",
+        "",
+        "- ENA S1 complete.",
+        "- ENA S2 has not started.",
+        "- No ENA records are yet authorised for global S4.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def _combined_hash_token(role_hashes: Mapping[str, str]) -> str:
     return "|".join(
         f"{role}:{role_hashes[role]}"
@@ -1154,7 +1324,7 @@ def run_s1_extraction(
             f"SHA-256 mismatch before adapter execution for {source_key!r}"
         )
 
-    if source_key in {"aptabase", "utexas", "riboaptamer", "aptaindex"}:
+    if source_key in {"aptabase", "utexas", "riboaptamer", "aptaindex", "ena"}:
         extraction = adapter(
             input_path,
             source_dataset=row.source_dataset,
@@ -1191,6 +1361,9 @@ def run_s1_extraction(
     elif source_key == "aptaindex":
         write_aptaindex_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
         report_builder = build_aptaindex_s1_report
+    elif source_key == "ena":
+        write_ena_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
+        report_builder = build_ena_s1_report
     else:
         raise S1ExtractError(f"No sidecar writer for source_key={source_key!r}")
 
@@ -1228,8 +1401,14 @@ def run_s1_extraction(
                 write_utexas_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
             elif source_key == "aptaindex":
                 write_aptaindex_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
-            else:
+            elif source_key == "ena":
+                write_ena_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
+            elif source_key == "riboaptamer":
                 write_riboaptamer_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
+            else:
+                raise S1ExtractError(
+                    f"No sidecar writer for source_key={source_key!r}"
+                )
             deterministic_ok = (
                 tmp_c.read_bytes() == canonical_path.read_bytes()
                 and tmp_s.read_bytes() == sidecar_path.read_bytes()
@@ -1289,7 +1468,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Registry source_key to extract (e.g. aptabase, utexas, aptadb, riboaptamer, aptaindex)",
+        help="Registry source_key to extract (e.g. aptabase, utexas, aptadb, riboaptamer, aptaindex, ena)",
     )
     parser.add_argument(
         "--registry-spec",
@@ -1357,6 +1536,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         AptaBaseAdapterError,
         AptaDBAdapterError,
         AptaIndexAdapterError,
+        EnaAdapterError,
         RiboAptamerAdapterError,
         UTexasAdapterError,
         CorpusSchemaError,

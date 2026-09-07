@@ -143,6 +143,34 @@ def test_load_utexas_eligibility_policy() -> None:
     assert policy.decision_precedence[1] == "non_rna_molecule"
 
 
+def test_load_ena_eligibility_policy() -> None:
+    policy = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "ena.json"
+    )
+    assert policy.source_key == "ena"
+    assert policy.defer_target_classification is True
+    assert policy.defer_evidence_scoring is True
+    assert policy.defer_leakage_exclusion is True
+    assert policy.sequence_leakage_matching_enabled is False
+    assert policy.target_leakage_matching_enabled is False
+    assert policy.use_plan_reason_vocabulary is True
+    assert policy.unresolved_trim_blocks_eligibility is True
+    assert policy.random_accept_audit_size == 30
+    assert policy.random_seed == 42
+    assert policy.core_length_min == 20
+    assert policy.core_length_max == 100
+    assert policy.length_out_of_range_decision == "proposed_reject"
+    assert policy.trim_review_decision == "proposed_park"
+    assert policy.eligible_rna_decision == "proposed_accept"
+    assert policy.decision_precedence[0] == "missing_sequence"
+    assert policy.decision_precedence[-1] == "technically_eligible_rna"
+    assert "length_out_of_range" in policy.decision_precedence
+    assert "trim_construct_unresolved" in policy.decision_precedence
+    assert "ssdna_parked" not in policy.decision_precedence
+    assert "non_protein_target_parked" not in policy.decision_precedence
+    assert policy.active_review_batches[0] == "01_judgement_dependent_technical"
+
+
 def test_load_aptaindex_eligibility_policy() -> None:
     policy = load_eligibility_policy(
         REPO_ROOT / "config" / "source_eligibility" / "aptaindex.json"

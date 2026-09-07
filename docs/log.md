@@ -4978,3 +4978,781 @@ AptaIndex CHECKPOINT-1 closed
 AptaIndex prepared for later global S4 (not run)
 ```
 
+## 2026-09-07 — ENA S0 registration and S1 extraction
+
+**Stage:** Aim 2 / data curation / ENA S0 registration + S1 extraction only.
+ENA S2 was not started. CHECKPOINT-1 was not opened. Global S4 was not run.
+
+### What was done
+
+The curated 679-row ENA review_v2 selected file was registered as the
+authoritative Tier-1 source and frozen by SHA-256 and expected row
+count. A source-specific S1 adapter then extracted every registered
+row into the canonical corpus schema, with a complete one-to-one
+source-metadata sidecar. All 679 source records and all 37 original
+source columns were retained. Sequence normalisation, T→U conversion,
+molecule/chemistry classification, trimming, target canonicalisation,
+evidence scoring, leakage, deduplication, clustering, balancing, and
+CHECKPOINT-1 were deliberately not performed.
+
+### Why this file is authoritative
+
+Inventory `recommended_S0_status` for this path is
+`derived_output_not_raw_input`. That classification is correct as a
+raw-tree label: the file is a reviewed selected lane, not the original
+EMBL download. The governing curation plan already authorises a
+registry-over-inventory override, so S0 emitted the existing generic
+inventory warning and did not fail. The original EMBL download,
+inspection/, candidates/, review/, other review_v2 CSVs, the processed
+676-row export, and copied ENA data under `upload to chat gpt/` were
+not registered and were not ingested.
+
+### Decisions made
+
+- `native_id` is source `review_unit_id` (populated and unique 679/679).
+  `record_id` is `ena:{review_unit_id}`. Supporting `review_unit_ids`
+  remain sidecar provenance. Three consolidated rows were not split.
+- Reviewed source `sequence` is copied verbatim into `sequence_raw`.
+  `sequence_original` is sidecar provenance only. No uppercase, no
+  whitespace strip, no T→U, and no alphabet inspection were applied.
+- Sequence and target correction fields remain sidecar provenance
+  (8 sequence corrections; 1 target correction).
+- Canonical `publication`, `doi`, `pubmed_id`, evidence, and affinity
+  fields remain empty. Source evidence/title/reference fields stay in
+  the sidecar for later global S4.
+- Canonical `experiment_group_id` remains empty because the live S1
+  schema forbids it. The primary source field is preserved in the
+  sidecar for later S2 group inference. Supporting
+  `experiment_group_ids` are stored separately and are not treated as
+  the primary key (25 primary groups vs 28 expanded supporting IDs).
+- Blank source `near_duplicate_family_id` means singleton, not unknown.
+  312 blank rows received deterministic sidecar IDs
+  `ena_singleton_{review_unit_id}` with family size 1. 367 nonblank
+  source family values were left unchanged, including one
+  pipe-delimited consolidated family value. Canonical
+  `near_duplicate_family_id` remains empty at S1.
+- The 679-versus-676 processed-export difference remains deferred to
+  ENA CHECKPOINT-1.
+
+### Inputs used
+
+- `source_dataset = ena_selected_v2_2026-08`
+- `data/raw/ENA/review_v2/ena_selected_after_manual_review.csv`
+- SHA-256:
+  `d1069b96c2bcf5eba02d7d7907b3bcc33e041bf80aac6345e7295715e45c5a35`
+- 679 logical rows; 37-column UTF-8 CSV with BOM
+- Snapshot date: `2026-08-04`; tier `1`;
+  `redistribution_status = unknown`
+
+### Outputs produced
+
+Ignored under `/data/`:
+
+- `data/interim/registry/source_registry.csv` (operational S0 registry;
+  13 validated registered files, exactly one `ena` entry)
+- `data/interim/extracted/ena_extracted.csv` (679 rows)
+- `data/interim/extracted/ena_source_metadata.csv` (679 rows)
+- `data/interim/extracted/ena_s1_report.md`
+
+Tracked scripts, tests and this log entry. Nothing under `data/` is
+tracked.
+
+### Numbers
+
+- 679 rows input
+- 679 extracted; 679 unique `record_id`; 679 unique `native_id`
+- 0 S1 rejections, parking, filtering, or deduplication
+- 37 raw metadata columns preserved in the sidecar, plus three derived
+  family-provenance fields; one-to-one join to canonical rows
+- `sequence_raw` is text-equivalent to source `sequence`; source order
+  preserved
+- `target_name_raw` is text-equivalent to source `target`
+- populated primary experiment groups: 679; distinct primary groups: 25
+- original blank family IDs: 312; materialised unique singleton IDs: 312
+- original nonblank family IDs unchanged: 367
+- source sequence_corrected_applied=1: 8; target_corrected_applied=1: 1
+- consolidated source rows retained unsplit: 3
+- canonical publication/DOI/PMID: 0
+- source raw hash unchanged before and after S0/S1:
+  `d1069b96c2bcf5eba02d7d7907b3bcc33e041bf80aac6345e7295715e45c5a35`
+- S0: 13 registered, 13 validated; warnings=3 (two AptaBase inventory
+  overrides plus the expected ENA generic `derived_output_not_raw_input`
+  warning). No shared registry machinery was added.
+- Deterministic S1 rerun: byte-identical canonical, sidecar, and report
+
+### Open questions carried forward
+
+- ENA S2 shared sequence normalisation, including T→U for the five
+  current T-alphabet reviewed sequences.
+- S2 consumption of sidecar primary `experiment_group_id` for
+  group-wise constant-region inference.
+- 679-versus-676 CHECKPOINT-1 reconciliation.
+
+### Pipeline status
+
+```text
+ENA S0 complete
+ENA S1 complete
+ENA S2 has not started
+No ENA CHECKPOINT-1 decision has been made
+No ENA records are yet authorised for global S4
+```
+
+## 2026-09-07 — ENA S2 sequence normalisation and constant-region proposals
+
+**Stage:** Aim 2 / data curation / ENA S2 sequence normalisation, QC, and
+constant-region proposals only. S1 was not reopened. S3 was not started.
+CHECKPOINT-1 was not generated. No human trim decisions were made. No
+inferred ENA constant-region trims were applied. Global S4 was not run.
+
+### What was done
+
+ENA S1 canonical `sequence_raw` was passed through the shared sequence
+normaliser under a fixed RNA source contract. Alphabet classification,
+molecule-aware T→U, known-motif detection, and group-wise constant-region
+inference used the live shared machinery. ENA-specific code is a thin
+adapter plus dispatcher registration. Legacy ENA normalisation/finalisation
+scripts were not imported or executed.
+
+### Source-contract decision
+
+The authoritative 679-row ENA lane represents RNA aptamers. Therefore at
+S2, `molecule_type=RNA` and `chemistry=RNA` for all 679 records. Molecule
+type is not inferred from T/U alphabet. T alphabet does not mean ssDNA.
+T→U on a T-encoded reviewed sequence is computational transcription of an
+RNA record.
+
+### Numbers
+
+- 679 S1 rows in; 679 S2 canonical rows out; 679 unique `record_id`
+- same row order; zero drops; zero parks; zero deduplication
+- `sequence_raw` unchanged 679/679; `target_name_raw` unchanged 679/679
+- `molecule_type=RNA`: 679; `chemistry=RNA`: 679
+- alphabet: `RNA` 674, `DNA_T` 5; mixed T/U 0; ambiguous 0; invalid 0
+- T→U applied: 5 (exactly the DNA_T rows); those `sequence_full` values
+  contain U rather than T
+- live shared vocabulary used (`RNA` / `DNA_T`, not `RNA_U`)
+- the shared normaliser also flags those 5 rows `t_in_reported_rna` as
+  transcription provenance; T→U still succeeded
+- display transformations: `t_to_u` on 5 rows only
+- `sequence_core == sequence_full` for 679/679; applied trims = 0
+- length (from S2 sequences, not source `sequence_length`):
+  missing 0; `<20` 4; `20-25` 22; `26-89` 643; `90-100` 10; `>100` 0
+  (min/median/max 17 / 64 / 100). Source length mismatches: 0
+- sidecar sequence_corrected_applied=1 preserved: 8
+- primary `experiment_group_id` groups: 25 (679/679 populated)
+- supporting `experiment_group_ids` expanded (diagnostic only): 28
+- inference used the 25 primary groups, not the 28-ID expansion
+- groups meeting live minimum size 5: 14; skipped for size: 11
+- records in eligible groups: 654
+- group-consensus proposals: 5 (3 five-prime, 2 three-prime);
+  medium confidence; applied=false; 92 associated records
+- shared known-motif detections: 0
+- source promoter/template concern rows: 8 (all also T7-flagged)
+- overlap source concern and shared known motif: 0
+- source concern without shared motif: 8
+- family provenance unchanged: 312 original-blank/materialised
+  singletons; 367 nonblank source family rows
+- review-candidate rows: 104
+  (group-consensus 92; source promoter/template 8; T-encoded RNA
+  transcription flag 5; core below min length 4; some overlap)
+- exact post-S2 `sequence_full` values with count>1: 3 values / 6
+  records (diagnostic only — no deduplication performed)
+- no target canonicalisation, UniProt, evidence scoring, affinity,
+  leakage, clustering, or partitioning
+- 679-versus-676 reconciliation not performed
+
+### Outputs produced
+
+Ignored under `/data/`:
+
+- `data/interim/normalised/ena_normalised.csv`
+- `data/interim/normalised/ena_s2_qc.csv`
+- `data/interim/normalised/ena_s2_review_candidates.csv`
+- `data/interim/normalised/ena_constant_region_proposals.csv`
+- `data/interim/normalised/ena_constant_region_membership.csv`
+- `data/interim/normalised/ena_s2_report.md`
+
+Tracked: ENA S2 policy, thin adapter, S2 dispatcher registration,
+synthetic tests, and this log entry. `config/constant_regions.yaml`
+was not modified. Nothing under `data/` is tracked.
+
+### Integrity
+
+- Raw SHA-256 unchanged:
+  `d1069b96c2bcf5eba02d7d7907b3bcc33e041bf80aac6345e7295715e45c5a35`
+- S1 canonical hash unchanged:
+  `3d823f4007cde419e2c5cb4a71230c8febaefbeb237cf54e5888740c02578fac`
+- S1 sidecar hash unchanged:
+  `977cf57be81152e2c5307db68928ccdfc9f66aa2c0a20f8999eab4c9ba78acad`
+- Deterministic rerun: byte-identical normalised, QC, review,
+  proposal, and membership CSVs
+- `git ls-files data` remains empty
+- newly tracked artefacts contain no real ENA aptamer sequences
+
+### Open questions carried forward
+
+- ENA S3 eligibility plus structured CHECKPOINT-1 preparation,
+  including the 679-versus-676 reconciliation (3 exact
+  `sequence_full` pair collapses after T→U are diagnostic only at S2).
+- Human review of 5 unapplied group-consensus proposals and 8
+  source promoter/template flags that the shared T7 detector did
+  not match one-for-one.
+
+### Pipeline status
+
+```text
+ENA S0 complete
+ENA S1 complete
+ENA S2 complete
+ENA S3 has not started
+No ENA CHECKPOINT-1 decision has been made
+No ENA records are yet authorised for global S4
+```
+
+## 2026-09-07 — ENA S3 technical eligibility and CHECKPOINT-1 preparation
+
+**Stage:** Aim 2 / data curation / ENA S3 provisional technical eligibility
+and structured CHECKPOINT-1 preparation only. S2 was not scientifically
+regenerated. No human CHECKPOINT-1 decision was populated. No constant-region
+trim was applied. CHECKPOINT-1 was not applied or closed. Global S4 was not
+prepared or run. ENA was not deduplicated.
+
+### 679-row reconciliation
+
+- S3 input = 679; S3 route total = 679; unique `record_id` = 679
+- `679` = `575` proposed_accept + `100` proposed_park + `4` proposed_reject
+- S3 canonical scientific fields unchanged from S2 (byte-identical SHA-256
+  `4e88f44a07cfee89014eae17d68b90f70acc23d6a6792f29c8ee8f622e2aa8ca`)
+- applied trims remain 0; `sequence_core == sequence_full` for 679/679
+- molecule_type RNA = 679; chemistry RNA = 679; T→U provenance unchanged (5)
+
+### Proposed routes
+
+- proposed_accept / `technically_eligible_rna`: 575
+- proposed_park / `trim_construct_unresolved`: 100
+  - 92 unresolved medium-confidence group-consensus records
+  - 8 source promoter/template concerns with no group-consensus coverage
+- proposed_reject / `length_out_of_range`: 4 (all `<20` nt; none `>100`)
+- ssDNA parks: 0; chemistry parks: 0; non-RNA parks: 0
+
+### Secondary / review reasons
+
+- `constant_region_proposal`: 92
+- `medium_confidence_trim`: 92
+- `lower_length_boundary`: 22
+- `upper_length_boundary`: 10
+- `random_accept_audit`: 30
+
+### Four below-minimum records
+
+Machine route: `proposed_reject` / `length_out_of_range`. Included in
+CHECKPOINT-1 batch `01_judgement_dependent_technical` with recommendation
+`confirm_current_length_reject`. No source-specific `<20` exception was
+introduced.
+
+### Five group-consensus rules / 92 affected records
+
+One structured rule row per inferred proposal (5), not 92 independent trim
+decisions. Hypothetical trim was simulated only; nothing was applied.
+Machine recommendation for all five: `needs_source_review`.
+
+- 5′ / group 23 / support 1 / motif length 23 / affected 23 /
+  hypothetical `<20` 0 / hypothetical `>40%` 21 / conflict 0 /
+  source-promoter overlap 0
+- 3′ / group 23 / support 0.913043 / motif length 20 / affected 23 /
+  hypothetical `<20` 0 / hypothetical `>40%` 21 / conflict 0 /
+  source-promoter overlap 0
+- 5′ / group 15 / support 1 / motif length 23 / affected 15 /
+  hypothetical `<20` 0 / hypothetical `>40%` 12 / conflict 0 /
+  source-promoter overlap 0
+- 3′ / group 15 / support 0.8 / motif length 20 / affected 15 /
+  hypothetical `<20` 0 / hypothetical `>40%` 12 / conflict 0 /
+  source-promoter overlap 0
+- 5′ / group 54 / support 0.851852 / motif length 12 / affected 54 /
+  hypothetical `<20` 0 / hypothetical `>40%` 0 / conflict 0 /
+  source-promoter overlap 0
+
+`>40%` combined trim is a group-level human-review trigger, not an automatic
+rejection. Record-level exceptions: 13, all `non_terminal_match` (members
+that do not carry an exact terminal motif). Human fields blank.
+
+S2 proposal/membership group IDs are namespaced
+(`ena:experiment_group:experiment_<hash>`) while QC uses the unprefixed
+source key. S3 joins both forms plus membership `record_id`; S2 was not
+reopened.
+
+### Eight source promoter/template concerns
+
+Shared known-motif detector remains 0 matches. None of the 8 overlap a
+group-consensus rule, so each is a record-level CHECKPOINT item in batch
+`01` under `proposed_park` / `trim_construct_unresolved`. Recommendation:
+needs human construct review; no automatic trim. No trim action populated.
+
+### Five T-transcribed RNA audit records
+
+All five remain experimental RNA after S2 T→U. They are not DNA/ssDNA/chemistry
+parks. All five also carry a source promoter/template flag, so the higher-precedence
+construct park applies; they still appear in CHECKPOINT-1. Three participate
+in the legacy 679→676 collapse.
+
+### Legacy 679→676 reconciliation
+
+Mechanical reproduction (not a hardcoded preflight): 3 collapse groups,
+6 source records, all still present in the 679-row S3 set. The old 676-row
+finaliser collapsed three pairs after T→U, target alias, and exact
+`(sequence, target)` consolidation. It did not reject three bad records.
+Machine recommendation: `retain_both_through_checkpoint_and_defer_exact_dedup`.
+Human fields blank. No pair was collapsed.
+
+Post-S2 exact `sequence_full` diagnostic: 3 duplicated values / 6 records;
+label `diagnostic only — no deduplication performed`. Equality is not an
+S3 route.
+
+### Length-boundary and random-kept audits
+
+- 20–25 nt: 22 proposed_accept (eyeball only)
+- 90–100 nt: 10 proposed_accept (eyeball only)
+- random kept audit: 30 selected from pool 540, seed 42, shortfall 0
+
+### Review queues
+
+- record-level active queue: 77 (12 judgement, 3 transcription/reconciliation,
+  32 length-boundary, 30 random kept)
+- group-only parks are not duplicated as individual trim decisions (602
+  records have no record-level review row)
+- constant-group review rows: 5
+- reconciliation review rows: 3
+- human decision fields blank; `ready_for_application = 0`
+- validator fail-closed (exit 2): unresolved decisions > 0; apply would fail
+
+### Deferred
+
+No S4 fields populated. No target/evidence/leakage work. No exact
+deduplication. Near-duplicate families unused for routing.
+
+### Integrity
+
+- raw SHA-256 unchanged:
+  `d1069b96c2bcf5eba02d7d7907b3bcc33e041bf80aac6345e7295715e45c5a35`
+- S1 canonical SHA-256 unchanged:
+  `3d823f4007cde419e2c5cb4a71230c8febaefbeb237cf54e5888740c02578fac`
+- S1 sidecar SHA-256 unchanged:
+  `977cf57be81152e2c5307db68928ccdfc9f66aa2c0a20f8999eab4c9ba78acad`
+- S2 canonical and proposal artefacts unchanged
+- S3 + CHECKPOINT preparation rerun byte-identical
+- `git ls-files data` remains empty
+- newly tracked artefacts contain no real ENA aptamer sequences
+
+### Pipeline status
+
+```text
+ENA S0 complete
+ENA S1 complete
+ENA S2 complete
+ENA S3 technical eligibility complete
+ENA CHECKPOINT-1 prepared, blank, unapplied, fail-closed
+Global S4 has not been run
+```
+
+## 2026-09-07 — ENA S3 technical eligibility and CHECKPOINT-1 preparation
+
+**Stage:** Aim 2 / data curation / ENA S3 technical sequence/molecule/construct
+eligibility and structured CHECKPOINT-1 **preparation only**. S2 was not
+reopened. Human CHECKPOINT-1 decisions were not populated. No constant-region
+trim was applied. CHECKPOINT-1 was not applied or closed. Exact deduplication
+was not performed. Global S4 was not started.
+
+### What was done
+
+All 679 accepted S2 records received exactly one provisional S3 route.
+Canonical scientific fields remain byte-identical to S2. Routing, rejection
+logging, construct parking, and CHECKPOINT artefacts live in sidecars under
+ignored `data/interim/checkpoints/ena_cp1/`.
+
+ENA uses the shared eligibility framework with
+`unresolved_trim_blocks_eligibility=true`. Precedence: missing sequence →
+mixed T/U → ambiguous bases → alignment gaps → invalid alphabet →
+length out of range → unresolved construct/trim → technically eligible RNA.
+ssDNA / non-RNA / chemistry parking paths were not used. Source target type,
+evidence, leakage, clustering, balancing, and partitioning were not run.
+
+S2 QC `experiment_group_id` values (`experiment_<hash>`) and S2 proposal
+group ids (`ena:experiment_group:experiment_<hash>`) were joined in S3
+without rewriting S2. Membership record_ids were used as a second attachment
+path.
+
+### S3 row reconciliation
+
+```text
+S3 input = 679
+S3 route total = 679
+unique record_id = 679
+679 = 575 proposed_accept + 100 proposed_park + 4 proposed_reject
+```
+
+Primary reasons:
+
+```text
+technically_eligible_rna = 575
+trim_construct_unresolved = 100
+length_out_of_range = 4
+```
+
+Secondary reasons:
+
+```text
+constant_region_proposal = 92
+medium_confidence_trim = 92
+lower_length_boundary = 22
+upper_length_boundary = 10
+random_accept_audit = 30
+```
+
+Canonical invariants: `sequence_raw` / `sequence_full` / `sequence_core`
+unchanged; applied trims = 0; `sequence_core == sequence_full` = 679;
+molecule_type RNA = 679; chemistry RNA = 679; T→U provenance unchanged (5).
+S4 fields remain empty. No ssDNA park. No chemistry park. No non-RNA park.
+
+### Four below-minimum records
+
+Four records with core length <20 nt were `proposed_reject` /
+`length_out_of_range` under the already-decided 20–100 nt corpus rule.
+They are in CHECKPOINT-1 batch 01 with recommendation
+`confirm_current_length_reject`. No source-specific <20 exception was
+introduced. No >100 records exist.
+
+### Five T-transcribed RNA records
+
+All five remain experimental RNA. They were not reclassified as DNA and were
+not parked for `t_in_reported_rna`. All five also carry a source
+promoter/template concern, so the higher-precedence unresolved-construct
+park applies. They appear in CHECKPOINT-1 batch 01 with the construct-review
+recommendation; transcription is a secondary audit reason, not an exclusion
+reason.
+
+### Constant-region group review
+
+Five unapplied medium-confidence group-consensus proposals (3 five-prime,
+2 three-prime) affect 92 unique S3 records (130 membership rows because two
+groups have both ends). Those 92 are `proposed_park` /
+`trim_construct_unresolved` and are reviewed as **five rule rows**, not 92
+independent trim decisions.
+
+Sequence-free rule summary:
+
+```text
+rule A  five_prime   group=23  support=1        motif_len=23  affected=23
+        hypo<20=0  hypo>40%=21  conflict=0  promoter_overlap=0
+        hard_invalid=0  rec=needs_source_review
+
+rule B  three_prime  group=23  support=0.913043 motif_len=20  affected=23
+        hypo<20=0  hypo>40%=21  conflict=0  promoter_overlap=0
+        hard_invalid=2  rec=needs_source_review
+
+rule C  five_prime   group=15  support=1        motif_len=23  affected=15
+        hypo<20=0  hypo>40%=12  conflict=0  promoter_overlap=0
+        hard_invalid=0  rec=needs_source_review
+
+rule D  three_prime  group=15  support=0.8      motif_len=20  affected=15
+        hypo<20=0  hypo>40%=12  conflict=0  promoter_overlap=0
+        hard_invalid=3  rec=needs_source_review
+
+rule E  five_prime   group=54  support=0.851852 motif_len=12  affected=54
+        hypo<20=0  hypo>40%=0   conflict=0  promoter_overlap=0
+        hard_invalid=8  rec=needs_source_review
+```
+
+Hypothetical >40% combined trim is a human-review trigger on the rule row,
+not an automatic rejection and not a per-record exception when it is the
+majority group pattern. No trim was applied. Motif strings remain only in
+ignored `data/` membership/local-detail files.
+
+Record-level constant-region exceptions: 13, all `non_terminal_match`
+(2 + 3 + 8 on the three-prime / large five-prime rules). Human fields blank.
+
+### Eight source promoter/template concerns
+
+S2 retained 8 source promoter/template/T7 concern rows. Shared known-motif
+detections remain 0. None overlap a group-consensus proposal, so all 8 are
+record-level CHECKPOINT items in batch 01 (`proposed_park` /
+`trim_construct_unresolved`). Machine recommendation:
+`needs human construct review; no automatic trim`. No trim action was
+populated. Five of the eight are the T-transcribed RNA records above.
+
+### Length-boundary and random-kept audits
+
+```text
+20–25 nt = 22  (proposed_accept; eyeball only)
+90–100 nt = 10 (proposed_accept; eyeball only)
+random kept = 30 of pool 540, seed 42, shortfall 0
+```
+
+Random pool = otherwise-clean proposed accepts not already in a higher
+review batch, not group-covered, and not source-promoter.
+
+### Exact duplicate diagnostic and 679-versus-676
+
+Post-S2 exact `sequence_full` collisions: 3 duplicated values / 6 records.
+Label: `diagnostic only — no deduplication performed`. Sequence equality
+did not become an S3 route. All six records remain.
+
+Mechanical legacy-finaliser reproduction found 3 collapse groups (pairs).
+The old 676-row file collapsed three pairs after T→U, target alias, and
+exact `(sequence,target)` consolidation; it did not reject three bad
+records. Unified S2 `sequence_full` is identical within each pair. One pair
+has differing raw target strings. All three pairs have prior manual
+sequence/target correction provenance and a source promoter/template flag
+on at least one member. Machine recommendation:
+`retain_both_through_checkpoint_and_defer_exact_dedup`. Human fields blank.
+No pair was collapsed. Denominator remains 679.
+
+Of the six members: 3 are parked (source-promoter overlap, including the
+three T-encoded members) and 3 are proposed accepts in batch 02.
+
+### Record-level review queue
+
+```text
+active record-level rows = 77
+no record-level review = 602  (includes 92 group-only parks)
+01_judgement_dependent_technical = 12  (4 length reject + 8 promoter)
+02_transcription_or_reconciliation_audit = 3  (clean collapse-pair members)
+03_length_boundary = 32
+04_random_kept_audit = 30
+constant-group review rows = 5
+reconciliation review rows = 3
+record-level constant exceptions = 13
+```
+
+A record appears once in the primary per-record queue. Group-rule and
+reconciliation tables are separate CHECKPOINT components.
+
+### Human decisions and fail-closed validation
+
+All human decision fields are blank. Machine recommendations are populated
+and do not count as decisions. Validator:
+
+```text
+unresolved_manual_decisions = 77
+unresolved_constant_rules = 5
+unresolved_exceptions = 13
+unresolved_reconciliation_groups = 3
+ready_for_application = 0
+CHECKPOINT-1 is not closed
+apply would fail closed
+```
+
+This is SUCCESS for preparation. Decisions were not filled to force a pass.
+Apply was not run.
+
+### Tests, determinism, integrity
+
+Synthetic-only ENA S3/CHECKPOINT tests plus completed-source S3/CHECKPOINT
+regressions passed. Production S3 `--check-deterministic-rerun` and
+CHECKPOINT prepare were each run twice with byte-identical outputs.
+
+- Raw SHA-256 unchanged:
+  `d1069b96c2bcf5eba02d7d7907b3bcc33e041bf80aac6345e7295715e45c5a35`
+- S1 canonical unchanged:
+  `3d823f4007cde419e2c5cb4a71230c8febaefbeb237cf54e5888740c02578fac`
+- S1 sidecar unchanged:
+  `977cf57be81152e2c5307db68928ccdfc9f66aa2c0a20f8999eab4c9ba78acad`
+- S2 canonical unchanged:
+  `4e88f44a07cfee89014eae17d68b90f70acc23d6a6792f29c8ee8f622e2aa8ca`
+- S2 QC / proposal / membership artefacts unchanged
+- S3 canonical SHA-256 equals S2
+- `git ls-files data` remains empty
+- newly tracked Milestone 3 artefacts contain no real ENA aptamer sequences
+  or inferred motifs
+
+### Unexpected notes
+
+- S2 QC grouping keys and proposal `experiment_group_id` values used
+  different namespaces; S3 joins them. S2 was not rewritten.
+- All 5 T-encoded records are among the 8 source promoter/template
+  concerns, so they park rather than `proposed_accept`.
+- Two groups have both 5′ and 3′ proposals; hypothetical combined trim
+  exceeds 40% for the matching majority. Flagged on the rule, not auto-rejected.
+
+### Pipeline status
+
+```text
+ENA S0 complete
+ENA S1 complete
+ENA S2 complete
+ENA S3 technical eligibility complete
+ENA CHECKPOINT-1 package prepared; human fields blank; unapplied
+No ENA record is authorised for S4
+Global S4 has not been run
+```
+
+## 2026-09-07 — ENA CHECKPOINT-1 application dry-run — unapplied
+
+Human CHECKPOINT-1 review is complete and fail-closed validated:
+77/77 record decisions, 5 group rules, 13 exceptions, 3
+reconciliation groups, and 62/62 audit-only bulk confirmation.
+Zero unresolved decisions or blockers. Frozen completed-review
+hashes matched. Pristine reconstruction (written only under ignored
+`dry_run/pristine_reconstruction/`) differed from the completed
+package only in allowed human fields.
+
+An ENA-specific CHECKPOINT-1 apply/dry-run adapter was added to the
+shared dispatcher. `manual_decision=keep` retains the record, applies
+reviewed trim/no-trim resolution, then recomputes technical
+eligibility; it does not force `technically_eligible`. Real apply
+without `--dry-run` is refused. No `resolved/` outputs, tracked
+resolutions, or closure metadata were written.
+
+Reviewed Korean cassette policy (ALPPL2 and CTHRC1): one 23-nt 5′
+removal and one 19-nt 3′ removal from `sequence_full`. Combined >40%
+trim is human-approved. Five Korean 3′ exceptions received exactly
+one 19-nt 3′ trim (no double application). NGF 12-nt group trim was
+rejected: 54 records remain untrimmed. Eight promoter/template
+concerns were resolved as keep-untrimmed (reject trim, not reject
+record). Four `<20 nt` records remain confirmed `length_out_of_range`
+technical rejects. Three legacy-collapse pairs were consumed as
+`retain_both`; no deduplication.
+
+Production dry-run was run twice against the frozen review and was
+byte-identical. Sequence-free local report:
+
+`data/interim/checkpoints/ena_cp1/dry_run/ena_checkpoint1_dry_run_report.md`
+
+SHA-256:
+`cb39c4c1e9b69c4c62b14a56ab37cc72c342098088811b0136afd79b3a6cff36`
+
+Projected post-review 679-row reconciliation (derived, not targeted):
+
+`675` technically eligible + `0` parked + `4` technical rejects
+(`length_out_of_range`) = `679`.
+
+Trim preview: 38 records trimmed (0 five-only, 0 three-only, 38
+both-end); 38 `large_trim_human_approved`; 0 exact-terminal /
+overlap / core `<20` / unreviewed >40% failures. Korean cassette
+cores min/median/max = 38 / 39.0 / 40. Transitions: 575 accept→accept,
+100 park→accept, 4 reject→reject. All 679 source identities remain.
+S4/forbidden fields remain empty. CHECKPOINT-1 remains
+`pending_checkpoint_1_review`.
+
+Actual CHECKPOINT apply was **not** performed. CHECKPOINT-1 is not
+closed. ENA is not authorised for global S4. Global S4 was not run.
+Raw / S1 / S2 / S3 / completed-review hashes were unchanged.
+`git ls-files data` remains empty.
+
+### Pipeline stop
+
+```text
+CHECKPOINT-1 human review is complete.
+ENA apply/dry-run adapter implemented.
+Dry-run complete. Actual apply was not run.
+CHECKPOINT-1 is not closed.
+S4 remains blocked.
+```
+
+## 2026-09-07 — ENA CHECKPOINT-1 applied and closed
+
+Frozen human CHECKPOINT-1 review was applied through the same
+`apply_ena_reviewed_record` / `simulate_ena_checkpoint1_application`
+path used by the accepted dry-run. Authoritative outputs were written
+under ignored `data/interim/checkpoints/ena_cp1/resolved/`. Sequence-free
+tracked closure records were written to
+`config/checkpoint_reviews/ena_checkpoint1_resolutions.csv` and
+`config/checkpoint_reviews/ena_checkpoint1_metadata.json`.
+
+Dry-run/apply parity: all nine scientific CSV payloads are
+byte-identical to the accepted dry-run freeze (zero semantic
+mismatches). Deterministic verification rerun matched the
+authoritative applied files. Pre-review raw / S1 / S2 / S3 and frozen
+human-review hashes were unchanged.
+
+Derived 679-row reconciliation: `675` technically eligible + `0`
+parked + `4` technical rejects = `679`. `authorised_for_s4=true` for
+the 675 technically eligible records only. That flag means allowed to
+enter a future global-S4 source handoff; it does not mean target
+canonicalised, protein confirmed, evidence threshold passed, leakage
+cleared, deduplicated, clustered, balanced, or partitioned.
+
+Korean cassette: 38 records received one 23-nt 5′ trim and one 19-nt
+3′ trim. Resulting cores min/median/max = 38 / 39 / 40
+(distribution 38×5, 39×29, 40×4). All 38 combined >40% trims remain
+`large_trim_human_approved`. Guard-rail failures = 0. Five Korean
+exception records received 23+19 exactly once.
+
+NGF 12-nt group trim remains rejected: 54 records retained untrimmed
+and technically eligible. Eight promoter/template records remain
+untrimmed and eligible; historical source concern survives on S2 QC
+and applied routing; the reviewed construct blocker is resolved.
+Four `<20 nt` records remain `technical_reject` /
+`length_out_of_range` with `authorised_for_s4=false`. Three
+679→676 legacy-collapse groups (`retain_both`) keep all six member
+records. No deduplication.
+
+S4 target/evidence/leakage/cluster/partition fields remain empty.
+`config/global_s4_sources/ena.json` was not created. Global S4 was
+not run. CHECKPOINT-1 is closed.
+
+### Pipeline status
+
+```text
+ENA S0 complete
+ENA S1 complete
+ENA S2 complete
+ENA S3 technical eligibility complete
+ENA CHECKPOINT-1 applied and closed
+675 records technically authorised for a future global-S4 handoff
+ENA global-S4 handoff has not been prepared
+Global S4 has not been run
+```
+
+## 2026-09-07 — ENA prepared for future global S4
+
+ENA S1–S3 are complete and CHECKPOINT-1 is closed. The 675
+CHECKPOINT-authorised records were materialised as a reviewed applied
+subset for a future corpus-wide global S4 input. Global S4 was not
+run.
+
+`authorised_for_s4=true` / inclusion in this handoff means only
+technically eligible after ENA sequence/molecule/construct review and
+prepared as an input to the future corpus-wide global S4 stage. It
+does not mean protein target confirmed, target canonicalised, UniProt
+resolved, evidence threshold passed, leakage cleared, final corpus
+included, deduplicated, clustered, balanced, or partitioned.
+
+Handoff denominator: 675 authorised, 0 parked, 4
+`length_out_of_range` rejects excluded. The 675-row reviewed applied
+canonical subset was joined to ENA source sidecar target, evidence,
+experiment-group, and near-duplicate-family provenance. Canonical S4
+target/evidence/leakage/cluster/partition fields remain empty. Three
+exact sequence duplicate pairs remain as six source records
+(diagnostic only — no deduplication performed). Target
+canonicalisation, evidence scoring, leakage exclusion, deduplication,
+and clustering were not performed.
+
+Authorised-lane provenance (derived): 310 materialised singletons;
+365 source-nonblank family rows; 25 distinct primary experiment
+groups. Korean cassette trimmed records = 38 (both-end; core
+min/median/max 38/39/40; `large_trim_human_approved` = 38). Five
+T-transcribed records remain authorised with DNA_T/T→U provenance.
+NGF no-trim (54) and promoter no-trim (8) records remain full/core
+equal.
+
+Tracked: `config/global_s4_sources/ena.json`, a minimal reusable
+extension of `prepare_global_s4_source.py` for colliding sidecar
+extras, and tests. Ignored: `ena_global_s4_input.csv` (675 rows) and
+the sequence-free handoff summary. Deterministic rerun was
+byte-identical. Raw / S1 / S2 / S3 / CHECKPOINT-1 / applied /
+human-review hashes were unchanged. `git ls-files data` remains
+empty.
+
+### Pipeline status
+
+```text
+ENA S0 complete
+ENA S1 complete
+ENA S2 complete
+ENA S3 technical eligibility complete
+ENA CHECKPOINT-1 applied and closed
+ENA future global-S4 handoff prepared (675 records)
+Global S4 has not been run
+```
+

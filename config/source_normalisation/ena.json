@@ -1,0 +1,15 @@
+{
+  "source_key": "ena",
+  "contract_version": "1.0",
+  "molecule_type": "RNA",
+  "chemistry": "RNA",
+  "molecule_evidence_source": "source_contract",
+  "reported_length_field": "sequence_length",
+  "group_inference_sidecar_field": "experiment_group_id",
+  "apply_approved_trims": false,
+  "group_inference_key": "experiment_group_id",
+  "do_not_use_supporting_group_ids": true,
+  "do_not_use_family_id_as_group": true,
+  "do_not_infer_molecule_from_alphabet": true,
+  "do_not_apply_inferred_trims": true
+}

@@ -16,7 +16,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -59,6 +59,27 @@ from adapters.aptadb_s2 import (  # noqa: E402
     normalise_aptadb_record,
     summarise_lengths as summarise_aptadb_lengths,
     update_stats_from_row as update_aptadb_stats_from_row,
+)
+from adapters.ena_s2 import (  # noqa: E402
+    CONSTANT_PROPOSAL_COLUMNS as ENA_CONSTANT_PROPOSAL_COLUMNS,
+    MEMBERSHIP_COLUMNS as ENA_MEMBERSHIP_COLUMNS,
+    S2_QC_COLUMNS as ENA_S2_QC_COLUMNS,
+    EnaS2Error,
+    EnaS2Stats,
+    annotate_group_consensus_on_qc,
+    assert_genuine_proposals as assert_ena_genuine_proposals,
+    assert_no_legacy_ena_normaliser_import,
+    build_group_proposal_rows as build_ena_group_proposal_rows,
+    build_known_motif_proposals as build_ena_known_motif_proposals,
+    build_membership_rows as build_ena_membership_rows,
+    finalise_review_and_duplicate_stats,
+    group_size_bucket,
+    is_review_candidate as ena_is_review_candidate,
+    load_ena_policy,
+    normalise_ena_record,
+    split_supporting_group_ids,
+    summarise_lengths as summarise_ena_lengths,
+    update_stats_from_row as update_ena_stats_from_row,
 )
 from adapters.riboaptamer_s2 import (  # noqa: E402
     CONSTANT_PROPOSAL_COLUMNS as RIBOAPTAMER_CONSTANT_PROPOSAL_COLUMNS,
@@ -175,6 +196,18 @@ EXPECTED_APTAINDEX_RAW_SHA256 = (
     "912b8e554fa2bb2ed3a9e9bdf1cfbe4f757d8c7a00c401629e5bcb5e5c2877a8"
 )
 
+EXPECTED_ENA_ROWS = 679
+EXPECTED_ENA_MOLECULE = {"RNA": 679}
+EXPECTED_ENA_CHEMISTRY = {"RNA": 679}
+EXPECTED_ENA_ALPHABET = {"RNA": 674, "DNA_T": 5}
+EXPECTED_ENA_T_TO_U = 5
+EXPECTED_ENA_SOURCE_DATASET = "ena_selected_v2_2026-08"
+EXPECTED_ENA_RAW_SHA256 = (
+    "d1069b96c2bcf5eba02d7d7907b3bcc33e041bf80aac6345e7295715e45c5a35"
+)
+EXPECTED_ENA_PRIMARY_GROUPS = 25
+EXPECTED_ENA_SEQUENCE_CORRECTIONS = 8
+
 
 class S2NormaliseError(ValueError):
     """Hard failure during S2 normalisation orchestration."""
@@ -191,6 +224,7 @@ class S2RunResult:
         | AptaDBS2Stats
         | RiboAptamerS2Stats
         | AptaIndexS2Stats
+        | EnaS2Stats
     )
     output_normalised: Path
     output_qc: Path
@@ -3504,6 +3538,833 @@ def run_aptaindex_s2(
     return run_result
 
 
+def build_ena_s2_report(
+    *,
+    repo_root: Path,
+    result: S2RunResult,
+    rules_path: Path,
+    policy_path: Path,
+    diagnostics: Any | None = None,
+) -> str:
+    """Build an aggregate-only Markdown ENA S2 report (no sequences or motifs)."""
+    stats = result.stats
+    if not isinstance(stats, EnaS2Stats):
+        raise S2NormaliseError("ENA report requires EnaS2Stats")
+    full_min, full_med, full_max = summarise_ena_lengths(stats.length_full_values)
+    core_min, core_med, core_max = summarise_ena_lengths(stats.length_core_values)
+    scanned = ", ".join(f"`{name}`" for name in stats.known_motifs_scanned) or "(none)"
+    lines = [
+        "# ENA S2 normalisation report",
+        "",
+        "## Reconciliation",
+        "",
+        f"- Source key: `ena`",
+        f"- Source dataset: `{EXPECTED_ENA_SOURCE_DATASET}`",
+        f"- S1 canonical rows: `{stats.s1_rows}`",
+        f"- Source-metadata rows: `{stats.source_metadata_rows}`",
+        f"- S2 output rows: `{stats.s2_rows}`",
+        f"- Records dropped: `{stats.records_dropped}`",
+        f"- Records parked: `{stats.records_parked}`",
+        f"- Unique record_id values: `{stats.unique_record_ids}`",
+        f"- Unique native_id values: `{stats.unique_native_ids}`",
+        f"- Row disappearance: `{stats.s1_rows - stats.s2_rows}`",
+        f"- S1 row order preserved: `{'pass' if stats.order_preserved else 'fail'}`",
+        f"- S1 provenance preserved: "
+        f"`{'pass' if stats.provenance_preserved else 'fail'}`",
+        f"- sequence_raw unchanged: "
+        f"`{'pass' if stats.sequence_raw_unchanged else 'fail'}`",
+        f"- target_name_raw unchanged: "
+        f"`{'pass' if stats.target_name_raw_unchanged else 'fail'}`",
+        f"- Missing sequence rows: `{stats.missing_sequence_rows}`",
+        f"- Nonempty sequence rows: `{stats.nonempty_sequence_rows}`",
+        f"- Shared rules: `{_relative_display(rules_path, repo_root)}`",
+        f"- Source policy: `{_relative_display(policy_path, repo_root)}`",
+        "",
+        "## Molecule / chemistry",
+        "",
+        "Experimental molecule type is fixed by the ENA source contract",
+        "(`molecule_type=RNA`, `chemistry=RNA`). These 679 records are RNA",
+        "aptamers. T alphabet does not mean ssDNA. Molecule type is never",
+        "inferred from sequence letters. T→U on a T-encoded reviewed",
+        "sequence is computational transcription of an RNA record.",
+        "",
+        "### Canonical molecule_type",
+        "",
+    ]
+    for name, count in _count_sorted(stats.molecule_type_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Canonical chemistry", ""])
+    for name, count in _count_sorted(stats.chemistry_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Reported alphabet",
+            "",
+            "Shared alphabet vocabulary is `RNA` / `DNA_T` / `mixed_T_U` /",
+            "`ambiguous` / `invalid` (not a separate `RNA_U` token).",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.alphabet_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Computational transcription",
+            "",
+            f"- total `t_to_u_applied=true`: `{stats.t_to_u_count}`",
+            "",
+        ]
+    )
+    if stats.t_to_u_by_molecule:
+        for name, count in _count_sorted(stats.t_to_u_by_molecule):
+            lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Display cleaning",
+            "",
+        ]
+    )
+    if stats.transformation_counts:
+        for name, count in _count_sorted(stats.transformation_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+    lines.extend(
+        [
+            "",
+            "## QC",
+            "",
+            f"- Invalid character rows: `{stats.invalid_character_count}`",
+            f"- Alignment-gap rows: `{stats.alignment_gaps_count}`",
+            f"- Ambiguous base rows: `{stats.ambiguous_base_count}`",
+            f"- Mixed T/U rows: `{stats.mixed_t_u_count}`",
+            f"- Core below minimum length: `{stats.core_below_min_count}`",
+            f"- Core above maximum length: `{stats.core_above_max_count}`",
+            f"- Source vs S2 length mismatches (diagnostic only): "
+            f"`{stats.length_mismatch_count}`",
+            f"- Rows with any QC flag: `{stats.rows_with_any_qc_flag}`",
+            f"- Rows with multiple QC flags: `{stats.rows_with_multiple_qc_flags}`",
+            f"- Review-candidate rows: `{stats.review_candidate_rows}`",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.qc_flag_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Review reasons", ""])
+    if stats.review_reason_counts:
+        for name, count in _count_sorted(stats.review_reason_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+    lines.extend(
+        [
+            "",
+            "## Length",
+            "",
+            "Lengths are computed from the shared normalised representation,",
+            "not from the source `sequence_length` field. Source length is",
+            "compared as a diagnostic only and is not repaired. These buckets",
+            "are descriptive at S2; they do not filter records.",
+            "",
+            f"- sequence_length_full min / median / max: "
+            f"`{full_min}` / `{full_med}` / `{full_max}`",
+            f"- sequence_length_core min / median / max: "
+            f"`{core_min}` / `{core_med}` / `{core_max}`",
+            "",
+            "### sequence_length_full buckets",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.length_full_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### sequence_length_core buckets", ""])
+    for name, count in _count_sorted(stats.length_core_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    if stats.core_differs_from_full == 0:
+        lines.extend(
+            [
+                "",
+                "Full and core length distributions are identical because no",
+                "trim was applied (`sequence_core == sequence_full`).",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Construct / trim state",
+            "",
+            "Known-motif detection and group-consensus inference are recorded",
+            "as proposals only. Detection does not authorise trimming at S2.",
+            "Source `automatic_concern_flags=t7_promoter` and",
+            "`sequence_quality_status=promoter_or_template_requires_review`",
+            "are provenance, not trim authorisation.",
+            "",
+            "### construct_scope",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.construct_scope_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### trim_status", ""])
+    for name, count in _count_sorted(stats.trim_status_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### trim_confidence", ""])
+    for name, count in _count_sorted(stats.trim_confidence_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Experiment groups",
+            "",
+            "Primary grouping uses sidecar `experiment_group_id` only.",
+            "Supporting `experiment_group_ids` are provenance and are not",
+            "the grouping contract. Near-duplicate family IDs are not used",
+            "as constant-inference groups. Canonical `experiment_group_id`",
+            "remains empty under the live S2 schema.",
+            "",
+            f"- Primary experiment groups observed: `{stats.primary_experiment_groups}`",
+            f"- Rows with populated primary group: "
+            f"`{stats.populated_primary_experiment_groups}`",
+            f"- Supporting group IDs after expansion (diagnostic only): "
+            f"`{stats.supporting_group_ids_expanded}`",
+            f"- Groups considered for inference: `{stats.groups_considered}`",
+            f"- Groups meeting minimum size: `{stats.groups_meeting_min_size}`",
+            f"- Groups skipped for insufficient size: `{stats.groups_below_min_size}`",
+            f"- Records participating in eligible groups: "
+            f"`{stats.records_in_eligible_groups}`",
+            f"- Group-size histogram: `{dict(stats.group_size_histogram)}`",
+            "",
+            "## Constant-region inference",
+            "",
+            "Grouping uses shared mode `experiment_group_id` consumed from",
+            "the S1 sidecar. Newly inferred medium-confidence motifs are",
+            "proposals only and were not applied.",
+            "`config/constant_regions.yaml` was not modified.",
+            "",
+            f"- Approved known motifs scanned: {scanned}",
+            f"- Records with known-motif detection: "
+            f"`{stats.known_motif_detection_count}`",
+            f"- 5′ group-consensus proposals: `{stats.five_prime_proposals}`",
+            f"- 3′ group-consensus proposals: `{stats.three_prime_proposals}`",
+            f"- Records associated with medium-confidence proposals: "
+            f"`{stats.records_with_medium_confidence_proposal}`",
+            f"- Previously approved high-confidence trims applied: "
+            f"`{stats.high_confidence_trims_applied}`",
+            f"- Records actually trimmed: `{stats.applied_trims}`",
+            f"- Genuine proposal rows: `{stats.constant_region_proposals}`",
+            f"- Rows where sequence_core != sequence_full: "
+            f"`{stats.core_differs_from_full}`",
+            f"- Reason: `{stats.constant_region_reason}`",
+            "",
+            "### proposal sources",
+            "",
+        ]
+    )
+    if stats.proposal_source_counts:
+        for name, count in _count_sorted(stats.proposal_source_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+    if diagnostics is not None:
+        lines.extend(
+            [
+                "",
+                "### Tier-2 consensus diagnostics",
+                "",
+                f"- Groups total: `{diagnostics.groups_total}`",
+                f"- Groups below min size: `{diagnostics.groups_below_min_size}`",
+                f"- Qualifying 5′ groups: `{diagnostics.groups_qualifying_prefix}`",
+                f"- Qualifying 3′ groups: `{diagnostics.groups_qualifying_suffix}`",
+                f"- No qualifying 5′: `{diagnostics.groups_no_qualifying_prefix}`",
+                f"- No qualifying 3′: `{diagnostics.groups_no_qualifying_suffix}`",
+                f"- Skipped missing grouping evidence: "
+                f"`{diagnostics.skipped_missing_group}`",
+                f"- Group-size histogram: `{dict(diagnostics.group_size_histogram)}`",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Source promoter/template provenance",
+            "",
+            "Prior source-review promoter/template flags are retained in the",
+            "sidecar and exposed as review-candidate reasons. They are not",
+            "rejections and not automatic trims. Shared known-motif detection",
+            "is an independent evidence channel.",
+            "",
+            f"- Source promoter/template concern rows: "
+            f"`{stats.source_promoter_or_template_count}`",
+            f"- Source T7 concern rows: `{stats.source_t7_concern_count}`",
+            f"- Overlap source concern and shared known motif: "
+            f"`{stats.overlap_source_and_shared_motif_count}`",
+            f"- Source concern without shared motif: "
+            f"`{stats.source_concern_without_shared_motif_count}`",
+            f"- Shared motif without source concern: "
+            f"`{stats.shared_motif_without_source_concern_count}`",
+            "",
+            "## Source correction and family provenance",
+            "",
+            "Previously applied ENA manual-review sequence corrections remain",
+            "sidecar provenance. They are not new CHECKPOINT decisions.",
+            "Near-duplicate families are preserved and are not used as",
+            "constant-inference groups.",
+            "",
+            f"- Sidecar sequence_corrected_applied=1: "
+            f"`{stats.sequence_corrections_applied}`",
+            f"- Original blank family IDs: `{stats.blank_source_family_ids}`",
+            f"- Original nonblank family IDs: `{stats.nonblank_source_family_ids}`",
+            f"- Materialised singleton family IDs: "
+            f"`{stats.materialised_singleton_family_ids}`",
+            "",
+            "## Duplicate diagnostic (no deduplication performed)",
+            "",
+            "diagnostic only — no deduplication performed. Formal",
+            "679-versus-676 reconciliation remains CHECKPOINT-1.",
+            "",
+            f"- Distinct sequence_full values with count>1: "
+            f"`{stats.exact_duplicate_sequence_full_values}`",
+            f"- Records participating in those sequence_full values: "
+            f"`{stats.records_in_exact_duplicate_sequence_full}`",
+            f"- Distinct sequence_core values with count>1: "
+            f"`{stats.exact_duplicate_sequence_core_values}`",
+            f"- Records participating in those sequence_core values: "
+            f"`{stats.records_in_exact_duplicate_sequence_core}`",
+            "",
+            "## Invariants",
+            "",
+            f"- sequence_raw unchanged: "
+            f"`{'pass' if stats.sequence_raw_unchanged else 'fail'}`",
+            f"- Records retained: `{stats.s2_rows}`",
+            f"- Provenance unchanged: "
+            f"`{'pass' if stats.provenance_preserved else 'fail'}`",
+            "- S4 target/evidence/affinity/PDB fields remain blank",
+            "- Canonical target/UniProt/family/Pfam remain blank",
+            "- Binding evidence was not mapped onto E1–E5",
+            "- No leakage, clustering, balancing or partitioning",
+            (
+                f"- Raw input hash unchanged: "
+                f"`{'pass' if result.raw_sha_unchanged else 'fail'}`"
+                if result.raw_sha_unchanged is not None
+                else "- Raw input hash unchanged: `not_checked`"
+            ),
+            f"- S1 inputs unchanged: "
+            f"`{'pass' if result.inputs_unchanged else 'fail'}`",
+            (
+                f"- Deterministic rerun result: "
+                f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+                if result.deterministic_rerun_ok is not None
+                else "- Deterministic rerun result: `not_checked`"
+            ),
+            "",
+            f"- S1 canonical hash before: `{result.s1_hash_before}`",
+            f"- S1 canonical hash after: `{result.s1_hash_after}`",
+            f"- Source-metadata hash before: `{result.sidecar_hash_before}`",
+            f"- Source-metadata hash after: `{result.sidecar_hash_after}`",
+            (
+                f"- Raw SHA-256: `{result.raw_sha256}`"
+                if result.raw_sha256
+                else "- Raw SHA-256: `not_checked`"
+            ),
+            "",
+            "## Outputs",
+            "",
+            f"- Normalised: "
+            f"`{_relative_display(result.output_normalised, repo_root)}`",
+            f"- QC: `{_relative_display(result.output_qc, repo_root)}`",
+            f"- Review candidates: "
+            f"`{_relative_display(result.output_review, repo_root)}`",
+            f"- Constant-region proposals: "
+            f"`{_relative_display(result.output_proposals, repo_root)}`",
+        ]
+    )
+    if result.output_rule_membership is not None:
+        lines.append(
+            f"- Group-consensus membership: "
+            f"`{_relative_display(result.output_rule_membership, repo_root)}`"
+        )
+    lines.extend(
+        [
+            f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+            "",
+            "## Stage boundary",
+            "",
+            "ENA S2 sequence normalisation and constant-region proposal only.",
+            "",
+            "- No record was rejected or parked.",
+            "- No target canonicalisation or aliasing was performed.",
+            "- No affinity/evidence decision was performed.",
+            "- No leakage, clustering, balancing or partitioning was performed.",
+            "- S3 has not started.",
+            "- CHECKPOINT-1 has not been generated.",
+            "- Newly inferred medium-confidence motifs were not applied.",
+            "- Known-motif detections were not applied as trims.",
+            "- 679-versus-676 deduplication was not performed.",
+            "- Global S4 has not been run.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_ena_s2(
+    *,
+    repo_root: Path,
+    input_dir: Path,
+    output_dir: Path,
+    rules_path: Path,
+    policy_path: Path,
+    expected_rows: int | None = EXPECTED_ENA_ROWS,
+    check_deterministic_rerun: bool = False,
+) -> S2RunResult:
+    """Execute ENA S2 normalisation."""
+    assert_no_legacy_ena_normaliser_import()
+    repo_root = repo_root.resolve()
+    input_dir = input_dir if input_dir.is_absolute() else (repo_root / input_dir)
+    input_dir = input_dir.resolve()
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    rules_path = (
+        rules_path if rules_path.is_absolute() else (repo_root / rules_path)
+    ).resolve()
+    policy_path = (
+        policy_path if policy_path.is_absolute() else (repo_root / policy_path)
+    ).resolve()
+
+    canonical_path = input_dir / "ena_extracted.csv"
+    sidecar_path = input_dir / "ena_source_metadata.csv"
+    if not canonical_path.is_file():
+        raise S2NormaliseError(f"Missing S1 canonical input: {canonical_path.name}")
+    if not sidecar_path.is_file():
+        raise S2NormaliseError(f"Missing S1 sidecar input: {sidecar_path.name}")
+
+    raw_path = (
+        repo_root / "data" / "raw" / "ENA" / "review_v2"
+        / "ena_selected_after_manual_review.csv"
+    )
+    raw_sha_before: str | None = None
+    if expected_rows == EXPECTED_ENA_ROWS:
+        if not raw_path.is_file():
+            raise S2NormaliseError("Missing registered ENA raw file")
+        digest = _sha256_file(raw_path)
+        if digest != EXPECTED_ENA_RAW_SHA256:
+            raise S2NormaliseError(
+                "ENA raw SHA-256 does not match registry expectation"
+            )
+        raw_sha_before = digest
+
+    s1_hash_before = _sha256_file(canonical_path)
+    sidecar_hash_before = _sha256_file(sidecar_path)
+
+    rules = load_normalisation_rules(rules_path)
+    policy = load_ena_policy(policy_path)
+    if policy.apply_approved_trims or not policy.do_not_apply_inferred_trims:
+        raise S2NormaliseError("ENA S2 must not apply approved or inferred trims")
+
+    canonical_rows = _read_corpus_csv(canonical_path)
+    sidecar_rows = _read_sidecar_csv(sidecar_path)
+    aligned_sidecar = _match_sidecar_one_to_one(canonical_rows, sidecar_rows)
+
+    if expected_rows is not None and len(canonical_rows) != expected_rows:
+        raise S2NormaliseError(
+            f"S1 row count must be {expected_rows}; got {len(canonical_rows)}"
+        )
+
+    for index, row in enumerate(canonical_rows, start=1):
+        if row["source_db"] != "ena":
+            raise S2NormaliseError(f"row {index}: source_db must be ena")
+        if expected_rows == EXPECTED_ENA_ROWS:
+            if row["source_dataset"] != EXPECTED_ENA_SOURCE_DATASET:
+                raise S2NormaliseError(
+                    f"row {index}: source_dataset must be "
+                    f"{EXPECTED_ENA_SOURCE_DATASET}"
+                )
+        if row.get("experiment_group_id"):
+            raise S2NormaliseError(
+                "ENA S2 must not find canonical experiment_group_id populated"
+            )
+        if row.get("near_duplicate_family_id"):
+            raise S2NormaliseError(
+                "ENA S2 must not find canonical near_duplicate_family_id populated"
+            )
+
+    stats = EnaS2Stats()
+    stats.s1_rows = len(canonical_rows)
+    stats.source_metadata_rows = len(aligned_sidecar)
+    stats.order_preserved = True
+    stats.provenance_preserved = True
+    stats.sequence_raw_unchanged = True
+    stats.target_name_raw_unchanged = True
+    stats.known_motifs_scanned = tuple(
+        motif.name for motif in rules.known_non_core_motifs
+    )
+
+    normalised_rows: list[dict[str, str]] = []
+    qc_rows: list[dict[str, str]] = []
+    row_results: list = []
+    primary_groups: dict[str, list[str]] = {}
+    supporting_ids: set[str] = set()
+    blank_family = 0
+    nonblank_family = 0
+    singleton_family = 0
+
+    for s1_row, meta_row in zip(canonical_rows, aligned_sidecar, strict=True):
+        result = normalise_ena_record(
+            s1_row,
+            meta_row,
+            policy=policy,
+            rules=rules,
+        )
+        if result.canonical["record_id"] != s1_row["record_id"]:
+            stats.order_preserved = False
+            raise S2NormaliseError("S2 altered record_id or row identity")
+        if result.canonical["native_id"] != s1_row["native_id"]:
+            raise S2NormaliseError("S2 altered native_id")
+        if result.canonical["sequence_raw"] != s1_row["sequence_raw"]:
+            stats.sequence_raw_unchanged = False
+            raise S2NormaliseError("S2 must not alter sequence_raw")
+        if result.canonical["target_name_raw"] != s1_row["target_name_raw"]:
+            stats.target_name_raw_unchanged = False
+            raise S2NormaliseError("S2 must not alter target_name_raw")
+        if result.canonical["sequence_core"] != result.canonical["sequence_full"]:
+            raise S2NormaliseError(
+                "ENA S2 must not apply trims; sequence_core must equal "
+                "sequence_full"
+            )
+        if result.canonical.get("experiment_group_id"):
+            raise S2NormaliseError(
+                "ENA S2 must not populate canonical experiment_group_id"
+            )
+        if result.canonical.get("near_duplicate_family_id"):
+            raise S2NormaliseError(
+                "ENA S2 must not populate canonical near_duplicate_family_id"
+            )
+        for field in (
+            "target_name",
+            "target_uniprot",
+            "target_type",
+            "target_family",
+            "target_pfam",
+            "binding_evidence_type",
+            "binding_evidence_score",
+            "cluster_id",
+            "partition",
+        ):
+            if result.canonical.get(field):
+                raise S2NormaliseError(f"ENA S2 must not populate {field}")
+
+        primary = (result.sidecar_experiment_group_id or "").strip()
+        if primary:
+            primary_groups.setdefault(primary, []).append(result.canonical["record_id"])
+        for token in split_supporting_group_ids(result.sidecar_experiment_group_ids):
+            supporting_ids.add(token)
+        source_family = (meta_row.get("near_duplicate_family_id") or "").strip()
+        if source_family:
+            nonblank_family += 1
+        else:
+            blank_family += 1
+        if (meta_row.get("ena_source_family_id_was_blank") or "").strip() in {
+            "1",
+            "true",
+        }:
+            singleton_family += 1
+
+        normalised_rows.append(result.canonical)
+        qc_rows.append(result.qc)
+        row_results.append(result)
+        update_ena_stats_from_row(stats, result)
+
+    stats.s2_rows = len(normalised_rows)
+    stats.unique_record_ids = len({row["record_id"] for row in normalised_rows})
+    stats.unique_native_ids = len({row["native_id"] for row in normalised_rows})
+    stats.records_dropped = 0
+    stats.records_parked = 0
+    stats.primary_experiment_groups = len(primary_groups)
+    stats.populated_primary_experiment_groups = sum(
+        len(members) for members in primary_groups.values()
+    )
+    stats.supporting_group_ids_expanded = len(supporting_ids)
+    stats.blank_source_family_ids = blank_family
+    stats.nonblank_source_family_ids = nonblank_family
+    stats.materialised_singleton_family_ids = singleton_family
+    histogram: dict[str, int] = {}
+    for members in primary_groups.values():
+        bucket = group_size_bucket(len(members))
+        histogram[bucket] = histogram.get(bucket, 0) + 1
+    stats.group_size_histogram = dict(sorted(histogram.items()))
+
+    if expected_rows == EXPECTED_ENA_ROWS:
+        if stats.s2_rows != EXPECTED_ENA_ROWS:
+            raise S2NormaliseError(
+                f"S2 must preserve {EXPECTED_ENA_ROWS} rows; got {stats.s2_rows}"
+            )
+        if stats.unique_record_ids != EXPECTED_ENA_ROWS:
+            raise S2NormaliseError("S2 record_id values are not unique")
+        if stats.s1_rows - stats.s2_rows != 0:
+            raise S2NormaliseError("S2 row disappearance must be 0")
+        for key, expected in EXPECTED_ENA_MOLECULE.items():
+            got = stats.molecule_type_counts.get(key, 0)
+            if got != expected:
+                raise S2NormaliseError(
+                    f"molecule_type {key} expected {expected}; got {got}"
+                )
+        for key, expected in EXPECTED_ENA_CHEMISTRY.items():
+            got = stats.chemistry_counts.get(key, 0)
+            if got != expected:
+                raise S2NormaliseError(
+                    f"chemistry {key} expected {expected}; got {got}"
+                )
+        alphabet_got = {
+            key: stats.alphabet_counts.get(key, 0)
+            for key in EXPECTED_ENA_ALPHABET
+        }
+        extra_alphabets = {
+            key: count
+            for key, count in stats.alphabet_counts.items()
+            if key not in EXPECTED_ENA_ALPHABET and count
+        }
+        if alphabet_got != EXPECTED_ENA_ALPHABET or extra_alphabets:
+            raise S2NormaliseError(
+                "ENA alphabet counts differ from S1 audit expectation "
+                f"{EXPECTED_ENA_ALPHABET}; got {dict(stats.alphabet_counts)}"
+            )
+        if stats.t_to_u_count != EXPECTED_ENA_T_TO_U:
+            raise S2NormaliseError(
+                f"ENA T→U count expected {EXPECTED_ENA_T_TO_U}; "
+                f"got {stats.t_to_u_count}"
+            )
+        if stats.mixed_t_u_count != 0:
+            raise S2NormaliseError("ENA S2 found mixed T/U rows")
+        if stats.ambiguous_base_count != 0:
+            raise S2NormaliseError("ENA S2 found ambiguous-base rows")
+        if stats.invalid_character_count != 0:
+            raise S2NormaliseError("ENA S2 found invalid-character rows")
+        if stats.core_differs_from_full != 0:
+            raise S2NormaliseError(
+                "ENA S2 applied a trim; sequence_core must equal sequence_full"
+            )
+        if stats.primary_experiment_groups != EXPECTED_ENA_PRIMARY_GROUPS:
+            raise S2NormaliseError(
+                "ENA primary experiment groups expected "
+                f"{EXPECTED_ENA_PRIMARY_GROUPS}; got "
+                f"{stats.primary_experiment_groups}"
+            )
+        if stats.sequence_corrections_applied != EXPECTED_ENA_SEQUENCE_CORRECTIONS:
+            raise S2NormaliseError(
+                "ENA sidecar sequence corrections expected "
+                f"{EXPECTED_ENA_SEQUENCE_CORRECTIONS}; got "
+                f"{stats.sequence_corrections_applied}"
+            )
+
+    inference_inputs = []
+    group_membership: dict[str, list[str]] = {}
+    inference_key_by_record: dict[str, str | None] = {}
+    min_group_size = rules.constant_region_inference.minimum_group_size
+    eligible_record_count = 0
+    for row, result_row in zip(normalised_rows, row_results, strict=True):
+        group_id = build_group_inference_key(
+            source_db=row.get("source_db") or "ena",
+            grouping_mode=policy.group_inference_key,
+            experiment_group_id=result_row.sidecar_experiment_group_id or None,
+            target_name_raw=None,
+            publication=None,
+            pubmed_id=None,
+        )
+        inference_key_by_record[row["record_id"]] = group_id
+        if group_id is not None:
+            group_membership.setdefault(group_id, []).append(row["record_id"])
+        inference_inputs.append(
+            {
+                "record_id": row["record_id"],
+                "experiment_group_id": group_id,
+                "sequence_full": row["sequence_full"] or None,
+            }
+        )
+    for members in group_membership.values():
+        if len(members) >= min_group_size:
+            eligible_record_count += len(members)
+
+    inference_result = infer_group_constant_regions_with_diagnostics(
+        inference_inputs, rules=rules
+    )
+    group_proposal_rows = build_ena_group_proposal_rows(inference_result.proposals)
+    known_motif_proposals = build_ena_known_motif_proposals(row_results)
+    all_proposals = group_proposal_rows + known_motif_proposals
+    all_proposals.sort(key=lambda item: item["proposal_id"])
+    assert_ena_genuine_proposals(all_proposals)
+
+    medium_groups = {
+        row["experiment_group_id"]
+        for row in group_proposal_rows
+        if row["proposal_source"] == "group_consensus"
+    }
+    annotate_group_consensus_on_qc(
+        row_results,
+        group_ids_with_proposals=medium_groups,
+        inference_key_by_record=inference_key_by_record,
+    )
+    qc_rows = [row.qc for row in row_results]
+    review_rows = [row.qc for row in row_results if ena_is_review_candidate(row.qc)]
+    membership_rows = build_ena_membership_rows(
+        group_proposal_rows=group_proposal_rows,
+        group_membership=group_membership,
+    )
+    finalise_review_and_duplicate_stats(stats, row_results)
+
+    stats.constant_region_proposals = len(all_proposals)
+    stats.groups_considered = inference_result.diagnostics.groups_total
+    stats.groups_below_min_size = inference_result.diagnostics.groups_below_min_size
+    stats.groups_meeting_min_size = (
+        inference_result.diagnostics.groups_total
+        - inference_result.diagnostics.groups_below_min_size
+    )
+    stats.records_in_eligible_groups = eligible_record_count
+    stats.five_prime_proposals = sum(
+        1
+        for row in group_proposal_rows
+        if row["side"] == "five_prime" and row["proposal_source"] == "group_consensus"
+    )
+    stats.three_prime_proposals = sum(
+        1
+        for row in group_proposal_rows
+        if row["side"] == "three_prime" and row["proposal_source"] == "group_consensus"
+    )
+    stats.records_with_medium_confidence_proposal = sum(
+        len(group_membership.get(group_id, ())) for group_id in medium_groups
+    )
+    stats.high_confidence_trims_applied = 0
+    stats.applied_trims = 0
+    for row in all_proposals:
+        source = row["proposal_source"]
+        stats.proposal_source_counts[source] = (
+            stats.proposal_source_counts.get(source, 0) + 1
+        )
+    stats.constant_region_reason = (
+        f"tier2_grouping={policy.group_inference_key};"
+        "sidecar_primary_experiment_group_id;"
+        "proposals_only_not_applied"
+    )
+
+    if expected_rows == EXPECTED_ENA_ROWS:
+        if stats.groups_considered != EXPECTED_ENA_PRIMARY_GROUPS:
+            raise S2NormaliseError(
+                "ENA inference groups must equal 25 primary experiment "
+                f"groups; got {stats.groups_considered}"
+            )
+        if stats.supporting_group_ids_expanded == stats.primary_experiment_groups:
+            # Supporting expansion is allowed to equal 25; it must not be  used
+            # as grouping. The 28-ID expansion is the known larger set.
+            pass
+        if stats.groups_considered == stats.supporting_group_ids_expanded and (
+            stats.supporting_group_ids_expanded != EXPECTED_ENA_PRIMARY_GROUPS
+        ):
+            raise S2NormaliseError(
+                "ENA grouping appears to have used expanded supporting IDs"
+            )
+
+    for row in normalised_rows:
+        if row["sequence_core"] != row["sequence_full"]:
+            raise S2NormaliseError(
+                "medium-confidence proposals must not mutate sequence_core"
+            )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_normalised = output_dir / "ena_normalised.csv"
+    out_qc = output_dir / "ena_s2_qc.csv"
+    out_review = output_dir / "ena_s2_review_candidates.csv"
+    out_proposals = output_dir / "ena_constant_region_proposals.csv"
+    out_membership = output_dir / "ena_constant_region_membership.csv"
+    out_report = output_dir / "ena_s2_report.md"
+
+    write_corpus_csv_atomic(out_normalised, normalised_rows)
+    write_csv_atomic(out_qc, ENA_S2_QC_COLUMNS, qc_rows)
+    write_csv_atomic(out_review, ENA_S2_QC_COLUMNS, review_rows)
+    write_csv_atomic(out_proposals, ENA_CONSTANT_PROPOSAL_COLUMNS, all_proposals)
+    write_csv_atomic(out_membership, ENA_MEMBERSHIP_COLUMNS, membership_rows)
+
+    s1_hash_after = _sha256_file(canonical_path)
+    sidecar_hash_after = _sha256_file(sidecar_path)
+    inputs_unchanged = (
+        s1_hash_before == s1_hash_after
+        and sidecar_hash_before == sidecar_hash_after
+    )
+    if not inputs_unchanged:
+        raise S2NormaliseError("S1 inputs were modified during S2 execution")
+    stats.sidecar_unchanged = sidecar_hash_before == sidecar_hash_after
+
+    raw_sha_after: str | None = None
+    raw_sha_unchanged: bool | None = None
+    if raw_sha_before is not None:
+        raw_sha_after = _sha256_file(raw_path)
+        if raw_sha_after != raw_sha_before:
+            raise S2NormaliseError("ENA raw SHA changed during S2")
+        raw_sha_unchanged = True
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        first_hashes = {
+            "normalised": _sha256_file(out_normalised),
+            "qc": _sha256_file(out_qc),
+            "review": _sha256_file(out_review),
+            "proposals": _sha256_file(out_proposals),
+            "membership": _sha256_file(out_membership),
+        }
+        second = run_ena_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=policy_path,
+            expected_rows=expected_rows,
+            check_deterministic_rerun=False,
+        )
+        deterministic_ok = (
+            first_hashes["normalised"] == _sha256_file(second.output_normalised)
+            and first_hashes["qc"] == _sha256_file(second.output_qc)
+            and first_hashes["review"] == _sha256_file(second.output_review)
+            and first_hashes["proposals"] == _sha256_file(second.output_proposals)
+            and second.output_rule_membership is not None
+            and first_hashes["membership"]
+            == _sha256_file(second.output_rule_membership)
+        )
+        if not deterministic_ok:
+            raise S2NormaliseError(
+                "S2 outputs were not byte-identical across deterministic rerun"
+            )
+
+    run_result = S2RunResult(
+        source_key="ena",
+        stats=stats,
+        output_normalised=out_normalised,
+        output_qc=out_qc,
+        output_review=out_review,
+        output_proposals=out_proposals,
+        output_report=out_report,
+        s1_hash_before=s1_hash_before,
+        s1_hash_after=s1_hash_after,
+        sidecar_hash_before=sidecar_hash_before,
+        sidecar_hash_after=sidecar_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        deterministic_rerun_ok=deterministic_ok,
+        raw_sha256=raw_sha_after,
+        raw_sha_unchanged=raw_sha_unchanged,
+        output_rule_membership=out_membership,
+    )
+    report_text = build_ena_s2_report(
+        repo_root=repo_root,
+        result=run_result,
+        rules_path=rules_path,
+        policy_path=policy_path,
+        diagnostics=inference_result.diagnostics,
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in report_text:
+        raise S2NormaliseError("S2 report must not contain absolute repository paths")
+    _write_text_atomic(out_report, report_text)
+    return run_result
+
+
 def run_s2_normalisation(
     *,
     repo_root: Path,
@@ -3573,6 +4434,18 @@ def run_s2_normalisation(
             policy_path=source_policy,
             expected_rows=(
                 EXPECTED_APTAINDEX_ROWS if expected_rows is None else expected_rows
+            ),
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key == "ena":
+        return run_ena_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=source_policy,
+            expected_rows=(
+                EXPECTED_ENA_ROWS if expected_rows is None else expected_rows
             ),
             check_deterministic_rerun=check_deterministic_rerun,
         )
@@ -3678,6 +4551,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_path = Path("config/source_normalisation/riboaptamer.json")
         elif args.source == "aptaindex":
             policy_path = Path("config/source_normalisation/aptaindex.json")
+        elif args.source == "ena":
+            policy_path = Path("config/source_normalisation/ena.json")
         else:
             raise S2NormaliseError(
                 "--source-policy is required for unrecognised sources"
@@ -3700,6 +4575,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         AptaDBS2Error,
         RiboAptamerS2Error,
         AptaIndexS2Error,
+        EnaS2Error,
         CorpusSchemaError,
     ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -3749,6 +4625,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"\nmixed_t_u_count={stats.mixed_t_u_count}"
             f"\ncore_differs_from_full={stats.core_differs_from_full}"
             f"\napplied_trims={stats.applied_trims}"
+        )
+    elif isinstance(stats, EnaS2Stats):
+        extra = (
+            f"\nmolecule_type_counts={dict(sorted(stats.molecule_type_counts.items()))}"
+            f"\nchemistry_counts={dict(sorted(stats.chemistry_counts.items()))}"
+            f"\nalphabet_counts={dict(sorted(stats.alphabet_counts.items()))}"
+            f"\nt_to_u_count={stats.t_to_u_count}"
+            f"\nprimary_experiment_groups={stats.primary_experiment_groups}"
+            f"\ngroups_meeting_min_size={stats.groups_meeting_min_size}"
+            f"\nknown_motif_detection_count={stats.known_motif_detection_count}"
+            f"\ncore_differs_from_full={stats.core_differs_from_full}"
+            f"\napplied_trims={stats.applied_trims}"
+            f"\nreview_candidate_rows={stats.review_candidate_rows}"
         )
     print(
         f"source={result.source_key}\n"
