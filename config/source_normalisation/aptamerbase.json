@@ -1,0 +1,123 @@
+{
+  "source_key": "aptamerbase",
+  "contract_version": "1.0",
+  "s1_spine_basename": "aptamerbase_aptamers.csv",
+  "supporting_rdf_basename": "aptamerbase.freebase.extract.nt.gz",
+  "molecule_evidence_source": "rdf_type",
+  "reported_length_field": "aptamerbase_sequence_length",
+  "source_object_type_field": "aptamerbase_type",
+  "source_id_field": "aptamerbase_id",
+  "modification_text_field": "aptamerbase_has_modification_details",
+  "apply_approved_trims": false,
+  "group_inference_key": "disabled",
+  "do_not_infer_molecule_from_alphabet": true,
+  "do_not_apply_inferred_trims": true,
+  "do_not_create_experiment_group_id": true,
+  "approved_trims": [],
+  "rdf_predicates": {
+    "rdf_type": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+    "freebase_object_type": "http://rdf.freebase.com/ns/type.object.type",
+    "modification_details": "http://rdf.freebase.com/ns/base.aptamer.modified_nucleic_acid.modification_details"
+  },
+  "rdf_type_uris": {
+    "aptamer": "http://rdf.freebase.com/ns/base.aptamer.aptamer",
+    "rna": "http://rdf.freebase.com/ns/base.aptamer.rna",
+    "dna": "http://rdf.freebase.com/ns/base.aptamer.dna",
+    "nucleic_acid": "http://rdf.freebase.com/ns/base.aptamer.nucleic_acid",
+    "linear_polymer": "http://rdf.freebase.com/ns/base.aptamer.linear_polymer",
+    "modified_nucleic_acid": "http://rdf.freebase.com/ns/base.aptamer.modified_nucleic_acid",
+    "minimal_aptamer": "http://rdf.freebase.com/ns/base.aptamer.minimal_aptamer",
+    "nucleic_acid_secondary_structure": "http://rdf.freebase.com/ns/base.aptamer.nucleic_acid_secondary_structure",
+    "predicted_secondary_structure": "http://rdf.freebase.com/ns/base.aptamer.predicted_secondary_structure"
+  },
+  "source_object_type_map": {
+    "http://rdf.freebase.com/ns/base.aptamer.aptamer": "aptamer",
+    "http://rdf.freebase.com/ns/base.aptamer.nucleic_acid_secondary_structure": "nucleic_acid_secondary_structure",
+    "http://rdf.freebase.com/ns/base.aptamer.predicted_secondary_structure": "predicted_secondary_structure"
+  },
+  "structure_topic_object_types": [
+    "nucleic_acid_secondary_structure",
+    "predicted_secondary_structure"
+  ],
+  "rdf_molecule_map": {
+    "rna_only": "RNA",
+    "dna_only": "ssDNA",
+    "rna_and_dna": "unknown",
+    "neither": "unknown"
+  },
+  "chemistry_literals": {
+    "2' Fluoropyrimidine": "twof_rna",
+    "2' fluoro pyrimidines": "twof_rna",
+    "2' fluoropyrimidine": "twof_rna",
+    "2' fluorpyrimidine": "twof_rna",
+    "2'-F": "twof_rna",
+    "2'-F Pyrimidine and 2'-OH purine": "twof_rna",
+    "2'-F modified nucleic acid": "twof_rna",
+    "2'-F modified pyrimidine": "twof_rna",
+    "2'-F modified pyrimidines": "twof_rna",
+    "2'-F pyrimidines": "twof_rna",
+    "2'-F-Py": "twof_rna",
+    "2'-deoxy-2'-fluoro CTP and UTP": "twof_rna",
+    "2'-fluoro pyrimidines": "twof_rna",
+    "2'-fluoro substituted pyrimidine": "twof_rna",
+    "2'-fluoro-modified pyrimidine": "twof_rna",
+    "2'-fluoro-pyrimidine": "twof_rna",
+    "2'-fluoropyrimidine-containing RNA": "twof_rna",
+    "2'-fluoropyrimidine-containting RNA": "twof_rna",
+    "2'-fluoropyrimidines": "twof_rna",
+    "2’ fluorpyrimidine": "twof_rna",
+    "5'-FITC": "terminal_conjugate",
+    "5'-fluorescein": "terminal_conjugate",
+    "B = biotin-CE": "terminal_conjugate",
+    "X = polyethylene glycol 18 (PEG18)": "terminal_conjugate",
+    "biotinylated": "terminal_conjugate",
+    "biotinylated at 5' end": "terminal_conjugate",
+    "2'-OH": "unmodified_backbone",
+    "Spiegelmer (L-RNA), X = polyethylene glycol 18 (PEG18)": "spiegelmer_l_rna",
+    "Spiegelmer (L-RNA), X = polyethylene glycol 18 (PEG18), 3'-modified with 40 kDa polyethylene glycol": "spiegelmer_l_rna",
+    "2'-amino-Uridines": "amino_2nh2",
+    "2'-amino-Uridines reaction products with 3-hydroxy-4-methoxybenzaldehyde": "amino_2nh2",
+    "2'-amino-Uridines reaction products with 4-[3-(dimethylamino)propoxyl]benzaldehyde hydrochloride": "amino_2nh2",
+    "2'-amino-Uridines reaction products with nalidixic aldehyde": "amino_2nh2",
+    "2'-amino-modified pyrimidine nucleotides": "amino_2nh2",
+    "has a 2' NH2-pyrimidine modifier on 5' end": "amino_2nh2",
+    "2'-deoxy purines and 2'-O-methyl pyrimidines": "ome_or_mixed_sugar",
+    "5'-biotinylated 2'methoxy pyrimidine": "ome_or_mixed_sugar",
+    "26 unmodified 2' O-methyl-nucleotides, one inverted deoxythymidine nucleotide as a 3' cap, and one phosphorthioate linkage between mG20 and dT21, 5' end modified with 20kDa PEG molecule": "ome_or_mixed_sugar",
+    "20kDa PEG, 5' linker NH2-CH6, 3'cap [3'-3'T]": "inverted_dt_construct",
+    "40kDa PEG, 5' linker NH2-CH6, 3'cap [3'-3'T]": "inverted_dt_construct",
+    "PEG, 5' linker NH2-dT, 3'cap [3'-3'T]": "inverted_dt_construct",
+    "conjugate: 20kDa PEG, 5' linker –SO2-(CH2)2-S-(CH2)6, 3'cap [T-NH2]-[-3’-3’T]": "inverted_dt_construct",
+    "conjugate: DSPE-2kDa PEG, 5' linker NH2-dT, 3'cap [3''-3'T]-T": "inverted_dt_construct",
+    "conjugate: none, 5' linker NH2-CH6-dUT, 3'cap [3'-3'T]": "inverted_dt_construct",
+    "5-pentynyl dU bases": "pentynyl_du",
+    "has iso-Guanosine base at position 10": "iso_guanosine",
+    "iso-Guanosine base on position 8": "iso_guanosine",
+    "iso-Guanosine on the first G base": "iso_guanosine",
+    "t indicates 5-((2-(6-(arginamido)hexylamino)-2-oxoethyl))-dU": "unusual_modified_nucleotide"
+  },
+  "chemistry_automatic_map": {
+    "unmodified_backbone": {
+      "RNA": "RNA",
+      "ssDNA": "DNA"
+    },
+    "terminal_conjugate": {
+      "RNA": "RNA",
+      "ssDNA": "DNA"
+    },
+    "twof_rna": {
+      "RNA": "2F-RNA"
+    }
+  },
+  "qc_tokens": {
+    "structure_topic": "non_aptamer_structure_topic",
+    "molecule_type_conflict": "source_molecule_type_conflict",
+    "molecule_alphabet_conflict": "source_molecule_alphabet_conflict",
+    "chemistry_review": "chemistry_requires_review",
+    "spiegelmer": "spiegelmer_l_rna_review",
+    "dna_twof": "dna_twof_like_modification_review",
+    "rdf_mod_without_text": "rdf_modified_type_without_modification_text",
+    "text_without_rdf_mod": "modification_text_without_rdf_modified_type",
+    "terminal_conjugate": "terminal_conjugate_present"
+  }
+}

@@ -2887,7 +2887,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, or ena)",
+        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, ena, or aptamerbase)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -2965,6 +2965,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--skip-deterministic-rerun",
         action="store_true",
         help="Skip in-memory dry-run determinism check (tests only)",
+    )
+    parser.add_argument(
+        "--authorise-actual-apply",
+        action="store_true",
+        help=(
+            "Required for AptamerBase actual CHECKPOINT-1 apply. "
+            "Without this flag AptamerBase remains dry-run only."
+        ),
     )
     return parser
 
@@ -5686,6 +5694,1369 @@ def run_ena_checkpoint1_dry_run(
     return output_hashes
 
 
+def run_aptamerbase_checkpoint1_dry_run(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    check_deterministic_rerun: bool = True,
+    expected_source_rows: int | None = 2128,
+    verify_frozen_inputs: bool = True,
+) -> None:
+    """Simulate AptamerBase CHECKPOINT-1 application without closing it."""
+    from adapters.aptamerbase_checkpoint1_dry_run import (
+        CHANGE_REPORT_COLUMNS,
+        DECISION_AUDIT_COLUMNS,
+        DRY_RUN_BANNER,
+        ELIGIBLE_COLUMNS,
+        format_dry_run_markdown,
+        serialise_aptamerbase_simulation_sequence_free,
+        simulate_aptamerbase_checkpoint1_application,
+    )
+    from adapters.aptamerbase_checkpoint1_review import (
+        AptamerBaseCheckpoint1ReviewError,
+        compare_review_to_pristine,
+        load_default_policy,
+        validate_review_package,
+    )
+    from adapters.aptadb_checkpoint1_review import (
+        AptaDBCheckpoint1ReviewError,
+        read_csv_rows,
+    )
+    from adapters.aptamerbase_s3 import (
+        DECISION_COLUMNS,
+        PARK_COLUMNS,
+        REJECTION_COLUMNS,
+        index_constant_proposals,
+    )
+    from common.corpus_schema import CORPUS_COLUMNS, write_corpus_csv_atomic
+
+    output_dir = _assert_aptadb_dry_run_output(output_dir)
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    review_dir = checkpoint_dir / "manual_review"
+    queue_path = review_dir / "aptamerbase_checkpoint1_manual_review.csv"
+    group_path = review_dir / "aptamerbase_checkpoint1_constant_group_review.csv"
+    bulk_path = review_dir / "aptamerbase_checkpoint1_bulk_audit_confirmation.csv"
+    pristine_path = (
+        review_dir / "pristine_blank" / "aptamerbase_checkpoint1_manual_review.csv"
+    )
+    canonical_path = checkpoint_dir / "aptamerbase_s3_canonical.csv"
+    decision_path = checkpoint_dir / "aptamerbase_s3_decisions.csv"
+    rejection_path = checkpoint_dir / "rejected_aptamerbase.csv"
+    parked_ssdna_path = checkpoint_dir / "aptamerbase_s3_parked_ssdna.csv"
+    parked_molecule_path = (
+        checkpoint_dir / "aptamerbase_s3_parked_molecule_unresolved.csv"
+    )
+    parked_chemistry_path = checkpoint_dir / "aptamerbase_s3_parked_chemistry_review.csv"
+    parked_construct_path = checkpoint_dir / "aptamerbase_s3_parked_construct_review.csv"
+    s1_path = repo_root / "data" / "interim" / "extracted" / "aptamerbase_extracted.csv"
+    s2_path = repo_root / "data" / "interim" / "normalised" / "aptamerbase_normalised.csv"
+    qc_path = repo_root / "data" / "interim" / "normalised" / "aptamerbase_s2_qc.csv"
+    sidecar_path = (
+        repo_root / "data" / "interim" / "extracted" / "aptamerbase_source_metadata.csv"
+    )
+    proposals_path = (
+        repo_root
+        / "data"
+        / "interim"
+        / "normalised"
+        / "detected_constants_aptamerbase.csv"
+    )
+    rec_json = (
+        repo_root
+        / "config"
+        / "checkpoint_reviews"
+        / "aptamerbase_checkpoint1_recommendations.json"
+    )
+    raw_path = repo_root / "data" / "raw" / "aptamerbase" / "aptamerbase_aptamers.csv"
+    s3_review_path = checkpoint_dir / "aptamerbase_checkpoint1_review.csv"
+    s3_local_path = checkpoint_dir / "aptamerbase_checkpoint1_local_detail.csv"
+
+    required = [
+        queue_path,
+        bulk_path,
+        canonical_path,
+        decision_path,
+        rejection_path,
+        s2_path,
+        qc_path,
+        sidecar_path,
+    ]
+    for path in required:
+        if not path.is_file():
+            raise Checkpoint1ApplyError(f"Missing dry-run input: {path.name}")
+
+    hashes_before = {
+        "queue": sha256_file(queue_path),
+        "groups": sha256_file(group_path) if group_path.is_file() else "",
+        "bulk": sha256_file(bulk_path),
+        "s1": sha256_file(s1_path) if s1_path.is_file() else "",
+        "s2": sha256_file(s2_path),
+        "s3": sha256_file(canonical_path),
+        "s3_review": sha256_file(s3_review_path) if s3_review_path.is_file() else "",
+        "s3_local": sha256_file(s3_local_path) if s3_local_path.is_file() else "",
+        "sidecar": sha256_file(sidecar_path),
+        "qc": sha256_file(qc_path),
+        "proposals": sha256_file(proposals_path) if proposals_path.is_file() else "",
+        "rec_json": sha256_file(rec_json) if rec_json.is_file() else "",
+        "raw": sha256_file(raw_path) if raw_path.is_file() else "",
+    }
+    if verify_frozen_inputs:
+        if hashes_before["s3_review"] and hashes_before["s3_review"] != (
+            "1423f852cbe1b9eb194acef929f581ce7dddc6a9a4ed564404b26b43dba7dc61"
+        ):
+            raise Checkpoint1ApplyError(
+                "AptamerBase pre-review CHECKPOINT CSV SHA-256 drifted"
+            )
+        if hashes_before["s3_local"] and hashes_before["s3_local"] != (
+            "e16dba912e37453baad35ea6d3cad4ba32cb5104be45d5e0a3de1eb4fb4b0ecb"
+        ):
+            raise Checkpoint1ApplyError(
+                "AptamerBase local-detail SHA-256 drifted"
+            )
+        if hashes_before["s2"] != hashes_before["s3"]:
+            raise Checkpoint1ApplyError(
+                "AptamerBase S3 canonical is not byte-identical to S2"
+            )
+
+    queue_rows = read_csv_rows(queue_path)
+    group_rows = read_csv_rows(group_path) if group_path.is_file() else []
+    bulk_rows = read_csv_rows(bulk_path)
+    bulk = bulk_rows[0] if bulk_rows else None
+    if pristine_path.is_file():
+        pristine_rows = read_csv_rows(pristine_path)
+        drift = compare_review_to_pristine(queue_rows, pristine_rows)
+        if drift:
+            raise Checkpoint1ApplyError(
+                "Completed review drifted from pristine outside permitted "
+                "human fields: " + "; ".join(drift[:10])
+            )
+    try:
+        report = validate_review_package(
+            queue_rows=queue_rows,
+            group_rows=group_rows,
+            bulk_confirmation=bulk,
+        )
+    except Exception as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+    if not report.ok:
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for dry-run application"
+        )
+    if report.unresolved_judgement_required or report.audit_only_unconfirmed:
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for dry-run application"
+        )
+    if not report.ready_for_application:
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for dry-run application"
+        )
+
+    canonical_rows = read_csv_rows(canonical_path)
+    decision_rows = read_csv_rows(decision_path)
+    rejection_rows = read_csv_rows(rejection_path) if rejection_path.is_file() else []
+    parked_ssdna = (
+        read_csv_rows(parked_ssdna_path) if parked_ssdna_path.is_file() else []
+    )
+    parked_molecule = (
+        read_csv_rows(parked_molecule_path) if parked_molecule_path.is_file() else []
+    )
+    parked_chemistry = (
+        read_csv_rows(parked_chemistry_path) if parked_chemistry_path.is_file() else []
+    )
+    parked_construct = (
+        read_csv_rows(parked_construct_path) if parked_construct_path.is_file() else []
+    )
+    qc_rows = read_csv_rows(qc_path)
+    sidecar_rows = read_csv_rows(sidecar_path)
+    proposal_rows = read_csv_rows(proposals_path) if proposals_path.is_file() else []
+    s2_qc_by_id = {row["record_id"]: row for row in qc_rows}
+    source_metadata_by_id = {row["record_id"]: row for row in sidecar_rows}
+    proposals_by_record = index_constant_proposals(canonical_rows, proposal_rows)
+    policy = load_default_policy(repo_root)
+
+    def _simulate():
+        try:
+            return simulate_aptamerbase_checkpoint1_application(
+                queue_rows=queue_rows,
+                group_rows=group_rows,
+                canonical_rows=canonical_rows,
+                decision_rows=decision_rows,
+                source_metadata_by_id=source_metadata_by_id,
+                s2_qc_by_id=s2_qc_by_id,
+                policy=policy,
+                proposals_by_record=proposals_by_record,
+                bulk_confirmation=bulk,
+                existing_rejection_rows=rejection_rows,
+                existing_parked_ssdna=parked_ssdna,
+                existing_parked_molecule=parked_molecule,
+                existing_parked_chemistry=parked_chemistry,
+                existing_parked_construct=parked_construct,
+                expected_source_rows=expected_source_rows,
+            )
+        except (AptamerBaseCheckpoint1ReviewError, AptaDBCheckpoint1ReviewError) as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    simulation = _simulate()
+    deterministic_ok = False
+    if check_deterministic_rerun:
+        second = _simulate()
+        if serialise_aptamerbase_simulation_sequence_free(
+            simulation
+        ) != serialise_aptamerbase_simulation_sequence_free(second):
+            raise Checkpoint1ApplyError(
+                "AptamerBase CHECKPOINT-1 dry-run preview was not byte-identical "
+                "across deterministic in-memory rerun"
+            )
+        deterministic_ok = True
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_corpus_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_dry_run_canonical_preview.csv",
+        simulation.preview_canonical,
+        columns=CORPUS_COLUMNS,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_dry_run_routing_preview.csv",
+        DECISION_COLUMNS,
+        simulation.preview_decisions,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_dry_run_rejection_preview.csv",
+        REJECTION_COLUMNS,
+        simulation.preview_rejections,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_dry_run_parked_ssdna_preview.csv",
+        PARK_COLUMNS,
+        simulation.preview_parked_ssdna,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_dry_run_parked_molecule_preview.csv",
+        PARK_COLUMNS,
+        simulation.preview_parked_molecule,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_dry_run_parked_chemistry_preview.csv",
+        PARK_COLUMNS,
+        simulation.preview_parked_chemistry,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_dry_run_parked_construct_preview.csv",
+        PARK_COLUMNS,
+        simulation.preview_parked_construct,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_dry_run_eligible_preview.csv",
+        ELIGIBLE_COLUMNS,
+        simulation.preview_eligible,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_dry_run_change_report.csv",
+        CHANGE_REPORT_COLUMNS,
+        simulation.change_report,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_dry_run_decision_audit.csv",
+        DECISION_AUDIT_COLUMNS,
+        simulation.decision_audit,
+        quoting=csv.QUOTE_ALL,
+    )
+    review_hashes = {
+        "queue": hashes_before["queue"],
+        "groups": hashes_before["groups"],
+        "bulk": hashes_before["bulk"],
+    }
+    integrity = {
+        "s1": hashes_before["s1"],
+        "s2": hashes_before["s2"],
+        "s3": hashes_before["s3"],
+        "raw": hashes_before["raw"],
+        "deterministic_ok": "true" if deterministic_ok else "false",
+    }
+    report_text = format_dry_run_markdown(
+        simulation, review_hashes=review_hashes, integrity=integrity
+    )
+    _write_text_atomic(
+        output_dir / "aptamerbase_checkpoint1_dry_run_report.md", report_text
+    )
+    _write_text_atomic(
+        output_dir / "README.md",
+        DRY_RUN_BANNER
+        + (
+            "\n\nThese files are application previews only. They must not be "
+            "treated as resolved CHECKPOINT-1 outputs or an S4 handoff.\n"
+            "Canonical preview rows contain restricted sequences and must "
+            "remain under ignored data/.\n"
+        ),
+    )
+
+    hashes_after = {
+        "queue": sha256_file(queue_path),
+        "groups": sha256_file(group_path) if group_path.is_file() else "",
+        "bulk": sha256_file(bulk_path),
+        "s1": sha256_file(s1_path) if s1_path.is_file() else "",
+        "s2": sha256_file(s2_path),
+        "s3": sha256_file(canonical_path),
+        "s3_review": sha256_file(s3_review_path) if s3_review_path.is_file() else "",
+        "s3_local": sha256_file(s3_local_path) if s3_local_path.is_file() else "",
+        "sidecar": sha256_file(sidecar_path),
+        "qc": sha256_file(qc_path),
+        "proposals": sha256_file(proposals_path) if proposals_path.is_file() else "",
+        "rec_json": sha256_file(rec_json) if rec_json.is_file() else "",
+        "raw": sha256_file(raw_path) if raw_path.is_file() else "",
+    }
+    if hashes_after != hashes_before:
+        raise Checkpoint1ApplyError(
+            "Dry-run mutated an input artefact; aborting without treating "
+            "preview files as authoritative"
+        )
+    if simulation.nogo_reasons:
+        raise Checkpoint1ApplyError(
+            "Dry-run fail-closed: " + "; ".join(simulation.nogo_reasons)
+        )
+
+    stats = simulation.stats
+    print(DRY_RUN_BANNER)
+    print(
+        "source=aptamerbase\n"
+        "mode=dry_run\n"
+        "checkpoint_status=unapplied\n"
+        f"total_records={stats['total_records']}\n"
+        f"reviewed_records={stats['reviewed_records']}\n"
+        f"judgement_required={stats['judgement_required']}\n"
+        f"human_keep_csv={stats['human_keep_csv']}\n"
+        f"human_edit={stats['human_edit']}\n"
+        f"human_drop={stats['human_drop']}\n"
+        f"audit_only_bulk={stats['human_blank_audit_only']}\n"
+        f"human_reviewed_drops={stats['human_reviewed_drops']}\n"
+        f"technically_eligible={stats['technically_eligible']}\n"
+        f"parked_ssdna={stats['parked_ssdna']}\n"
+        f"parked_molecule_unresolved={stats['parked_molecule_unresolved']}\n"
+        f"parked_chemistry_review={stats['parked_chemistry_review']}\n"
+        f"parked_construct_review={stats['parked_construct_review']}\n"
+        f"technical_rejects_after_review={stats['technical_rejects_after_review']}\n"
+        f"manual_rejects={stats['manual_rejects']}\n"
+        f"records_trimmed={stats['records_trimmed']}\n"
+        f"route_changed={stats['route_changed']}\n"
+        f"keep_unexpected_route_changes={stats['keep_unexpected_route_changes']}\n"
+        f"authorised_for_s4={stats['authorised_for_s4']}\n"
+        f"review_queue_sha256={hashes_before['queue']}\n"
+        f"review_bulk_sha256={hashes_before['bulk']}\n"
+        f"s1_sha256={hashes_before['s1']}\n"
+        f"s2_sha256={hashes_before['s2']}\n"
+        f"s3_sha256={hashes_before['s3']}\n"
+        f"raw_sha256={hashes_before['raw']}\n"
+        f"nogo_reasons={';'.join(simulation.nogo_reasons) or 'none'}\n"
+        f"deterministic_rerun={'pass' if deterministic_ok else 'skipped'}\n"
+        "CHECKPOINT-1 is not closed\n"
+        "S4 remains blocked"
+    )
+
+
+@dataclass(frozen=True)
+class AptamerBaseApplyResult:
+    """Authoritative AptamerBase CHECKPOINT-1 apply/closure result."""
+
+    output_dir: Path
+    metadata_out: Path
+    tracked_manifest: Path
+    summary_out: Path
+    output_hashes: dict[str, str]
+    stats: dict[str, int | str | bool]
+    preview_comparison_ok: bool
+    deterministic_rerun_ok: bool
+    semantic_mismatches: int
+    byte_identical_count: int
+    checkpoint_closed: bool
+
+
+def _assert_aptamerbase_resolved_output(path: Path, *, checkpoint_dir: Path) -> Path:
+    resolved = path.resolve()
+    checkpoint_resolved = checkpoint_dir.resolve()
+    if resolved == checkpoint_resolved:
+        raise Checkpoint1ApplyError(
+            "Refusing to overwrite the AptamerBase CHECKPOINT-1 snapshot directory"
+        )
+    dry_run_dir = (checkpoint_resolved / "dry_run").resolve()
+    if resolved == dry_run_dir:
+        raise Checkpoint1ApplyError(
+            "Refusing to overwrite the validated dry-run preview directory"
+        )
+    lowered = [part.lower() for part in resolved.parts]
+    if any(name in APPLY_FORBIDDEN_DIR_NAMES for name in lowered):
+        raise Checkpoint1ApplyError(
+            f"Resolved output must not use a dry-run/S2/S3/S4 directory: {resolved}"
+        )
+    return resolved
+
+
+def _write_aptamerbase_transform_csvs(
+    output_dir: Path, simulation: object
+) -> dict[str, Path]:
+    from adapters.aptamerbase_checkpoint1_dry_run import (
+        CHANGE_REPORT_COLUMNS,
+        DECISION_AUDIT_COLUMNS,
+        ELIGIBLE_COLUMNS,
+        AptamerBaseDryRunSimulation,
+    )
+    from adapters.aptamerbase_s3 import DECISION_COLUMNS, PARK_COLUMNS, REJECTION_COLUMNS
+    from common.corpus_schema import CORPUS_COLUMNS, write_corpus_csv_atomic
+
+    if not isinstance(simulation, AptamerBaseDryRunSimulation):
+        raise Checkpoint1ApplyError("Apply payload has unexpected type")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths = {
+        "canonical": output_dir / "aptamerbase_checkpoint1_applied_canonical.csv",
+        "routing": output_dir / "aptamerbase_checkpoint1_applied_routing.csv",
+        "rejection": output_dir / "aptamerbase_checkpoint1_applied_rejection.csv",
+        "parked_ssdna": output_dir / "aptamerbase_checkpoint1_applied_parked_ssdna.csv",
+        "parked_molecule": (
+            output_dir / "aptamerbase_checkpoint1_applied_parked_molecule.csv"
+        ),
+        "parked_chemistry": (
+            output_dir / "aptamerbase_checkpoint1_applied_parked_chemistry.csv"
+        ),
+        "parked_construct": (
+            output_dir / "aptamerbase_checkpoint1_applied_parked_construct.csv"
+        ),
+        "eligible": output_dir / "aptamerbase_checkpoint1_applied_eligible.csv",
+        "change_report": output_dir / "aptamerbase_checkpoint1_applied_change_report.csv",
+        "decision_audit": output_dir / "aptamerbase_checkpoint1_decision_audit.csv",
+    }
+    write_corpus_csv_atomic(
+        paths["canonical"],
+        simulation.preview_canonical,
+        columns=CORPUS_COLUMNS,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        paths["routing"],
+        DECISION_COLUMNS,
+        simulation.preview_decisions,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        paths["rejection"],
+        REJECTION_COLUMNS,
+        simulation.preview_rejections,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        paths["parked_ssdna"],
+        PARK_COLUMNS,
+        simulation.preview_parked_ssdna,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        paths["parked_molecule"],
+        PARK_COLUMNS,
+        simulation.preview_parked_molecule,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        paths["parked_chemistry"],
+        PARK_COLUMNS,
+        simulation.preview_parked_chemistry,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        paths["parked_construct"],
+        PARK_COLUMNS,
+        simulation.preview_parked_construct,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        paths["eligible"],
+        ELIGIBLE_COLUMNS,
+        simulation.preview_eligible,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        paths["change_report"],
+        CHANGE_REPORT_COLUMNS,
+        simulation.change_report,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        paths["decision_audit"],
+        DECISION_AUDIT_COLUMNS,
+        simulation.decision_audit,
+        quoting=csv.QUOTE_ALL,
+    )
+    return paths
+
+
+def _aptamerbase_csv_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        fields = list(reader.fieldnames or [])
+        return fields, list(reader)
+
+
+def _aptamerbase_semantic_mismatches(
+    *,
+    preview_dir: Path,
+    applied_paths: Mapping[str, Path],
+) -> int:
+    from adapters.aptamerbase_checkpoint1_apply import SEMANTIC_RECORD_FIELDS
+
+    preview_canonical = preview_dir / "aptamerbase_checkpoint1_dry_run_canonical_preview.csv"
+    preview_routing = preview_dir / "aptamerbase_checkpoint1_dry_run_routing_preview.csv"
+    preview_eligible = preview_dir / "aptamerbase_checkpoint1_dry_run_eligible_preview.csv"
+    _, canonical_preview = _aptamerbase_csv_rows(preview_canonical)
+    _, routing_preview = _aptamerbase_csv_rows(preview_routing)
+    _, eligible_preview = _aptamerbase_csv_rows(preview_eligible)
+    _, canonical_applied = _aptamerbase_csv_rows(applied_paths["canonical"])
+    _, routing_applied = _aptamerbase_csv_rows(applied_paths["routing"])
+    _, eligible_applied = _aptamerbase_csv_rows(applied_paths["eligible"])
+    if len(canonical_preview) != len(canonical_applied):
+        return abs(len(canonical_preview) - len(canonical_applied)) or 1
+    if len(routing_preview) != len(routing_applied):
+        return abs(len(routing_preview) - len(routing_applied)) or 1
+
+    def _join(
+        canonical_rows: list[dict[str, str]], routing_rows: list[dict[str, str]]
+    ) -> dict[str, dict[str, str]]:
+        joined: dict[str, dict[str, str]] = {}
+        routing_by_id = {row["record_id"]: row for row in routing_rows}
+        for canon in canonical_rows:
+            record_id = canon["record_id"]
+            joined[record_id] = {**canon, **routing_by_id.get(record_id, {})}
+        return joined
+
+    preview_by_id = _join(canonical_preview, routing_preview)
+    applied_by_id = _join(canonical_applied, routing_applied)
+    if set(preview_by_id) != set(applied_by_id):
+        return len(set(preview_by_id).symmetric_difference(applied_by_id)) or 1
+    mismatches = 0
+    for record_id, preview_row in preview_by_id.items():
+        applied_row = applied_by_id[record_id]
+        for field_name in SEMANTIC_RECORD_FIELDS:
+            if (preview_row.get(field_name) or "") != (applied_row.get(field_name) or ""):
+                mismatches += 1
+    preview_eligible_ids = {row["record_id"] for row in eligible_preview}
+    applied_eligible_ids = {row["record_id"] for row in eligible_applied}
+    if preview_eligible_ids != applied_eligible_ids:
+        mismatches += len(preview_eligible_ids.symmetric_difference(applied_eligible_ids))
+    return mismatches
+
+
+def _compare_aptamerbase_applied_to_preview(
+    *,
+    applied_paths: Mapping[str, Path],
+    preview_dir: Path,
+) -> tuple[dict[str, bool], int]:
+    from adapters.aptamerbase_checkpoint1_apply import PREVIEW_COMPARISON_FILES
+
+    missing = [
+        preview_name
+        for _key, preview_name, _applied in PREVIEW_COMPARISON_FILES
+        if not (preview_dir / preview_name).is_file()
+    ]
+    if missing:
+        raise Checkpoint1ApplyError(
+            "Validated dry-run preview is incomplete; refusing real apply: "
+            + ", ".join(missing)
+        )
+    byte_identical: dict[str, bool] = {}
+    for key, preview_name, _applied_name in PREVIEW_COMPARISON_FILES:
+        preview_path = preview_dir / preview_name
+        applied_path = applied_paths[key]
+        byte_identical[key] = preview_path.read_bytes() == applied_path.read_bytes()
+    semantic_mismatches = 0
+    if not all(byte_identical.values()):
+        semantic_mismatches = _aptamerbase_semantic_mismatches(
+            preview_dir=preview_dir, applied_paths=applied_paths
+        )
+        if semantic_mismatches:
+            mismatched = [key for key, ok in byte_identical.items() if not ok]
+            raise Checkpoint1ApplyError(
+                "Real application has scientific mismatches versus the "
+                "accepted dry-run preview for: " + ", ".join(mismatched)
+            )
+    return byte_identical, semantic_mismatches
+
+
+def _assert_aptamerbase_existing_resolved_identical(
+    output_dir: Path, new_paths: Mapping[str, Path]
+) -> None:
+    from adapters.aptamerbase_checkpoint1_apply import PREVIEW_COMPARISON_FILES
+
+    existing_names = [
+        applied_name
+        for _key, _preview, applied_name in PREVIEW_COMPARISON_FILES
+        if (output_dir / applied_name).is_file()
+    ]
+    if not existing_names:
+        return
+    mismatches: list[str] = []
+    for key, _preview, applied_name in PREVIEW_COMPARISON_FILES:
+        dest = output_dir / applied_name
+        src = new_paths[key]
+        if dest.is_file() and dest.read_bytes() != src.read_bytes():
+            mismatches.append(key)
+        elif not dest.is_file():
+            mismatches.append(key)
+    if mismatches:
+        raise Checkpoint1ApplyError(
+            "Existing authoritative AptamerBase resolved payload differs from "
+            "this apply; refusing to overwrite: " + ", ".join(mismatches)
+        )
+
+
+def run_aptamerbase_checkpoint1_apply(
+    *,
+    repo_root: Path | None = None,
+    checkpoint_dir: Path | None = None,
+    output_dir: Path | None = None,
+    tracked_manifest: Path | None = None,
+    metadata_out: Path | None = None,
+    preview_dir: Path | None = None,
+    check_deterministic_rerun: bool = True,
+    expected_source_rows: int | None = 2128,
+    verify_production_hashes: bool | None = None,
+    compare_to_preview: bool | None = None,
+    authorise_actual_apply: bool = False,
+) -> AptamerBaseApplyResult:
+    """Apply completed AptamerBase CHECKPOINT-1 review and close it.
+
+    Uses the same ``simulate_aptamerbase_checkpoint1_application`` transform
+    as dry-run. Does not prepare a global-S4 handoff or start S4.
+    """
+    from adapters.aptamerbase_checkpoint1_apply import (
+        ACCEPTED_DRY_RUN_ROUTES,
+        APTAMERBASE_CHECKPOINT_CLOSED_STATEMENT,
+        APTAMERBASE_TRACKED_RESOLUTION_COLUMNS,
+        AUTHORISED_FOR_S4_MEANING,
+        CLOSURE_ONLY_FIELDS,
+        FROZEN_APTAMERBASE_DRY_RUN_REPORT_SHA256,
+        FROZEN_APTAMERBASE_RAW_CSV_SHA256,
+        FROZEN_APTAMERBASE_RAW_RDF_SHA256,
+        FROZEN_APTAMERBASE_REVIEW_BULK_SHA256,
+        FROZEN_APTAMERBASE_REVIEW_QUEUE_SHA256,
+        FROZEN_APTAMERBASE_S1_CANONICAL_SHA256,
+        FROZEN_APTAMERBASE_S1_SIDECAR_SHA256,
+        FROZEN_APTAMERBASE_S2_S3_CANONICAL_SHA256,
+        FROZEN_APTAMERBASE_S3_DECISIONS_SHA256,
+        PREVIEW_COMPARISON_FILES,
+        SOURCE_DATASET,
+        SOURCE_DENOMINATOR,
+        TRIM_AUDIT_COLUMNS,
+        AptamerBaseCheckpoint1ApplyError,
+        assert_s4_fields_empty,
+        build_tracked_resolutions,
+        build_trim_audit,
+        check_accepted_dry_run_counts,
+        count_manual_decisions,
+        eligible_chemistry_counts,
+        format_closure_markdown,
+        refuse_unauthorised_apply,
+        tracked_payload_contains_sequence,
+    )
+    from adapters.aptamerbase_checkpoint1_dry_run import (
+        serialise_aptamerbase_simulation_sequence_free,
+        simulate_aptamerbase_checkpoint1_application,
+    )
+    from adapters.aptamerbase_checkpoint1_review import (
+        AptamerBaseCheckpoint1ReviewError,
+        compare_review_to_pristine,
+        load_default_policy,
+        validate_review_package,
+    )
+    from adapters.aptadb_checkpoint1_review import (
+        AptaDBCheckpoint1ReviewError,
+        read_csv_rows,
+    )
+    from adapters.aptamerbase_s3 import (
+        PRIMARY_ROUTE_CHEMISTRY_REVIEW,
+        PRIMARY_ROUTE_CONSTRUCT,
+        PRIMARY_ROUTE_ELIGIBLE,
+        PRIMARY_ROUTE_MOLECULE,
+        PRIMARY_ROUTE_REJECT,
+        PRIMARY_ROUTE_SSDNA,
+        index_constant_proposals,
+    )
+
+    if not authorise_actual_apply:
+        try:
+            refuse_unauthorised_apply()
+        except AptamerBaseCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    if repo_root is None:
+        repo_root = find_repo_root(Path(__file__).resolve())
+    repo_root = Path(repo_root).resolve()
+    if checkpoint_dir is None:
+        checkpoint_dir = Path("data/interim/checkpoints/aptamerbase_cp1")
+    if not Path(checkpoint_dir).is_absolute():
+        checkpoint_dir = repo_root / checkpoint_dir
+    checkpoint_dir = Path(checkpoint_dir).resolve()
+    if output_dir is None:
+        output_dir = checkpoint_dir / "resolved"
+    if not Path(output_dir).is_absolute():
+        output_dir = repo_root / output_dir
+    output_dir = _assert_aptamerbase_resolved_output(
+        Path(output_dir), checkpoint_dir=checkpoint_dir
+    )
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    if tracked_manifest is None:
+        tracked_manifest = Path(
+            "config/checkpoint_reviews/aptamerbase_checkpoint1_resolutions.csv"
+        )
+    if metadata_out is None:
+        metadata_out = Path(
+            "config/checkpoint_reviews/aptamerbase_checkpoint1_metadata.json"
+        )
+    tracked_manifest = _assert_tracked_path_allowed(repo_root, tracked_manifest)
+    metadata_out = _assert_tracked_path_allowed(repo_root, metadata_out)
+    if preview_dir is None:
+        preview_dir = checkpoint_dir / "dry_run"
+    if not Path(preview_dir).is_absolute():
+        preview_dir = repo_root / preview_dir
+    preview_dir = preview_dir.resolve()
+    if verify_production_hashes is None:
+        verify_production_hashes = expected_source_rows == SOURCE_DENOMINATOR
+    if compare_to_preview is None:
+        compare_to_preview = expected_source_rows == SOURCE_DENOMINATOR
+
+    if metadata_out.is_file():
+        payload = json.loads(metadata_out.read_text(encoding="utf-8"))
+        if bool(payload.get("checkpoint_closed")):
+            canonical_out = output_dir / "aptamerbase_checkpoint1_applied_canonical.csv"
+            if not canonical_out.is_file():
+                raise Checkpoint1ApplyError(
+                    "CHECKPOINT-1 is already closed and no identical resolved "
+                    "payload is present for an idempotent rerun"
+                )
+
+    review_dir = checkpoint_dir / "manual_review"
+    queue_path = review_dir / "aptamerbase_checkpoint1_manual_review.csv"
+    group_path = review_dir / "aptamerbase_checkpoint1_constant_group_review.csv"
+    bulk_path = review_dir / "aptamerbase_checkpoint1_bulk_audit_confirmation.csv"
+    pristine_path = (
+        review_dir / "pristine_blank" / "aptamerbase_checkpoint1_manual_review.csv"
+    )
+    canonical_path = checkpoint_dir / "aptamerbase_s3_canonical.csv"
+    decision_path = checkpoint_dir / "aptamerbase_s3_decisions.csv"
+    rejection_path = checkpoint_dir / "rejected_aptamerbase.csv"
+    parked_ssdna_path = checkpoint_dir / "aptamerbase_s3_parked_ssdna.csv"
+    parked_molecule_path = (
+        checkpoint_dir / "aptamerbase_s3_parked_molecule_unresolved.csv"
+    )
+    parked_chemistry_path = checkpoint_dir / "aptamerbase_s3_parked_chemistry_review.csv"
+    parked_construct_path = checkpoint_dir / "aptamerbase_s3_parked_construct_review.csv"
+    s1_path = repo_root / "data" / "interim" / "extracted" / "aptamerbase_extracted.csv"
+    s2_path = repo_root / "data" / "interim" / "normalised" / "aptamerbase_normalised.csv"
+    qc_path = repo_root / "data" / "interim" / "normalised" / "aptamerbase_s2_qc.csv"
+    sidecar_path = (
+        repo_root / "data" / "interim" / "extracted" / "aptamerbase_source_metadata.csv"
+    )
+    proposals_path = (
+        repo_root
+        / "data"
+        / "interim"
+        / "normalised"
+        / "detected_constants_aptamerbase.csv"
+    )
+    rec_json = (
+        repo_root
+        / "config"
+        / "checkpoint_reviews"
+        / "aptamerbase_checkpoint1_recommendations.json"
+    )
+    raw_path = repo_root / "data" / "raw" / "aptamerbase" / "aptamerbase_aptamers.csv"
+    rdf_path = (
+        repo_root / "data" / "raw" / "aptamerbase" / "aptamerbase.freebase.extract.nt.gz"
+    )
+    dry_run_report_path = preview_dir / "aptamerbase_checkpoint1_dry_run_report.md"
+    s3_review_path = checkpoint_dir / "aptamerbase_checkpoint1_review.csv"
+    s3_local_path = checkpoint_dir / "aptamerbase_checkpoint1_local_detail.csv"
+    handoff_json = repo_root / "config" / "global_s4_sources" / "aptamerbase.json"
+    handoff_csv = (
+        repo_root / "data" / "interim" / "global_s4_ready" / "aptamerbase_global_s4_input.csv"
+    )
+    if handoff_json.is_file() or handoff_csv.is_file():
+        raise Checkpoint1ApplyError(
+            "Global-S4 handoff artefacts must not exist during CHECKPOINT-1 apply"
+        )
+
+    required = [
+        queue_path,
+        bulk_path,
+        canonical_path,
+        decision_path,
+        rejection_path,
+        s2_path,
+        qc_path,
+        sidecar_path,
+    ]
+    for path in required:
+        if not path.is_file():
+            raise Checkpoint1ApplyError(f"Missing apply input: {path.name}")
+
+    preview_hash_paths = {
+        key: preview_dir / preview_name
+        for key, preview_name, _applied in PREVIEW_COMPARISON_FILES
+    }
+    preview_hashes_before = (
+        _hash_paths(preview_hash_paths) if compare_to_preview else {}
+    )
+
+    hashes_before = {
+        "queue": sha256_file(queue_path),
+        "groups": sha256_file(group_path) if group_path.is_file() else "",
+        "bulk": sha256_file(bulk_path),
+        "s1": sha256_file(s1_path) if s1_path.is_file() else "",
+        "s2": sha256_file(s2_path),
+        "s3": sha256_file(canonical_path),
+        "s3_decisions": sha256_file(decision_path),
+        "s3_review": sha256_file(s3_review_path) if s3_review_path.is_file() else "",
+        "s3_local": sha256_file(s3_local_path) if s3_local_path.is_file() else "",
+        "sidecar": sha256_file(sidecar_path),
+        "qc": sha256_file(qc_path),
+        "proposals": sha256_file(proposals_path) if proposals_path.is_file() else "",
+        "rec_json": sha256_file(rec_json) if rec_json.is_file() else "",
+        "raw": sha256_file(raw_path) if raw_path.is_file() else "",
+        "rdf": sha256_file(rdf_path) if rdf_path.is_file() else "",
+        "dry_run_report": (
+            sha256_file(dry_run_report_path) if dry_run_report_path.is_file() else ""
+        ),
+    }
+    if verify_production_hashes:
+        if hashes_before["queue"] != FROZEN_APTAMERBASE_REVIEW_QUEUE_SHA256:
+            raise Checkpoint1ApplyError(
+                "Completed human review SHA-256 does not match the accepted freeze"
+            )
+        if hashes_before["bulk"] != FROZEN_APTAMERBASE_REVIEW_BULK_SHA256:
+            raise Checkpoint1ApplyError(
+                "Bulk confirmation SHA-256 does not match the accepted freeze"
+            )
+        if hashes_before["raw"] and hashes_before["raw"] != FROZEN_APTAMERBASE_RAW_CSV_SHA256:
+            raise Checkpoint1ApplyError("AptamerBase raw CSV SHA-256 drifted")
+        if hashes_before["rdf"] and hashes_before["rdf"] != FROZEN_APTAMERBASE_RAW_RDF_SHA256:
+            raise Checkpoint1ApplyError("AptamerBase supporting RDF SHA-256 drifted")
+        if (
+            hashes_before["s1"]
+            and hashes_before["s1"] != FROZEN_APTAMERBASE_S1_CANONICAL_SHA256
+        ):
+            raise Checkpoint1ApplyError("Frozen S1 canonical SHA-256 drifted")
+        if hashes_before["sidecar"] != FROZEN_APTAMERBASE_S1_SIDECAR_SHA256:
+            raise Checkpoint1ApplyError("Frozen S1 sidecar SHA-256 drifted")
+        if hashes_before["s2"] != FROZEN_APTAMERBASE_S2_S3_CANONICAL_SHA256:
+            raise Checkpoint1ApplyError("Pre-review S2 canonical SHA-256 drifted")
+        if hashes_before["s3"] != FROZEN_APTAMERBASE_S2_S3_CANONICAL_SHA256:
+            raise Checkpoint1ApplyError("Pre-review S3 canonical SHA-256 drifted")
+        if hashes_before["s3_decisions"] != FROZEN_APTAMERBASE_S3_DECISIONS_SHA256:
+            raise Checkpoint1ApplyError("Pre-review S3 decisions SHA-256 drifted")
+        if (
+            hashes_before["dry_run_report"]
+            and hashes_before["dry_run_report"]
+            != FROZEN_APTAMERBASE_DRY_RUN_REPORT_SHA256
+        ):
+            raise Checkpoint1ApplyError(
+                "Accepted dry-run report SHA-256 drifted"
+            )
+
+    queue_rows = read_csv_rows(queue_path)
+    group_rows = read_csv_rows(group_path) if group_path.is_file() else []
+    bulk_rows = read_csv_rows(bulk_path)
+    bulk = bulk_rows[0] if bulk_rows else None
+    if pristine_path.is_file():
+        pristine_rows = read_csv_rows(pristine_path)
+        drift = compare_review_to_pristine(queue_rows, pristine_rows)
+        if drift:
+            raise Checkpoint1ApplyError(
+                "Completed review drifted from pristine outside permitted "
+                "human fields: " + "; ".join(drift[:10])
+            )
+    try:
+        report = validate_review_package(
+            queue_rows=queue_rows,
+            group_rows=group_rows,
+            bulk_confirmation=bulk,
+        )
+    except (AptamerBaseCheckpoint1ReviewError, AptaDBCheckpoint1ReviewError) as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+    if not report.ok or report.blocking_issues:
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 cannot be applied while required human decisions "
+            f"remain unresolved ({len(report.blocking_issues)} blocking issues)"
+        )
+    if (
+        report.unresolved_manual_decisions
+        or getattr(report, "unresolved_judgement_required", 0)
+        or report.audit_only_unconfirmed
+        or not getattr(report, "bulk_audit_confirmed", False)
+        or not report.ready_for_application
+    ):
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for CHECKPOINT-1 application"
+        )
+    if verify_production_hashes and (
+        report.total_review_records != 291
+        or report.unresolved_manual_decisions != 0
+        or getattr(report, "unresolved_judgement_required", 0) != 0
+        or report.audit_only_unconfirmed != 0
+        or not report.bulk_audit_confirmed
+        or report.ready_for_application != 291
+        or report.blocking_issues
+    ):
+        raise Checkpoint1ApplyError(
+            "Fail-closed validator is not ready for CHECKPOINT-1 application"
+        )
+
+    canonical_rows = read_csv_rows(canonical_path)
+    decision_rows = read_csv_rows(decision_path)
+    rejection_rows = read_csv_rows(rejection_path) if rejection_path.is_file() else []
+    parked_ssdna = (
+        read_csv_rows(parked_ssdna_path) if parked_ssdna_path.is_file() else []
+    )
+    parked_molecule = (
+        read_csv_rows(parked_molecule_path) if parked_molecule_path.is_file() else []
+    )
+    parked_chemistry = (
+        read_csv_rows(parked_chemistry_path) if parked_chemistry_path.is_file() else []
+    )
+    parked_construct = (
+        read_csv_rows(parked_construct_path) if parked_construct_path.is_file() else []
+    )
+    qc_rows = read_csv_rows(qc_path)
+    sidecar_rows = read_csv_rows(sidecar_path)
+    proposal_rows = read_csv_rows(proposals_path) if proposals_path.is_file() else []
+    s2_qc_by_id = {row["record_id"]: row for row in qc_rows}
+    source_metadata_by_id = {row["record_id"]: row for row in sidecar_rows}
+    proposals_by_record = index_constant_proposals(canonical_rows, proposal_rows)
+    policy = load_default_policy(repo_root)
+    canonical_before = {row["record_id"]: dict(row) for row in canonical_rows}
+
+    def _simulate():
+        try:
+            return simulate_aptamerbase_checkpoint1_application(
+                queue_rows=queue_rows,
+                group_rows=group_rows,
+                canonical_rows=canonical_rows,
+                decision_rows=decision_rows,
+                source_metadata_by_id=source_metadata_by_id,
+                s2_qc_by_id=s2_qc_by_id,
+                policy=policy,
+                proposals_by_record=proposals_by_record,
+                bulk_confirmation=bulk,
+                existing_rejection_rows=rejection_rows,
+                existing_parked_ssdna=parked_ssdna,
+                existing_parked_molecule=parked_molecule,
+                existing_parked_chemistry=parked_chemistry,
+                existing_parked_construct=parked_construct,
+                expected_source_rows=expected_source_rows,
+            )
+        except (AptamerBaseCheckpoint1ReviewError, AptaDBCheckpoint1ReviewError) as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    simulation = _simulate()
+    try:
+        assert_s4_fields_empty(simulation.preview_canonical)
+    except AptamerBaseCheckpoint1ApplyError as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+
+    deterministic_ok = False
+    scientific_serialised = serialise_aptamerbase_simulation_sequence_free(simulation)
+    if check_deterministic_rerun:
+        second = _simulate()
+        if scientific_serialised != serialise_aptamerbase_simulation_sequence_free(
+            second
+        ):
+            raise Checkpoint1ApplyError(
+                "AptamerBase CHECKPOINT-1 application was not byte-identical "
+                "across deterministic in-memory rerun"
+            )
+        deterministic_ok = True
+
+    record_decisions = count_manual_decisions(queue_rows)
+    if expected_source_rows == SOURCE_DENOMINATOR:
+        try:
+            check_accepted_dry_run_counts(
+                simulation=simulation, record_decisions=record_decisions
+            )
+        except AptamerBaseCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    compare_dir = checkpoint_dir / "closure_validation" / "apply_vs_preview"
+    compare_dir = _assert_output_dir_allowed(repo_root, compare_dir)
+    compare_paths = _write_aptamerbase_transform_csvs(compare_dir, simulation)
+    preview_comparison_ok = False
+    semantic_mismatches = 0
+    byte_identical: dict[str, bool] = {}
+    if compare_to_preview:
+        byte_identical, semantic_mismatches = _compare_aptamerbase_applied_to_preview(
+            applied_paths=compare_paths, preview_dir=preview_dir
+        )
+        preview_hashes_after_compare = _hash_paths(preview_hash_paths)
+        if preview_hashes_after_compare != preview_hashes_before:
+            raise Checkpoint1ApplyError(
+                "Dry-run preview files changed during real application"
+            )
+        preview_comparison_ok = True
+
+    _assert_aptamerbase_existing_resolved_identical(output_dir, compare_paths)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    applied_paths = _write_aptamerbase_transform_csvs(output_dir, simulation)
+    if compare_to_preview:
+        byte_identical, semantic_mismatches = _compare_aptamerbase_applied_to_preview(
+            applied_paths=applied_paths, preview_dir=preview_dir
+        )
+
+    eligible_n = int(simulation.stats["technically_eligible"])
+    simulation.stats["authorised_for_s4"] = eligible_n
+    simulation.stats["checkpoint_closed"] = True
+
+    tracked_rows = build_tracked_resolutions(
+        decisions=simulation.preview_decisions,
+        canonical_rows=simulation.preview_canonical,
+        queue_rows=queue_rows,
+        change_report=simulation.change_report,
+        route_changed_ids=simulation.route_changed_ids,
+    )
+    authorised_n = sum(1 for row in tracked_rows if row["authorised_for_s4"] == "true")
+    if authorised_n != eligible_n:
+        raise Checkpoint1ApplyError(
+            "authorised_for_s4 was not derived from the technical eligible route"
+        )
+    for row in tracked_rows:
+        if row["primary_route"] == PRIMARY_ROUTE_ELIGIBLE:
+            if row["authorised_for_s4"] != "true":
+                raise Checkpoint1ApplyError(
+                    "Eligible technical route must be authorised_for_s4"
+                )
+        elif row["authorised_for_s4"] != "false":
+            raise Checkpoint1ApplyError(
+                "Non-eligible technical routes must remain unauthorised for S4"
+            )
+
+    parked_routes = {
+        PRIMARY_ROUTE_SSDNA,
+        PRIMARY_ROUTE_MOLECULE,
+        PRIMARY_ROUTE_CHEMISTRY_REVIEW,
+        PRIMARY_ROUTE_CONSTRUCT,
+    }
+    s4_rows = [
+        {
+            "record_id": row["record_id"],
+            "resolved_decision": "accept",
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+        }
+        for row in tracked_rows
+        if row["authorised_for_s4"] == "true"
+    ]
+    parked_id_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["manual_decision"],
+        }
+        for row in tracked_rows
+        if row["primary_route"] in parked_routes
+    ]
+    rejected_id_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["manual_decision"],
+        }
+        for row in tracked_rows
+        if row["primary_route"] == PRIMARY_ROUTE_REJECT
+    ]
+    trim_audit = build_trim_audit(
+        applied=simulation.applied, canonical_before=canonical_before
+    )
+    write_csv_atomic(
+        tracked_manifest,
+        APTAMERBASE_TRACKED_RESOLUTION_COLUMNS,
+        tracked_rows,
+        quoting=csv.QUOTE_ALL,
+    )
+    if tracked_payload_contains_sequence(
+        tracked_manifest.read_text(encoding="utf-8")
+    ):
+        raise Checkpoint1ApplyError(
+            "Tracked resolutions must not contain biological sequence fields"
+        )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_s4_authorised_ids.csv",
+        S4_ID_COLUMNS,
+        s4_rows,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_parked_ids.csv",
+        PARKED_ID_COLUMNS,
+        parked_id_rows,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_rejected_ids.csv",
+        REJECTED_ID_COLUMNS,
+        rejected_id_rows,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        output_dir / "aptamerbase_checkpoint1_trim_audit.csv",
+        TRIM_AUDIT_COLUMNS,
+        trim_audit,
+        quoting=csv.QUOTE_ALL,
+    )
+
+    transform_hashes = {name: sha256_file(path) for name, path in applied_paths.items()}
+    closure_paths = {
+        "s4_authorised_ids": output_dir / "aptamerbase_checkpoint1_s4_authorised_ids.csv",
+        "parked_ids": output_dir / "aptamerbase_checkpoint1_parked_ids.csv",
+        "rejected_ids": output_dir / "aptamerbase_checkpoint1_rejected_ids.csv",
+        "trim_audit": output_dir / "aptamerbase_checkpoint1_trim_audit.csv",
+        "tracked_manifest": tracked_manifest,
+    }
+    output_hashes = {
+        **transform_hashes,
+        **{name: sha256_file(path) for name, path in closure_paths.items()},
+    }
+
+    chemistry_counts = eligible_chemistry_counts(simulation.preview_eligible)
+    review_hashes = {
+        "queue": hashes_before["queue"],
+        "groups": hashes_before["groups"],
+        "bulk": hashes_before["bulk"],
+        "dry_run_report": hashes_before["dry_run_report"],
+    }
+    integrity = {
+        "raw": hashes_before["raw"],
+        "rdf": hashes_before["rdf"],
+        "s1": hashes_before["s1"],
+        "sidecar": hashes_before["sidecar"],
+        "s2": hashes_before["s2"],
+        "s3": hashes_before["s3"],
+        "s3_decisions": hashes_before["s3_decisions"],
+        "deterministic_ok": "true" if deterministic_ok else "false",
+    }
+    summary_text = format_closure_markdown(
+        simulation,
+        review_hashes=review_hashes,
+        integrity=integrity,
+        output_hashes=output_hashes,
+        record_decisions=record_decisions,
+        chemistry_counts=chemistry_counts,
+        byte_identical=byte_identical,
+        semantic_mismatches=semantic_mismatches,
+        deterministic_ok=deterministic_ok,
+        preview_comparison_ok=preview_comparison_ok or not compare_to_preview,
+    )
+    if APTAMERBASE_CHECKPOINT_CLOSED_STATEMENT not in summary_text:
+        raise Checkpoint1ApplyError(
+            "Resolution summary missing checkpoint-closed statement"
+        )
+    if AUTHORISED_FOR_S4_MEANING not in summary_text:
+        raise Checkpoint1ApplyError(
+            "Resolution summary missing authorised_for_s4 meaning"
+        )
+    if str(repo_root.resolve()) in summary_text:
+        raise Checkpoint1ApplyError(
+            "Resolution summary must not contain absolute repository paths"
+        )
+    summary_path = output_dir / "aptamerbase_checkpoint1_resolution_summary.md"
+    _write_text_atomic(summary_path, summary_text)
+    _write_text_atomic(
+        output_dir / "README.md",
+        "CHECKPOINT-1 CLOSED.\n"
+        "These files are the authoritative AptamerBase post-review artefacts.\n"
+        "They must not overwrite S1, S2, pre-review S3, completed human review, "
+        "or dry-run previews.\n"
+        "authorised_for_s4 means technical eligibility only.\n"
+        "Global S4 has not started. No global-S4 handoff was prepared.\n",
+    )
+    output_hashes["summary"] = sha256_file(summary_path)
+
+    metadata = {
+        "source_key": "aptamerbase",
+        "source_dataset": SOURCE_DATASET,
+        "checkpoint": "CHECKPOINT-1",
+        "review_model": "single_reviewer",
+        "checkpoint_status": "closed",
+        "checkpoint_closed": True,
+        "application_status": "applied",
+        "s4_started": False,
+        "global_s4_handoff_prepared": False,
+        "global_s4_run": False,
+        "next_stage": "review_aptamerbase_closure_before_global_s4_handoff",
+        "source_denominator": int(simulation.stats["total_records"]),
+        "reviewed_records": int(simulation.stats["reviewed_records"]),
+        "record_decisions": record_decisions,
+        "audit_only_bulk_confirmed": int(simulation.stats["audit_only_rows"]),
+        "human_reviewed_drops": int(simulation.stats["human_reviewed_drops"]),
+        "technical_rejects_after_review": int(
+            simulation.stats["technical_rejects_after_review"]
+        ),
+        "parked_ssdna": int(simulation.stats["parked_ssdna"]),
+        "parked_molecule_unresolved": int(
+            simulation.stats["parked_molecule_unresolved"]
+        ),
+        "parked_chemistry_review": int(simulation.stats["parked_chemistry_review"]),
+        "parked_construct_review": int(simulation.stats["parked_construct_review"]),
+        "technically_eligible": eligible_n,
+        "authorised_for_s4": authorised_n,
+        "authorised_for_s4_meaning": AUTHORISED_FOR_S4_MEANING,
+        "sequence_corrections": int(simulation.stats["sequence_corrections"]),
+        "molecule_overrides": int(simulation.stats["molecule_overrides"]),
+        "records_trimmed": int(simulation.stats["records_trimmed"]),
+        "eligible_chemistry": chemistry_counts,
+        "chemistry_park_ids": [
+            row["record_id"] for row in simulation.preview_parked_chemistry
+        ],
+        "applied_trim_ids": sorted(
+            item.record_id
+            for item in simulation.applied
+            if item.applied_trim_5p_nt or item.applied_trim_3p_nt
+        ),
+        "review_file_sha256": hashes_before["queue"],
+        "review_bulk_sha256": hashes_before["bulk"],
+        "accepted_dry_run_report_sha256": hashes_before["dry_run_report"],
+        "raw_sha256": hashes_before["raw"],
+        "rdf_sha256": hashes_before["rdf"],
+        "s1_sha256": hashes_before["s1"],
+        "sidecar_sha256": hashes_before["sidecar"],
+        "s2_sha256": hashes_before["s2"],
+        "s3_sha256": hashes_before["s3"],
+        "s3_decisions_sha256": hashes_before["s3_decisions"],
+        "output_hashes": output_hashes,
+        "preview_comparison_ok": preview_comparison_ok or not compare_to_preview,
+        "byte_identical": byte_identical,
+        "semantic_mismatches": semantic_mismatches,
+        "deterministic_rerun_ok": deterministic_ok,
+        "accepted_dry_run_routes": ACCEPTED_DRY_RUN_ROUTES,
+        "closure_only_fields": list(CLOSURE_ONLY_FIELDS),
+        "application_mode": "apply",
+        "code_identity": {
+            "apply_adapter": "adapters.aptamerbase_checkpoint1_apply",
+            "dispatcher": "scripts/data_preparation/checkpoint1_apply_review.py",
+            "eligibility_policy": "config/source_eligibility/aptamerbase.json",
+        },
+    }
+    metadata_text = json.dumps(metadata, indent=2, sort_keys=False)
+    if tracked_payload_contains_sequence(metadata_text):
+        raise Checkpoint1ApplyError(
+            "Tracked metadata must not contain biological sequence fields"
+        )
+    _write_json_atomic(metadata_out, metadata)
+    output_hashes["metadata"] = sha256_file(metadata_out)
+
+    if check_deterministic_rerun:
+        determinism_dir = checkpoint_dir / "closure_validation" / "determinism"
+        determinism_dir = _assert_output_dir_allowed(repo_root, determinism_dir)
+        third = _simulate()
+        if scientific_serialised != serialise_aptamerbase_simulation_sequence_free(
+            third
+        ):
+            raise Checkpoint1ApplyError(
+                "Deterministic verification rerun diverged from the "
+                "authoritative in-memory payload"
+            )
+        verify_paths = _write_aptamerbase_transform_csvs(determinism_dir, third)
+        for name, path in applied_paths.items():
+            if sha256_file(path) != sha256_file(verify_paths[name]):
+                raise Checkpoint1ApplyError(
+                    f"Deterministic verification mismatch for {name}"
+                )
+
+    hashes_after = {
+        "queue": sha256_file(queue_path),
+        "groups": sha256_file(group_path) if group_path.is_file() else "",
+        "bulk": sha256_file(bulk_path),
+        "s1": sha256_file(s1_path) if s1_path.is_file() else "",
+        "s2": sha256_file(s2_path),
+        "s3": sha256_file(canonical_path),
+        "s3_decisions": sha256_file(decision_path),
+        "s3_review": sha256_file(s3_review_path) if s3_review_path.is_file() else "",
+        "s3_local": sha256_file(s3_local_path) if s3_local_path.is_file() else "",
+        "sidecar": sha256_file(sidecar_path),
+        "qc": sha256_file(qc_path),
+        "proposals": sha256_file(proposals_path) if proposals_path.is_file() else "",
+        "rec_json": sha256_file(rec_json) if rec_json.is_file() else "",
+        "raw": sha256_file(raw_path) if raw_path.is_file() else "",
+        "rdf": sha256_file(rdf_path) if rdf_path.is_file() else "",
+        "dry_run_report": (
+            sha256_file(dry_run_report_path) if dry_run_report_path.is_file() else ""
+        ),
+    }
+    if hashes_after != hashes_before:
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 apply mutated an immutable input artefact"
+        )
+    if compare_to_preview:
+        preview_hashes_final = _hash_paths(preview_hash_paths)
+        if preview_hashes_final != preview_hashes_before:
+            raise Checkpoint1ApplyError(
+                "Dry-run preview files changed after real application"
+            )
+
+    stats = dict(simulation.stats)
+    stats["checkpoint_closed"] = True
+    stats["authorised_for_s4"] = authorised_n
+    stats["preview_comparison_ok"] = preview_comparison_ok or not compare_to_preview
+    stats["deterministic_rerun_ok"] = deterministic_ok
+    stats["semantic_mismatches"] = semantic_mismatches
+    print(
+        "source=aptamerbase\n"
+        "mode=apply\n"
+        "checkpoint_status=closed\n"
+        "checkpoint_closed=true\n"
+        f"total_records={stats['total_records']}\n"
+        f"reviewed_records={stats['reviewed_records']}\n"
+        f"human_edit={stats['human_edit']}\n"
+        f"human_drop={stats['human_drop']}\n"
+        f"audit_only_bulk={stats['audit_only_rows']}\n"
+        f"technically_eligible={stats['technically_eligible']}\n"
+        f"parked_ssdna={stats['parked_ssdna']}\n"
+        f"parked_molecule_unresolved={stats['parked_molecule_unresolved']}\n"
+        f"parked_chemistry_review={stats['parked_chemistry_review']}\n"
+        f"parked_construct_review={stats['parked_construct_review']}\n"
+        f"technical_rejects_after_review={stats['technical_rejects_after_review']}\n"
+        f"manual_rejects={stats['manual_rejects']}\n"
+        f"records_trimmed={stats['records_trimmed']}\n"
+        f"authorised_for_s4={stats['authorised_for_s4']}\n"
+        f"review_queue_sha256={hashes_before['queue']}\n"
+        f"review_bulk_sha256={hashes_before['bulk']}\n"
+        f"s1_sha256={hashes_before['s1']}\n"
+        f"s2_sha256={hashes_before['s2']}\n"
+        f"s3_sha256={hashes_before['s3']}\n"
+        f"raw_sha256={hashes_before['raw']}\n"
+        f"preview_comparison={'pass' if stats['preview_comparison_ok'] else 'fail'}\n"
+        f"semantic_mismatches={semantic_mismatches}\n"
+        f"deterministic_rerun={'pass' if deterministic_ok else 'skipped'}\n"
+        "CHECKPOINT-1 is closed\n"
+        "authorised_for_s4 means technical eligibility only\n"
+        "S4 was not started"
+    )
+    return AptamerBaseApplyResult(
+        output_dir=output_dir,
+        metadata_out=metadata_out,
+        tracked_manifest=tracked_manifest,
+        summary_out=summary_path,
+        output_hashes=output_hashes,
+        stats=stats,
+        preview_comparison_ok=bool(stats["preview_comparison_ok"]),
+        deterministic_rerun_ok=deterministic_ok,
+        semantic_mismatches=semantic_mismatches,
+        byte_identical_count=sum(1 for ok in byte_identical.values() if ok),
+        checkpoint_closed=True,
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -5698,10 +7069,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             "riboaptamer",
             "aptaindex",
             "ena",
+            "aptamerbase",
         }:
             raise Checkpoint1ApplyError(
                 f"Unsupported source_key={args.source!r}; "
-                "supported: aptabase, utexas, aptadb, riboaptamer, aptaindex, ena"
+                "supported: aptabase, utexas, aptadb, riboaptamer, "
+                "aptaindex, ena, aptamerbase"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -5710,6 +7083,73 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if not repo_root.is_dir():
             raise Checkpoint1ApplyError(f"Repository root does not exist: {repo_root}")
+
+        if args.source == "aptamerbase":
+            checkpoint_dir = (
+                args.checkpoint_dir
+                if args.checkpoint_dir is not None
+                else Path("data/interim/checkpoints/aptamerbase_cp1")
+            )
+            if not Path(checkpoint_dir).is_absolute():
+                checkpoint_dir = repo_root / checkpoint_dir
+            expected_total = (
+                2128
+                if args.expected_total_rows is None
+                else args.expected_total_rows
+            )
+            if args.dry_run:
+                output_dir = (
+                    args.output_dir
+                    if args.output_dir is not None
+                    else Path(checkpoint_dir) / "dry_run"
+                )
+                if not Path(output_dir).is_absolute():
+                    output_dir = repo_root / output_dir
+                run_aptamerbase_checkpoint1_dry_run(
+                    repo_root=repo_root,
+                    checkpoint_dir=Path(checkpoint_dir),
+                    output_dir=Path(output_dir),
+                    check_deterministic_rerun=not args.skip_deterministic_rerun,
+                    expected_source_rows=expected_total,
+                    verify_frozen_inputs=not args.skip_pipeline_integrity,
+                )
+                return 0
+            if not args.authorise_actual_apply:
+                run_aptamerbase_checkpoint1_apply()
+                return 1
+            output_dir = (
+                args.output_dir
+                if args.output_dir is not None
+                else Path(checkpoint_dir) / "resolved"
+            )
+            if not Path(output_dir).is_absolute():
+                output_dir = repo_root / output_dir
+            tracked_manifest = (
+                args.tracked_manifest
+                if args.tracked_manifest is not None
+                else Path(
+                    "config/checkpoint_reviews/aptamerbase_checkpoint1_resolutions.csv"
+                )
+            )
+            metadata_out = (
+                args.metadata_out
+                if args.metadata_out is not None
+                else Path(
+                    "config/checkpoint_reviews/aptamerbase_checkpoint1_metadata.json"
+                )
+            )
+            run_aptamerbase_checkpoint1_apply(
+                repo_root=repo_root,
+                checkpoint_dir=Path(checkpoint_dir),
+                output_dir=Path(output_dir),
+                tracked_manifest=tracked_manifest,
+                metadata_out=metadata_out,
+                check_deterministic_rerun=not args.skip_deterministic_rerun,
+                expected_source_rows=expected_total,
+                verify_production_hashes=not args.skip_pipeline_integrity,
+                authorise_actual_apply=True,
+            )
+            return 0
 
         if args.source == "ena":
             checkpoint_dir = (

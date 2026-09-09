@@ -27,6 +27,12 @@ from adapters.aptabase import (  # noqa: E402
     extract_aptabase,
     write_sidecar_csv_atomic as write_aptabase_sidecar_csv_atomic,
 )
+from adapters.aptamerbase import (  # noqa: E402
+    AptamerBaseAdapterError,
+    AptamerBaseExtractionResult,
+    extract_aptamerbase,
+    write_sidecar_csv_atomic as write_aptamerbase_sidecar_csv_atomic,
+)
 from adapters.aptadb import (  # noqa: E402
     AptaDBAdapterError,
     extract_aptadb,
@@ -79,6 +85,11 @@ APTADB_ROLE_BY_BASENAME = {
     "protein.csv": "protein",
 }
 
+APTAMERBASE_ROLE_BY_BASENAME = {
+    "aptamerbase_aptamers.csv": "spine",
+    "aptamerbase.freebase.extract.nt.gz": "supporting_rdf",
+}
+
 # Lowercase basenames — matching is case-insensitive so forbidden companions
 # cannot be bypassed via case variants on case-insensitive filesystems.
 FORBIDDEN_COMPANION_BASENAMES = frozenset(
@@ -127,6 +138,7 @@ class S1RunResult:
 AdapterFn = Callable[
     ...,
     AptaBaseExtractionResult
+    | AptamerBaseExtractionResult
     | UTexasExtractionResult
     | RiboAptamerExtractionResult
     | AptaIndexExtractionResult
@@ -137,6 +149,8 @@ AdapterFn = Callable[
 def _get_adapter(source_key: str) -> AdapterFn:
     if source_key == "aptabase":
         return extract_aptabase
+    if source_key == "aptamerbase":
+        return extract_aptamerbase
     if source_key == "utexas":
         return extract_utexas
     if source_key == "riboaptamer":
@@ -208,6 +222,34 @@ def _resolve_aptadb_roles(
     if len(matches) != 3:
         raise S1ExtractError(
             f"AptaDB expects exactly three registered paths; got {len(matches)}"
+        )
+    return by_role
+
+
+def _resolve_aptamerbase_roles(
+    rows: Sequence[RegistrySpecRow],
+) -> dict[str, RegistrySpecRow]:
+    """Resolve AptamerBase files by basename: CSV spine vs supporting RDF."""
+    matches = _resolve_source_rows(rows, "aptamerbase")
+    by_role: dict[str, RegistrySpecRow] = {}
+    for row in matches:
+        basename = Path(row.path).name.lower()
+        role = APTAMERBASE_ROLE_BY_BASENAME.get(basename)
+        if role is None:
+            raise S1ExtractError(
+                f"Unrecognised AptamerBase registered basename "
+                f"{Path(row.path).name!r}; expected aptamerbase_aptamers.csv "
+                "or aptamerbase.freebase.extract.nt.gz"
+            )
+        if role in by_role:
+            raise S1ExtractError(
+                f"Duplicate AptamerBase registered role {role!r}"
+            )
+        by_role[role] = row
+    if "spine" not in by_role:
+        raise S1ExtractError(
+            "AptamerBase registry is missing the CSV row spine "
+            "(aptamerbase_aptamers.csv)"
         )
     return by_role
 
@@ -370,6 +412,193 @@ def build_aptabase_s1_report(
         "  interpretation was performed.",
         "",
     ]
+    return "\n".join(lines)
+
+
+def build_aptamerbase_s1_report(
+    *,
+    repo_root: Path,
+    registry_row: RegistrySpecRow,
+    result: S1RunResult,
+) -> str:
+    """Build an aggregate-only Markdown AptamerBase S1 report (no sequences)."""
+    stats = result.stats
+    lines = [
+        "# AptamerBase S1 extraction report",
+        "",
+        "## SOURCE",
+        "",
+        f"- source_key: `{result.source_key}`",
+        f"- source_dataset: `{registry_row.source_dataset}`",
+        f"- path: `{registry_row.path}`",
+        f"- SHA-256: `{registry_row.sha256}`",
+        f"- Observed SHA-256: `{result.observed_sha256}`",
+        f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+        f"- registered rows: `{registry_row.n_rows_expected}`",
+        f"- redistribution_status: `{registry_row.redistribution_status}`",
+        "",
+        "## RECONCILIATION",
+        "",
+        f"- rows in: `{stats.input_rows}`",
+        f"- canonical rows: `{stats.canonical_rows}`",
+        f"- sidecar rows: `{stats.sidecar_rows}`",
+        f"- unique record_id: `{stats.unique_record_ids}`",
+        f"- unique native_id: `{stats.unique_native_ids}`",
+        f"- first native ID: `{stats.first_native_id}`",
+        f"- last native ID: `{stats.last_native_id}`",
+        f"- source order preserved: "
+        f"`{'pass' if stats.order_preserved else 'fail'}`",
+        f"- exact sequence_raw copy: "
+        f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+        "- S1 records filtered, rejected, or parked: `0`",
+        "",
+        "## Native-ID strategy",
+        "",
+        f"- Strategy: `{stats.native_id_strategy}`",
+        "- Source Freebase `id` is preserved only in the sidecar; it is not",
+        "  used as `native_id` because it is duplicated across physical rows.",
+        f"- Unique Freebase IDs: `{stats.unique_freebase_ids}`",
+        f"- Duplicated Freebase ID groups: `{stats.duplicate_freebase_id_groups}`",
+        f"- Rows involved in duplicated Freebase ID groups: "
+        f"`{stats.rows_in_duplicate_freebase_id_groups}`",
+        "",
+        "## SOURCE GRAIN",
+        "",
+        "- This is a flattened Freebase/RDF-style export. One physical CSV",
+        "  row is not necessarily one biological aptamer.",
+        "- S1 retains every physical row. No row consolidation occurred.",
+        f"- Exact duplicate complete-row groups: "
+        f"`{stats.exact_duplicate_complete_row_groups}`",
+        f"- Rows in those groups: "
+        f"`{stats.rows_in_exact_duplicate_complete_row_groups}`",
+        f"- Excess complete-row duplicates: "
+        f"`{stats.exact_duplicate_complete_row_excess}`",
+        "- Duplicate complete rows, repeated Freebase IDs, repeated",
+        "  sequences, parent/minimal-aptamer expansions, structure-topic",
+        "  rows, blank sequences, and textual `n/a` sequences are retained.",
+        "- This is not an S1 defect.",
+        "",
+        "## Source type (sidecar diagnostics only; not eligibility)",
+        "",
+    ]
+    for name, count in stats.type_counts.items():
+        label = name if name != "" else "<blank>"
+        lines.append(f"- `{label}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## SEQUENCE RAW STATUS",
+            "",
+            f"- empty `sequence` (empty string): `{stats.empty_sequences}`",
+            f"- exact textual `n/a`: `{stats.sequence_na_text}`",
+            f"- other nonempty: `{stats.other_nonempty_sequences}`",
+            "- Textual `n/a` is preserved verbatim and is not treated as",
+            "  missing. Alphabet is not classified at S1.",
+            "",
+            "## TARGET",
+            "",
+            f"- target_name_raw populated: `{stats.nonempty_targets}`",
+            "- Source `label` is a composite Freebase export label, not a",
+            "  documented raw-target column. It is preserved sidecar-only",
+            "  pending later target extraction.",
+            "",
+            "## Publication / grouping fields",
+            "",
+            f"- nonempty publication: `{stats.nonempty_publication}`",
+            f"- nonempty DOI: `{stats.nonempty_doi}`",
+            f"- nonempty PMID: `{stats.nonempty_pmid}`",
+            "- accession, experiment_group_id, and",
+            "  near_duplicate_family_id remain empty.",
+            "",
+            "## SOURCE METADATA",
+            "",
+            f"- Sidecar rows: `{stats.sidecar_rows}`",
+            "- Sidecar retains the CSV data-row number, native_id, and all",
+            "  14 original AptamerBase columns, including type, Freebase id,",
+            "  label, sequence, sequence_length, and the relationship /",
+            "  structure / evidence / application / modification fields.",
+            f"- has_mutational_analysis true/false/blank: "
+            f"`{stats.has_mutational_analysis_true}` / "
+            f"`{stats.has_mutational_analysis_false}` / "
+            f"`{stats.has_mutational_analysis_blank}`",
+            f"- has_experimentally_determined_structure true/false/blank: "
+            f"`{stats.has_experimentally_determined_structure_true}` / "
+            f"`{stats.has_experimentally_determined_structure_false}` / "
+            f"`{stats.has_experimentally_determined_structure_blank}`",
+            f"- nonempty has_minimal_aptamer (relationship URI, not a",
+            f"  canonical cluster field): `{stats.has_minimal_aptamer_nonempty}`",
+            f"- nonempty is_minimal_aptamer_of: "
+            f"`{stats.is_minimal_aptamer_of_nonempty}`",
+            f"- nonempty has_application: `{stats.has_application_nonempty}`",
+            f"- nonempty has_modification_details: "
+            f"`{stats.has_modification_details_nonempty}`",
+            f"- nonempty has_secondary_structure: "
+            f"`{stats.has_secondary_structure_nonempty}`",
+            f"- nonempty has_predicted_secondary_structure: "
+            f"`{stats.has_predicted_secondary_structure_nonempty}`",
+            f"- nonempty has_sequence_pattern: "
+            f"`{stats.has_sequence_pattern_nonempty}`",
+            "- Structure and evidence fields are preserved but uninterpreted.",
+            "  They do not populate canonical PDB or evidence fields.",
+            "",
+            "## Validation results",
+            "",
+            f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+            f"- Row retention (rows_in == rows_out == "
+            f"{registry_row.n_rows_expected}): "
+            f"`{'pass' if stats.canonical_rows == registry_row.n_rows_expected else 'fail'}`",
+            f"- Unique native/record IDs: "
+            f"`{'pass' if stats.unique_native_ids == stats.canonical_rows and stats.unique_record_ids == stats.canonical_rows else 'fail'}`",
+            f"- Sequence exact-copy: "
+            f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+            f"- No row consolidation: "
+            f"`{'pass' if stats.no_row_consolidation else 'fail'}`",
+            "",
+            "## Integrity / raw-data immutability",
+            "",
+            f"- Source-input hash before: `{result.input_hash_before}`",
+            f"- Source-input hash after: `{result.input_hash_after}`",
+            f"- Source-input pre/post hash result: "
+            f"`{'pass' if result.input_hash_unchanged else 'fail'}`",
+            (
+                f"- Deterministic rerun result: "
+                f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+                if result.deterministic_rerun_ok is not None
+                else "- Deterministic rerun result: `not_checked`"
+            ),
+            "",
+            "## Outputs",
+            "",
+            f"- Canonical: `{_relative_display(result.output_canonical, repo_root)}`",
+            f"- Sidecar: `{_relative_display(result.output_sidecar, repo_root)}`",
+            f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+            "",
+            "## DEFERRED",
+            "",
+            "- molecule type unresolved",
+            "- chemistry unresolved",
+            "- no T→U",
+            "- no sequence normalisation",
+            "- no constant trimming",
+            "- no target extraction/canonicalisation",
+            "- no evidence scoring",
+            "- no affinity normalisation",
+            "- no PDB mapping",
+            "- no leakage",
+            "- no filtering/parking/rejection",
+            "- no deduplication/clustering",
+            "- no CHECKPOINT-1",
+            "- no global S4",
+            "",
+            "## Pipeline status",
+            "",
+            "- AptamerBase S0 complete.",
+            "- AptamerBase S1 complete.",
+            "- AptamerBase S2 has not started.",
+            "- No AptamerBase record is authorised for global S4.",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -1310,7 +1539,15 @@ def run_s1_extraction(
             check_deterministic_rerun=check_deterministic_rerun,
         )
 
-    row = _resolve_single_source_row(spec_rows, source_key)
+    if source_key == "aptamerbase":
+        aptamerbase_roles = _resolve_aptamerbase_roles(spec_rows)
+        row = aptamerbase_roles["spine"]
+        registered_paths = tuple(
+            item.path for item in _resolve_source_rows(spec_rows, source_key)
+        )
+    else:
+        row = _resolve_single_source_row(spec_rows, source_key)
+        registered_paths = (row.path,)
     _assert_not_forbidden_companion(row.path)
 
     adapter = _get_adapter(source_key)
@@ -1324,7 +1561,14 @@ def run_s1_extraction(
             f"SHA-256 mismatch before adapter execution for {source_key!r}"
         )
 
-    if source_key in {"aptabase", "utexas", "riboaptamer", "aptaindex", "ena"}:
+    if source_key in {
+        "aptabase",
+        "aptamerbase",
+        "utexas",
+        "riboaptamer",
+        "aptaindex",
+        "ena",
+    }:
         extraction = adapter(
             input_path,
             source_dataset=row.source_dataset,
@@ -1352,6 +1596,9 @@ def run_s1_extraction(
     if source_key == "aptabase":
         write_aptabase_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
         report_builder = build_aptabase_s1_report
+    elif source_key == "aptamerbase":
+        write_aptamerbase_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
+        report_builder = build_aptamerbase_s1_report
     elif source_key == "utexas":
         write_utexas_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
         report_builder = build_utexas_s1_report
@@ -1397,6 +1644,8 @@ def run_s1_extraction(
                 write_corpus_csv_atomic(tmp_c, second.canonical_rows)
             if source_key == "aptabase":
                 write_aptabase_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
+            elif source_key == "aptamerbase":
+                write_aptamerbase_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
             elif source_key == "utexas":
                 write_utexas_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
             elif source_key == "aptaindex":
@@ -1438,7 +1687,7 @@ def run_s1_extraction(
         output_canonical=canonical_path,
         output_sidecar=sidecar_path,
         output_report=report_path,
-        registered_paths=(row.path,),
+        registered_paths=registered_paths,
     )
 
     report_text = report_builder(
@@ -1468,7 +1717,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Registry source_key to extract (e.g. aptabase, utexas, aptadb, riboaptamer, aptaindex, ena)",
+        help="Registry source_key to extract (e.g. aptabase, aptamerbase, utexas, aptadb, riboaptamer, aptaindex, ena)",
     )
     parser.add_argument(
         "--registry-spec",
@@ -1534,6 +1783,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         S1ExtractError,
         RegistryError,
         AptaBaseAdapterError,
+        AptamerBaseAdapterError,
         AptaDBAdapterError,
         AptaIndexAdapterError,
         EnaAdapterError,

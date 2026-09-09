@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """S0a: validate the tracked source-registry specification and write the operational registry.
 
-This stage freezes registered inputs by verifying path, SHA-256 and CSV row counts.
-It does not build the leakage-exclusion set, extract sequences, or implement S1 adapters.
+This stage freezes registered inputs by verifying path, SHA-256 and expected
+record counts (CSV data rows, XLSX physical worksheet rows, or gzip
+N-Triples physical statements). It does not build the leakage-exclusion set,
+extract sequences, or implement S1 adapters.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import hashlib
 import os
 import re
@@ -257,8 +260,49 @@ def count_xlsx_physical_data_rows(path: Path) -> int:
         ) from exc
 
 
+def is_ntriples_gzip_path(path: Path | str) -> bool:
+    """Return True when ``path`` is a gzip-compressed N-Triples file."""
+    return Path(path).name.lower().endswith(".nt.gz")
+
+
+def count_ntriples_gzip_statements(path: Path) -> int:
+    """Count decompressed N-Triples physical statements without writing a file.
+
+    A physical statement is a nonempty, non-comment line in the decompressed
+    N-Triples text. SHA-256 validation remains over the compressed bytes and
+    is performed separately. Does not treat statements as aptamer records.
+    """
+    try:
+        count = 0
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            for line in handle:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                count += 1
+        return count
+    except gzip.BadGzipFile as exc:
+        raise RegistryError(
+            f"Registered N-Triples gzip is corrupt: {path.name}"
+        ) from exc
+    except UnicodeDecodeError as exc:
+        raise RegistryError(
+            f"Registered N-Triples gzip is not valid UTF-8: {path.name}"
+        ) from exc
+    except EOFError as exc:
+        raise RegistryError(
+            f"Registered N-Triples gzip is truncated: {path.name}"
+        ) from exc
+    except OSError as exc:
+        raise RegistryError(
+            f"Registered N-Triples gzip could not be read: {path.name}"
+        ) from exc
+
+
 def count_registered_rows(path: Path) -> int:
-    """Count rows for a registered input according to its file type."""
+    """Count rows or statements for a registered input according to its file type."""
+    if is_ntriples_gzip_path(path):
+        return count_ntriples_gzip_statements(path)
     suffix = path.suffix.lower()
     if suffix == ".csv":
         return count_csv_data_rows(path)
@@ -573,8 +617,13 @@ def validate_registered_file(
         )
     actual_rows = count_registered_rows(resolved)
     if actual_rows != row.n_rows_expected:
+        kind = (
+            "N-Triples statement-count"
+            if is_ntriples_gzip_path(resolved)
+            else "Row-count"
+        )
         raise RegistryError(
-            f"Row-count mismatch for source_key={row.source_key!r} "
+            f"{kind} mismatch for source_key={row.source_key!r} "
             f"path={row.path}: expected {row.n_rows_expected}, "
             f"actual {actual_rows}"
         )

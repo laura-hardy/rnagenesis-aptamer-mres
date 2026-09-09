@@ -162,7 +162,11 @@ class ValidationReport:
     drop_records: int = 0
     deferred_records: int = 0
     deferred_groups: int = 0
+    judgement_required_rows: int = 0
+    unresolved_judgement_required: int = 0
+    audit_only_rows: int = 0
     audit_only_unconfirmed: int = 0
+    bulk_audit_confirmed: bool = False
     ready_for_application: int = 0
     blocking_issues: list[str] = field(default_factory=list)
     eligible_bulk_audit_ids: tuple[str, ...] = ()
@@ -847,6 +851,7 @@ def validate_review_package(
         bulk_confirmation is not None
         and _blank(bulk_confirmation.get("confirm")).lower() == "true"
     )
+    report.bulk_audit_confirmed = bulk_confirmed
 
     for group in group_rows:
         action = _blank(group.get("manual_trim_action"))
@@ -874,13 +879,27 @@ def validate_review_package(
 
     for row in queue_rows:
         record_id = row["record_id"]
+        audit_only = is_audit_only_row(row)
+        if audit_only:
+            report.audit_only_rows += 1
+        else:
+            report.judgement_required_rows += 1
         decision = _blank(row.get("manual_decision"))
         if decision not in ALLOWED_MANUAL_DECISIONS:
             report.blocking_issues.append(f"Invalid manual_decision for {record_id}")
             continue
         if decision == "":
-            report.unresolved_manual_decisions += 1
-            report.blocking_issues.append(f"Unresolved manual_decision for {record_id}")
+            if audit_only and bulk_confirmed:
+                # Explicit bulk confirm=true resolves audit-only keep_current_route
+                # without writing 122 individual manual_decision values.
+                pass
+            else:
+                report.unresolved_manual_decisions += 1
+                report.blocking_issues.append(
+                    f"Unresolved manual_decision for {record_id}"
+                )
+                if not audit_only:
+                    report.unresolved_judgement_required += 1
         if decision == "drop":
             report.drop_records += 1
             if any(
@@ -972,8 +991,10 @@ def validate_review_package(
                 f"Unresolved core-boundary decision for {record_id}"
             )
         if is_audit_only_row(row) and decision == "":
-            report.audit_only_unconfirmed += 1
-            if not bulk_confirmed:
+            if bulk_confirmed:
+                pass
+            else:
+                report.audit_only_unconfirmed += 1
                 report.blocking_issues.append(
                     f"Audit-only row unconfirmed for {record_id}"
                 )
@@ -1008,9 +1029,13 @@ def validate_review_package(
     return report
 
 
-def format_validation_markdown(report: ValidationReport) -> str:
+def format_validation_markdown(
+    report: ValidationReport,
+    *,
+    source_label: str = "AptaDB",
+) -> str:
     lines = [
-        "# AptaDB CHECKPOINT-1 review validation",
+        f"# {source_label} CHECKPOINT-1 review validation",
         "",
         f"- total review records: `{report.total_review_records}`",
         f"- unresolved manual decisions: `{report.unresolved_manual_decisions}`",
@@ -1022,7 +1047,11 @@ def format_validation_markdown(report: ValidationReport) -> str:
         f"- drop records: `{report.drop_records}`",
         f"- deferred records: `{report.deferred_records}`",
         f"- deferred groups: `{report.deferred_groups}`",
+        f"- judgement-required rows: `{report.judgement_required_rows}`",
+        f"- unresolved judgement-required: `{report.unresolved_judgement_required}`",
+        f"- audit-only rows: `{report.audit_only_rows}`",
         f"- audit-only unconfirmed: `{report.audit_only_unconfirmed}`",
+        f"- bulk audit confirmed: `{str(report.bulk_audit_confirmed).lower()}`",
         f"- ready for application: `{report.ready_for_application}`",
         "",
         "## Blocking issues",

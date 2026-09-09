@@ -384,11 +384,14 @@ One record = one (sequence, target) pair (§2.0).
 **Rejection reason vocabulary (closed set):**
 `missing_sequence`, `missing_target`, `length_out_of_range`, `ambiguous_bases`, `invalid_alphabet`,
 `mixed_T_and_U`, `alignment_gaps`, `truncated_sequence`, `primer_like`, `library_template`,
-`ssdna_parked`, `non_protein_target_parked`, `non_nucleic_acid_molecule`, `no_binding_evidence`,
+`ssdna_parked`, `non_protein_target_parked`, `non_nucleic_acid_molecule`, `non_aptamer_source_object`,
+`no_binding_evidence`,
 `evidence_below_threshold`, `leakage_excluded`, `duplicate`, `target_cap_subsample`,
 `manual_reject`.
 
 `non_nucleic_acid_molecule`: source-declared non-nucleic-acid aptamer/molecule record, e.g. peptide aptamer.
+
+`non_aptamer_source_object`: source record belongs to an explicitly typed metadata/structure object rather than an aptamer biological record (technical/source-reconciliation rejection, not a human decision).
 
 ---
 

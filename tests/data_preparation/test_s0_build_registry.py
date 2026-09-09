@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import gzip
 import hashlib
 import sys
 from pathlib import Path
@@ -20,9 +21,11 @@ from s0_build_registry import (  # noqa: E402
     RegistrySpecRow,
     build_registry,
     count_csv_data_rows,
+    count_ntriples_gzip_statements,
     detect_csv_text_encoding,
     load_registry_spec,
     main,
+    validate_registered_file,
 )
 
 
@@ -1059,3 +1062,209 @@ def test_aptadb_nonprotein_lookup_registration_rejected(demo_repo: Path) -> None
             / "raw_data_inventory.csv",
             output_path=demo_repo / "data" / "interim" / "registry" / "out.csv",
         )
+
+
+SYNTHETIC_NT_STATEMENTS = [
+    "<http://example.org/s1> <http://example.org/p1> <http://example.org/o1> .",
+    "<http://example.org/s1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.org/Item> .",
+    "<http://example.org/s2> <http://example.org/p2> \"synthetic-token\" .",
+]
+
+
+def _write_nt_gz(path: Path, statements: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(path, "wt", encoding="utf-8") as handle:
+        for statement in statements:
+            handle.write(statement.rstrip("\n") + "\n")
+
+
+def test_nt_gz_validates_compressed_sha_and_statement_count(tmp_path: Path) -> None:
+    repo = _make_repo_tree(tmp_path)
+    nt_path = repo / "data" / "raw" / "demo" / "demo.nt.gz"
+    _write_nt_gz(nt_path, SYNTHETIC_NT_STATEMENTS)
+    digest = _hash_path(nt_path)
+    assert count_ntriples_gzip_statements(nt_path) == 3
+    row = RegistrySpecRow(
+        source_key="demo",
+        source_dataset="demo_v1",
+        path="data/raw/demo/demo.nt.gz",
+        sha256=digest,
+        n_rows_expected=3,
+        snapshot_date="2026-09-08",
+        tier="1",
+        redistribution_status="unknown",
+        notes="synthetic ntriples gzip",
+    )
+    validate_registered_file(repo, row)
+    assert not (nt_path.parent / "demo.nt").exists()
+
+
+def test_nt_gz_statement_count_mismatch_fails_closed(tmp_path: Path) -> None:
+    repo = _make_repo_tree(tmp_path)
+    nt_path = repo / "data" / "raw" / "demo" / "demo.nt.gz"
+    _write_nt_gz(nt_path, SYNTHETIC_NT_STATEMENTS)
+    row = RegistrySpecRow(
+        source_key="demo",
+        source_dataset="demo_v1",
+        path="data/raw/demo/demo.nt.gz",
+        sha256=_hash_path(nt_path),
+        n_rows_expected=99,
+        snapshot_date="2026-09-08",
+        tier="1",
+        redistribution_status="unknown",
+        notes="mismatch",
+    )
+    with pytest.raises(RegistryError, match="statement-count mismatch"):
+        validate_registered_file(repo, row)
+
+
+def test_nt_gz_corrupt_gzip_fails_closed(tmp_path: Path) -> None:
+    repo = _make_repo_tree(tmp_path)
+    nt_path = repo / "data" / "raw" / "demo" / "demo.nt.gz"
+    nt_path.write_bytes(b"this is not gzip compressed ntriples")
+    row = RegistrySpecRow(
+        source_key="demo",
+        source_dataset="demo_v1",
+        path="data/raw/demo/demo.nt.gz",
+        sha256=_hash_path(nt_path),
+        n_rows_expected=1,
+        snapshot_date="2026-09-08",
+        tier="1",
+        redistribution_status="unknown",
+        notes="corrupt",
+    )
+    with pytest.raises(RegistryError, match="corrupt|could not be read"):
+        validate_registered_file(repo, row)
+
+
+def test_nt_gz_skips_comments_and_blank_lines(tmp_path: Path) -> None:
+    path = tmp_path / "comments.nt.gz"
+    _write_nt_gz(
+        path,
+        [
+            "# comment only",
+            "",
+            "<http://example.org/s> <http://example.org/p> <http://example.org/o> .",
+            "   ",
+            "<http://example.org/s2>\t<http://example.org/p2>\t<http://example.org/o2> .",
+        ],
+    )
+    assert count_ntriples_gzip_statements(path) == 2
+
+
+def test_multifile_aptamerbase_source_accepted_by_registry_rules(
+    tmp_path: Path,
+) -> None:
+    repo = _make_repo_tree(tmp_path)
+    csv_path = repo / "data" / "raw" / "aptamerbase" / "aptamerbase_aptamers.csv"
+    nt_path = (
+        repo / "data" / "raw" / "aptamerbase" / "aptamerbase.freebase.extract.nt.gz"
+    )
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_utf8_sig_csv(
+        csv_path, ["record_id", "label", "payload"], _synthetic_input_rows(2)
+    )
+    _write_nt_gz(nt_path, SYNTHETIC_NT_STATEMENTS)
+    csv_digest = _hash_path(csv_path)
+    nt_digest = _hash_path(nt_path)
+    spec_rows = [
+        _spec_row(
+            source_key="aptamerbase",
+            source_dataset="aptamerbase_export_2026-06-24",
+            path="data/raw/aptamerbase/aptamerbase_aptamers.csv",
+            sha256=csv_digest,
+            n_rows_expected=2,
+            notes="csv spine",
+        ),
+        _spec_row(
+            source_key="aptamerbase",
+            source_dataset="aptamerbase_export_2026-06-24",
+            path="data/raw/aptamerbase/aptamerbase.freebase.extract.nt.gz",
+            sha256=nt_digest,
+            n_rows_expected=3,
+            notes="supporting rdf",
+        ),
+    ]
+    _write_csv(
+        repo / "config" / "source_registry.csv",
+        list(REQUIRED_COLUMNS),
+        spec_rows,
+    )
+    parsed = load_registry_spec(repo / "config" / "source_registry.csv")
+    assert len(parsed) == 2
+    assert {row.source_key for row in parsed} == {"aptamerbase"}
+    assert {row.source_dataset for row in parsed} == {
+        "aptamerbase_export_2026-06-24"
+    }
+    _write_minimal_inventory(
+        repo / "docs" / "data_curation" / "raw_data_inventory.csv",
+        [
+            _inventory_row(
+                relative_path="data/raw/aptamerbase/aptamerbase_aptamers.csv",
+                sha256=csv_digest,
+                row_count="2",
+            ),
+            _inventory_row(
+                relative_path="data/raw/aptamerbase/aptamerbase.freebase.extract.nt.gz",
+                sha256=nt_digest,
+                row_count="3",
+            ),
+        ],
+    )
+    result = build_registry(
+        repo_root=repo,
+        registry_spec=repo / "config" / "source_registry.csv",
+        inventory_path=repo / "docs" / "data_curation" / "raw_data_inventory.csv",
+        output_path=repo / "data" / "interim" / "registry" / "out.csv",
+    )
+    assert result.validated == 2
+    written = list(
+        csv.DictReader(
+            (repo / "data" / "interim" / "registry" / "out.csv").open(
+                encoding="utf-8", newline=""
+            )
+        )
+    )
+    assert [row["n_rows_expected"] for row in written] == ["3", "2"]
+    assert written[0]["path"].endswith(".nt.gz")
+    assert written[1]["path"].endswith("aptamerbase_aptamers.csv")
+
+
+def test_tracked_aptamerbase_csv_registration_unchanged() -> None:
+    rows = load_registry_spec(REPO_ROOT / "config" / "source_registry.csv")
+    csv_rows = [
+        row
+        for row in rows
+        if row.path == "data/raw/aptamerbase/aptamerbase_aptamers.csv"
+    ]
+    assert len(csv_rows) == 1
+    row = csv_rows[0]
+    assert row.source_key == "aptamerbase"
+    assert row.source_dataset == "aptamerbase_export_2026-06-24"
+    assert row.sha256 == (
+        "40b329551b225a29ee2c656cf6b59b98ff686a981968b856685cdc7c222a784c"
+    )
+    assert row.n_rows_expected == 2128
+    assert row.snapshot_date == "2026-06-24"
+    assert row.tier == "1"
+    assert row.redistribution_status == "unknown"
+
+
+def test_tracked_source_dataset_still_belongs_to_one_source_key() -> None:
+    rows = load_registry_spec(REPO_ROOT / "config" / "source_registry.csv")
+    dataset_to_keys: dict[str, set[str]] = {}
+    for row in rows:
+        dataset_to_keys.setdefault(row.source_dataset, set()).add(row.source_key)
+    assert all(len(keys) == 1 for keys in dataset_to_keys.values())
+    aptamerbase = [row for row in rows if row.source_key == "aptamerbase"]
+    assert len(aptamerbase) == 2
+    assert {row.source_dataset for row in aptamerbase} == {
+        "aptamerbase_export_2026-06-24"
+    }
+    aptadb = [row for row in rows if row.source_key == "aptadb"]
+    assert len(aptadb) == 3
+    keys_to_count = {}
+    for row in rows:
+        keys_to_count[row.source_key] = keys_to_count.get(row.source_key, 0) + 1
+    assert keys_to_count["aptabase"] == 1
+    assert keys_to_count["ena"] == 1

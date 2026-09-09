@@ -1,0 +1,48 @@
+{
+  "source_key": "aptamerbase",
+  "records": {},
+  "groups": {},
+  "audit_only": {
+    "review_recommendation": "keep_current_route",
+    "recommended_manual_decision": "keep",
+    "rationale": "Length-boundary and random-kept audit rows are otherwise technically eligible RNA/2F-RNA. Confirm the current route unless a separate scientific issue is visible. Audit only; do not reclassify solely because of boundary length.",
+    "requires_specific_human_decision": false
+  },
+  "known_motif": {
+    "review_recommendation": "decide_trim",
+    "recommended_manual_decision": "edit",
+    "recommended_trim_action": "defer",
+    "rationale": "S2 detected a known shared-motif construct proposal. It has not been applied. Approve the existing motif trim, reject the trim and keep the full sequence, override with a numeric correction if appropriate, or defer. sequence_core is currently unchanged. Do not auto-approve.",
+    "requires_specific_human_decision": true
+  },
+  "sequence_notation": {
+    "review_recommendation": "inspect_sequence",
+    "recommended_manual_decision": "",
+    "rationale": "Source sequence notation is mixed T/U, ambiguous, gapped, or invalid. The proposed technical rejection is the governing default, but human review may determine whether a source notation or modification is recoverable. Do not automatically repair the sequence or erase explicit RDF molecule identity.",
+    "requires_specific_human_decision": true
+  },
+  "source_molecule_alphabet_conflict": {
+    "review_recommendation": "needs_source_review",
+    "recommended_manual_decision": "",
+    "rationale": "RDF molecule type is DNA (canonical ssDNA) but the reported alphabet is a clean U/RNA alphabet. Remain parked as ssDNA. Do not automatically convert to RNA or overwrite RDF source type. CHECKPOINT-1 may later confirm DNA or authorise a reviewed molecule override.",
+    "requires_specific_human_decision": true
+  },
+  "molecule_type_unresolved": {
+    "review_recommendation": "needs_source_review",
+    "recommended_manual_decision": "",
+    "rationale": "Aptamer-topic molecule_type is unknown. Do not infer RNA from a U-only alphabet or DNA from a T-only alphabet. Do not infer molecule type from label or modification text. Source review is required.",
+    "requires_specific_human_decision": true
+  },
+  "chemistry_requires_review": {
+    "review_recommendation": "needs_source_review",
+    "recommended_manual_decision": "",
+    "rationale": "Molecule type is RNA but backbone/sugar chemistry is unsupported or unresolved (including Spiegelmer/L-RNA, 2NH2, 2OMe, mixed sugar/backbone, inverted-dT constructs, pentynyl-dU, iso-G, and other unusual modifications). Park for chemistry review. Do not flatten Spiegelmer/L-RNA to ordinary RNA chemistry.",
+    "requires_specific_human_decision": true
+  },
+  "judgement_dependent": {
+    "review_recommendation": "inspect_sequence",
+    "recommended_manual_decision": "",
+    "rationale": "Judgement-dependent technical, molecule, or chemistry condition. Do not treat this row as an automatic closed-vocabulary reject that can skip review.",
+    "requires_specific_human_decision": true
+  }
+}

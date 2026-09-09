@@ -114,6 +114,10 @@ class EligibilityReason(str, Enum):
     L_DNA_STEREOCHEMISTRY = "l_dna_stereochemistry"
     CHIMERIC_MOLECULE = "chimeric_molecule"
     SOURCE_TYPE_TOKEN_DISAGREEMENT = "source_type_token_disagreement"
+    # AptamerBase S3: RDF-flattened non-aptamer structure objects and
+    # unsupported RNA chemistry parked for CHECKPOINT-1.
+    NON_APTAMER_SOURCE_OBJECT = "non_aptamer_source_object"
+    CHEMISTRY_REQUIRES_REVIEW = "chemistry_requires_review"
 
 
 class ManualReviewPriority(str, Enum):
@@ -213,6 +217,8 @@ class EligibilityPolicy:
     unresolved_trim_blocks_eligibility: bool = True
     non_protein_target_decision: str = "proposed_park"
     non_nucleic_acid_molecule_decision: str = "proposed_reject"
+    non_aptamer_source_object_decision: str = "proposed_reject"
+    chemistry_review_decision: str = "proposed_park"
 
 
 @dataclass(frozen=True)
@@ -521,6 +527,12 @@ def load_eligibility_policy(path: str | Path) -> EligibilityPolicy:
         ),
         non_nucleic_acid_molecule_decision=_optional_decision(
             data, "non_nucleic_acid_molecule_decision", "proposed_reject"
+        ),
+        non_aptamer_source_object_decision=_optional_decision(
+            data, "non_aptamer_source_object_decision", "proposed_reject"
+        ),
+        chemistry_review_decision=_optional_decision(
+            data, "chemistry_review_decision", "proposed_park"
         ),
     )
 

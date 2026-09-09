@@ -33,6 +33,26 @@ from adapters.aptabase_s2 import (  # noqa: E402
     normalise_aptabase_record,
     update_stats_from_row,
 )
+from adapters.aptamerbase_rdf import (  # noqa: E402
+    AptamerBaseRdfError,
+    load_aptamerbase_rdf_index,
+    require_subject_facts,
+)
+from adapters.aptamerbase_s2 import (  # noqa: E402
+    CONSTANT_PROPOSAL_COLUMNS as APTAMERBASE_CONSTANT_PROPOSAL_COLUMNS,
+    S2_QC_COLUMNS as APTAMERBASE_S2_QC_COLUMNS,
+    AptamerBaseS2Error,
+    AptamerBaseS2Stats,
+    assert_genuine_proposals as assert_aptamerbase_genuine_proposals,
+    build_known_motif_proposals as build_aptamerbase_known_motif_proposals,
+    finalise_review_and_id_stats as finalise_aptamerbase_review_and_id_stats,
+    is_review_candidate as aptamerbase_is_review_candidate,
+    load_aptamerbase_policy,
+    normalise_aptamerbase_record,
+    s4_fields_are_empty as aptamerbase_s4_fields_are_empty,
+    summarise_lengths as summarise_aptamerbase_lengths,
+    update_stats_from_row as update_aptamerbase_stats_from_row,
+)
 from adapters.aptaindex_s2 import (  # noqa: E402
     CONSTANT_PROPOSAL_COLUMNS as APTAINDEX_CONSTANT_PROPOSAL_COLUMNS,
     S2_QC_COLUMNS as APTAINDEX_S2_QC_COLUMNS,
@@ -208,6 +228,23 @@ EXPECTED_ENA_RAW_SHA256 = (
 EXPECTED_ENA_PRIMARY_GROUPS = 25
 EXPECTED_ENA_SEQUENCE_CORRECTIONS = 8
 
+EXPECTED_APTAMERBASE_ROWS = 2128
+EXPECTED_APTAMERBASE_UNIQUE_IDS = 1868
+EXPECTED_APTAMERBASE_SOURCE_DATASET = "aptamerbase_export_2026-06-24"
+EXPECTED_APTAMERBASE_RAW_CSV_SHA256 = (
+    "40b329551b225a29ee2c656cf6b59b98ff686a981968b856685cdc7c222a784c"
+)
+EXPECTED_APTAMERBASE_RAW_RDF_SHA256 = (
+    "3ab9340ee1fcb6a0910532a6e8d4cf5cc62579c3b21d85355c48d473e372006c"
+)
+EXPECTED_APTAMERBASE_RDF_STATEMENTS = 270507
+EXPECTED_APTAMERBASE_S1_CANONICAL_SHA256 = (
+    "0bb0282033ba0561b2c8d8de1358ae6e5a4e8fa47bfb640c56dc87b177552896"
+)
+EXPECTED_APTAMERBASE_S1_SIDECAR_SHA256 = (
+    "47a49f7495648bb11105a77eee9cbcfeabeb7b7b05f357dc433d3edb779f41b7"
+)
+
 
 class S2NormaliseError(ValueError):
     """Hard failure during S2 normalisation orchestration."""
@@ -220,6 +257,7 @@ class S2RunResult:
     source_key: str
     stats: (
         AptaBaseS2Stats
+        | AptamerBaseS2Stats
         | UTexasS2Stats
         | AptaDBS2Stats
         | RiboAptamerS2Stats
@@ -4365,6 +4403,665 @@ def run_ena_s2(
     return run_result
 
 
+def build_aptamerbase_s2_report(
+    *,
+    repo_root: Path,
+    result: S2RunResult,
+    rules_path: Path,
+    policy_path: Path,
+) -> str:
+    """Build an aggregate-only Markdown AptamerBase S2 report (no sequences)."""
+    stats = result.stats
+    if not isinstance(stats, AptamerBaseS2Stats):
+        raise S2NormaliseError("AptamerBase report requires AptamerBaseS2Stats")
+    full_min, full_med, full_max = summarise_aptamerbase_lengths(
+        stats.length_full_values
+    )
+    core_min, core_med, core_max = summarise_aptamerbase_lengths(
+        stats.length_core_values
+    )
+    scanned = (
+        ", ".join(f"`{name}`" for name in stats.known_motifs_scanned) or "(none)"
+    )
+    lines = [
+        "# AptamerBase S2 normalisation report",
+        "",
+        "Aggregate counts only. Source sequences and modification strings are",
+        "not included.",
+        "",
+        "## SOURCE CONTRACT",
+        "",
+        f"- Source key: `aptamerbase`",
+        f"- Source dataset: `{EXPECTED_APTAMERBASE_SOURCE_DATASET}`",
+        f"- CSV spine: `data/raw/aptamerbase/aptamerbase_aptamers.csv`",
+        (
+            f"- CSV SHA-256: `{result.raw_sha256}`"
+            if result.raw_sha256
+            else "- CSV SHA-256: `not_checked`"
+        ),
+        f"- Supporting RDF: `data/raw/aptamerbase/aptamerbase.freebase.extract.nt.gz`",
+        f"- RDF SHA-256: `{EXPECTED_APTAMERBASE_RAW_RDF_SHA256}`",
+        f"- RDF decompressed N-Triples statements: `{stats.rdf_statement_count}`",
+        f"- S1 canonical rows: `{stats.s1_rows}`",
+        f"- Source-metadata rows: `{stats.source_metadata_rows}`",
+        f"- S2 output rows: `{stats.s2_rows}`",
+        f"- Unique Freebase IDs: `{stats.unique_freebase_ids}`",
+        f"- RDF subjects joined: `{stats.rdf_subjects_joined}`",
+        f"- RDF join coverage: "
+        f"`{'pass' if stats.rdf_join_coverage_ok else 'fail'}`",
+        f"- S1 frozen canonical hash: `{EXPECTED_APTAMERBASE_S1_CANONICAL_SHA256}`",
+        f"- S1 frozen sidecar hash: `{EXPECTED_APTAMERBASE_S1_SIDECAR_SHA256}`",
+        f"- Shared rules: `{_relative_display(rules_path, repo_root)}`",
+        f"- Source policy: `{_relative_display(policy_path, repo_root)}`",
+        "",
+        "## OBJECT GRAIN",
+        "",
+        "Source object class is taken from the S1 sidecar `aptamerbase_type`.",
+        "Secondary-structure and predicted-secondary-structure objects are",
+        "retained with `molecule_type=unknown` and `chemistry=unknown`. An",
+        "incidental RDF RNA type does not convert a structure topic into an",
+        "aptamer record. No S3 route is decided here.",
+        "",
+    ]
+    for name, count in _count_sorted(stats.source_object_type_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            f"- Structure-topic rows: `{stats.structure_topic_rows}`",
+            f"- Structure-topic rows with nonempty normalised sequence: "
+            f"`{stats.structure_topic_nonempty_sequence}`",
+            "",
+            "## MOLECULE TYPE",
+            "",
+            "Experimental molecule type is RDF RNA/DNA typing, then the",
+            "structure-topic override. Sequence alphabet does not establish or",
+            "erase molecule type. Unresolved RDF IDs remain `unknown`.",
+            "",
+            "### Physical rows",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.molecule_type_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Unique Freebase IDs", ""])
+    for name, count in _count_sorted(stats.molecule_type_unique_id_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            f"- Evidence source: `rdf_type` (structure topics: `source_object_type`)",
+            f"- Unresolved / unknown physical rows: "
+            f"`{stats.molecule_type_counts.get('unknown', 0)}`",
+            "",
+            "## ALPHABET / T→U",
+            "",
+            "`alphabet_as_reported` is the shared display-level classification",
+            "before T→U. T→U is applied only after RDF has independently",
+            "established RNA. RDF DNA printed in U is retained as ssDNA with a",
+            "contradiction flag. Mixed T/U is not automatically transcribed.",
+            "A/C/G-only sequences are not a separate canonical alphabet; they",
+            "use the shared molecule-type tie-break (`RNA` or `DNA_T`).",
+            "Invalid counts are post-display-clean remaining noncanonical",
+            "characters, not a pre-clean diagnostic.",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.alphabet_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            f"- `t_to_u_applied=true`: `{stats.t_to_u_count}`",
+            f"- RDF RNA × DNA_T alphabet (computational transcription candidates): "
+            f"`{stats.rna_t_alphabet_count}`",
+            f"- RDF DNA × U alphabet conflict rows: `{stats.dna_u_conflict_count}`",
+            f"- RDF DNA × U alphabet conflict unique IDs: "
+            f"`{stats.dna_u_conflict_unique_ids}`",
+            f"- mixed T/U: `{stats.mixed_t_u_count}`",
+            f"- ambiguous: `{stats.ambiguous_base_count}`",
+            f"- invalid/noncanonical: `{stats.invalid_character_count}`",
+            "",
+            "## CHEMISTRY",
+            "",
+            "Chemistry is separate from molecule identity. Automatic mapping is",
+            "limited to unmodified RNA/DNA backbones, terminal/conjugate-only",
+            "metadata, and a closed 2′-fluoro-pyrimidine RNA allowlist.",
+            "Spiegelmer/L-RNA, 2OMe, 2NH2, inverted-dT constructs, iso-G,",
+            "pentynyl-dU and other unusual combinations remain `unknown` for",
+            "review. DNA + 2F-like modification text is not auto-mapped.",
+            "",
+            "### Canonical chemistry",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.chemistry_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Chemistry class (aggregate, no source literals)", ""])
+    for name, count in _count_sorted(stats.chemistry_class_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            f"- Automatic 2F-RNA assignments: `{stats.twof_rna_automatic_count}`",
+            f"- Chemistry-review rows: `{stats.chemistry_review_count}`",
+            f"- Spiegelmer/L-RNA review rows: `{stats.spiegelmer_count}`",
+            f"- Terminal-conjugate diagnostic rows: `{stats.terminal_conjugate_count}`",
+            f"- RDF modified type + source modification text: "
+            f"`{stats.rdf_modified_with_text}`",
+            f"- RDF modified type but blank text: `{stats.rdf_modified_without_text}`",
+            f"- Modification text without RDF modified type: "
+            f"`{stats.text_without_rdf_modified}`",
+            "",
+            "## SEQUENCE / LENGTH QC",
+            "",
+            "Canonical lengths are `len(sequence_full)` / `len(sequence_core)`.",
+            "Source `aptamerbase_sequence_length` is compared as QC only.",
+            "Invalid/ambiguous early-return paths may have an observable",
+            "normalised string length without emitting shared core-length QC",
+            "flags; those denominators are reported separately.",
+            "",
+            f"- Sequence missing after shared textual-null processing: "
+            f"`{stats.missing_sequence_rows}`",
+            f"- Nonempty normalised sequences: `{stats.nonempty_sequence_rows}`",
+            f"- sequence_raw unchanged: "
+            f"`{'pass' if stats.sequence_raw_unchanged else 'fail'}`",
+            f"- target_name_raw unchanged and empty: "
+            f"`{'pass' if stats.target_name_raw_unchanged else 'fail'}`",
+            f"- Source-reported length mismatches: `{stats.length_mismatch_count}`",
+            f"- Observable length outside 20–100 without shared core-length QC: "
+            f"`{stats.observable_length_without_core_qc}`",
+            f"- Shared `core_below_min_length` flags: `{stats.core_below_min_count}`",
+            f"- Shared `core_above_max_length` flags: `{stats.core_above_max_count}`",
+            f"- sequence_length_full min/median/max: "
+            f"`{full_min}` / `{full_med}` / `{full_max}`",
+            f"- sequence_length_core min/median/max: "
+            f"`{core_min}` / `{core_med}` / `{core_max}`",
+            "",
+            "### Observable sequence_length_full buckets",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.length_full_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### sequence_length_core buckets", ""])
+    for name, count in _count_sorted(stats.length_core_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## CONSTANTS",
+            "",
+            "Known-motif detection uses the shared motif library only.",
+            "No AptamerBase-specific primer/T7 motifs were added. No trim is",
+            "applied. Group-wise consensus inference is disabled because the",
+            "S1 contract has no defensible experiment/publication grouping key.",
+            "`label` is not used as a grouping or target field.",
+            "",
+            f"- Known motifs scanned: {scanned}",
+            f"- Records with known-motif detection: "
+            f"`{stats.known_motif_detection_count}`",
+            f"- Known-motif proposals (unapplied): `{stats.constant_region_proposals}`",
+            f"- 5′ known-motif proposals: `{stats.five_prime_proposals}`",
+            f"- 3′ known-motif proposals: `{stats.three_prime_proposals}`",
+            f"- Group-consensus proposals: `0`",
+            f"- Groups considered: `{stats.groups_considered}`",
+            f"- Applied trims: `{stats.applied_trims}`",
+            f"- sequence_core differs from sequence_full: "
+            f"`{stats.core_differs_from_full}`",
+            f"- Constant-region reason: `{stats.constant_region_reason}`",
+            "",
+            "### construct_scope",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.construct_scope_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### trim_status", ""])
+    for name, count in _count_sorted(stats.trim_status_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## RELATIONSHIP / SOURCE-METADATA PRESERVATION",
+            "",
+            "Minimal-aptamer sidecar fields are retained as source provenance",
+            "for later S5 clustering-validation evidence. They are not mapped",
+            "into `near_duplicate_family_id`, `cluster_id`, dedup keys or",
+            "target fields. No row consolidation occurred.",
+            "",
+            f"- Sidecar `has_minimal_aptamer` nonempty: "
+            f"`{stats.sidecar_has_minimal_aptamer_nonempty}`",
+            f"- Sidecar `is_minimal_aptamer_of` nonempty: "
+            f"`{stats.sidecar_is_minimal_aptamer_of_nonempty}`",
+            f"- Records dropped: `{stats.records_dropped}`",
+            f"- Records parked: `{stats.records_parked}`",
+            f"- Unique record_id values: `{stats.unique_record_ids}`",
+            f"- S1 row order preserved: `{'pass' if stats.order_preserved else 'fail'}`",
+            "",
+            "## DEFERRED",
+            "",
+            "The following remain empty / unperformed at S2:",
+            "",
+            "- target identity / `target_name` / `target_name_raw` (still empty)",
+            "- UniProt / target type / family / Pfam",
+            "- interaction participant",
+            "- PMID / publication parsing from `label`",
+            "- evidence ladder E1–E5 / `binding_evidence_score`",
+            "- affinity normalisation",
+            "- experimentally determined structure / PDB",
+            "- leakage exclusion",
+            "- filtering / parking / ssDNA S3 routing",
+            "- deduplication / Freebase ID collapse",
+            "- clustering / partition",
+            "- CHECKPOINT-1",
+            "- global S4",
+            "",
+            f"- Deferred S4 fields empty: "
+            f"`{'pass' if stats.s4_fields_empty else 'fail'}`",
+            "",
+            "## Review candidates",
+            "",
+            f"- Review-candidate rows: `{stats.review_candidate_rows}`",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.review_reason_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### qc_flags", ""])
+    for name, count in _count_sorted(stats.qc_flag_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Integrity",
+            "",
+            f"- Deterministic rerun: "
+            f"`{'pass' if result.deterministic_rerun_ok else ('not_run' if result.deterministic_rerun_ok is None else 'fail')}`",
+            f"- S1 inputs unchanged: `{'pass' if result.inputs_unchanged else 'fail'}`",
+            f"- S1 canonical hash before: `{result.s1_hash_before}`",
+            f"- S1 canonical hash after: `{result.s1_hash_after}`",
+            f"- Source-metadata hash before: `{result.sidecar_hash_before}`",
+            f"- Source-metadata hash after: `{result.sidecar_hash_after}`",
+            (
+                f"- Raw CSV SHA-256 unchanged: "
+                f"`{'pass' if result.raw_sha_unchanged else 'fail'}`"
+                if result.raw_sha_unchanged is not None
+                else "- Raw CSV SHA-256 unchanged: `not_checked`"
+            ),
+            "",
+            "## Outputs",
+            "",
+            f"- Normalised: "
+            f"`{_relative_display(result.output_normalised, repo_root)}`",
+            f"- QC: `{_relative_display(result.output_qc, repo_root)}`",
+            f"- Review candidates: "
+            f"`{_relative_display(result.output_review, repo_root)}`",
+            f"- Detected constants / proposals: "
+            f"`{_relative_display(result.output_proposals, repo_root)}`",
+            f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+            "",
+            "## Stage boundary",
+            "",
+            "AptamerBase S2 RDF-supported sequence normalisation only.",
+            "",
+            "- No record was rejected, parked or dropped.",
+            "- No Freebase ID or sequence duplicate was collapsed.",
+            "- No trim was applied.",
+            "- Group-wise constant inference was not run.",
+            "- S3 has not started.",
+            "- CHECKPOINT-1 was not generated.",
+            "- No AptamerBase record is authorised for global S4.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_aptamerbase_s2(
+    *,
+    repo_root: Path,
+    input_dir: Path,
+    output_dir: Path,
+    rules_path: Path,
+    policy_path: Path,
+    expected_rows: int | None = EXPECTED_APTAMERBASE_ROWS,
+    check_deterministic_rerun: bool = False,
+) -> S2RunResult:
+    """Execute AptamerBase S2 normalisation."""
+    repo_root = repo_root.resolve()
+    input_dir = input_dir if input_dir.is_absolute() else (repo_root / input_dir)
+    input_dir = input_dir.resolve()
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    rules_path = (
+        rules_path if rules_path.is_absolute() else (repo_root / rules_path)
+    ).resolve()
+    policy_path = (
+        policy_path if policy_path.is_absolute() else (repo_root / policy_path)
+    ).resolve()
+
+    canonical_path = input_dir / "aptamerbase_extracted.csv"
+    sidecar_path = input_dir / "aptamerbase_source_metadata.csv"
+    if not canonical_path.is_file():
+        raise S2NormaliseError(f"Missing S1 canonical input: {canonical_path.name}")
+    if not sidecar_path.is_file():
+        raise S2NormaliseError(f"Missing S1 sidecar input: {sidecar_path.name}")
+
+    raw_csv_path = (
+        repo_root / "data" / "raw" / "aptamerbase" / "aptamerbase_aptamers.csv"
+    )
+    raw_rdf_path = (
+        repo_root
+        / "data"
+        / "raw"
+        / "aptamerbase"
+        / "aptamerbase.freebase.extract.nt.gz"
+    )
+    production = expected_rows == EXPECTED_APTAMERBASE_ROWS
+    raw_sha_before: str | None = None
+    if production:
+        if not raw_csv_path.is_file():
+            raise S2NormaliseError("Missing registered AptamerBase raw CSV")
+        if not raw_rdf_path.is_file():
+            raise S2NormaliseError("Missing registered AptamerBase supporting RDF")
+        digest = _sha256_file(raw_csv_path)
+        if digest != EXPECTED_APTAMERBASE_RAW_CSV_SHA256:
+            raise S2NormaliseError(
+                "AptamerBase raw CSV SHA-256 does not match the frozen contract"
+            )
+        rdf_digest = _sha256_file(raw_rdf_path)
+        if rdf_digest != EXPECTED_APTAMERBASE_RAW_RDF_SHA256:
+            raise S2NormaliseError(
+                "AptamerBase supporting RDF SHA-256 does not match the "
+                "frozen contract"
+            )
+        raw_sha_before = digest
+
+    s1_hash_before = _sha256_file(canonical_path)
+    sidecar_hash_before = _sha256_file(sidecar_path)
+    if production:
+        if s1_hash_before != EXPECTED_APTAMERBASE_S1_CANONICAL_SHA256:
+            raise S2NormaliseError(
+                "AptamerBase S1 canonical SHA-256 does not match the frozen "
+                "accepted value; S2 must not proceed"
+            )
+        if sidecar_hash_before != EXPECTED_APTAMERBASE_S1_SIDECAR_SHA256:
+            raise S2NormaliseError(
+                "AptamerBase S1 sidecar SHA-256 does not match the frozen "
+                "accepted value; S2 must not proceed"
+            )
+
+    rules = load_normalisation_rules(rules_path)
+    policy = load_aptamerbase_policy(policy_path)
+    if policy.apply_approved_trims:
+        raise S2NormaliseError("AptamerBase S2 must not apply approved trims")
+    if policy.group_inference_key != "disabled":
+        raise S2NormaliseError(
+            "AptamerBase S2 must keep group-wise inference disabled"
+        )
+    if not raw_rdf_path.is_file():
+        raise S2NormaliseError("Missing AptamerBase supporting RDF for S2 join")
+
+    rdf_index = load_aptamerbase_rdf_index(
+        raw_rdf_path,
+        rdf_type_predicate=policy.rdf_type_predicate,
+        freebase_type_predicate=policy.freebase_type_predicate,
+        modification_details_predicate=policy.modification_details_predicate,
+        type_uris=policy.rdf_type_uris,
+        expected_statements=(
+            EXPECTED_APTAMERBASE_RDF_STATEMENTS if production else None
+        ),
+    )
+
+    canonical_rows = _read_corpus_csv(canonical_path)
+    sidecar_rows = _read_sidecar_csv(sidecar_path)
+    aligned_sidecar = _match_sidecar_one_to_one(canonical_rows, sidecar_rows)
+
+    if expected_rows is not None and len(canonical_rows) != expected_rows:
+        raise S2NormaliseError(
+            f"S1 row count must be {expected_rows}; got {len(canonical_rows)}"
+        )
+
+    for index, row in enumerate(canonical_rows, start=1):
+        if row["source_db"] != "aptamerbase":
+            raise S2NormaliseError(f"row {index}: source_db must be aptamerbase")
+        if production and row["source_dataset"] != EXPECTED_APTAMERBASE_SOURCE_DATASET:
+            raise S2NormaliseError(
+                f"row {index}: source_dataset must be "
+                f"{EXPECTED_APTAMERBASE_SOURCE_DATASET}"
+            )
+
+    stats = AptamerBaseS2Stats()
+    stats.s1_rows = len(canonical_rows)
+    stats.source_metadata_rows = len(aligned_sidecar)
+    stats.rdf_statement_count = rdf_index.statement_count
+    stats.order_preserved = True
+    stats.provenance_preserved = True
+    stats.sequence_raw_unchanged = True
+    stats.target_name_raw_unchanged = True
+    stats.notes_unchanged = True
+    stats.known_motifs_scanned = tuple(
+        motif.name for motif in rules.known_non_core_motifs
+    )
+
+    normalised_rows: list[dict[str, str]] = []
+    qc_rows: list[dict[str, str]] = []
+    review_rows: list[dict[str, str]] = []
+    row_results: list = []
+    rdf_typing_by_id: dict[str, str] = {}
+
+    for s1_row, meta_row in zip(canonical_rows, aligned_sidecar, strict=True):
+        source_id = meta_row.get(policy.source_id_field, "")
+        facts = require_subject_facts(rdf_index, source_id)
+        result = normalise_aptamerbase_record(
+            s1_row,
+            meta_row,
+            facts,
+            policy=policy,
+            rules=rules,
+        )
+        previous_typing = rdf_typing_by_id.get(source_id)
+        if previous_typing is None:
+            rdf_typing_by_id[source_id] = result.rdf_molecule_type
+        elif previous_typing != result.rdf_molecule_type:
+            raise S2NormaliseError(
+                "repeated Freebase ID received inconsistent RDF-derived typing"
+            )
+        if result.canonical["record_id"] != s1_row["record_id"]:
+            stats.order_preserved = False
+            raise S2NormaliseError("S2 altered record_id or row identity")
+        if result.canonical["native_id"] != s1_row["native_id"]:
+            raise S2NormaliseError("S2 altered native_id")
+        if result.canonical["sequence_raw"] != s1_row["sequence_raw"]:
+            stats.sequence_raw_unchanged = False
+            raise S2NormaliseError("S2 must not alter sequence_raw")
+        if result.canonical["target_name_raw"] != s1_row["target_name_raw"]:
+            stats.target_name_raw_unchanged = False
+            raise S2NormaliseError("S2 must not alter target_name_raw")
+        if result.canonical["notes"] != s1_row["notes"]:
+            stats.notes_unchanged = False
+            raise S2NormaliseError("S2 must not alter notes")
+        if result.canonical["source_db"] != s1_row["source_db"]:
+            stats.provenance_preserved = False
+            raise S2NormaliseError("S2 must not alter source_db")
+        if result.canonical["source_dataset"] != s1_row["source_dataset"]:
+            stats.provenance_preserved = False
+            raise S2NormaliseError("S2 must not alter source_dataset")
+        if result.canonical["sequence_core"] != result.canonical["sequence_full"]:
+            raise S2NormaliseError(
+                "AptamerBase S2 must not apply trims; sequence_core must equal "
+                "sequence_full"
+            )
+        if not aptamerbase_s4_fields_are_empty(result.canonical):
+            raise S2NormaliseError("AptamerBase S2 populated a deferred S4 field")
+        length_full = result.canonical["sequence_length_full"]
+        if length_full != "":
+            if int(length_full) != len(result.canonical["sequence_full"]):
+                raise S2NormaliseError(
+                    "sequence_length_full must equal len(sequence_full)"
+                )
+            if int(result.canonical["sequence_length_core"]) != len(
+                result.canonical["sequence_core"]
+            ):
+                raise S2NormaliseError(
+                    "sequence_length_core must equal len(sequence_core)"
+                )
+        normalised_rows.append(result.canonical)
+        qc_rows.append(result.qc)
+        row_results.append(result)
+        if aptamerbase_is_review_candidate(result.qc):
+            review_rows.append(result.qc)
+        update_aptamerbase_stats_from_row(stats, result)
+
+    stats.s2_rows = len(normalised_rows)
+    stats.unique_record_ids = len({row["record_id"] for row in normalised_rows})
+    stats.unique_native_ids = len({row["native_id"] for row in normalised_rows})
+    stats.records_dropped = 0
+    stats.records_parked = 0
+    finalise_aptamerbase_review_and_id_stats(stats, row_results)
+    stats.s4_fields_empty = all(
+        aptamerbase_s4_fields_are_empty(row) for row in normalised_rows
+    )
+
+    if production:
+        if stats.s2_rows != EXPECTED_APTAMERBASE_ROWS:
+            raise S2NormaliseError(
+                f"S2 must preserve {EXPECTED_APTAMERBASE_ROWS} rows; "
+                f"got {stats.s2_rows}"
+            )
+        if stats.unique_record_ids != EXPECTED_APTAMERBASE_ROWS:
+            raise S2NormaliseError("S2 record_id values are not unique")
+        if stats.unique_freebase_ids != EXPECTED_APTAMERBASE_UNIQUE_IDS:
+            raise S2NormaliseError(
+                "S2 unique Freebase ID count does not match the S1 contract"
+            )
+        if not stats.rdf_join_coverage_ok:
+            raise S2NormaliseError("S2 RDF join coverage is incomplete")
+        if stats.s1_rows - stats.s2_rows != 0:
+            raise S2NormaliseError("S2 row disappearance must be 0")
+        if stats.core_differs_from_full != 0 or stats.applied_trims != 0:
+            raise S2NormaliseError(
+                "AptamerBase S2 applied a trim; sequence_core must equal "
+                "sequence_full"
+            )
+        nonempty_target = sum(1 for row in normalised_rows if row["target_name_raw"])
+        if nonempty_target:
+            raise S2NormaliseError(
+                "AptamerBase S2 must not populate target_name_raw"
+            )
+
+    known_motif_proposals = build_aptamerbase_known_motif_proposals(row_results)
+    assert_aptamerbase_genuine_proposals(known_motif_proposals)
+
+    stats.constant_region_proposals = len(known_motif_proposals)
+    stats.groups_considered = 0
+    stats.groups_meeting_min_size = 0
+    stats.five_prime_proposals = sum(
+        1 for row in known_motif_proposals if row["side"] == "five_prime"
+    )
+    stats.three_prime_proposals = sum(
+        1 for row in known_motif_proposals if row["side"] == "three_prime"
+    )
+    stats.records_with_medium_confidence_proposal = 0
+    stats.high_confidence_trims_applied = 0
+    stats.applied_trims = 0
+    for row in known_motif_proposals:
+        source = row["proposal_source"]
+        stats.proposal_source_counts[source] = (
+            stats.proposal_source_counts.get(source, 0) + 1
+        )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_normalised = output_dir / "aptamerbase_normalised.csv"
+    out_qc = output_dir / "aptamerbase_s2_qc.csv"
+    out_review = output_dir / "aptamerbase_s2_review_candidates.csv"
+    out_proposals = output_dir / "detected_constants_aptamerbase.csv"
+    out_report = output_dir / "aptamerbase_s2_report.md"
+
+    write_corpus_csv_atomic(out_normalised, normalised_rows)
+    write_csv_atomic(out_qc, APTAMERBASE_S2_QC_COLUMNS, qc_rows)
+    write_csv_atomic(out_review, APTAMERBASE_S2_QC_COLUMNS, review_rows)
+    write_csv_atomic(
+        out_proposals, APTAMERBASE_CONSTANT_PROPOSAL_COLUMNS, known_motif_proposals
+    )
+
+    s1_hash_after = _sha256_file(canonical_path)
+    sidecar_hash_after = _sha256_file(sidecar_path)
+    inputs_unchanged = (
+        s1_hash_before == s1_hash_after
+        and sidecar_hash_before == sidecar_hash_after
+    )
+    if not inputs_unchanged:
+        raise S2NormaliseError("S1 inputs were modified during S2 execution")
+
+    raw_sha_after: str | None = None
+    raw_sha_unchanged: bool | None = None
+    if raw_sha_before is not None:
+        digest = _sha256_file(raw_csv_path)
+        rdf_digest = _sha256_file(raw_rdf_path)
+        if digest != raw_sha_before or rdf_digest != EXPECTED_APTAMERBASE_RAW_RDF_SHA256:
+            raise S2NormaliseError("AptamerBase raw CSV/RDF SHA changed during S2")
+        raw_sha_after = digest
+        raw_sha_unchanged = True
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        first_hashes = {
+            "normalised": _sha256_file(out_normalised),
+            "qc": _sha256_file(out_qc),
+            "review": _sha256_file(out_review),
+            "proposals": _sha256_file(out_proposals),
+        }
+        second = run_aptamerbase_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=policy_path,
+            expected_rows=expected_rows,
+            check_deterministic_rerun=False,
+        )
+        deterministic_ok = (
+            first_hashes["normalised"] == _sha256_file(second.output_normalised)
+            and first_hashes["qc"] == _sha256_file(second.output_qc)
+            and first_hashes["review"] == _sha256_file(second.output_review)
+            and first_hashes["proposals"] == _sha256_file(second.output_proposals)
+        )
+        if not deterministic_ok:
+            raise S2NormaliseError(
+                "S2 outputs were not byte-identical across deterministic rerun"
+            )
+
+    run_result = S2RunResult(
+        source_key="aptamerbase",
+        stats=stats,
+        output_normalised=out_normalised,
+        output_qc=out_qc,
+        output_review=out_review,
+        output_proposals=out_proposals,
+        output_report=out_report,
+        s1_hash_before=s1_hash_before,
+        s1_hash_after=s1_hash_after,
+        sidecar_hash_before=sidecar_hash_before,
+        sidecar_hash_after=sidecar_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        deterministic_rerun_ok=deterministic_ok,
+        raw_sha256=raw_sha_after,
+        raw_sha_unchanged=raw_sha_unchanged,
+    )
+    report_text = build_aptamerbase_s2_report(
+        repo_root=repo_root,
+        result=run_result,
+        rules_path=rules_path,
+        policy_path=policy_path,
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in report_text:
+        raise S2NormaliseError("S2 report must not contain absolute repository paths")
+    _write_text_atomic(out_report, report_text)
+    return run_result
+
+
 def run_s2_normalisation(
     *,
     repo_root: Path,
@@ -4446,6 +5143,18 @@ def run_s2_normalisation(
             policy_path=source_policy,
             expected_rows=(
                 EXPECTED_ENA_ROWS if expected_rows is None else expected_rows
+            ),
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key == "aptamerbase":
+        return run_aptamerbase_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=source_policy,
+            expected_rows=(
+                EXPECTED_APTAMERBASE_ROWS if expected_rows is None else expected_rows
             ),
             check_deterministic_rerun=check_deterministic_rerun,
         )
@@ -4553,6 +5262,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_path = Path("config/source_normalisation/aptaindex.json")
         elif args.source == "ena":
             policy_path = Path("config/source_normalisation/ena.json")
+        elif args.source == "aptamerbase":
+            policy_path = Path("config/source_normalisation/aptamerbase.json")
         else:
             raise S2NormaliseError(
                 "--source-policy is required for unrecognised sources"
@@ -4571,6 +5282,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (
         S2NormaliseError,
         AptaBaseS2Error,
+        AptamerBaseS2Error,
+        AptamerBaseRdfError,
         UTexasS2Error,
         AptaDBS2Error,
         RiboAptamerS2Error,
@@ -4634,6 +5347,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"\nt_to_u_count={stats.t_to_u_count}"
             f"\nprimary_experiment_groups={stats.primary_experiment_groups}"
             f"\ngroups_meeting_min_size={stats.groups_meeting_min_size}"
+            f"\nknown_motif_detection_count={stats.known_motif_detection_count}"
+            f"\ncore_differs_from_full={stats.core_differs_from_full}"
+            f"\napplied_trims={stats.applied_trims}"
+            f"\nreview_candidate_rows={stats.review_candidate_rows}"
+        )
+    elif isinstance(stats, AptamerBaseS2Stats):
+        extra = (
+            f"\nmolecule_type_counts={dict(sorted(stats.molecule_type_counts.items()))}"
+            f"\nchemistry_counts={dict(sorted(stats.chemistry_counts.items()))}"
+            f"\nalphabet_counts={dict(sorted(stats.alphabet_counts.items()))}"
+            f"\nsource_object_type_counts="
+            f"{dict(sorted(stats.source_object_type_counts.items()))}"
+            f"\nt_to_u_count={stats.t_to_u_count}"
+            f"\nrna_t_alphabet_count={stats.rna_t_alphabet_count}"
+            f"\ndna_u_conflict_count={stats.dna_u_conflict_count}"
             f"\nknown_motif_detection_count={stats.known_motif_detection_count}"
             f"\ncore_differs_from_full={stats.core_differs_from_full}"
             f"\napplied_trims={stats.applied_trims}"

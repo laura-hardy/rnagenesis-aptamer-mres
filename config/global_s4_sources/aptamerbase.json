@@ -1,0 +1,210 @@
+{
+  "source_key": "aptamerbase",
+  "source_dataset": "aptamerbase_export_2026-06-24",
+  "handoff_status": "ready_for_global_s4",
+  "authoritative_stage": "CHECKPOINT-1",
+  "checkpoint_status": "closed",
+  "checkpoint_metadata": "config/checkpoint_reviews/aptamerbase_checkpoint1_metadata.json",
+  "canonical_input": "data/interim/checkpoints/aptamerbase_cp1/resolved/aptamerbase_checkpoint1_applied_canonical.csv",
+  "resolution_manifest": "config/checkpoint_reviews/aptamerbase_checkpoint1_resolutions.csv",
+  "authorised_ids_input": "data/interim/checkpoints/aptamerbase_cp1/resolved/aptamerbase_checkpoint1_s4_authorised_ids.csv",
+  "authorisation_field": "authorised_for_s4",
+  "expected_authorised_records": 881,
+  "global_s4_handoff_output": "data/interim/global_s4_ready/aptamerbase_global_s4_input.csv",
+  "global_s4_handoff_summary": "data/interim/global_s4_ready/aptamerbase_global_s4_handoff_summary.md",
+  "redistribution_status": "unknown",
+  "global_s4_run": false,
+  "physical_row_join_key": "record_id",
+  "physical_source_grain_preserved": true,
+  "do_not_collapse_by": [
+    "aptamerbase_id",
+    "sequence",
+    "aptamerbase_label",
+    "minimal_aptamer_parent",
+    "exact_duplicate_row"
+  ],
+  "handoff_ready_statement": "AptamerBase CHECKPOINT-1 is closed and this source is prepared as one input to the future corpus-wide global S4 stage. authorised_for_s4=true / inclusion in this handoff means only technically eligible after AptamerBase sequence/molecule/chemistry/construct review. Canonical target_name_raw is deliberately empty. AptamerBase label is source metadata, not a target name. The Freebase ID is a source provenance / future source-metadata join key, not record_id, native_id, a target ID, or a dedup key. Interaction/experiment companion tables are not registered in this handoff. Global S4 has not been run.",
+  "emit_target_evidence_boundary": true,
+  "emit_source_metadata_only_disclaimer": true,
+  "authorised_for_s4_meaning": "Technically eligible after AptamerBase sequence/molecule/chemistry/construct CHECKPOINT-1 and prepared as an input to the future corpus-wide global S4 stage. Does not mean target identified, target canonicalised, protein target confirmed, UniProt resolved, evidence threshold passed, affinity resolved, PDB resolved, leakage cleared, final corpus included, deduplicated, clustered, balanced, or partitioned.",
+  "handoff_summary_additional_notes": [
+    "authorised_for_s4=true / inclusion in this handoff means only technically eligible after AptamerBase sequence/molecule/chemistry/construct review and prepared as an input to the future corpus-wide global S4 stage.",
+    "It does not mean target identified, target canonicalised, protein target confirmed, UniProt resolved, evidence threshold passed, affinity resolved, PDB resolved, leakage cleared, final corpus included, deduplicated, clustered, balanced, or partitioned.",
+    "Canonical target_name_raw is deliberately empty. aptamerbase_label is sidecar source metadata only and must not be treated as a target name.",
+    "The Freebase ID (aptamerbase_id) is a source provenance / future source-metadata join key. It is not record_id, native_id, a target ID, or a deduplication key.",
+    "Physical source grain is preserved: 881 authorised records remain 881 handoff rows even when Freebase IDs or sequences repeat.",
+    "Global S4 has not been run."
+  ],
+  "handoff_extra_fields": [
+    "aptamerbase_id",
+    "aptamerbase_label",
+    "aptamerbase_type",
+    "aptamerbase_sequence_length",
+    "aptamerbase_has_mutational_analysis",
+    "aptamerbase_has_experimentally_determined_structure",
+    "aptamerbase_has_minimal_aptamer",
+    "aptamerbase_is_minimal_aptamer_of",
+    "aptamerbase_has_application",
+    "aptamerbase_has_modification_details",
+    "aptamerbase_has_secondary_structure",
+    "aptamerbase_has_predicted_secondary_structure",
+    "aptamerbase_has_sequence_pattern"
+  ],
+  "additional_source_metadata_joins": [
+    {
+      "path": "data/interim/normalised/aptamerbase_s2_qc.csv",
+      "fields": [
+        "source_object_type",
+        "molecule_evidence_source",
+        "rdf_has_rna",
+        "rdf_has_dna",
+        "rdf_has_modified_nucleic_acid"
+      ]
+    }
+  ],
+  "required_nonempty_handoff_fields": [
+    "aptamerbase_id"
+  ],
+  "require_empty_canonical_fields": [
+    "target_name_raw",
+    "target_name",
+    "target_uniprot",
+    "target_type",
+    "target_type_source",
+    "target_family",
+    "target_pfam",
+    "pdb_id",
+    "binding_evidence_type",
+    "binding_evidence_score",
+    "affinity_value",
+    "affinity_unit",
+    "affinity_type",
+    "cluster_id",
+    "is_cluster_representative",
+    "partition"
+  ],
+  "handoff_summary_provenance_counts": {
+    "trim_status_value": "t7_removed",
+    "report_t_to_u_applied": true,
+    "report_duplicate_sequence_identities": true,
+    "unique_count_fields": [
+      "aptamerbase_id"
+    ],
+    "duplicate_group_fields": [
+      "aptamerbase_id"
+    ],
+    "nonempty_count_fields": [
+      "aptamerbase_label",
+      "aptamerbase_has_minimal_aptamer",
+      "aptamerbase_is_minimal_aptamer_of",
+      "aptamerbase_has_application",
+      "aptamerbase_has_modification_details",
+      "aptamerbase_has_secondary_structure",
+      "aptamerbase_has_predicted_secondary_structure",
+      "aptamerbase_has_sequence_pattern"
+    ],
+    "true_value_count_fields": [
+      "aptamerbase_has_mutational_analysis",
+      "aptamerbase_has_experimentally_determined_structure",
+      "rdf_has_rna",
+      "rdf_has_dna",
+      "rdf_has_modified_nucleic_acid"
+    ],
+    "value_count_fields": [
+      "molecule_type",
+      "chemistry",
+      "source_object_type"
+    ]
+  },
+  "handoff_summary_count_labels": {
+    "unique_aptamerbase_id": "unique Freebase IDs",
+    "duplicate_aptamerbase_id_groups": "duplicated Freebase-ID groups",
+    "duplicate_aptamerbase_id_rows": "rows in duplicated Freebase-ID groups",
+    "nonempty_aptamerbase_label": "nonempty AptamerBase labels",
+    "nonempty_aptamerbase_has_minimal_aptamer": "nonempty has_minimal_aptamer relations",
+    "nonempty_aptamerbase_is_minimal_aptamer_of": "nonempty is_minimal_aptamer_of relations",
+    "nonempty_aptamerbase_has_application": "nonempty has_application",
+    "nonempty_aptamerbase_has_modification_details": "nonempty has_modification_details",
+    "nonempty_aptamerbase_has_secondary_structure": "nonempty has_secondary_structure",
+    "nonempty_aptamerbase_has_predicted_secondary_structure": "nonempty has_predicted_secondary_structure",
+    "nonempty_aptamerbase_has_sequence_pattern": "nonempty has_sequence_pattern",
+    "true_aptamerbase_has_mutational_analysis": "has_mutational_analysis=true",
+    "true_aptamerbase_has_experimentally_determined_structure": "has_experimentally_determined_structure=true",
+    "true_rdf_has_rna": "source RDF RNA flag true",
+    "true_rdf_has_dna": "source RDF DNA flag true",
+    "true_rdf_has_modified_nucleic_acid": "source RDF modified_nucleic_acid flag true"
+  },
+  "future_enrichment_join": {
+    "physical_row_key": "record_id",
+    "source_freebase_id_field": "aptamerbase_id",
+    "join_path": "record_id -> S1 sidecar AptamerBase Freebase ID -> AptamerBase interaction/experiment graph/tables",
+    "freebase_id_is_not": [
+      "record_id",
+      "native_id",
+      "target ID",
+      "dedup key"
+    ]
+  },
+  "future_global_s4_prerequisites": [
+    "Before AptamerBase target/evidence normalisation begins, hash-pin the original-authors interaction and experiment companion tables (or equivalent RDF graph representation) and join them by Freebase ID/interaction relationships.",
+    "Do not parse aptamerbase_label into target_name_raw. Canonical target identity, if any, must come from later interaction/experiment enrichment.",
+    "Do not interpret has_experimentally_determined_structure as E1, map the structure boolean to PDB, parse PMID-like labels, or classify protein/non-protein at this handoff.",
+    "Deduplication of repeated Freebase IDs and exact sequence duplicates remains S5. Physical source grain must be preserved until then."
+  ],
+  "closure_hashes": {
+    "applied_canonical": "d43361de291fb9fb6ceb2651289c05de507b6f9b6a6298f6319386c6f514fff6",
+    "routing": "6ab6c270871eeb5a9aaf7df7ce6380560337f617c16619ff5f9bdf62099b36fa",
+    "s4_authorised_ids": "0141257ccb5958f029b5ebd9667011d053ae2fa190de33d65a0294061c6bca3e",
+    "sidecar": "47a49f7495648bb11105a77eee9cbcfeabeb7b7b05f357dc433d3edb779f41b7",
+    "s1": "0bb0282033ba0561b2c8d8de1358ae6e5a4e8fa47bfb640c56dc87b177552896",
+    "s2": "69bcfb97592255bc0d70727991bd68d7bf5dc18f1c47db532b182461ba6d81f8",
+    "s3_prereview": "69bcfb97592255bc0d70727991bd68d7bf5dc18f1c47db532b182461ba6d81f8",
+    "completed_review": "55000f2ea3cf51e5236c4ba9e44bc2e73d87050cc9c0d1c0e7afe5d995098ae1",
+    "bulk_confirmation": "6ea8217f952c7f66489d9a07a664669023f7230b02f64312c61c2e78226f916a",
+    "accepted_dry_run_report": "f589fd95317b33266e5b63e465c59e3b11aaa727bd0a5f707474b3c9695bc3af",
+    "raw": "40b329551b225a29ee2c656cf6b59b98ff686a981968b856685cdc7c222a784c",
+    "rdf": "3ab9340ee1fcb6a0910532a6e8d4cf5cc62579c3b21d85355c48d473e372006c"
+  },
+  "target_metadata": {
+    "canonical_raw_field": "target_name_raw",
+    "source_specific_field": "",
+    "source_general_field": "",
+    "source_general_is_categorical": false,
+    "specific_target_present_in_authorised_records": 0,
+    "specific_target_missing_in_authorised_records": 881,
+    "source_metadata_path": "data/interim/extracted/aptamerbase_source_metadata.csv",
+    "label_field": "aptamerbase_label",
+    "label_is_not_canonical_target": true,
+    "freebase_id_field": "aptamerbase_id",
+    "uniprot_source_columns_present": false,
+    "pdb_source_columns_present": false,
+    "pfam_source_columns_present": false,
+    "family_source_columns_present": false
+  },
+  "s4_semantics": {
+    "canonical_target_name_raw_empty": true,
+    "label_is_not_target": true,
+    "future_enrichment_joins_through_freebase_id": true,
+    "interaction_experiment_companions_not_registered": true,
+    "target_identity_from_descriptive_source_metadata": false,
+    "source_structure_boolean_is_not_e1": true,
+    "source_structure_boolean_is_not_pdb": true,
+    "protein_non_protein_routing_after_target_resolution": true,
+    "leakage_exclusion_global_at_s4": true,
+    "canonical_s4_fields_populated_here": false,
+    "target_evidence_processing_deferred": true
+  },
+  "global_s4_rules": {
+    "final_target_normalisation_performed_here": false,
+    "final_target_type_assignment_performed_here": false,
+    "uniprot_resolution_performed_here": false,
+    "target_family_assignment_performed_here": false,
+    "evidence_threshold_performed_here": false,
+    "global_leakage_application_performed_here": false,
+    "deduplication_performed_here": false,
+    "clustering_performed_here": false,
+    "balancing_performed_here": false,
+    "partitioning_performed_here": false,
+    "checkpoint2_emitted_here": false
+  }
+}

@@ -123,6 +123,29 @@ from adapters.ena_s3 import (  # noqa: E402
     refresh_stats_after_audit as refresh_ena_stats_after_audit,
     update_stats_from_row as update_ena_stats_from_row,
 )
+from adapters.aptamerbase_s3 import (  # noqa: E402
+    DECISION_COLUMNS as APTAMERBASE_DECISION_COLUMNS,
+    LOCAL_DETAIL_COLUMNS as APTAMERBASE_LOCAL_DETAIL_COLUMNS,
+    PARK_COLUMNS as APTAMERBASE_PARK_COLUMNS,
+    PRIMARY_ROUTE_CHEMISTRY_REVIEW as APTAMERBASE_PRIMARY_ROUTE_CHEMISTRY_REVIEW,
+    PRIMARY_ROUTE_CONSTRUCT as APTAMERBASE_PRIMARY_ROUTE_CONSTRUCT,
+    PRIMARY_ROUTE_ELIGIBLE as APTAMERBASE_PRIMARY_ROUTE_ELIGIBLE,
+    PRIMARY_ROUTE_MOLECULE as APTAMERBASE_PRIMARY_ROUTE_MOLECULE,
+    PRIMARY_ROUTE_REJECT as APTAMERBASE_PRIMARY_ROUTE_REJECT,
+    PRIMARY_ROUTE_SSDNA as APTAMERBASE_PRIMARY_ROUTE_SSDNA,
+    REASON_COUNT_COLUMNS as APTAMERBASE_REASON_COUNT_COLUMNS,
+    REJECTION_COLUMNS as APTAMERBASE_REJECTION_COLUMNS,
+    AptamerBaseS3Error,
+    AptamerBaseS3Stats,
+    apply_random_accept_audit as apply_aptamerbase_random_accept_audit,
+    assert_aptamerbase_accept_invariants,
+    assert_aptamerbase_reject_park_invariants,
+    build_local_detail_row as build_aptamerbase_local_detail_row,
+    classify_aptamerbase_record,
+    index_constant_proposals as index_aptamerbase_constant_proposals,
+    refresh_stats_after_audit as refresh_aptamerbase_stats_after_audit,
+    update_stats_from_row as update_aptamerbase_stats_from_row,
+)
 from adapters.utexas_s3 import (  # noqa: E402
     DECISION_COLUMNS as UTEXAS_DECISION_COLUMNS,
     LOCAL_DETAIL_COLUMNS as UTEXAS_LOCAL_DETAIL_COLUMNS,
@@ -190,6 +213,23 @@ EXPECTED_ENA_RAW_SHA256 = (
 EXPECTED_ENA_S2_HASH = (
     "4e88f44a07cfee89014eae17d68b90f70acc23d6a6792f29c8ee8f622e2aa8ca"
 )
+EXPECTED_APTAMERBASE_ROWS = 2128
+EXPECTED_APTAMERBASE_SOURCE_DATASET = "aptamerbase_export_2026-06-24"
+EXPECTED_APTAMERBASE_RAW_CSV_SHA256 = (
+    "40b329551b225a29ee2c656cf6b59b98ff686a981968b856685cdc7c222a784c"
+)
+EXPECTED_APTAMERBASE_RAW_RDF_SHA256 = (
+    "3ab9340ee1fcb6a0910532a6e8d4cf5cc62579c3b21d85355c48d473e372006c"
+)
+EXPECTED_APTAMERBASE_S1_CANONICAL_SHA256 = (
+    "0bb0282033ba0561b2c8d8de1358ae6e5a4e8fa47bfb640c56dc87b177552896"
+)
+EXPECTED_APTAMERBASE_S1_SIDECAR_SHA256 = (
+    "47a49f7495648bb11105a77eee9cbcfeabeb7b7b05f357dc433d3edb779f41b7"
+)
+EXPECTED_APTAMERBASE_S2_HASH = (
+    "69bcfb97592255bc0d70727991bd68d7bf5dc18f1c47db532b182461ba6d81f8"
+)
 EXPECTED_APTADB_MOLECULE = {"RNA": 289, "ssDNA": 1061}
 EXPECTED_UTEXAS_MISSING = 399
 EXPECTED_UTEXAS_NONEMPTY = 1495
@@ -232,6 +272,13 @@ ENA_PIPELINE_STOP_STATEMENT = (
     "The pipeline is stopped awaiting Laura CHECKPOINT-1 review.\n"
     "Global S4 has not been run."
 )
+APTAMERBASE_PIPELINE_STOP_STATEMENT = (
+    "CHECKPOINT-1 package generated.\n"
+    "No human decisions applied.\n"
+    "No AptamerBase record is authorised for S4 yet.\n"
+    "The pipeline is stopped awaiting Laura CHECKPOINT-1 review.\n"
+    "Global S4 has not been run."
+)
 
 
 class S3ClassifyError(ValueError):
@@ -250,6 +297,7 @@ class S3RunResult:
         | RiboAptamerS3Stats
         | AptaIndexS3Stats
         | EnaS3Stats
+        | AptamerBaseS3Stats
     )
     output_canonical: Path
     output_decisions: Path
@@ -271,6 +319,8 @@ class S3RunResult:
     output_parks: Path | None = None
     output_parked_ssdna: Path | None = None
     output_parked_non_protein: Path | None = None
+    output_parked_molecule_unresolved: Path | None = None
+    output_parked_construct: Path | None = None
     raw_sha_before: str = ""
     raw_sha_after: str = ""
 
@@ -4472,6 +4522,849 @@ def run_ena_s3(
     return run_result
 
 
+def _assert_aptamerbase_s2_invariants(canonical_rows: Sequence[dict[str, str]]) -> None:
+    """Hard-fail if the AptamerBase S2 starting contract is broken."""
+    if len(canonical_rows) != EXPECTED_APTAMERBASE_ROWS:
+        raise S3ClassifyError(
+            f"S3 input rows must be {EXPECTED_APTAMERBASE_ROWS}; "
+            f"got {len(canonical_rows)}"
+        )
+    record_ids = [row["record_id"] for row in canonical_rows]
+    if len(set(record_ids)) != EXPECTED_APTAMERBASE_ROWS:
+        raise S3ClassifyError("AptamerBase S2 record_id values are not unique")
+    for row in canonical_rows:
+        if row.get("source_db") != "aptamerbase":
+            raise S3ClassifyError("S2 row source_db must be aptamerbase")
+        if row.get("source_dataset") != EXPECTED_APTAMERBASE_SOURCE_DATASET:
+            raise S3ClassifyError(
+                "S2 row source_dataset must be "
+                f"{EXPECTED_APTAMERBASE_SOURCE_DATASET}"
+            )
+        if row.get("sequence_core") != row.get("sequence_full"):
+            raise S3ClassifyError(
+                "AptamerBase S2 sequence_core must equal sequence_full"
+            )
+        for field_name in (
+            "target_name",
+            "target_uniprot",
+            "target_type",
+            "target_family",
+            "target_pfam",
+            "pdb_id",
+            "binding_evidence_type",
+            "binding_evidence_score",
+            "affinity_value",
+            "cluster_id",
+            "partition",
+        ):
+            if row.get(field_name):
+                raise S3ClassifyError(
+                    f"AptamerBase S2 must leave {field_name} empty"
+                )
+        if row.get("target_name_raw"):
+            raise S3ClassifyError("AptamerBase S2 must leave target_name_raw empty")
+
+
+def build_aptamerbase_checkpoint1_summary(
+    *,
+    repo_root: Path,
+    result: S3RunResult,
+    policy_path: Path,
+) -> str:
+    """Sequence-free AptamerBase S3 / CHECKPOINT-1 report."""
+    stats = result.stats
+    assert isinstance(stats, AptamerBaseS3Stats)
+
+    def _count(mapping: Mapping[str, int], key: str) -> int:
+        return int(mapping.get(key, 0))
+
+    rejected = _count(stats.primary_route_counts, APTAMERBASE_PRIMARY_ROUTE_REJECT)
+    parked_ssdna = _count(stats.primary_route_counts, APTAMERBASE_PRIMARY_ROUTE_SSDNA)
+    parked_molecule = _count(
+        stats.primary_route_counts, APTAMERBASE_PRIMARY_ROUTE_MOLECULE
+    )
+    parked_chemistry = _count(
+        stats.primary_route_counts, APTAMERBASE_PRIMARY_ROUTE_CHEMISTRY_REVIEW
+    )
+    parked_construct = _count(
+        stats.primary_route_counts, APTAMERBASE_PRIMARY_ROUTE_CONSTRUCT
+    )
+    eligible = _count(stats.primary_route_counts, APTAMERBASE_PRIMARY_ROUTE_ELIGIBLE)
+    route_sum = (
+        rejected
+        + parked_ssdna
+        + parked_molecule
+        + parked_chemistry
+        + parked_construct
+        + eligible
+    )
+    lines = [
+        "# AptamerBase S3 technical eligibility and CHECKPOINT-1",
+        "",
+        "## Source reconciliation",
+        "",
+        f"- Physical S2/S3 rows: `{stats.s2_rows}` / `{stats.s3_rows}`",
+        f"- Unique `record_id`: `{stats.unique_record_ids}`",
+        f"- Unique `native_id`: `{stats.unique_native_ids}`",
+        f"- Unique Freebase IDs (from S2 grain): `{stats.unique_freebase_ids}`",
+        f"- Order preserved: `{'yes' if stats.order_preserved else 'no'}`",
+        f"- Group-wise constant-region inference: "
+        f"`{'disabled' if stats.group_inference_disabled else 'enabled'}`",
+        f"- Applied trims: `{stats.applied_trim_count}`",
+        f"- `sequence_core` differs from `sequence_full`: "
+        f"`{stats.core_differs_from_full}`",
+        "",
+        "Source object types:",
+        "",
+    ]
+    for name, count in _count_sorted(stats.source_object_type_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "Primary routes (exactly one per row):",
+            "",
+            f"- technical/source rejects: `{rejected}`",
+            f"- parked ssDNA: `{parked_ssdna}`",
+            f"- parked molecule unknown: `{parked_molecule}`",
+            f"- parked chemistry review: `{parked_chemistry}`",
+            f"- parked unresolved construct: `{parked_construct}`",
+            f"- technically eligible RNA/2F-RNA: `{eligible}`",
+            f"- route total: `{route_sum}`",
+            "",
+            "### Source object type by primary route",
+            "",
+        ]
+    )
+    lines.extend(_nested_count_lines(stats.source_object_by_route))
+    lines.extend(
+        [
+            "",
+            "## Technical rejections",
+            "",
+            "Primary reasons:",
+            "",
+            f"- `non_aptamer_source_object`: "
+            f"`{_count(stats.primary_reason_counts, 'non_aptamer_source_object')}`",
+            f"- `missing_sequence`: "
+            f"`{_count(stats.primary_reason_counts, 'missing_sequence')}`",
+            f"- `mixed_T_and_U`: "
+            f"`{_count(stats.primary_reason_counts, 'mixed_T_and_U')}`",
+            f"- `ambiguous_bases`: "
+            f"`{_count(stats.primary_reason_counts, 'ambiguous_bases')}`",
+            f"- `alignment_gaps`: "
+            f"`{_count(stats.primary_reason_counts, 'alignment_gaps')}`",
+            f"- `invalid_alphabet`: "
+            f"`{_count(stats.primary_reason_counts, 'invalid_alphabet')}`",
+            f"- `length_out_of_range`: "
+            f"`{_count(stats.primary_reason_counts, 'length_out_of_range')}`",
+            "",
+            "Overlapping condition tallies (a record may contribute to more than one):",
+            "",
+            f"- non-aptamer source objects: `{stats.non_aptamer_source_object_count}`",
+            f"- structure-topic rows: `{stats.structure_topic_rows}`",
+            f"- structure-topic nonempty sequence: "
+            f"`{stats.structure_topic_nonempty_sequence}`",
+            f"- missing-sequence condition: `{stats.missing_sequence_count}`",
+            f"- missing sequence on structure topics: "
+            f"`{stats.missing_sequence_structure_count}`",
+            f"- missing sequence on aptamer topics: "
+            f"`{stats.missing_sequence_aptamer_count}`",
+            f"- mixed T/U condition: `{stats.mixed_t_u_count}`",
+            f"- ambiguous-bases condition: `{stats.ambiguous_bases_count}`",
+            f"- alignment-gaps condition: `{stats.alignment_gaps_count}`",
+            f"- invalid-alphabet condition: `{stats.invalid_alphabet_count}`",
+            f"- length-out-of-range condition: `{stats.length_out_of_range_count}`",
+            f"- actual length <20: `{stats.length_below_min_count}`",
+            f"- actual length >100: `{stats.length_above_max_count}`",
+            "",
+            "## Parking",
+            "",
+            f"- source ssDNA rows: `{stats.ssdna_source_count}`",
+            f"- parked ssDNA (primary route): `{parked_ssdna}`",
+            f"- source molecule unknown: `{stats.molecule_unknown_source_count}`",
+            f"- molecule unknown on structure topics: "
+            f"`{stats.molecule_unknown_structure_count}`",
+            f"- molecule unknown on aptamer topics: "
+            f"`{stats.molecule_unknown_aptamer_count}`",
+            f"- parked unresolved molecule (primary route): `{parked_molecule}`",
+            f"- parked chemistry review (primary route): `{parked_chemistry}`",
+            f"- Spiegelmer/L-RNA QC condition: `{stats.spiegelmer_count}`",
+            f"- parked unresolved construct (primary route): `{parked_construct}`",
+            "",
+            "Chemistry class counts (all rows):",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.chemistry_class_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Technically eligible",
+            "",
+            f"- technically eligible primary route: `{eligible}`",
+            f"- RNA chemistry: `{stats.eligible_rna_chemistry_count}`",
+            f"- 2F-RNA chemistry: `{stats.eligible_twof_chemistry_count}`",
+            "- Invariants: aptamer source object; molecule_type=RNA; chemistry",
+            "  RNA or 2F-RNA; nonempty valid RNA core; 20–100 nt; no unresolved",
+            "  syntax, molecule, chemistry, or known-motif blocker; S4 fields empty.",
+            "- `target_name_raw` is not required at S3.",
+            "",
+            "## Source conflicts",
+            "",
+            f"- RDF DNA × U/RNA alphabet conflicts: `{stats.dna_u_conflict_count}`",
+            "- These remain parked ssDNA (`t_to_u_applied=false`).",
+            "- No automatic reclassification to RNA.",
+            "",
+            "## Construct review",
+            "",
+            f"- known-motif proposal records: "
+            f"`{stats.known_motif_proposal_record_count}`",
+            f"- known-motif proposal rows: `{stats.known_motif_proposal_row_count}`",
+            f"- group-consensus proposals: "
+            f"`{stats.group_consensus_proposal_record_count}`",
+            f"- applied trims: `{stats.applied_trim_count}`",
+            "- Group-wise constant-region inference was disabled.",
+            "",
+            "## CHECKPOINT-1",
+            "",
+            f"- unique active review records: "
+            f"`{stats.unique_checkpoint_review_records}`",
+            f"- sequence/source-conflict review: "
+            f"`{stats.sequence_notation_review_count}`",
+            f"- DNA×U source-conflict review: "
+            f"`{stats.source_conflict_review_count}`",
+            f"- construct/known-motif review: `{stats.constant_review_count}`",
+            f"- length-boundary audit (20–25 and 90–100 among accepts): "
+            f"`{stats.boundary_review_count}`",
+            f"- lower-boundary condition: `{stats.boundary_low_count}`",
+            f"- upper-boundary condition: `{stats.boundary_high_count}`",
+            f"- random-kept audit sampled: `{stats.random_accept_audit_count}`",
+            f"- random-kept audit pool: `{stats.random_accept_audit_pool_size}`",
+            f"- random-kept audit shortfall: "
+            f"`{stats.random_accept_audit_shortfall}`",
+            "- Human decision fields are blank.",
+            "- Machine recommendations are stored separately.",
+            "- `ready_for_application = 0` until Laura completes review.",
+            "",
+            "Active review batches:",
+            "",
+        ]
+    )
+    for batch, count in _count_sorted(stats.review_batch_counts):
+        lines.append(f"- `{batch}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Deferred",
+            "",
+            f"- blank `target_name_raw`: `{stats.missing_target_raw_count}`",
+            f"- S3 `missing_target` rejects: `{stats.missing_target_rejected_count}`",
+            f"- Target canonicalised: `{stats.target_canonicalised_count}`",
+            f"- Evidence scored: `{stats.evidence_scored_count}`",
+            f"- Affinity normalised: `{stats.affinity_normalised_count}`",
+            f"- Sequence leakage: `{stats.sequence_leakage_count}`",
+            f"- Target leakage: `{stats.target_leakage_count}`",
+            "- Target extraction from `label`, interactions, experiments,",
+            "  PMID, PDB, UniProt/Pfam, leakage, deduplication, Freebase-ID",
+            "  collapse, exact-sequence collapse, clustering, and global S4",
+            "  were not run.",
+            "- Duplicate Freebase IDs and minimal-aptamer relationships are",
+            "  retained for later S5 clustering validation.",
+            "",
+            "## Integrity",
+            "",
+            f"- S2 canonical SHA-256: `{result.s2_hash_before}`",
+            f"- S3 canonical SHA-256 equals S2: "
+            f"`{'yes' if result.s2_integrity_ok else 'no'}`",
+            f"- Inputs unchanged during S3: "
+            f"`{'yes' if result.inputs_unchanged else 'no'}`",
+            f"- Deterministic rerun: "
+            f"`{result.deterministic_rerun_ok if result.deterministic_rerun_ok is not None else 'not_requested'}`",
+            f"- Eligibility policy: `{_relative_display(policy_path, repo_root)}`",
+            "",
+            "Outputs (gitignored under `data/`):",
+            "",
+            f"- `{_relative_display(result.output_canonical, repo_root)}`",
+            f"- `{_relative_display(result.output_decisions, repo_root)}`",
+            f"- `{_relative_display(result.output_review, repo_root)}`",
+            f"- `{_relative_display(result.output_local_detail, repo_root)}`",
+            f"- `{_relative_display(result.output_reason_counts, repo_root)}`",
+        ]
+    )
+    if result.output_rejected is not None:
+        lines.append(f"- `{_relative_display(result.output_rejected, repo_root)}`")
+    if result.output_parked_ssdna is not None:
+        lines.append(
+            f"- `{_relative_display(result.output_parked_ssdna, repo_root)}`"
+        )
+    if result.output_parked_molecule_unresolved is not None:
+        lines.append(
+            f"- `{_relative_display(result.output_parked_molecule_unresolved, repo_root)}`"
+        )
+    if result.output_parks is not None:
+        lines.append(f"- `{_relative_display(result.output_parks, repo_root)}`")
+    if result.output_parked_construct is not None:
+        lines.append(
+            f"- `{_relative_display(result.output_parked_construct, repo_root)}`"
+        )
+    lines.extend(
+        [
+            f"- `{_relative_display(result.output_summary, repo_root)}`",
+            "",
+            APTAMERBASE_PIPELINE_STOP_STATEMENT,
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def run_aptamerbase_s3(
+    *,
+    repo_root: Path,
+    input_dir: Path,
+    source_metadata_dir: Path,
+    eligibility_policy: Path,
+    output_dir: Path,
+    expected_rows: int | None = EXPECTED_APTAMERBASE_ROWS,
+    check_deterministic_rerun: bool = False,
+) -> S3RunResult:
+    """Execute AptamerBase S3 technical eligibility and CHECKPOINT-1."""
+    repo_root = repo_root.resolve()
+    input_dir = (
+        input_dir if input_dir.is_absolute() else (repo_root / input_dir)
+    ).resolve()
+    source_metadata_dir = (
+        source_metadata_dir
+        if source_metadata_dir.is_absolute()
+        else (repo_root / source_metadata_dir)
+    ).resolve()
+    eligibility_policy = (
+        eligibility_policy
+        if eligibility_policy.is_absolute()
+        else (repo_root / eligibility_policy)
+    ).resolve()
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+
+    canonical_path = input_dir / "aptamerbase_normalised.csv"
+    qc_path = input_dir / "aptamerbase_s2_qc.csv"
+    sidecar_path = source_metadata_dir / "aptamerbase_source_metadata.csv"
+    proposals_path = input_dir / "detected_constants_aptamerbase.csv"
+    for path, label in (
+        (canonical_path, "S2 canonical"),
+        (qc_path, "S2 QC"),
+        (sidecar_path, "source-metadata"),
+        (proposals_path, "S2 known-motif proposals"),
+    ):
+        if not path.is_file():
+            raise S3ClassifyError(f"Missing {label} input: {path.name}")
+
+    raw_path = (
+        repo_root / "data" / "raw" / "aptamerbase" / "aptamerbase_aptamers.csv"
+    )
+    rdf_path = (
+        repo_root
+        / "data"
+        / "raw"
+        / "aptamerbase"
+        / "aptamerbase.freebase.extract.nt.gz"
+    )
+    s1_path = source_metadata_dir / "aptamerbase_extracted.csv"
+    raw_sha_before = ""
+    rdf_sha_before = ""
+    s1_sha_before = ""
+    s1_sidecar_sha_before = ""
+    check_raw = expected_rows == EXPECTED_APTAMERBASE_ROWS
+    if check_raw:
+        if not raw_path.is_file():
+            raise S3ClassifyError("Missing registered AptamerBase raw CSV")
+        raw_sha_before = _sha256_file(raw_path)
+        if raw_sha_before != EXPECTED_APTAMERBASE_RAW_CSV_SHA256:
+            raise S3ClassifyError(
+                "AptamerBase raw CSV SHA-256 does not match registry expectation"
+            )
+        if rdf_path.is_file():
+            rdf_sha_before = _sha256_file(rdf_path)
+            if rdf_sha_before != EXPECTED_APTAMERBASE_RAW_RDF_SHA256:
+                raise S3ClassifyError(
+                    "AptamerBase RDF SHA-256 does not match registry expectation"
+                )
+        if s1_path.is_file():
+            s1_sha_before = _sha256_file(s1_path)
+            if s1_sha_before != EXPECTED_APTAMERBASE_S1_CANONICAL_SHA256:
+                raise S3ClassifyError(
+                    "AptamerBase S1 canonical SHA-256 does not match the frozen S1"
+                )
+        s1_sidecar_sha_before = _sha256_file(sidecar_path)
+        if s1_sidecar_sha_before != EXPECTED_APTAMERBASE_S1_SIDECAR_SHA256:
+            raise S3ClassifyError(
+                "AptamerBase S1 sidecar SHA-256 does not match the frozen S1"
+            )
+
+    s2_hash_before = _sha256_file(canonical_path)
+    qc_hash_before = _sha256_file(qc_path)
+    sidecar_hash_before = _sha256_file(sidecar_path)
+    proposals_hash_before = _sha256_file(proposals_path)
+    if check_raw and s2_hash_before != EXPECTED_APTAMERBASE_S2_HASH:
+        raise S3ClassifyError(
+            "AptamerBase S2 normalised hash does not match the completed S2 milestone"
+        )
+
+    policy = load_eligibility_policy(eligibility_policy)
+    if policy.source_key != "aptamerbase":
+        raise S3ClassifyError(
+            f"Eligibility policy source_key must be aptamerbase; "
+            f"got {policy.source_key!r}"
+        )
+    if not policy.defer_target_classification or not policy.defer_evidence_scoring:
+        raise S3ClassifyError(
+            "AptamerBase S3 policy must defer target classification and "
+            "evidence scoring"
+        )
+    if (
+        policy.sequence_leakage_matching_enabled
+        or policy.target_leakage_matching_enabled
+        or not policy.defer_leakage_exclusion
+    ):
+        raise S3ClassifyError("AptamerBase S3 must not apply leakage exclusions")
+    if not policy.unresolved_trim_blocks_eligibility:
+        raise S3ClassifyError(
+            "AptamerBase S3 must park unresolved known-motif/construct cases"
+        )
+
+    canonical_rows = _read_corpus_csv(canonical_path)
+    qc_rows = _read_sidecar_csv(qc_path, label="S2 QC")
+    sidecar_rows = _read_sidecar_csv(sidecar_path, label="source-metadata")
+    proposal_rows = _read_plain_csv(proposals_path, label="S2 known-motif proposals")
+    aligned_qc = _match_sidecar_one_to_one(
+        canonical_rows, qc_rows, label="S2 QC"
+    )
+    aligned_sidecar = _match_sidecar_one_to_one(
+        canonical_rows, sidecar_rows, label="source-metadata"
+    )
+    proposal_index = index_aptamerbase_constant_proposals(
+        canonical_rows, proposal_rows
+    )
+
+    if expected_rows is not None and len(canonical_rows) != expected_rows:
+        raise S3ClassifyError(
+            f"S2 row count must be {expected_rows}; got {len(canonical_rows)}"
+        )
+    if expected_rows == EXPECTED_APTAMERBASE_ROWS:
+        _assert_aptamerbase_s2_invariants(canonical_rows)
+
+    stats = AptamerBaseS3Stats()
+    stats.s2_rows = len(canonical_rows)
+    stats.order_preserved = True
+    stats.group_inference_disabled = True
+    stats.unique_freebase_ids = len(
+        {
+            (meta.get("aptamerbase_id") or row["native_id"])
+            for row, meta in zip(canonical_rows, aligned_sidecar, strict=True)
+        }
+    )
+
+    s3_canonical: list[dict[str, str]] = []
+    decision_rows: list[dict[str, str]] = []
+    rejection_rows: list[dict[str, str]] = []
+    parked_ssdna_rows: list[dict[str, str]] = []
+    parked_molecule_rows: list[dict[str, str]] = []
+    parked_chemistry_rows: list[dict[str, str]] = []
+    parked_construct_rows: list[dict[str, str]] = []
+    local_detail_by_id: dict[str, dict[str, str]] = {}
+    core_by_id = {row["record_id"]: row["sequence_core"] for row in canonical_rows}
+
+    for s2_row, qc_row, meta_row in zip(
+        canonical_rows, aligned_qc, aligned_sidecar, strict=True
+    ):
+        classified = classify_aptamerbase_record(
+            s2_row,
+            qc_row,
+            meta_row,
+            policy=policy,
+            proposals=proposal_index.get(s2_row["record_id"], ()),
+        )
+        if classified.canonical["record_id"] != s2_row["record_id"]:
+            stats.order_preserved = False
+            raise S3ClassifyError("S3 altered record_id or row identity")
+        for column in CORPUS_COLUMNS:
+            if classified.canonical[column] != s2_row[column]:
+                raise S3ClassifyError(
+                    f"S3 altered S2 canonical field {column!r}"
+                )
+        s3_canonical.append(classified.canonical)
+        decision_rows.append(classified.decision)
+        if classified.rejection_row is not None:
+            rejection_rows.append(classified.rejection_row)
+        if classified.park_row is not None:
+            if classified.primary_route == APTAMERBASE_PRIMARY_ROUTE_SSDNA:
+                parked_ssdna_rows.append(classified.park_row)
+            elif classified.primary_route == APTAMERBASE_PRIMARY_ROUTE_MOLECULE:
+                parked_molecule_rows.append(classified.park_row)
+            elif classified.primary_route == APTAMERBASE_PRIMARY_ROUTE_CHEMISTRY_REVIEW:
+                parked_chemistry_rows.append(classified.park_row)
+            elif classified.primary_route == APTAMERBASE_PRIMARY_ROUTE_CONSTRUCT:
+                parked_construct_rows.append(classified.park_row)
+            else:
+                raise S3ClassifyError(
+                    f"Park row has unexpected primary_route {classified.primary_route}"
+                )
+        local_detail_by_id[classified.canonical["record_id"]] = (
+            build_aptamerbase_local_detail_row(
+                canonical=classified.canonical,
+                s2_qc=qc_row,
+                source_metadata=meta_row,
+                decision=classified.decision,
+            )
+        )
+        update_aptamerbase_stats_from_row(stats, classified)
+
+    sampled, pool, shortfall = apply_aptamerbase_random_accept_audit(
+        decision_rows,
+        local_detail_by_id,
+        seed=policy.random_seed,
+        sample_size=policy.random_accept_audit_size,
+    )
+    stats.random_accept_audit_pool_size = pool
+    stats.random_accept_audit_shortfall = shortfall
+    refresh_aptamerbase_stats_after_audit(stats, decision_rows)
+
+    stats.s3_rows = len(s3_canonical)
+    stats.unique_record_ids = len({row["record_id"] for row in s3_canonical})
+    stats.unique_native_ids = len({row["native_id"] for row in s3_canonical})
+
+    if stats.s3_rows != len(canonical_rows):
+        raise S3ClassifyError("S3 must preserve every S2 row")
+    if stats.unique_record_ids != len(s3_canonical):
+        raise S3ClassifyError("S3 record_id values are not unique")
+    if len({row["record_id"] for row in decision_rows}) != len(decision_rows):
+        raise S3ClassifyError("Decision sidecar contains duplicate record_id values")
+
+    rejected_n = stats.primary_route_counts.get(APTAMERBASE_PRIMARY_ROUTE_REJECT, 0)
+    parked_ssdna_n = stats.primary_route_counts.get(APTAMERBASE_PRIMARY_ROUTE_SSDNA, 0)
+    parked_molecule_n = stats.primary_route_counts.get(
+        APTAMERBASE_PRIMARY_ROUTE_MOLECULE, 0
+    )
+    parked_chemistry_n = stats.primary_route_counts.get(
+        APTAMERBASE_PRIMARY_ROUTE_CHEMISTRY_REVIEW, 0
+    )
+    parked_construct_n = stats.primary_route_counts.get(
+        APTAMERBASE_PRIMARY_ROUTE_CONSTRUCT, 0
+    )
+    eligible_n = stats.primary_route_counts.get(APTAMERBASE_PRIMARY_ROUTE_ELIGIBLE, 0)
+    if (
+        rejected_n
+        + parked_ssdna_n
+        + parked_molecule_n
+        + parked_chemistry_n
+        + parked_construct_n
+        + eligible_n
+        != stats.s3_rows
+    ):
+        raise S3ClassifyError(
+            "technical_rejects + parked lanes + technically_eligible "
+            "does not equal S3 rows"
+        )
+    if len(rejection_rows) != rejected_n:
+        raise S3ClassifyError(
+            "Rejection log count does not match technical_reject route"
+        )
+    if len(parked_ssdna_rows) != parked_ssdna_n:
+        raise S3ClassifyError("Parked ssDNA count does not match parked_ssdna route")
+    if len(parked_molecule_rows) != parked_molecule_n:
+        raise S3ClassifyError(
+            "Unresolved-molecule park count does not match parked_molecule_unresolved"
+        )
+    if len(parked_chemistry_rows) != parked_chemistry_n:
+        raise S3ClassifyError(
+            "Chemistry-review park count does not match parked_chemistry_review"
+        )
+    if len(parked_construct_rows) != parked_construct_n:
+        raise S3ClassifyError(
+            "Construct-review park count does not match parked_construct_review"
+        )
+    if sampled != stats.random_accept_audit_count:
+        raise S3ClassifyError("Random-accept audit count mismatch")
+    if stats.group_consensus_proposal_record_count != 0:
+        raise S3ClassifyError(
+            "AptamerBase S3 unexpectedly found group-consensus proposals"
+        )
+    if stats.target_canonicalised_count or stats.evidence_scored_count:
+        raise S3ClassifyError(
+            "AptamerBase S3 must not canonicalise target or evidence"
+        )
+    if stats.affinity_normalised_count:
+        raise S3ClassifyError("AptamerBase S3 must not normalise affinity")
+    if stats.missing_target_rejected_count != 0:
+        raise S3ClassifyError("AptamerBase S3 must not emit missing_target rejects")
+    if stats.applied_trim_count != 0 or stats.core_differs_from_full != 0:
+        raise S3ClassifyError("AptamerBase S3 must not apply a trim")
+
+    park_id_sets = [
+        {row["record_id"] for row in parked_ssdna_rows},
+        {row["record_id"] for row in parked_molecule_rows},
+        {row["record_id"] for row in parked_chemistry_rows},
+        {row["record_id"] for row in parked_construct_rows},
+    ]
+    for i, left in enumerate(park_id_sets):
+        for right in park_id_sets[i + 1 :]:
+            if left & right:
+                raise S3ClassifyError(
+                    "A record must not appear in more than one park sidecar"
+                )
+
+    for row in decision_rows:
+        if not row["primary_reason"]:
+            raise S3ClassifyError("Decision row missing primary_reason")
+        if row.get("primary_reason") == "missing_target":
+            raise S3ClassifyError("AptamerBase S3 must not reject missing_target")
+        if row.get("target_name_raw"):
+            raise S3ClassifyError("AptamerBase S3 must leave target_name_raw empty")
+
+    assert_aptamerbase_accept_invariants(decision_rows)
+    assert_aptamerbase_reject_park_invariants(decision_rows)
+
+    reason_count_rows: list[dict[str, str]] = []
+    combo_counts: dict[tuple[str, str], int] = {}
+    for row in decision_rows:
+        key = (row["proposed_decision"], row["primary_reason"])
+        combo_counts[key] = combo_counts.get(key, 0) + 1
+    for (decision, reason), count in sorted(combo_counts.items()):
+        reason_count_rows.append(
+            {
+                "proposed_decision": decision,
+                "primary_reason": reason,
+                "record_count": str(count),
+            }
+        )
+    if sum(int(row["record_count"]) for row in reason_count_rows) != len(decision_rows):
+        raise S3ClassifyError("Reason counts do not reconcile to decision rows")
+
+    review_rows = sorted(decision_rows, key=review_sort_key)
+    local_detail_rows: list[dict[str, str]] = []
+    for review_row in review_rows:
+        record_id = review_row["record_id"]
+        if record_id not in local_detail_by_id:
+            raise S3ClassifyError(
+                f"Missing local-detail row for record_id={record_id!r}"
+            )
+        detail = local_detail_by_id[record_id]
+        if detail["sequence_core"] != core_by_id[record_id]:
+            raise S3ClassifyError("CHECKPOINT-1 must not apply constant-region trims")
+        if detail.get("manual_decision"):
+            raise S3ClassifyError("Local-detail must not pre-fill manual_decision")
+        for field_name in (
+            "manual_sequence_corrected",
+            "manual_molecule_type_override",
+            "manual_trim_action",
+        ):
+            if detail.get(field_name):
+                raise S3ClassifyError(
+                    f"Local-detail must not pre-fill {field_name}"
+                )
+        local_detail_rows.append(detail)
+    for review_row, detail_row in zip(review_rows, local_detail_rows, strict=True):
+        if review_row["record_id"] != detail_row["record_id"]:
+            raise S3ClassifyError(
+                "Local-detail ordering does not match sequence-free review"
+            )
+        if review_row["review_batch"] != detail_row.get("review_batch", ""):
+            raise S3ClassifyError("Local-detail review_batch mismatch")
+
+    forbidden_seq_cols = {"sequence_raw", "sequence_full", "sequence_core"}
+    for col in forbidden_seq_cols:
+        if col in APTAMERBASE_DECISION_COLUMNS or col in APTAMERBASE_PARK_COLUMNS:
+            raise S3ClassifyError(f"Sequence column leaked into sidecar schema: {col}")
+    for col in ("sequence_raw", "sequence_full", "sequence_core"):
+        if col not in APTAMERBASE_LOCAL_DETAIL_COLUMNS:
+            raise S3ClassifyError(
+                f"Local-detail schema missing required sequence column: {col}"
+            )
+
+    review_ids = [
+        row["record_id"]
+        for row in review_rows
+        if row.get("manual_review_required") == "true"
+    ]
+    if len(review_ids) != len(set(review_ids)):
+        raise S3ClassifyError("CHECKPOINT-1 review rows are duplicated")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_canonical = output_dir / "aptamerbase_s3_canonical.csv"
+    out_decisions = output_dir / "aptamerbase_s3_decisions.csv"
+    out_review = output_dir / "aptamerbase_checkpoint1_review.csv"
+    out_local_detail = output_dir / "aptamerbase_checkpoint1_local_detail.csv"
+    out_reason_counts = output_dir / "aptamerbase_checkpoint1_reason_counts.csv"
+    out_rejected = output_dir / "rejected_aptamerbase.csv"
+    out_parked_ssdna = output_dir / "aptamerbase_s3_parked_ssdna.csv"
+    out_parked_molecule = (
+        output_dir / "aptamerbase_s3_parked_molecule_unresolved.csv"
+    )
+    out_parks = output_dir / "aptamerbase_s3_parked_chemistry_review.csv"
+    out_parked_construct = output_dir / "aptamerbase_s3_parked_construct_review.csv"
+    out_summary = output_dir / "aptamerbase_checkpoint1_summary.md"
+
+    write_corpus_csv_atomic(out_canonical, s3_canonical)
+    write_csv_atomic(
+        out_decisions, APTAMERBASE_DECISION_COLUMNS, decision_rows, quoting=csv.QUOTE_ALL
+    )
+    write_csv_atomic(
+        out_review, APTAMERBASE_DECISION_COLUMNS, review_rows, quoting=csv.QUOTE_ALL
+    )
+    write_csv_atomic(
+        out_local_detail,
+        APTAMERBASE_LOCAL_DETAIL_COLUMNS,
+        local_detail_rows,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        out_reason_counts, APTAMERBASE_REASON_COUNT_COLUMNS, reason_count_rows
+    )
+    write_csv_atomic(
+        out_rejected, APTAMERBASE_REJECTION_COLUMNS, rejection_rows, quoting=csv.QUOTE_ALL
+    )
+    write_csv_atomic(
+        out_parked_ssdna,
+        APTAMERBASE_PARK_COLUMNS,
+        parked_ssdna_rows,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        out_parked_molecule,
+        APTAMERBASE_PARK_COLUMNS,
+        parked_molecule_rows,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        out_parks, APTAMERBASE_PARK_COLUMNS, parked_chemistry_rows, quoting=csv.QUOTE_ALL
+    )
+    write_csv_atomic(
+        out_parked_construct,
+        APTAMERBASE_PARK_COLUMNS,
+        parked_construct_rows,
+        quoting=csv.QUOTE_ALL,
+    )
+
+    s2_hash_after = _sha256_file(canonical_path)
+    qc_hash_after = _sha256_file(qc_path)
+    sidecar_hash_after = _sha256_file(sidecar_path)
+    proposals_hash_after = _sha256_file(proposals_path)
+    raw_sha_after = raw_sha_before
+    if check_raw:
+        raw_sha_after = _sha256_file(raw_path)
+        if raw_sha_after != EXPECTED_APTAMERBASE_RAW_CSV_SHA256:
+            raise S3ClassifyError("AptamerBase raw SHA-256 changed during S3")
+        if rdf_path.is_file() and _sha256_file(rdf_path) != rdf_sha_before:
+            raise S3ClassifyError("AptamerBase RDF SHA-256 changed during S3")
+        if s1_path.is_file() and _sha256_file(s1_path) != s1_sha_before:
+            raise S3ClassifyError("AptamerBase S1 canonical SHA-256 changed during S3")
+    inputs_unchanged = (
+        s2_hash_before == s2_hash_after
+        and qc_hash_before == qc_hash_after
+        and sidecar_hash_before == sidecar_hash_after
+        and proposals_hash_before == proposals_hash_after
+        and (not check_raw or raw_sha_before == raw_sha_after)
+    )
+    if not inputs_unchanged:
+        raise S3ClassifyError("S2/source inputs were modified during S3 execution")
+
+    s2_integrity_ok = True
+    if _sha256_file(out_canonical) != s2_hash_before:
+        raise S3ClassifyError(
+            "S3 canonical output is not byte-identical to S2 normalised input"
+        )
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        first_hashes = {
+            "canonical": _sha256_file(out_canonical),
+            "decisions": _sha256_file(out_decisions),
+            "review": _sha256_file(out_review),
+            "local_detail": _sha256_file(out_local_detail),
+            "reason_counts": _sha256_file(out_reason_counts),
+            "rejected": _sha256_file(out_rejected),
+            "parked_ssdna": _sha256_file(out_parked_ssdna),
+            "parked_molecule": _sha256_file(out_parked_molecule),
+            "parks": _sha256_file(out_parks),
+            "parked_construct": _sha256_file(out_parked_construct),
+        }
+        second = run_aptamerbase_s3(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            source_metadata_dir=source_metadata_dir,
+            eligibility_policy=eligibility_policy,
+            output_dir=output_dir,
+            expected_rows=expected_rows,
+            check_deterministic_rerun=False,
+        )
+        second_hashes = {
+            "canonical": _sha256_file(second.output_canonical),
+            "decisions": _sha256_file(second.output_decisions),
+            "review": _sha256_file(second.output_review),
+            "local_detail": _sha256_file(second.output_local_detail),
+            "reason_counts": _sha256_file(second.output_reason_counts),
+            "rejected": _sha256_file(second.output_rejected),
+            "parked_ssdna": _sha256_file(second.output_parked_ssdna),
+            "parked_molecule": _sha256_file(second.output_parked_molecule_unresolved),
+            "parks": _sha256_file(second.output_parks),
+            "parked_construct": _sha256_file(second.output_parked_construct),
+        }
+        deterministic_ok = first_hashes == second_hashes
+        if not deterministic_ok:
+            raise S3ClassifyError(
+                "S3 outputs were not byte-identical across deterministic rerun"
+            )
+
+    run_result = S3RunResult(
+        source_key="aptamerbase",
+        stats=stats,
+        output_canonical=out_canonical,
+        output_decisions=out_decisions,
+        output_review=out_review,
+        output_local_detail=out_local_detail,
+        output_summary=out_summary,
+        output_reason_counts=out_reason_counts,
+        output_leakage_matches=None,
+        s2_hash_before=s2_hash_before,
+        s2_hash_after=s2_hash_after,
+        qc_hash_before=qc_hash_before,
+        qc_hash_after=qc_hash_after,
+        sidecar_hash_before=sidecar_hash_before,
+        sidecar_hash_after=sidecar_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        deterministic_rerun_ok=deterministic_ok,
+        s2_integrity_ok=s2_integrity_ok,
+        output_rejected=out_rejected,
+        output_parks=out_parks,
+        output_parked_ssdna=out_parked_ssdna,
+        output_parked_non_protein=None,
+        output_parked_molecule_unresolved=out_parked_molecule,
+        output_parked_construct=out_parked_construct,
+        raw_sha_before=raw_sha_before,
+        raw_sha_after=raw_sha_after,
+    )
+    summary_text = build_aptamerbase_checkpoint1_summary(
+        repo_root=repo_root,
+        result=run_result,
+        policy_path=eligibility_policy,
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in summary_text:
+        raise S3ClassifyError(
+            "CHECKPOINT-1 summary must not contain absolute repository paths"
+        )
+    if APTAMERBASE_PIPELINE_STOP_STATEMENT not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary missing pipeline stop statement")
+    if "group-wise constant-region inference was disabled" not in summary_text.lower():
+        raise S3ClassifyError(
+            "CHECKPOINT-1 summary must state that group-wise inference was disabled"
+        )
+    if "Evidence scored" not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary missing evidence deferral")
+    _write_text_atomic(out_summary, summary_text)
+    return run_result
+
+
 def run_s3_classification(
     *,
     repo_root: Path,
@@ -4557,6 +5450,18 @@ def run_s3_classification(
             output_dir=output_dir,
             expected_rows=(
                 EXPECTED_ENA_ROWS if expected_rows is None else expected_rows
+            ),
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key == "aptamerbase":
+        return run_aptamerbase_s3(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            source_metadata_dir=source_metadata_dir,
+            eligibility_policy=eligibility_policy,
+            output_dir=output_dir,
+            expected_rows=(
+                EXPECTED_APTAMERBASE_ROWS if expected_rows is None else expected_rows
             ),
             check_deterministic_rerun=check_deterministic_rerun,
         )
@@ -4684,6 +5589,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_path = Path("config/source_eligibility/aptaindex.json")
         elif args.source == "ena":
             policy_path = Path("config/source_eligibility/ena.json")
+        elif args.source == "aptamerbase":
+            policy_path = Path("config/source_eligibility/aptamerbase.json")
         else:
             raise S3ClassifyError(
                 "--eligibility-policy is required for unknown sources"
@@ -4700,6 +5607,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_dir = Path("data/interim/checkpoints/aptaindex_cp1")
         elif args.source == "ena":
             output_dir = Path("data/interim/checkpoints/ena_cp1")
+        elif args.source == "aptamerbase":
+            output_dir = Path("data/interim/checkpoints/aptamerbase_cp1")
         else:
             output_dir = Path("data/interim/checkpoints/aptabase_cp1")
 
@@ -4723,6 +5632,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         RiboAptamerS3Error,
         AptaIndexS3Error,
         EnaS3Error,
+        AptamerBaseS3Error,
         EligibilityError,
         CorpusSchemaError,
     ) as exc:

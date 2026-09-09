@@ -5756,3 +5756,639 @@ ENA future global-S4 handoff prepared (675 records)
 Global S4 has not been run
 ```
 
+## 2026-09-08 — AptamerBase registration and S1 verbatim extraction
+
+**Stage:** Aim 2 / data curation / AptamerBase S0-S1.
+AptamerBase S2, S3, CHECKPOINT-1, and global S4 were not started.
+
+### What was done
+
+The authoritative AptamerBase CSV was registered as a Tier-1 source
+and frozen by SHA-256 and expected row count. A source-specific S1
+adapter then extracted every physical source row into the canonical
+corpus schema, with a complete source-metadata sidecar. All 2128
+physical rows and all 14 raw source columns were retained.
+Deterministic physical-row native IDs were used because source
+Freebase `id` is not unique. Molecule classification, T→U conversion,
+target extraction from `label`, evidence scoring, structure/PDB
+mapping, eligibility filtering, parking, leakage checks, and
+deduplication were deliberately deferred.
+
+### Decisions made
+
+- AptamerBase is a flattened Freebase/RDF-style export. One physical
+  CSV row is not necessarily one biological aptamer.
+- All 2128 physical rows are preserved through S1. Duplicate complete
+  rows, repeated Freebase IDs, repeated sequences, parent/minimal-aptamer
+  expansions, structure-topic rows, blank sequences, and textual `n/a`
+  sequences are retained. No biological deduplication occurred. This is
+  not an S1 defect.
+- `native_id` uses the zero-padded 1-based source CSV data-row number
+  (`0001`…`2128`). `record_id` is `aptamerbase:{native_id}`. The source
+  Freebase `id` is preserved verbatim in the sidecar only.
+- Source object types are retained in the sidecar (aptamer topics and
+  secondary/predicted-structure topics). Source `type` is not treated
+  as eligibility.
+- Source `label` is a composite Freebase export label, not a documented
+  raw-target column. It is sidecar-only; `target_name_raw` is left empty.
+- Minimal-aptamer relationship fields (`has_minimal_aptamer`,
+  `is_minimal_aptamer_of`) are retained verbatim in the sidecar and are
+  not mapped into canonical clustering fields.
+- Structure/evidence metadata is retained but uninterpreted. Boolean
+  and URI-valued source fields do not populate canonical PDB or
+  evidence fields.
+- Molecule type and chemistry are deferred to S2. No T→U conversion,
+  sequence normalisation, or constant trimming was performed.
+- `paper.pdf` is documentation only and is not a registered corpus input.
+- `source_dataset = aptamerbase_export_2026-06-24` follows the inventory
+  last-modified date rather than inventing an August extraction date.
+
+### Inputs used
+
+- `source_dataset = aptamerbase_export_2026-06-24`
+- `data/raw/aptamerbase/aptamerbase_aptamers.csv`
+- SHA-256:
+  `40b329551b225a29ee2c656cf6b59b98ff686a981968b856685cdc7c222a784c`
+- 2128 logical rows; 14-column UTF-8 CSV, no BOM
+- Snapshot date: `2026-06-24`; tier `1`;
+  `redistribution_status = unknown`
+
+### Outputs produced
+
+Ignored under `/data/`:
+
+- `data/interim/registry/source_registry.csv` (operational S0 registry;
+  14 validated registered files, exactly one `aptamerbase` entry)
+- `data/interim/extracted/aptamerbase_extracted.csv` (2128 rows)
+- `data/interim/extracted/aptamerbase_source_metadata.csv` (2128 rows)
+- `data/interim/extracted/aptamerbase_s1_report.md`
+
+Tracked scripts, tests and this log entry. Nothing under `data/` is
+tracked.
+
+### Numbers
+
+- 2128 rows input
+- 2128 extracted; 2128 unique `record_id`; 2128 unique `native_id`
+- first native ID `0001`; last native ID `2128`
+- 0 S1 rejections, parking, or filtering
+- 14 raw metadata columns preserved in the sidecar; one-to-one join
+  to canonical rows
+- `sequence_raw` is text-equivalent to source `sequence`; source order
+  preserved
+- empty sequence rows retained: 179
+- exact textual `n/a` sequence rows retained: 4
+- other nonempty sequence rows: 1945
+- `target_name_raw` populated: 0; publication / DOI / PMID: 0
+- unique Freebase IDs: 1868; duplicated ID groups: 66; rows in those
+  groups: 326
+- exact duplicate complete-row groups: 2; rows in those groups: 6;
+  excess: 4
+- source type retained as sidecar diagnostics only: aptamer 2056,
+  nucleic-acid secondary structure 69, predicted secondary structure 3
+- nonempty `has_minimal_aptamer`: 273; nonempty
+  `is_minimal_aptamer_of`: 266
+- source raw hash unchanged before and after S0/S1:
+  `40b329551b225a29ee2c656cf6b59b98ff686a981968b856685cdc7c222a784c`
+- S0: 13 registered files before, 14 after; 14 validated; existing
+  AptaBase and ENA inventory-override warnings only; AptamerBase
+  inventory SHA and row count agree; `paper.pdf` not registered
+- Deterministic S1 rerun: byte-identical canonical and sidecar CSVs
+
+### Open questions carried forward
+
+- S2 molecule-type and chemistry investigation, including mixed
+  alphabets, textual `n/a`, blank sequences, and structure-topic rows.
+- Later target extraction from sidecar `label` (not at S1).
+- Later interpretation of minimal-aptamer relationships, structure
+  metadata, and evidence flags.
+- CHECKPOINT-1 later. Global S4 later.
+
+### Pipeline status
+
+```text
+AptamerBase S0 complete
+AptamerBase S1 complete
+AptamerBase S2 has not started
+No AptamerBase record is authorised for global S4
+```
+
+## 2026-09-08 — AptamerBase source contract enriched with Freebase RDF metadata
+
+**Stage:** Aim 2 / data curation / AptamerBase supporting-source registration.
+This is not S2. AptamerBase S1 was not rerun. Global S4 was not started.
+
+### Why this was needed
+
+The frozen 14-column AptamerBase CSV is the sole 2128-row S1 spine, but it
+does not carry experimental RNA/DNA molecule typing. Alphabet inspection
+cannot supply that identity. The original authors' Freebase RDF extract
+does contain source-native type predicates and is therefore registered as
+supporting provenance for a later S2 join.
+
+### What was done
+
+- Validated the local gzip RDF already present under `data/raw/` (read-only;
+  not downloaded or rewritten).
+- Registered it as a second file of the same logical `source_dataset`
+  `aptamerbase_export_2026-06-24`, following the AptaDB multi-file pattern.
+- Extended generic S0 validation to stream `.nt.gz` files, hash the
+  compressed bytes, and count decompressed N-Triples physical statements
+  without writing an uncompressed copy.
+- Extended generic inventory inspection for `.nt.gz` as supporting RDF
+  metadata, not as additional aptamer records.
+- S1 now distinguishes files by basename: CSV remains the row spine;
+  RDF is supporting-only. S1 outputs were not regenerated.
+
+### Inputs used
+
+- CSV spine: `data/raw/aptamerbase/aptamerbase_aptamers.csv`
+  SHA-256 `40b329551b225a29ee2c656cf6b59b98ff686a981968b856685cdc7c222a784c`
+  (2128 rows; unchanged)
+- Supporting RDF: `data/raw/aptamerbase/aptamerbase.freebase.extract.nt.gz`
+  SHA-256 `3ab9340ee1fcb6a0910532a6e8d4cf5cc62579c3b21d85355c48d473e372006c`
+  (270507 decompressed N-Triples statements)
+- Upstream: `micheldumontier/aptamerbase@e7a3eb43d24504fd5a7b6c3e470ab242bc471b3a`
+
+### Decisions made
+
+- CSV remains the sole 2128-row generating spine.
+- RDF is supporting-only, joined later by Freebase ID; it does not create
+  additional corpus records.
+- Experimental molecule typing exists in the RDF and is reserved for S2.
+- S1 remains frozen (2128 canonical rows; 2128 sidecar rows).
+- Experiments/interactions remain deferred to global S4.
+
+### Numbers
+
+- Registered files: 14 before this milestone, 15 after
+- AptamerBase registry rows: 2 files, 1 `source_dataset`
+- S0 validated 15/15; existing AptaBase and ENA inventory-override warnings
+  only; no AptamerBase inventory discrepancy after refresh
+- Inventory substantive files: 203 previous → 206 current
+  - intentional new file: supporting RDF
+  - previously uninventoried local PDFs under `rbms_paper/` (2)
+  - unchanged: 203; modified: 0; removed: 0
+  - transient artefacts ignored on disk: 11
+- S1 canonical and sidecar hashes unchanged
+
+### Pipeline status
+
+```text
+AptamerBase CSV S0 registration complete.
+AptamerBase supporting RDF registration complete.
+AptamerBase S1 remains complete and frozen.
+AptamerBase S2 has not started.
+No AptamerBase record is authorised for global S4.
+```
+
+## 2026-09-08 — AptamerBase S2 RDF-supported sequence normalisation
+
+**Stage:** Aim 2 / data curation / AptamerBase S2.
+AptamerBase S3, CHECKPOINT-1, and global S4 were not started.
+
+### What was done
+
+Supporting RDF type statements were joined to the frozen S1 sidecar by
+Freebase ID and used as the source-native RNA/DNA identity. Shared
+display-level sequence normalisation, a closed chemistry allowlist, and
+known-motif detection (proposals only) were applied to every physical
+S1 row. No record was dropped, parked, or collapsed.
+
+### Decisions made
+
+- Experimental molecule type is RDF RNA/DNA typing, not the printed
+  alphabet. Sequence alphabet does not establish or erase molecule type.
+- Source-confirmed RNA printed in T is computationally transcribed to U
+  with `t_to_u_applied` provenance. RDF DNA printed in U remains ssDNA
+  with a contradiction flag and is not auto-repaired.
+- Unresolved source IDs remain `molecule_type=unknown` rather than
+  alphabet-inferred.
+- Secondary-structure and predicted-secondary-structure objects are
+  retained but not treated as aptamers (`molecule_type=unknown`,
+  `chemistry=unknown`), even if RDF also carries an incidental RNA type.
+- Chemistry is conservative. Only unmodified RNA/DNA backbones,
+  terminal/conjugate-only metadata, and a closed 2′-fluoro-pyrimidine
+  RNA class are assigned automatically. Spiegelmer/L-RNA keeps RDF RNA
+  identity but chemistry `unknown` with a review flag. Unusual
+  modifications are retained for review.
+- Group-wise constant-region inference is disabled. Known-motif
+  detections are S2 proposals only; no trim was applied
+  (`sequence_core == sequence_full`).
+- Target, interaction, publication, evidence, affinity, PDB, leakage,
+  filtering, dedup, clustering, CHECKPOINT-1, and global S4 remain
+  deferred. Every S1 row is retained.
+
+### Inputs used
+
+- Frozen S1 canonical:
+  `data/interim/extracted/aptamerbase_extracted.csv`
+  SHA-256 `0bb0282033ba0561b2c8d8de1358ae6e5a4e8fa47bfb640c56dc87b177552896`
+- Frozen S1 sidecar:
+  `data/interim/extracted/aptamerbase_source_metadata.csv`
+  SHA-256 `47a49f7495648bb11105a77eee9cbcfeabeb7b7b05f357dc433d3edb779f41b7`
+- CSV spine SHA-256
+  `40b329551b225a29ee2c656cf6b59b98ff686a981968b856685cdc7c222a784c`
+- Supporting RDF SHA-256
+  `3ab9340ee1fcb6a0910532a6e8d4cf5cc62579c3b21d85355c48d473e372006c`
+  (270507 N-Triples statements; 1868/1868 S1 Freebase IDs joined)
+
+### Outputs produced
+
+Ignored under `/data/`:
+
+- `data/interim/normalised/aptamerbase_normalised.csv` (2128 rows)
+- `data/interim/normalised/aptamerbase_s2_qc.csv`
+- `data/interim/normalised/aptamerbase_s2_review_candidates.csv`
+- `data/interim/normalised/detected_constants_aptamerbase.csv`
+- `data/interim/normalised/aptamerbase_s2_report.md`
+
+Tracked policy, S2 adapter, RDF helper, dispatcher registration, tests,
+and this log entry. Nothing under `data/` is tracked.
+
+### Numbers
+
+- Physical rows in/out: 2128 / 2128; unique `record_id`: 2128
+- Object grain: aptamer 2056; secondary-structure 69;
+  predicted-secondary-structure 3
+- Molecule type rows: RNA 980; ssDNA 896; unknown 252
+- Molecule type unique IDs: RNA 917; ssDNA 836; unknown 115
+- Missing after shared textual-null processing: 183
+- T→U applied: 122 (121 RNA × clean DNA_T; 1 RNA × ambiguous with T)
+- RDF DNA × U alphabet conflict: 15 rows / 15 IDs
+- Chemistry: RNA 855; DNA 892; 2F-RNA 105; unknown 276
+- Known-motif detections / proposals: 7; applied trims: 0
+- Deferred S4 fields empty on all rows
+
+### Pipeline status
+
+```text
+AptamerBase S0 complete.
+AptamerBase S1 complete and frozen.
+AptamerBase S2 complete.
+AptamerBase S3 has not started.
+CHECKPOINT-1 has not been generated.
+No AptamerBase record is authorised for global S4.
+```
+
+## 2026-09-08 — AptamerBase S3 technical eligibility and CHECKPOINT-1 preparation
+
+**Stage:** Aim 2 / data curation / AptamerBase S3 + CHECKPOINT-1 prepare.
+Human CHECKPOINT-1 decisions were not populated. Apply was not run.
+Global S4 was not prepared or started.
+
+### What was done
+
+Every physical S2 row received exactly one provisional primary route.
+RDF-flattened secondary-structure and predicted-secondary-structure
+objects were rejected as `non_aptamer_source_object`. Missing aptamer
+sequences were mechanically rejected. Technically surviving ssDNA was
+parked. RDF DNA × U alphabet contradictions remained ssDNA parks but
+entered CHECKPOINT-1. Aptamer-topic unresolved molecule rows were
+parked for review. Clean RNA and 2′-F-RNA were technically eligible.
+Unsupported RNA chemistry was parked for chemistry review. Mixed /
+ambiguous / invalid / gapped source notation was provisionally rejected
+but placed in active review. Known-motif proposals were not applied.
+A structured CHECKPOINT-1 package was written with blank human fields
+and fail-closed validation (`ready_for_application = 0`).
+
+### Decisions made
+
+- Structure-topic source objects are not biological aptamer records.
+  They do not require human review to establish that fact.
+- Missing sequence is a mechanical reject, not a park.
+- Judgement-dependent sequence syntax remains a proposed technical
+  reject, but AptamerBase notation may be recoverable so those rows
+  enter CHECKPOINT-1. Sequences are not auto-repaired. RDF molecule
+  type is not erased.
+- Length uses actual `len(sequence_core)`, 20–100 nt, with no
+  source-specific exception.
+- Length-boundary eyeballing (20–25 and 90–100) applies only to
+  proposed technical accepts, not ordinary ssDNA parks.
+- Ordinary clean ssDNA is parked and not reviewed. DNA×U conflicts
+  stay ssDNA (`t_to_u_applied=false`) with `needs_source_review`.
+- No U-only or T-only fallback for unknown molecule type.
+- Chemistry does not replace molecule identity. Eligible RNA chemistry
+  is RNA or 2F-RNA. Spiegelmer/L-RNA is not ordinary RNA chemistry.
+- Known motifs remain unapplied. Group-wise constant inference stays
+  disabled. Unresolved construct blocks eligibility.
+- Target, interactions, evidence, affinity, PDB, leakage, dedup,
+  clustering, and global S4 remain deferred. `target_name_raw` stays
+  empty by design.
+
+### Inputs used
+
+- S2 canonical SHA-256
+  `69bcfb97592255bc0d70727991bd68d7bf5dc18f1c47db532b182461ba6d81f8`
+- Frozen S1 canonical SHA-256
+  `0bb0282033ba0561b2c8d8de1358ae6e5a4e8fa47bfb640c56dc87b177552896`
+- Frozen S1 sidecar SHA-256
+  `47a49f7495648bb11105a77eee9cbcfeabeb7b7b05f357dc433d3edb779f41b7`
+- CSV spine SHA-256
+  `40b329551b225a29ee2c656cf6b59b98ff686a981968b856685cdc7c222a784c`
+- Supporting RDF SHA-256
+  `3ab9340ee1fcb6a0910532a6e8d4cf5cc62579c3b21d85355c48d473e372006c`
+
+Raw, S1, and S2 hashes were unchanged. S3 canonical is byte-identical
+to S2. Applied trims remain 0.
+
+### Outputs produced
+
+Ignored under `/data/`:
+
+- `data/interim/checkpoints/aptamerbase_cp1/aptamerbase_s3_canonical.csv`
+- `data/interim/checkpoints/aptamerbase_cp1/aptamerbase_s3_decisions.csv`
+- `data/interim/checkpoints/aptamerbase_cp1/rejected_aptamerbase.csv`
+- parked ssDNA / molecule / chemistry / construct sidecars
+- CHECKPOINT-1 review, local-detail, reason-counts, and summary
+- `data/interim/checkpoints/aptamerbase_cp1/manual_review/`
+
+Tracked eligibility policy, checkpoint recommendation/metadata JSON,
+S3 and CHECKPOINT adapters, dispatcher wiring, tests, plan vocabulary,
+and this log entry. Nothing under `data/` is tracked.
+
+### Numbers
+
+- Physical rows: 2128 / 2128; unique `record_id`: 2128
+- Object grain unchanged: aptamer 2056; secondary-structure 69;
+  predicted-secondary-structure 3
+- Primary routes: technical/source reject 407; parked ssDNA 817;
+  parked molecule unknown 70; parked chemistry review 16;
+  parked unresolved construct 6; technically eligible 812
+- Eligible chemistry split: RNA 712; 2F-RNA 100
+- Non-aptamer source objects: 72 (primary)
+- Missing-sequence condition: 183 (71 structure / 112 aptamer-topic)
+- RDF DNA × U conflicts in CHECKPOINT-1: 15; still ssDNA
+- Known-motif proposals: 7; applied trims: 0
+- Active CHECKPOINT-1 records: 291; human decisions: 0;
+  `ready_for_application = 0`
+- Random-kept audit: 30 from pool 720; shortfall 0
+
+### Pipeline status
+
+```text
+AptamerBase S0 complete.
+AptamerBase S1 complete and frozen.
+AptamerBase S2 complete.
+AptamerBase S3 technical classification complete.
+AptamerBase CHECKPOINT-1 prepared with human decisions blank.
+No AptamerBase record is authorised for global S4.
+Global S4 has not been run.
+```
+
+## 2026-09-08 — AptamerBase CHECKPOINT-1 decision-support audit (Milestone 4A)
+
+**Stage:** Aim 2 / data curation / AptamerBase CHECKPOINT-1 decision-support
+audit and audit-only bulk-confirmation preparation.
+Human CHECKPOINT-1 decisions were not entered. CHECKPOINT-1 is not
+closed. Apply was not run. AptamerBase is not authorised for global S4.
+Global S4 was not run. S2/S3 scientific routes were not altered.
+
+### What was done
+
+The AptaDB/AptaIndex bulk-audit architecture was reused for AptamerBase:
+122 length-boundary / random-kept rows are `bulk_audit_eligible=true` with
+machine recommendation `keep_current_route`. A blank bulk-confirmation
+artefact was emitted. Confirm remains empty. The validator is fail-closed.
+
+A decision-support audit was added under ignored
+`data/interim/checkpoints/aptamerbase_cp1/manual_review/audit/`. Freebase-ID
+grouping is review support only: physical rows and `record_id` values are
+unchanged. PMID-like label prefixes are audit-only bibliographic hints.
+Canonical `pubmed_id` / `target_name_raw` were not populated.
+
+### Integrity
+
+- Raw CSV SHA-256
+  `40b329551b225a29ee2c656cf6b59b98ff686a981968b856685cdc7c222a784c`
+- Supporting RDF SHA-256
+  `3ab9340ee1fcb6a0910532a6e8d4cf5cc62579c3b21d85355c48d473e372006c`
+- Frozen S1 canonical SHA-256
+  `0bb0282033ba0561b2c8d8de1358ae6e5a4e8fa47bfb640c56dc87b177552896`
+- Frozen S1 sidecar SHA-256
+  `47a49f7495648bb11105a77eee9cbcfeabeb7b7b05f357dc433d3edb779f41b7`
+- S2 canonical SHA-256
+  `69bcfb97592255bc0d70727991bd68d7bf5dc18f1c47db532b182461ba6d81f8`
+- S2 QC SHA-256
+  `58e895c8e63fac7c14e8b094da9f6276083902d091020dd4e5abf1da2b67b1fd`
+- S3 canonical SHA-256 (byte-identical to S2)
+  `69bcfb97592255bc0d70727991bd68d7bf5dc18f1c47db532b182461ba6d81f8`
+- S3 decisions SHA-256
+  `f76127b32e930981e40a1ee15bbd08083fc798c9d0215f33b89c0c8ef026e866`
+- CHECKPOINT-1 review SHA-256
+  `1423f852cbe1b9eb194acef929f581ce7dddc6a9a4ed564404b26b43dba7dc61`
+- CHECKPOINT-1 local-detail SHA-256
+  `e16dba912e37453baad35ea6d3cad4ba32cb5104be45d5e0a3de1eb4fb4b0ecb`
+
+Human decision fields remain blank. `ready_for_application = 0`.
+
+### Workload
+
+- Active CHECKPOINT-1 records: 291
+- Judgement-required physical rows: 169 → 151 unique Freebase source-ID
+  review units
+- Audit-only: 122 (92 length-boundary + 30 frozen random-kept, seed 42)
+- Safe scientifically identical multi-record Freebase groups: 19
+  (0 unsafe). Thirteen of those groups are among the 169 judgement rows.
+
+### Fail-closed validation
+
+```text
+unresolved_judgement_required=169
+audit_only_rows=122
+audit_only_unconfirmed=122
+bulk_audit_confirmed=false
+ready_for_application=0
+checkpoint_closed=false
+```
+
+### Pipeline status
+
+```text
+AptamerBase CHECKPOINT-1 decision-support audit complete.
+Human decisions remain blank.
+CHECKPOINT-1 remains open and unapplied.
+No AptamerBase record is authorised for global S4.
+Global S4 has not been run.
+```
+
+## 2026-09-09 — AptamerBase CHECKPOINT-1 human review entered and dry-run
+
+Laura approved the 169 judgement-required CHECKPOINT-1 decisions
+(119 edit / 50 drop / 0 keep). The 122 audit-only rows (92
+length-boundary + 30 frozen random-kept) were bulk-confirmed
+(`confirm=true`); individual audit `manual_decision` fields remain
+blank. Fail-closed validation: `ready_for_application=291`, zero
+blockers.
+
+Notation: 50 unrecoverable/malformed/Spiegelmer rows were dropped;
+11 source-supported sequence repairs were edited (2 biotin display
+tokens retained as ssDNA; 9 publication-supported T→U RNA
+corrections, of which five 4'-thioRNA cases remain chemistry-parked).
+Fifteen RDF DNA × U conflicts were overridden to RNA (14 eligible;
+1152 chemistry-parked as 4'-thioRNA). Seventy molecule-unknown rows
+were resolved from publication groups (39 ssDNA/DNA parked; 31 RNA,
+including one cationic-uridine chemistry park). Sixteen primary
+chemistry parks were edited (2 pentynyl-dU → ssDNA park; 7 × 2F-RNA;
+2 × 2NH2-RNA; 5 × mixed). Seven known-motif T7 5′-17 nt trims were
+approved (0922 length reject → eligible; six construct parks →
+eligible). No 2OMe-RNA records were present in this reviewed set.
+
+AptamerBase S3/apply now treats reviewed `2NH2-RNA`, `2OMe-RNA`, and
+`mixed` as technically eligible for this source only. Reviewed
+`unknown` chemistry is not inferred back to RNA.
+
+A production dry-run was run twice against the completed review
+(`55000f2ea3cf51e5236c4ba9e44bc2e73d87050cc9c0d1c0e7afe5d995098ae1`)
+and was byte-identical. Sequence-free local report:
+
+`data/interim/checkpoints/aptamerbase_cp1/dry_run/aptamerbase_checkpoint1_dry_run_report.md`
+
+SHA-256:
+`f589fd95317b33266e5b63e465c59e3b11aaa727bd0a5f707474b3c9695bc3af`
+
+Projected post-review 2128-row reconciliation:
+
+`881` technically eligible + `845` parked ssDNA + `0` molecule-unresolved
++ `7` chemistry-review + `0` construct + `395` technical rejects
+= `2128`.
+
+Chemistry parks remain 0410 / 0473 / 0474 / 1152 / 1160 / 1161 / 1162.
+S4 fields were not populated. Raw / S1 / S2 / S3 hashes were unchanged.
+
+Actual CHECKPOINT apply was **not** performed. No tracked resolutions
+or closure metadata were written. CHECKPOINT-1 remains open and
+unapplied. No AptamerBase record is authorised for global S4. Global
+S4 was not run.
+
+### Pipeline stop
+
+```text
+AptamerBase CHECKPOINT-1 human review is complete.
+AptamerBase CHECKPOINT-1 dry-run is complete.
+Actual CHECKPOINT-1 apply has NOT been run.
+CHECKPOINT-1 remains open and unapplied.
+No AptamerBase record is yet authorised for global S4.
+Global S4 has not been run.
+```
+
+## 2026-09-09 — AptamerBase CHECKPOINT-1 applied and closed
+
+Laura authorised actual CHECKPOINT-1 application after accepting the
+completed review and production dry-run. The shared AptamerBase apply
+adapter consumed the frozen completed review through the same
+transformation used by the accepted dry-run. CHECKPOINT-1 is closed.
+Global S4 was not started. No global-S4 handoff was prepared.
+
+`authorised_for_s4=true` means technical eligibility only: the source
+object is an aptamer, sequence/molecule/chemistry/construct review is
+complete, and the record may enter a future corpus-wide global S4. It
+does not mean target identified, target canonicalised, protein target
+confirmed, UniProt resolved, evidence scored, affinity resolved, PDB
+resolved, leakage cleared, final corpus included, deduplicated,
+clustered, balanced, or partitioned.
+
+### Numbers
+
+- Source rows retained through checkpoint: 2128
+- 169 judgement decisions applied (119 edit / 50 drop / 0 keep)
+- 122 audit-only records bulk-confirmed with `keep_current_route`
+- 50 manual drops
+- 11 reviewed sequence corrections; 106 molecule/chemistry overrides
+- Molecule resolution removed all unresolved-molecule primary parks
+- ssDNA parked (845)
+- Supported modified RNA chemistries retained (2F-RNA, 2NH2-RNA, mixed)
+- Seven chemistry-unknown modified RNA cases remain parked
+- Seven T7 5′-17 nt known-motif trims applied once
+- Final technically eligible: 881
+- `authorised_for_s4`: 881
+
+Reconciliation: 395 technical/source reject + 845 parked ssDNA + 0
+molecule park + 7 chemistry park + 0 construct park + 881 technically
+eligible = 2128.
+
+Dry-run/apply parity: 10/10 corresponding CSV payloads byte-identical;
+semantic mismatches = 0. Deterministic verification rerun passed.
+Tracked resolutions/metadata contain no biological sequences.
+
+### Pipeline stop
+
+```text
+AptamerBase S0 complete.
+AptamerBase S1 complete and frozen.
+AptamerBase S2 complete.
+AptamerBase S3 complete.
+AptamerBase CHECKPOINT-1 applied and closed.
+881 AptamerBase records are technically authorised for future global S4.
+AptamerBase global-S4 handoff has NOT been prepared.
+Global S4 has not been run.
+```
+
+## 2026-09-09 — AptamerBase prepared for future global S4
+
+AptamerBase S1–S3 are complete and CHECKPOINT-1 is closed. The 881
+CHECKPOINT-authorised records were materialised from the authoritative
+applied checkpoint state as one future corpus-wide global S4 input.
+Global S4 was not run. Target normalisation, evidence scoring, leakage
+exclusion, and deduplication were not performed.
+
+`authorised_for_s4=true` / inclusion in this handoff means only
+technically eligible after AptamerBase sequence/molecule/chemistry/construct
+review. It does not mean target identified, target canonicalised, protein
+target confirmed, UniProt resolved, evidence scored, affinity resolved,
+PDB resolved, leakage cleared, final corpus included, deduplicated,
+clustered, balanced, or partitioned.
+
+Handoff denominator: 881 authorised physical records, 881 unique
+`record_id`, 881 handoff rows. Unique Freebase IDs = 827; 32 duplicated
+Freebase-ID groups covering 86 rows (diagnostic only — physical rows were
+not collapsed). Exact sequence-duplicate diagnostic: 40 duplicate
+`sequence_full` values across 109 records; same for `sequence_core`.
+Minimal-aptamer relations retained as source metadata: 84 nonempty
+`has_minimal_aptamer` and 84 nonempty `is_minimal_aptamer_of`.
+
+Canonical `target_name_raw` remains empty. `aptamerbase_label` is sidecar
+source metadata only and was not copied into `target_name_raw`. The
+Freebase ID (`aptamerbase_id`) is nonempty on every authorised row and is
+preserved as the future source-metadata join key
+(`record_id` → S1 sidecar Freebase ID → interaction/experiment graph).
+Original interaction/experiment companion tables are not registered;
+they remain a prerequisite for actual global S4 target/evidence
+enrichment.
+
+Derived authorised-lane technical state: molecule_type RNA = 881;
+chemistry RNA = 758, 2F-RNA = 112, 2NH2-RNA = 6, mixed = 5; ssDNA = 0;
+molecule unknown = 0; chemistry unknown = 0; source_object_type aptamer
+= 881; reviewed T7 trims = 7 (0922 core 89; 1738–1741 core 81; 1935 core
+65; 1955 core 58). No additional trims were applied. T-transcribed
+records = 119.
+
+SOURCE METADATA ONLY — NOT CANONICAL TARGET/EVIDENCE DECISIONS:
+nonempty labels = 881; has_experimentally_determined_structure=true =
+125; RDF RNA flag true = 837; RDF DNA flag true = 14; RDF
+modified_nucleic_acid flag true = 127. Structure booleans were not
+mapped to E1/PDB.
+
+Tracked: `config/global_s4_sources/aptamerbase.json`,
+`docs/data_curation/aptamerbase_global_s4_handoff.md`, a reusable
+extension of `prepare_global_s4_source.py` for additional source-metadata
+joins / required Freebase IDs / derived summary counts, and tests.
+Ignored: `aptamerbase_global_s4_input.csv` (881 rows) and the
+sequence-free handoff summary. Deterministic rerun was byte-identical.
+Raw / RDF / S1 / sidecar / S2 / pre-review S3 / completed review /
+CHECKPOINT closure / applied hashes were unchanged. `git ls-files data`
+remains empty.
+
+### Pipeline status
+
+```text
+AptamerBase S0 complete.
+AptamerBase S1 complete and frozen.
+AptamerBase S2 complete.
+AptamerBase S3 complete.
+AptamerBase CHECKPOINT-1 applied and closed.
+AptamerBase future global-S4 handoff prepared for 881 records.
+AptamerBase target/evidence enrichment has NOT been run.
+Global S4 has not been run.
+```
+

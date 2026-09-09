@@ -26,7 +26,7 @@ from adapters.aptadb_checkpoint1_review import (  # noqa: E402
 )
 from s0_build_registry import find_repo_root  # noqa: E402
 
-SUPPORTED_SOURCES = ("aptadb", "riboaptamer", "aptaindex", "ena")
+SUPPORTED_SOURCES = ("aptadb", "riboaptamer", "aptaindex", "ena", "aptamerbase")
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -36,7 +36,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptadb, riboaptamer, aptaindex, or ena)",
+        help="Source key (aptadb, riboaptamer, aptaindex, ena, or aptamerbase)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -87,6 +87,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         bulk_name = "ena_checkpoint1_bulk_audit_confirmation.csv"
         exception_name = "ena_checkpoint1_constant_exceptions.csv"
         reconciliation_name = "ena_checkpoint1_legacy_collapse_reconciliation.csv"
+    elif args.source == "aptamerbase":
+        default_checkpoint = Path("data/interim/checkpoints/aptamerbase_cp1")
+        queue_name = "aptamerbase_checkpoint1_manual_review.csv"
+        group_name = "aptamerbase_checkpoint1_constant_group_review.csv"
+        bulk_name = "aptamerbase_checkpoint1_bulk_audit_confirmation.csv"
     else:
         default_checkpoint = Path("data/interim/checkpoints/aptadb_cp1")
         queue_name = "aptadb_checkpoint1_manual_review.csv"
@@ -158,9 +163,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"source={args.source}\n"
         f"total_review_records={report.total_review_records}\n"
         f"unresolved_manual_decisions={report.unresolved_manual_decisions}\n"
+        f"unresolved_judgement_required={getattr(report, 'unresolved_judgement_required', 0)}\n"
         f"unresolved_constant_groups={report.unresolved_constant_groups}\n"
         f"unresolved_exceptions={report.unresolved_exceptions}\n"
+        f"audit_only_rows={getattr(report, 'audit_only_rows', 0)}\n"
         f"audit_only_unconfirmed={report.audit_only_unconfirmed}\n"
+        f"bulk_audit_confirmed={str(getattr(report, 'bulk_audit_confirmed', False)).lower()}\n"
         f"ready_for_application={report.ready_for_application}\n"
         f"blocking_issues={len(report.blocking_issues)}"
     )

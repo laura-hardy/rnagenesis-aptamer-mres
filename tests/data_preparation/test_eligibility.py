@@ -195,6 +195,66 @@ def test_load_aptaindex_eligibility_policy() -> None:
     assert "non_protein_target_parked" not in policy.decision_precedence
 
 
+def test_load_aptamerbase_eligibility_policy() -> None:
+    policy = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "aptamerbase.json"
+    )
+    assert policy.source_key == "aptamerbase"
+    assert policy.defer_target_classification is True
+    assert policy.defer_evidence_scoring is True
+    assert policy.defer_leakage_exclusion is True
+    assert policy.sequence_leakage_matching_enabled is False
+    assert policy.use_plan_reason_vocabulary is True
+    assert policy.unresolved_trim_blocks_eligibility is True
+    assert policy.random_accept_audit_size == 30
+    assert policy.random_seed == 42
+    assert policy.ssdna_decision == "proposed_park"
+    assert policy.unknown_molecule_decision == "proposed_park"
+    assert policy.chemistry_review_decision == "proposed_park"
+    assert policy.non_aptamer_source_object_decision == "proposed_reject"
+    assert policy.decision_precedence[0] == "non_aptamer_source_object"
+    assert policy.decision_precedence[1] == "missing_sequence"
+    assert "chemistry_requires_review" in policy.decision_precedence
+    assert "trim_construct_unresolved" in policy.decision_precedence
+    assert "ssdna_parked" in policy.decision_precedence
+    assert policy.active_review_batches[0] == "01_sequence_or_source_conflict"
+
+
+def test_non_aptamer_source_object_is_closed_reason_without_changing_completed_sources() -> None:
+    assert EligibilityReason.NON_APTAMER_SOURCE_OBJECT.value == (
+        "non_aptamer_source_object"
+    )
+    assert EligibilityReason.CHEMISTRY_REQUIRES_REVIEW.value == (
+        "chemistry_requires_review"
+    )
+    aptadb = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "aptadb.json"
+    )
+    ribo = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "riboaptamer.json"
+    )
+    utexas = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "utexas.json"
+    )
+    aptaindex = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "aptaindex.json"
+    )
+    ena = load_eligibility_policy(
+        REPO_ROOT / "config" / "source_eligibility" / "ena.json"
+    )
+    for policy in (aptadb, ribo, utexas, aptaindex, ena):
+        assert "non_aptamer_source_object" not in policy.decision_precedence
+        assert policy.non_aptamer_source_object_decision == "proposed_reject"
+        assert "chemistry_requires_review" not in policy.decision_precedence
+        assert policy.chemistry_review_decision == "proposed_park"
+    plan = REPO_ROOT / "docs" / "data_curation" / "rna_aptamer_corpus_curation_plan.md"
+    plan_text = plan.read_text(encoding="utf-8")
+    vocab_start = plan_text.index("**Rejection reason vocabulary (closed set):**")
+    vocab_block = plan_text[vocab_start : vocab_start + 1200]
+    assert "`non_aptamer_source_object`" in vocab_block
+    assert "explicitly typed metadata/structure object" in vocab_block
+
+
 def test_non_nucleic_acid_molecule_is_closed_reason_without_changing_completed_sources() -> None:
     assert EligibilityReason.NON_NUCLEIC_ACID_MOLECULE.value == (
         "non_nucleic_acid_molecule"

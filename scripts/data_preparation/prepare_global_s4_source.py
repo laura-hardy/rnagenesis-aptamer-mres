@@ -86,8 +86,16 @@ SEQUENCE_BEARING_HANDOFF_EXTRAS: frozenset[str] = frozenset(
         "sequence_core",
         "aptamer_sequence",
         "riboaptamer_sequence",
+        "aptamerbase_sequence",
         "sequence",
     }
+)
+
+VALUE_COUNT_KEY_PREFIX = "vc:"
+SOURCE_METADATA_COUNT_PREFIXES: tuple[str, ...] = (
+    "unique_",
+    "nonempty_",
+    "true_",
 )
 
 
@@ -362,6 +370,16 @@ def _assert_exact_subset_fields(
                 )
 
 
+@dataclass(frozen=True)
+class MetadataJoinSpec:
+    """One source-metadata CSV joined onto handoff rows by record_id."""
+
+    path: Path
+    fields: tuple[str, ...]
+    aliases: Mapping[str, str]
+    label: str
+
+
 def _sidecar_metadata_path(
     repo_root: Path, config: Mapping[str, Any]
 ) -> Path | None:
@@ -381,55 +399,158 @@ def _sidecar_metadata_path(
     return _resolve_under_repo(repo_root, sidecar_rel)
 
 
-def _parse_extra_field_aliases(config: Mapping[str, Any]) -> dict[str, str]:
-    raw = config.get("handoff_extra_field_aliases")
+def _parse_string_list(raw: Any, *, label: str) -> list[str]:
+    if raw in (None, [], ()):
+        return []
+    if not isinstance(raw, list) or not all(
+        isinstance(item, str) and item.strip() for item in raw
+    ):
+        raise GlobalS4HandoffError(f"{label} must be a list of nonempty strings")
+    return [item.strip() for item in raw]
+
+
+def _parse_alias_map(raw: Any, *, label: str) -> dict[str, str]:
     if raw in (None, {}):
         return {}
     if not isinstance(raw, dict):
         raise GlobalS4HandoffError(
-            "handoff_extra_field_aliases must be an object mapping sidecar "
-            "field names to output column names"
+            f"{label} must be an object mapping field names to output columns"
         )
     aliases: dict[str, str] = {}
     for key, value in raw.items():
         if not isinstance(key, str) or not key.strip():
-            raise GlobalS4HandoffError(
-                "handoff_extra_field_aliases keys must be nonempty strings"
-            )
+            raise GlobalS4HandoffError(f"{label} keys must be nonempty strings")
         if not isinstance(value, str) or not value.strip():
             raise GlobalS4HandoffError(
-                "handoff_extra_field_aliases values must be nonempty strings"
+                f"{label} values must be nonempty strings"
             )
         aliases[key.strip()] = value.strip()
     return aliases
+
+
+def _assert_repo_relative_path(value: str, *, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise GlobalS4HandoffError(f"{label} must be a nonempty string path")
+    if value.startswith("/") or (len(value) > 2 and value[1] == ":"):
+        raise GlobalS4HandoffError(f"{label} must be a repo-relative path")
+    return value.strip()
+
+
+def _parse_additional_metadata_joins(
+    repo_root: Path, config: Mapping[str, Any]
+) -> list[MetadataJoinSpec]:
+    raw = config.get("additional_source_metadata_joins")
+    if raw in (None, [], ()):
+        return []
+    if not isinstance(raw, list):
+        raise GlobalS4HandoffError(
+            "additional_source_metadata_joins must be a list of objects"
+        )
+    specs: list[MetadataJoinSpec] = []
+    for index, item in enumerate(raw, start=1):
+        if not isinstance(item, dict):
+            raise GlobalS4HandoffError(
+                f"additional_source_metadata_joins[{index}] must be an object"
+            )
+        path_rel = _assert_repo_relative_path(
+            str(item.get("path") or ""),
+            label=f"additional_source_metadata_joins[{index}].path",
+        )
+        fields = tuple(
+            _parse_string_list(
+                item.get("fields"),
+                label=f"additional_source_metadata_joins[{index}].fields",
+            )
+        )
+        if not fields:
+            raise GlobalS4HandoffError(
+                f"additional_source_metadata_joins[{index}].fields must be nonempty"
+            )
+        aliases = _parse_alias_map(
+            item.get("aliases"),
+            label=f"additional_source_metadata_joins[{index}].aliases",
+        )
+        specs.append(
+            MetadataJoinSpec(
+                path=_resolve_under_repo(repo_root, path_rel),
+                fields=fields,
+                aliases=aliases,
+                label=f"additional source-metadata join {index}",
+            )
+        )
+    return specs
+
+
+def _all_metadata_join_specs(
+    repo_root: Path, config: Mapping[str, Any]
+) -> list[MetadataJoinSpec]:
+    specs: list[MetadataJoinSpec] = []
+    extra_fields = _parse_string_list(
+        config.get("handoff_extra_fields"), label="handoff_extra_fields"
+    )
+    if extra_fields:
+        sidecar_path = _sidecar_metadata_path(repo_root, config)
+        if sidecar_path is None:
+            raise GlobalS4HandoffError(
+                "handoff_extra_fields requires source_metadata_path"
+            )
+        specs.append(
+            MetadataJoinSpec(
+                path=sidecar_path,
+                fields=tuple(extra_fields),
+                aliases=_parse_extra_field_aliases(config),
+                label="source-metadata sidecar",
+            )
+        )
+    specs.extend(_parse_additional_metadata_joins(repo_root, config))
+    return specs
+
+
+def _watched_metadata_paths(repo_root: Path, config: Mapping[str, Any]) -> list[Path]:
+    return [spec.path for spec in _all_metadata_join_specs(repo_root, config)]
+
+
+def _parse_extra_field_aliases(config: Mapping[str, Any]) -> dict[str, str]:
+    return _parse_alias_map(
+        config.get("handoff_extra_field_aliases"),
+        label="handoff_extra_field_aliases",
+    )
 
 
 def _extra_output_name(sidecar_field: str, aliases: Mapping[str, str]) -> str:
     return aliases.get(sidecar_field, sidecar_field)
 
 
-def _join_handoff_source_metadata(
-    *,
-    repo_root: Path,
-    config: Mapping[str, Any],
-    handoff_rows: list[dict[str, str]],
-) -> list[str]:
-    """Join configured sequence-safe source-metadata fields onto handoff rows."""
-    extra_raw = config.get("handoff_extra_fields")
-    if extra_raw in (None, [], ()):
-        return []
-    if not isinstance(extra_raw, list) or not all(
-        isinstance(item, str) and item.strip() for item in extra_raw
-    ):
+def _index_metadata_rows(
+    path: Path, *, label: str
+) -> dict[str, dict[str, str]]:
+    if not path.is_file():
         raise GlobalS4HandoffError(
-            "handoff_extra_fields must be a list of nonempty strings"
+            f"Missing source-metadata sidecar for handoff: {path.name}"
         )
-    extra_fields = [item.strip() for item in extra_raw]
-    aliases = _parse_extra_field_aliases(config)
+    rows = _read_csv(path, label=label)
+    by_id: dict[str, dict[str, str]] = {}
+    for row in rows:
+        record_id = (row.get("record_id") or "").strip()
+        if not record_id:
+            raise GlobalS4HandoffError(f"{label} row has blank record_id")
+        if record_id in by_id:
+            raise GlobalS4HandoffError(
+                f"{label} contains duplicate record_id={record_id!r}"
+            )
+        by_id[record_id] = row
+    return by_id
+
+
+def _join_one_metadata_spec(
+    *,
+    spec: MetadataJoinSpec,
+    handoff_rows: list[dict[str, str]],
+    seen_output: set[str],
+) -> list[str]:
     output_columns: list[str] = []
-    seen_output: set[str] = set()
-    for sidecar_field in extra_fields:
-        output_name = _extra_output_name(sidecar_field, aliases)
+    for sidecar_field in spec.fields:
+        output_name = _extra_output_name(sidecar_field, spec.aliases)
         if sidecar_field in SEQUENCE_BEARING_HANDOFF_EXTRAS or (
             output_name in SEQUENCE_BEARING_HANDOFF_EXTRAS
         ):
@@ -448,43 +569,74 @@ def _join_handoff_source_metadata(
             )
         seen_output.add(output_name)
         output_columns.append(output_name)
-    sidecar_path = _sidecar_metadata_path(repo_root, config)
-    if sidecar_path is None:
-        raise GlobalS4HandoffError(
-            "handoff_extra_fields requires source_metadata_path"
-        )
-    if not sidecar_path.is_file():
-        raise GlobalS4HandoffError(
-            f"Missing source-metadata sidecar for handoff: {sidecar_path.name}"
-        )
-    sidecar_rows = _read_csv(sidecar_path, label="source-metadata sidecar")
-    sidecar_by_id: dict[str, dict[str, str]] = {}
-    for row in sidecar_rows:
-        record_id = (row.get("record_id") or "").strip()
-        if not record_id:
-            raise GlobalS4HandoffError(
-                "source-metadata sidecar row has blank record_id"
-            )
-        if record_id in sidecar_by_id:
-            raise GlobalS4HandoffError(
-                f"Source-metadata sidecar contains duplicate record_id={record_id!r}"
-            )
-        sidecar_by_id[record_id] = row
+    by_id = _index_metadata_rows(spec.path, label=spec.label)
     for row in handoff_rows:
         record_id = row["record_id"]
-        if record_id not in sidecar_by_id:
+        if record_id not in by_id:
             raise GlobalS4HandoffError(
                 f"Authorised handoff record missing from source metadata: {record_id}"
             )
-        meta = sidecar_by_id[record_id]
-        for sidecar_field in extra_fields:
+        meta = by_id[record_id]
+        for sidecar_field in spec.fields:
             if sidecar_field not in meta:
                 raise GlobalS4HandoffError(
-                    f"Source-metadata sidecar missing handoff field {sidecar_field!r}"
+                    f"{spec.label} missing handoff field {sidecar_field!r}"
                 )
-            output_name = _extra_output_name(sidecar_field, aliases)
+            output_name = _extra_output_name(sidecar_field, spec.aliases)
             row[output_name] = meta.get(sidecar_field) or ""
     return output_columns
+
+
+def _join_handoff_source_metadata(
+    *,
+    repo_root: Path,
+    config: Mapping[str, Any],
+    handoff_rows: list[dict[str, str]],
+) -> list[str]:
+    """Join configured sequence-safe source-metadata fields onto handoff rows."""
+    join_key = str(config.get("physical_row_join_key") or "record_id").strip()
+    if join_key != "record_id":
+        raise GlobalS4HandoffError("physical_row_join_key must be record_id")
+    specs = _all_metadata_join_specs(repo_root, config)
+    if not specs:
+        return []
+    output_columns: list[str] = []
+    seen_output: set[str] = set()
+    for spec in specs:
+        output_columns.extend(
+            _join_one_metadata_spec(
+                spec=spec,
+                handoff_rows=handoff_rows,
+                seen_output=seen_output,
+            )
+        )
+    return output_columns
+
+
+def _assert_required_nonempty_fields(
+    rows: Sequence[Mapping[str, str]],
+    fields: Sequence[str],
+) -> None:
+    for field_name in fields:
+        for row in rows:
+            if not (row.get(field_name) or "").strip():
+                raise GlobalS4HandoffError(
+                    f"Handoff field {field_name!r} is required and nonempty; "
+                    f"blank on {row.get('record_id')!r}"
+                )
+
+
+def _assert_required_empty_fields(
+    rows: Sequence[Mapping[str, str]],
+    fields: Sequence[str],
+) -> None:
+    for field_name in fields:
+        for row in rows:
+            if (row.get(field_name) or "").strip():
+                raise GlobalS4HandoffError(
+                    f"Canonical field {field_name!r} must remain empty on "
+                    f"handoff for {row.get('record_id')!r}"
+                )
 
 
 def _provenance_counts(
@@ -548,7 +700,82 @@ def _provenance_counts(
         counts["duplicate_sequence_full_records"] = sum(dup_full.values())
         counts["duplicate_sequence_core_values"] = len(dup_core)
         counts["duplicate_sequence_core_records"] = sum(dup_core.values())
+    unique_fields = _parse_string_list(
+        spec.get("unique_count_fields"), label="unique_count_fields"
+    )
+    for field_name in unique_fields:
+        values = {
+            (row.get(field_name) or "").strip()
+            for row in handoff_rows
+            if (row.get(field_name) or "").strip()
+        }
+        counts[f"unique_{field_name}"] = len(values)
+    duplicate_fields = _parse_string_list(
+        spec.get("duplicate_group_fields"), label="duplicate_group_fields"
+    )
+    for field_name in duplicate_fields:
+        tallies: dict[str, int] = {}
+        for row in handoff_rows:
+            value = (row.get(field_name) or "").strip()
+            if not value:
+                continue
+            tallies[value] = tallies.get(value, 0) + 1
+        dup = {value: n for value, n in tallies.items() if n > 1}
+        counts[f"duplicate_{field_name}_groups"] = len(dup)
+        counts[f"duplicate_{field_name}_rows"] = sum(dup.values())
+    nonempty_fields = _parse_string_list(
+        spec.get("nonempty_count_fields"), label="nonempty_count_fields"
+    )
+    for field_name in nonempty_fields:
+        counts[f"nonempty_{field_name}"] = sum(
+            1
+            for row in handoff_rows
+            if (row.get(field_name) or "").strip()
+        )
+    true_fields = _parse_string_list(
+        spec.get("true_value_count_fields"), label="true_value_count_fields"
+    )
+    for field_name in true_fields:
+        counts[f"true_{field_name}"] = sum(
+            1
+            for row in handoff_rows
+            if (row.get(field_name) or "").strip() == "true"
+        )
+    value_fields = _parse_string_list(
+        spec.get("value_count_fields"), label="value_count_fields"
+    )
+    for field_name in value_fields:
+        field_tallies: dict[str, int] = {}
+        for row in handoff_rows:
+            value = (row.get(field_name) or "").strip() or "(blank)"
+            field_tallies[value] = field_tallies.get(value, 0) + 1
+        for value, n in sorted(field_tallies.items()):
+            counts[f"{VALUE_COUNT_KEY_PREFIX}{field_name}:{value}"] = n
     return counts
+
+
+def _is_source_metadata_count_key(key: str) -> bool:
+    if key.startswith("duplicate_sequence_"):
+        return False
+    if key.startswith(SOURCE_METADATA_COUNT_PREFIXES):
+        return True
+    return key.startswith("duplicate_")
+
+
+def _source_metadata_count_label(key: str) -> str:
+    if key.startswith("unique_"):
+        return f"unique {key[len('unique_'):].replace('_', ' ')}"
+    if key.startswith("nonempty_"):
+        return f"nonempty {key[len('nonempty_'):].replace('_', ' ')}"
+    if key.startswith("true_"):
+        return f"true {key[len('true_'):].replace('_', ' ')}"
+    if key.startswith("duplicate_") and key.endswith("_groups"):
+        field = key[len("duplicate_") : -len("_groups")]
+        return f"duplicated {field.replace('_', ' ')} groups"
+    if key.startswith("duplicate_") and key.endswith("_rows"):
+        field = key[len("duplicate_") : -len("_rows")]
+        return f"rows in duplicated {field.replace('_', ' ')} groups"
+    return key.replace("_", " ")
 
 
 def build_handoff_summary(
@@ -581,31 +808,88 @@ def build_handoff_summary(
         lines.extend(["", "## Observed source target_general categories", ""])
         for key, count in stats.category_observations.items():
             lines.append(f"- `{key}` = `{count}`")
-    if provenance_counts:
+    provenance = dict(provenance_counts or {})
+    custom_labels_raw = config.get("handoff_summary_count_labels")
+    custom_labels = (
+        custom_labels_raw if isinstance(custom_labels_raw, dict) else {}
+    )
+    labels = {
+        "materialised_singletons": "materialised singletons",
+        "source_nonblank_family_rows": "source-nonblank family rows",
+        "distinct_primary_experiment_groups": (
+            "distinct primary experiment groups"
+        ),
+        "trim_status_matches": "reviewed trimmed records",
+        "t_to_u_applied": "T-transcribed records",
+        "duplicate_sequence_full_values": "duplicate sequence_full values",
+        "duplicate_sequence_full_records": (
+            "records sharing a duplicate sequence_full"
+        ),
+        "duplicate_sequence_core_values": "duplicate sequence_core values",
+        "duplicate_sequence_core_records": (
+            "records sharing a duplicate sequence_core"
+        ),
+    }
+    for key, value in custom_labels.items():
+        if isinstance(key, str) and isinstance(value, str) and value.strip():
+            labels[key] = value.strip()
+    core_counts = {
+        key: count
+        for key, count in provenance.items()
+        if not key.startswith(VALUE_COUNT_KEY_PREFIX)
+        and not _is_source_metadata_count_key(key)
+    }
+    if core_counts:
         lines.extend(["", "## Authorised-lane provenance counts", ""])
-        labels = {
-            "materialised_singletons": "materialised singletons",
-            "source_nonblank_family_rows": "source-nonblank family rows",
-            "distinct_primary_experiment_groups": (
-                "distinct primary experiment groups"
-            ),
-            "trim_status_matches": "reviewed trimmed records",
-            "t_to_u_applied": "T-transcribed records",
-            "duplicate_sequence_full_values": "duplicate sequence_full values",
-            "duplicate_sequence_full_records": (
-                "records sharing a duplicate sequence_full"
-            ),
-            "duplicate_sequence_core_values": "duplicate sequence_core values",
-            "duplicate_sequence_core_records": (
-                "records sharing a duplicate sequence_core"
-            ),
-        }
-        for key, count in provenance_counts.items():
+        for key, count in core_counts.items():
             label = labels.get(key, key.replace("_", " "))
             lines.append(f"- {label} = `{count}`")
-        if "duplicate_sequence_full_values" in provenance_counts:
+        if "duplicate_sequence_full_values" in core_counts:
             lines.append(
                 "- diagnostic only — no deduplication performed"
+            )
+    technical_counts: dict[str, dict[str, int]] = {}
+    for key, count in provenance.items():
+        if not key.startswith(VALUE_COUNT_KEY_PREFIX):
+            continue
+        remainder = key[len(VALUE_COUNT_KEY_PREFIX) :]
+        field_name, _, value = remainder.partition(":")
+        if not field_name or not value:
+            continue
+        technical_counts.setdefault(field_name, {})[value] = count
+    if technical_counts:
+        lines.extend(["", "## Authorised-lane technical observations", ""])
+        for field_name, value_counts in technical_counts.items():
+            for value, count in value_counts.items():
+                lines.append(f"- `{field_name}` `{value}` = `{count}`")
+        lines.append("- derived from the authorised applied subset")
+    source_meta_counts = {
+        key: count
+        for key, count in provenance.items()
+        if _is_source_metadata_count_key(key)
+    }
+    if source_meta_counts or bool(
+        config.get("emit_source_metadata_only_disclaimer")
+    ):
+        lines.extend(
+            [
+                "",
+                "## SOURCE METADATA ONLY — NOT CANONICAL TARGET/EVIDENCE DECISIONS",
+                "",
+            ]
+        )
+        for key, count in source_meta_counts.items():
+            label = labels.get(key, _source_metadata_count_label(key))
+            lines.append(f"- {label} = `{count}`")
+        lines.append(
+            "- These are source metadata observations only. They are not "
+            "canonical target names, UniProt, PDB, evidence scores, or "
+            "deduplication decisions."
+        )
+        if "duplicate_aptamerbase_id_groups" in source_meta_counts:
+            lines.append(
+                "- duplicated Freebase IDs are diagnostic only — physical "
+                "rows were not collapsed"
             )
     lines.extend(
         [
@@ -628,7 +912,10 @@ def build_handoff_summary(
             lines.append(f"- {item}")
         lines.append("")
     extra_fields = config.get("handoff_extra_fields")
-    if isinstance(extra_fields, list) and extra_fields:
+    additional_joins = config.get("additional_source_metadata_joins")
+    has_primary_extras = isinstance(extra_fields, list) and extra_fields
+    has_additional = isinstance(additional_joins, list) and additional_joins
+    if has_primary_extras or has_additional:
         aliases = _parse_extra_field_aliases(config)
         lines.extend(
             [
@@ -636,18 +923,72 @@ def build_handoff_summary(
                 "",
             ]
         )
-        for field_name in extra_fields:
-            output_name = _extra_output_name(str(field_name), aliases)
-            if output_name != field_name:
-                lines.append(f"- `{field_name}` → `{output_name}`")
-            else:
-                lines.append(f"- `{field_name}`")
-        target_meta = config.get("target_metadata")
-        sidecar = ""
-        if isinstance(target_meta, dict):
-            sidecar = str(target_meta.get("source_metadata_path") or "")
-        if sidecar:
-            lines.append(f"- source-metadata linkage: `{sidecar}`")
+        if has_primary_extras:
+            for field_name in extra_fields:
+                output_name = _extra_output_name(str(field_name), aliases)
+                if output_name != field_name:
+                    lines.append(f"- `{field_name}` → `{output_name}`")
+                else:
+                    lines.append(f"- `{field_name}`")
+            target_meta = config.get("target_metadata")
+            sidecar = ""
+            if isinstance(target_meta, dict):
+                sidecar = str(target_meta.get("source_metadata_path") or "")
+            if sidecar:
+                lines.append(f"- source-metadata linkage: `{sidecar}`")
+        if has_additional:
+            for item in additional_joins:
+                if not isinstance(item, dict):
+                    continue
+                item_aliases = _parse_alias_map(
+                    item.get("aliases"), label="additional join aliases"
+                )
+                for field_name in item.get("fields") or []:
+                    if not isinstance(field_name, str):
+                        continue
+                    output_name = _extra_output_name(field_name, item_aliases)
+                    if output_name != field_name:
+                        lines.append(f"- `{field_name}` → `{output_name}`")
+                    else:
+                        lines.append(f"- `{field_name}`")
+                extra_path = str(item.get("path") or "").strip()
+                if extra_path:
+                    lines.append(
+                        f"- additional source-metadata linkage: `{extra_path}`"
+                    )
+        lines.append("")
+    enrichment = config.get("future_enrichment_join")
+    if isinstance(enrichment, dict) and enrichment:
+        lines.extend(["## Future source-metadata join key", ""])
+        join_path = str(enrichment.get("join_path") or "").strip()
+        if join_path:
+            lines.append(f"- {join_path}")
+        freebase_field = str(
+            enrichment.get("source_freebase_id_field") or ""
+        ).strip()
+        if freebase_field:
+            lines.append(
+                f"- Freebase ID field: `{freebase_field}` "
+                "(source provenance / future source-metadata join key)"
+            )
+        physical_key = str(
+            enrichment.get("physical_row_key") or "record_id"
+        ).strip()
+        lines.append(f"- physical-row reconciliation key: `{physical_key}`")
+        not_list = enrichment.get("freebase_id_is_not")
+        if isinstance(not_list, list) and not_list:
+            rendered = ", ".join(
+                f"`{item}`" if isinstance(item, str) else str(item)
+                for item in not_list
+            )
+            lines.append(f"- Freebase ID is not: {rendered}")
+        lines.append("")
+    prereqs = config.get("future_global_s4_prerequisites")
+    if isinstance(prereqs, list) and prereqs:
+        lines.extend(["## Future global-S4 prerequisites", ""])
+        for note in prereqs:
+            if isinstance(note, str) and note.strip():
+                lines.append(f"- {note.strip()}")
         lines.append("")
     extra_notes = config.get("handoff_summary_additional_notes")
     if isinstance(extra_notes, list) and extra_notes:
@@ -701,10 +1042,13 @@ def prepare_global_s4_source(
             )
         output_summary = _assert_output_allowed(root, output_summary)
 
-    sidecar_path = _sidecar_metadata_path(root, config)
-    watched_paths = [canonical_path, resolution_path, authorised_ids_path]
-    if sidecar_path is not None:
-        watched_paths.append(sidecar_path)
+    metadata_paths = _watched_metadata_paths(root, config)
+    watched_paths = [
+        canonical_path,
+        resolution_path,
+        authorised_ids_path,
+        *metadata_paths,
+    ]
     for path in watched_paths:
         try:
             path.resolve().relative_to((root / "data" / "raw").resolve())
@@ -719,12 +1063,13 @@ def prepare_global_s4_source(
         "resolutions": sha256_file(resolution_path),
         "authorised_ids": sha256_file(authorised_ids_path),
     }
-    if sidecar_path is not None:
-        if not sidecar_path.is_file():
+    for index, meta_path in enumerate(metadata_paths):
+        if not meta_path.is_file():
             raise GlobalS4HandoffError(
-                f"Missing source-metadata sidecar for handoff: {sidecar_path.name}"
+                f"Missing source-metadata sidecar for handoff: {meta_path.name}"
             )
-        before_hashes["source_metadata"] = sha256_file(sidecar_path)
+        key = "source_metadata" if index == 0 else f"source_metadata_{index}"
+        before_hashes[key] = sha256_file(meta_path)
 
     canonical_rows = _read_csv(canonical_path, label="S3 canonical")
     resolution_rows = _read_csv(resolution_path, label="CHECKPOINT-1 resolutions")
@@ -785,6 +1130,20 @@ def prepare_global_s4_source(
         handoff_rows=handoff_rows,
     )
     _assert_exact_subset_fields(handoff_rows, canonical_rows)
+    _assert_required_nonempty_fields(
+        handoff_rows,
+        _parse_string_list(
+            config.get("required_nonempty_handoff_fields"),
+            label="required_nonempty_handoff_fields",
+        ),
+    )
+    _assert_required_empty_fields(
+        handoff_rows,
+        _parse_string_list(
+            config.get("require_empty_canonical_fields"),
+            label="require_empty_canonical_fields",
+        ),
+    )
 
     target_meta = config.get("target_metadata")
     specific_present: int | None = None
@@ -862,8 +1221,9 @@ def prepare_global_s4_source(
             "resolutions": sha256_file(resolution_path),
             "authorised_ids": sha256_file(authorised_ids_path),
         }
-        if sidecar_path is not None:
-            after_hashes["source_metadata"] = sha256_file(sidecar_path)
+        for index, meta_path in enumerate(metadata_paths):
+            key = "source_metadata" if index == 0 else f"source_metadata_{index}"
+            after_hashes[key] = sha256_file(meta_path)
         if after_hashes != before_hashes:
             raise GlobalS4HandoffError(
                 "Input artefacts were modified during global-S4 handoff"

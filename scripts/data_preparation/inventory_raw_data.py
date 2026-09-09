@@ -175,6 +175,7 @@ ROLE_HINTS = [
     (re.compile(r"qc_report|processing_log|_log\.txt", re.I), "process_log_or_qc_report"),
     (re.compile(r"readme|README", re.I), "documentation"),
     (re.compile(r"\.pdf$", re.I), "source_document_pdf"),
+    (re.compile(r"\.nt\.gz$", re.I), "supporting_rdf_metadata"),
     (re.compile(r"\.html$", re.I), "scraped_or_cached_html"),
     (re.compile(r"\.gb$", re.I), "genbank_source_record"),
     (re.compile(r"\.fastq$", re.I), "sequence_reads_fastq"),
@@ -1286,6 +1287,56 @@ def inspect_generic_text(path: Path, insp: FileInspection) -> None:
     insp.possible_issue_flags = join_flags(flags)
 
 
+def inspect_ntriples_gzip(path: Path, insp: FileInspection) -> None:
+    """Inspect gzip N-Triples without writing a decompressed copy.
+
+    ``row_count`` is the number of physical N-Triples statements (nonempty,
+    non-comment lines). That count is not an aptamer-record count. Sequence
+    literals are not sampled into inventory artefacts.
+    """
+    flags: list[str] = []
+    notes: list[str] = [
+        "format=ntriples",
+        "gzip_streamed_no_decompressed_copy",
+        "physical_statements_are_not_aptamer_records",
+        "supporting_metadata_not_row_generating",
+    ]
+    insp.apparent_role = "supporting_rdf_metadata"
+    insp.compression_status = "gzip"
+    insp.column_count = "3"
+    insp.column_names = "ntriples:subject|predicate|object"
+    insp.sequence_type = "not_applicable_rdf_metadata"
+    n_statements = 0
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            for line in handle:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                n_statements += 1
+        insp.row_count = str(n_statements)
+        insp.readable = "yes"
+        notes.append(f"physical_statements={n_statements}")
+    except gzip.BadGzipFile as exc:
+        insp.readable = "no"
+        flags.append("unreadable_corrupt_gzip")
+        notes.append(f"BadGzipFile: {exc}")
+    except UnicodeDecodeError as exc:
+        insp.readable = "no"
+        flags.append("unreadable_non_utf8")
+        notes.append(f"UnicodeDecodeError: {exc}")
+    except OSError as exc:
+        insp.readable = "no"
+        flags.append("unreadable_gzip")
+        notes.append(str(exc))
+    insp.notes = "; ".join(notes)
+    insp.possible_issue_flags = join_flags(flags)
+    insp._qc = {
+        "n_statements": n_statements,
+        "seq_type": "not_applicable_rdf_metadata",
+    }
+
+
 def inspect_archive(path: Path, insp: FileInspection) -> None:
     flags: list[str] = []
     notes: list[str] = []
@@ -1363,6 +1414,8 @@ def inspect_file(path: Path, repo_root: Path) -> FileInspection:
 
         if ext in {".csv", ".tsv"} or name_lower.endswith(".csv.gz") or name_lower.endswith(".tsv.gz"):
             inspect_tabular_csv_like(path, insp)
+        elif name_lower.endswith(".nt.gz") or ext == ".nt.gz":
+            inspect_ntriples_gzip(path, insp)
         elif ext in {".xlsx", ".xlsm"}:
             inspect_xlsx(path, insp)
         elif ext in {".fastq", ".fq"} or name_lower.endswith(".fastq.gz") or name_lower.endswith(".fq.gz"):
@@ -1535,6 +1588,8 @@ def source_rollups(rows: list[FileInspection]) -> dict[str, Any]:
         roles = Counter(i.apparent_role for i in items)
         records = 0
         for i in items:
+            if i.apparent_role == "supporting_rdf_metadata":
+                continue
             if i.row_count.isdigit():
                 records += int(i.row_count)
         flags = Counter()
@@ -1684,6 +1739,7 @@ def recommend_s0_status(insp: FileInspection) -> str:
         "genbank_source_record",
         "scraped_or_assembled_raw_table",
         "manually_extracted_table",
+        "supporting_rdf_metadata",
     }:
         return "include_as_authoritative_input"
     if insp.apparent_role in {"documentation", "source_document_pdf"}:
@@ -1853,6 +1909,17 @@ def enrich_inventory_rows(
             r.unresolved_questions = "column_I_heading_incomplete_library1_interpretation"
 
         # Authoritative heuristics for major exports
+        if r.file_name.lower() == "aptamerbase.freebase.extract.nt.gz":
+            r.authoritative_candidate = "supporting_metadata_not_row_generating"
+            r.documented_source = (
+                "micheldumontier/aptamerbase@"
+                "e7a3eb43d24504fd5a7b6c3e470ab242bc471b3a"
+            )
+            r.documented_processing_state = "upstream_freebase_rdf_extract"
+            r.recommended_S0_status = "include_as_authoritative_input"
+            r.sequence_type = "not_applicable_rdf_metadata"
+            r.observed_processing_state = "supporting_rdf_metadata"
+
         if r.relative_path in {
             "data/raw/ENA/ena_embl_20260720-0853.txt",
             "data/raw/Aptadiff_datasetA/datasetA_IGFBP3_P6.csv",

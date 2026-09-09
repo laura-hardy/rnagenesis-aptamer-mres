@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import gzip
 import json
 import re
 import sys
@@ -20,11 +21,13 @@ from inventory_raw_data import (  # noqa: E402
     FileInspection,
     enrich_inventory_rows,
     human_size,
+    inspect_file,
     is_transient_raw_file,
     load_previous_inventory,
     match_sequence_columns,
     recommend_s0_status,
     redact_sequence_like_column_names,
+    source_rollups,
 )
 
 # Contiguous nucleotide strings of this length must not appear in tracked outputs.
@@ -345,3 +348,61 @@ def test_igfbp3_x_z_classified_as_latent_not_sequence_input() -> None:
     assert row["recommended_S0_status"] == "not_relevant_to_protein_aptamer_corpus"
     assert "latent" in (row["sequence_type"] or "").lower()
     assert not (row.get("sequence_column_candidates") or "").strip()
+
+
+def _write_synthetic_nt_gz(path: Path, statements: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(path, "wt", encoding="utf-8") as handle:
+        for statement in statements:
+            handle.write(statement.rstrip("\n") + "\n")
+
+
+def test_nt_gz_inventory_is_supporting_metadata_not_aptamer_records(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    raw = repo / "data" / "raw" / "demo"
+    path = raw / "example.nt.gz"
+    statements = [
+        "<http://example.org/s1> <http://example.org/p1> <http://example.org/o1> .",
+        "# comment",
+        "",
+        "<http://example.org/s2> <http://example.org/p2> \"synthetic-token\" .",
+    ]
+    _write_synthetic_nt_gz(path, statements)
+    insp = inspect_file(path, repo)
+    assert insp.compression_status == "gzip"
+    assert insp.readable == "yes"
+    assert insp.row_count == "2"
+    assert insp.apparent_role == "supporting_rdf_metadata"
+    assert insp.sequence_type == "not_applicable_rdf_metadata"
+    assert insp.column_names == "ntriples:subject|predicate|object"
+    assert "physical_statements_are_not_aptamer_records" in insp.notes
+    assert insp._seq_samples == []
+    assert recommend_s0_status(insp) == "include_as_authoritative_input"
+    rollup = source_rollups([insp])
+    assert rollup["demo"]["approx_row_or_record_sum"] == 0
+
+
+def test_nt_gz_inventory_corrupt_gzip_is_unreadable(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    path = repo / "data" / "raw" / "demo" / "broken.nt.gz"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"not-a-gzip-payload")
+    insp = inspect_file(path, repo)
+    assert insp.readable == "no"
+    assert "unreadable" in insp.possible_issue_flags
+
+
+def test_recommend_s0_supporting_rdf_metadata() -> None:
+    insp = FileInspection(
+        relative_path="data/raw/demo/example.nt.gz",
+        top_level_source="demo",
+        file_name="example.nt.gz",
+        extension="nt.gz",
+        file_size_bytes=10,
+        file_size_human="10 B",
+        last_modified="",
+        apparent_role="supporting_rdf_metadata",
+    )
+    assert recommend_s0_status(insp) == "include_as_authoritative_input"

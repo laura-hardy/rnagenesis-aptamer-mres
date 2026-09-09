@@ -77,6 +77,21 @@ from adapters.aptaindex_s3 import (  # noqa: E402
     DEFAULT_APTAINDEX_BATCHES,
     LOCAL_DETAIL_COLUMNS as APTAINDEX_LOCAL_DETAIL_COLUMNS,
 )
+from adapters.aptamerbase_checkpoint1_audit import (  # noqa: E402
+    AptamerBaseCheckpoint1AuditError,
+    run_aptamerbase_checkpoint1_audit,
+)
+from adapters.aptamerbase_checkpoint1_review import (  # noqa: E402
+    DEFAULT_RECOMMENDATIONS_REL as APTAMERBASE_RECOMMENDATIONS_REL,
+    AptamerBaseCheckpoint1ReviewError,
+    build_review_readme as build_aptamerbase_review_readme,
+    load_review_recommendations as load_aptamerbase_recommendations,
+    populate_aptamerbase_recommendations,
+)
+from adapters.aptamerbase_s3 import (  # noqa: E402
+    DEFAULT_APTAMERBASE_BATCHES,
+    LOCAL_DETAIL_COLUMNS as APTAMERBASE_LOCAL_DETAIL_COLUMNS,
+)
 from adapters.riboaptamer_checkpoint1_review import (  # noqa: E402
     DEFAULT_RECOMMENDATIONS_REL as RIBOAPTAMER_RECOMMENDATIONS_REL,
     RiboAptamerCheckpoint1ReviewError,
@@ -183,6 +198,16 @@ ENA_PIPELINE_STOP_STATEMENT = (
     "Global S4 has not been run."
 )
 ENA_PERMITTED_DECISIONS: tuple[str, ...] = ("keep", "drop", "edit")
+APTAMERBASE_EXPECTED_TOTAL_ROWS = 2128
+APTAMERBASE_BATCH_ORDER: tuple[str, ...] = DEFAULT_APTAMERBASE_BATCHES
+APTAMERBASE_PIPELINE_STOP_STATEMENT = (
+    "CHECKPOINT-1 package generated.\n"
+    "No human decisions applied.\n"
+    "No AptamerBase record is authorised for S4 yet.\n"
+    "The pipeline is stopped awaiting Laura CHECKPOINT-1 review.\n"
+    "Global S4 has not been run."
+)
+APTAMERBASE_PERMITTED_DECISIONS: tuple[str, ...] = ("keep", "drop", "edit")
 
 UTEXAS_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
     "review_batch",
@@ -318,6 +343,30 @@ ENA_INDEX_COLUMNS: tuple[str, ...] = tuple(
     column
     for column in ENA_MANUAL_REVIEW_COLUMNS
     if column not in ENA_SEQUENCE_COLUMNS
+)
+
+APTAMERBASE_SEQUENCE_COLUMNS: tuple[str, ...] = (
+    "sequence_raw",
+    "sequence_full",
+    "sequence_core",
+    "manual_sequence_corrected",
+    "recommended_sequence_corrected",
+)
+
+APTAMERBASE_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
+    ("review_order",)
+    + APTAMERBASE_LOCAL_DETAIL_COLUMNS
+    + tuple(
+        column
+        for column in RECOMMENDATION_FIELDS
+        if column not in APTAMERBASE_LOCAL_DETAIL_COLUMNS
+    )
+)
+
+APTAMERBASE_INDEX_COLUMNS: tuple[str, ...] = tuple(
+    column
+    for column in APTAMERBASE_MANUAL_REVIEW_COLUMNS
+    if column not in APTAMERBASE_SEQUENCE_COLUMNS
 )
 
 UTEXAS_INDEX_COLUMNS: tuple[str, ...] = tuple(
@@ -480,6 +529,7 @@ class ReviewPackageResult:
     output_exceptions: Path | None = None
     output_reconciliation: Path | None = None
     output_reconciliation_index: Path | None = None
+    output_audit_dir: Path | None = None
 
 
 def assert_no_legacy_cleaner_import() -> None:
@@ -2603,6 +2653,450 @@ def prepare_aptaindex_checkpoint1_review(
     return result
 
 
+def build_aptamerbase_manual_review_row(
+    *,
+    review_row: Mapping[str, str],
+    local_detail: Mapping[str, str],
+    review_batch: str,
+    review_order: int,
+) -> dict[str, str]:
+    """Build one AptamerBase sequence-bearing active-review row."""
+    if review_row["record_id"] != local_detail["record_id"]:
+        raise Checkpoint1ReviewError("Joined record_id mismatch")
+    for field_name in (
+        "proposed_decision",
+        "primary_reason",
+        "secondary_reasons",
+        "manual_review_priority",
+        "checkpoint_review_reasons",
+    ):
+        if review_row.get(field_name, "") != local_detail.get(field_name, ""):
+            raise Checkpoint1ReviewError(
+                f"Checkpoint field mismatch for {field_name!r} on "
+                f"{review_row['record_id']!r}"
+            )
+    row = {column: "" for column in APTAMERBASE_MANUAL_REVIEW_COLUMNS}
+    for column in APTAMERBASE_LOCAL_DETAIL_COLUMNS:
+        row[column] = local_detail.get(column, "")
+    row["review_batch"] = review_batch
+    row["review_order"] = str(review_order)
+    row["record_id"] = review_row["record_id"]
+    for name in MANUAL_FIELDS:
+        row[name] = ""
+    return row
+
+
+def build_aptamerbase_index_row(queue_row: Mapping[str, str]) -> dict[str, str]:
+    return {column: queue_row.get(column, "") for column in APTAMERBASE_INDEX_COLUMNS}
+
+
+def aptamerbase_review_package_sort_key(
+    row: Mapping[str, str],
+) -> tuple[int, int, str, str]:
+    batch = row.get("review_batch", "")
+    try:
+        batch_rank = APTAMERBASE_BATCH_ORDER.index(batch)
+    except ValueError:
+        batch_rank = len(APTAMERBASE_BATCH_ORDER)
+    return (
+        batch_rank,
+        _priority_rank(row.get("manual_review_priority", "none")),
+        row.get("primary_reason", ""),
+        row.get("record_id", ""),
+    )
+
+
+def build_aptamerbase_review_summary(
+    *,
+    repo_root: Path,
+    result: ReviewPackageResult,
+) -> str:
+    stats = result.stats
+    lines = [
+        "# AptamerBase CHECKPOINT-1 manual-review package",
+        "",
+        "## Totals",
+        "",
+        f"- Total checkpoint records: `{stats.total_checkpoint_records}`",
+        f"- Active review rows: `{stats.active_review_rows}`",
+        f"- No-review records: `{stats.no_review_records}`",
+        f"- Human decisions recorded: `0`",
+        f"- ready_for_application: `0`",
+        "",
+        "## Review model",
+        "",
+        "- `review_model` = `single_reviewer`",
+        "- Permitted `manual_decision` values: `keep` / `drop` / `edit`",
+        "- Permitted `manual_trim_action` values: `approve` / `override` / `reject` / `defer`",
+        "- `manual_*` fields are blank until Laura completes review.",
+        "- Machine `proposed_decision` and `review_recommendation` are not human decisions.",
+        "",
+        "## What S3 automatically excluded",
+        "",
+        "Non-aptamer RDF structure objects (`non_aptamer_source_object`),",
+        "ordinary missing-sequence rejects, ordinary clean ssDNA parks, and",
+        "ordinary automatic length rejects with no plausible known-motif trim",
+        "are not in this active queue.",
+        "",
+        "## What requires human judgement",
+        "",
+        "- Source sequence notation (mixed T/U, ambiguous, gaps, invalid).",
+        "- RDF DNA × U alphabet molecule/source contradiction.",
+        "- Aptamer-topic unresolved molecule type.",
+        "- Unsupported RNA chemistry, including Spiegelmer/L-RNA.",
+        "- Unapplied known-motif / construct proposals.",
+        "- Length-boundary retained records (20–25 nt and 90–100 nt) are for",
+        "  eyeballing, not rejection.",
+        "- A deterministic random kept sample of 30 technically eligible records.",
+        "",
+        "Group-wise constant-region inference was disabled. Target, evidence,",
+        "affinity, PDB, leakage, deduplication, and clustering remain deferred.",
+        "Blank `target_name_raw` is not an S3 missing_target reject.",
+        "",
+        "## Counts by review batch",
+        "",
+    ]
+    for batch in APTAMERBASE_BATCH_ORDER:
+        count = stats.batch_counts.get(batch, 0)
+        lines.append(f"- `{batch}`: `{count}`")
+
+    lines.extend(["", "## Counts by proposed decision", ""])
+    for name, count in sorted(stats.decision_counts.items()):
+        lines.append(f"- `{name}`: `{count}`")
+
+    lines.extend(["", "## Counts by primary reason", ""])
+    for name, count in sorted(stats.primary_reason_counts.items()):
+        lines.append(f"- `{name}`: `{count}`")
+
+    lines.extend(["", "## Counts by review priority", ""])
+    for name in PRIORITY_ORDER:
+        if name in stats.priority_counts:
+            lines.append(f"- `{name}`: `{stats.priority_counts[name]}`")
+
+    lines.extend(
+        [
+            "",
+            "## Permitted reviewer decisions",
+            "",
+        ]
+    )
+    for action in APTAMERBASE_PERMITTED_DECISIONS:
+        lines.append(f"- `{action}`")
+
+    lines.extend(
+        [
+            "",
+            "## Outputs",
+            "",
+            f"- Queue: `{_relative_display(result.output_queue, repo_root)}`",
+            f"- Sequence-free index: `{_relative_display(result.output_index, repo_root)}`",
+            f"- Summary: `{_relative_display(result.output_summary, repo_root)}`",
+        ]
+    )
+    if result.output_group_review is not None:
+        lines.append(
+            f"- Constant-group review: "
+            f"`{_relative_display(result.output_group_review, repo_root)}`"
+        )
+    if result.output_bulk_confirmation is not None:
+        lines.append(
+            f"- Bulk audit confirmation: "
+            f"`{_relative_display(result.output_bulk_confirmation, repo_root)}`"
+        )
+    if result.output_validation is not None:
+        lines.append(
+            f"- Validation: `{_relative_display(result.output_validation, repo_root)}`"
+        )
+    if result.output_audit_dir is not None:
+        lines.append(
+            f"- Decision-support audit: "
+            f"`{_relative_display(result.output_audit_dir, repo_root)}`"
+        )
+    lines.extend(
+        [
+            "",
+            "WARNING: the manual-review CSV contains source sequences.",
+            "Keep it under `data/`. Do not commit it.",
+            "",
+            "No human decision has yet been recorded.",
+            "Apply will fail closed until every active row is resolved.",
+            "",
+            APTAMERBASE_PIPELINE_STOP_STATEMENT,
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def prepare_aptamerbase_checkpoint1_review(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    expected_active_rows: int | None = None,
+    expected_total_rows: int | None = APTAMERBASE_EXPECTED_TOTAL_ROWS,
+) -> ReviewPackageResult:
+    """Build the AptamerBase CHECKPOINT-1 active manual-review package."""
+    repo_root = repo_root.resolve()
+    checkpoint_dir = _resolve_under_repo(repo_root, checkpoint_dir)
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+
+    review_path = checkpoint_dir / "aptamerbase_checkpoint1_review.csv"
+    local_detail_path = checkpoint_dir / "aptamerbase_checkpoint1_local_detail.csv"
+    for path, label in (
+        (review_path, "checkpoint review"),
+        (local_detail_path, "local-detail"),
+    ):
+        if not path.is_file():
+            raise Checkpoint1ReviewError(f"Missing {label} input: {path.name}")
+
+    review_hash_before = _sha256_file(review_path)
+    local_detail_hash_before = _sha256_file(local_detail_path)
+
+    review_rows = _read_csv(review_path, label="checkpoint review")
+    local_detail_rows = _read_csv(local_detail_path, label="local-detail")
+    paired = _join_review_and_local_detail(review_rows, local_detail_rows)
+
+    if expected_total_rows is not None and len(paired) != expected_total_rows:
+        raise Checkpoint1ReviewError(
+            f"Checkpoint row count must be {expected_total_rows}; got {len(paired)}"
+        )
+
+    stats = ReviewPackageStats()
+    stats.total_checkpoint_records = len(paired)
+
+    active_pairs: list[tuple[dict[str, str], dict[str, str], str]] = []
+    for review_row, detail_row in paired:
+        required = (review_row.get("manual_review_required") or "").strip()
+        if required not in {"true", "false"}:
+            raise Checkpoint1ReviewError(
+                "manual_review_required must be lowercase true/false; "
+                f"got {required!r} for {review_row['record_id']!r}"
+            )
+        if required == "false":
+            stats.no_review_records += 1
+            if review_row.get("review_batch"):
+                raise Checkpoint1ReviewError(
+                    "No-review AptamerBase row must not carry review_batch: "
+                    f"{review_row['record_id']!r}"
+                )
+            continue
+        if (
+            review_row.get("proposed_decision") == "proposed_reject"
+            and review_row.get("primary_reason") == "missing_sequence"
+        ):
+            raise Checkpoint1ReviewError(
+                "Missing-sequence reject must not enter the active review queue: "
+                f"{review_row['record_id']!r}"
+            )
+        if (
+            review_row.get("proposed_decision") == "proposed_reject"
+            and review_row.get("primary_reason") == "non_aptamer_source_object"
+        ):
+            raise Checkpoint1ReviewError(
+                "Non-aptamer source-object reject must not enter the active "
+                f"review queue: {review_row['record_id']!r}"
+            )
+        batch = (review_row.get("review_batch") or "").strip()
+        if not batch:
+            raise Checkpoint1ReviewError(
+                "Review-required AptamerBase row missing review_batch: "
+                f"{review_row['record_id']!r}"
+            )
+        if batch not in APTAMERBASE_BATCH_ORDER:
+            raise Checkpoint1ReviewError(
+                f"Unknown AptamerBase review_batch {batch!r} for "
+                f"{review_row['record_id']!r}"
+            )
+        detail_batch = (detail_row.get("review_batch") or "").strip()
+        if detail_batch and detail_batch != batch:
+            raise Checkpoint1ReviewError(
+                f"review_batch mismatch for {review_row['record_id']!r}"
+            )
+        if detail_row.get("manual_decision"):
+            raise Checkpoint1ReviewError(
+                "Prepared review must not pre-fill manual_decision: "
+                f"{review_row['record_id']!r}"
+            )
+        active_pairs.append((review_row, detail_row, batch))
+
+    if expected_active_rows is not None and len(active_pairs) != expected_active_rows:
+        raise Checkpoint1ReviewError(
+            f"Active review row count must be {expected_active_rows}; "
+            f"got {len(active_pairs)}"
+        )
+
+    recommendations_path = repo_root / APTAMERBASE_RECOMMENDATIONS_REL
+    recommendations: dict[str, object] = {
+        "records": {},
+        "groups": {},
+        "audit_only": {},
+        "known_motif": {},
+        "judgement_dependent": {},
+    }
+    if recommendations_path.is_file():
+        try:
+            recommendations = load_aptamerbase_recommendations(recommendations_path)
+        except AptamerBaseCheckpoint1ReviewError as exc:
+            raise Checkpoint1ReviewError(str(exc)) from exc
+
+    draft_rows: list[dict[str, str]] = []
+    for review_row, detail_row, batch in active_pairs:
+        built = build_aptamerbase_manual_review_row(
+            review_row=review_row,
+            local_detail=detail_row,
+            review_batch=batch,
+            review_order=0,
+        )
+        try:
+            built = populate_aptamerbase_recommendations(
+                built, recommendations=recommendations
+            )
+        except AptamerBaseCheckpoint1ReviewError as exc:
+            raise Checkpoint1ReviewError(str(exc)) from exc
+        draft_rows.append(built)
+
+    draft_rows.sort(key=aptamerbase_review_package_sort_key)
+    queue_rows: list[dict[str, str]] = []
+    for index, row in enumerate(draft_rows, start=1):
+        ordered = dict(row)
+        ordered["review_order"] = str(index)
+        if any(ordered.get(name) for name in MANUAL_FIELDS):
+            raise Checkpoint1ReviewError(
+                "Reviewer fields must be empty in the prepared package"
+            )
+        queue_rows.append(ordered)
+        batch = ordered["review_batch"]
+        stats.batch_counts[batch] = stats.batch_counts.get(batch, 0) + 1
+        decision = ordered["proposed_decision"]
+        stats.decision_counts[decision] = stats.decision_counts.get(decision, 0) + 1
+        primary = ordered["primary_reason"]
+        stats.primary_reason_counts[primary] = (
+            stats.primary_reason_counts.get(primary, 0) + 1
+        )
+        priority = ordered["manual_review_priority"]
+        stats.priority_counts[priority] = stats.priority_counts.get(priority, 0) + 1
+
+    stats.active_review_rows = len(queue_rows)
+    if len({row["record_id"] for row in queue_rows}) != len(queue_rows):
+        raise Checkpoint1ReviewError("Active review queue has duplicate record_id")
+
+    index_rows = [build_aptamerbase_index_row(row) for row in queue_rows]
+    if any(column in APTAMERBASE_INDEX_COLUMNS for column in APTAMERBASE_SEQUENCE_COLUMNS):
+        raise Checkpoint1ReviewError("Sequence columns leaked into index schema")
+
+    bulk_row = build_bulk_confirmation_row(queue_rows)
+    try:
+        validation = validate_review_package(
+            queue_rows=queue_rows,
+            group_rows=[],
+            bulk_confirmation=bulk_row,
+        )
+    except AptaDBCheckpoint1ReviewError as exc:
+        raise Checkpoint1ReviewError(str(exc)) from exc
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_queue = output_dir / "aptamerbase_checkpoint1_manual_review.csv"
+    out_index = output_dir / "aptamerbase_checkpoint1_manual_review_index.csv"
+    out_summary = output_dir / "aptamerbase_checkpoint1_manual_review_summary.md"
+    out_group = output_dir / "aptamerbase_checkpoint1_constant_group_review.csv"
+    out_bulk = output_dir / "aptamerbase_checkpoint1_bulk_audit_confirmation.csv"
+    out_readme = output_dir / "README.md"
+    out_validation = output_dir / "aptamerbase_checkpoint1_validation.md"
+
+    write_csv_atomic(
+        out_queue,
+        APTAMERBASE_MANUAL_REVIEW_COLUMNS,
+        queue_rows,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(
+        out_index,
+        APTAMERBASE_INDEX_COLUMNS,
+        index_rows,
+        quoting=csv.QUOTE_ALL,
+    )
+    write_csv_atomic(out_group, GROUP_REVIEW_COLUMNS, [], quoting=csv.QUOTE_ALL)
+    write_csv_atomic(
+        out_bulk, BULK_CONFIRMATION_COLUMNS, [bulk_row], quoting=csv.QUOTE_ALL
+    )
+    _write_text_atomic(out_readme, build_aptamerbase_review_readme())
+    _write_text_atomic(
+        out_validation,
+        format_validation_markdown(validation, source_label="AptamerBase"),
+    )
+    out_audit = output_dir / "audit"
+    production_artefacts = (
+        expected_total_rows == APTAMERBASE_EXPECTED_TOTAL_ROWS
+        and (repo_root / "data/interim/normalised/aptamerbase_normalised.csv").is_file()
+        and (
+            repo_root
+            / "data/interim/checkpoints/aptamerbase_cp1/aptamerbase_s3_canonical.csv"
+        ).is_file()
+    )
+    rdf_path = (
+        repo_root / "data/raw/aptamerbase/aptamerbase.freebase.extract.nt.gz"
+    )
+    try:
+        run_aptamerbase_checkpoint1_audit(
+            repo_root=repo_root,
+            queue_rows=queue_rows,
+            audit_dir=out_audit,
+            rdf_path=rdf_path if rdf_path.is_file() else None,
+            freeze_production_artefacts=production_artefacts,
+        )
+    except AptamerBaseCheckpoint1AuditError as exc:
+        raise Checkpoint1ReviewError(str(exc)) from exc
+
+    review_hash_after = _sha256_file(review_path)
+    local_detail_hash_after = _sha256_file(local_detail_path)
+    inputs_unchanged = (
+        review_hash_before == review_hash_after
+        and local_detail_hash_before == local_detail_hash_after
+    )
+    if not inputs_unchanged:
+        raise Checkpoint1ReviewError(
+            "CHECKPOINT-1 inputs were modified during review-package preparation"
+        )
+
+    result = ReviewPackageResult(
+        source_key="aptamerbase",
+        stats=stats,
+        output_queue=out_queue,
+        output_index=out_index,
+        output_summary=out_summary,
+        review_hash_before=review_hash_before,
+        review_hash_after=review_hash_after,
+        local_detail_hash_before=local_detail_hash_before,
+        local_detail_hash_after=local_detail_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        output_group_review=out_group,
+        output_bulk_confirmation=out_bulk,
+        output_readme=out_readme,
+        output_validation=out_validation,
+        output_audit_dir=out_audit,
+    )
+    summary_text = build_aptamerbase_review_summary(
+        repo_root=repo_root, result=result
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in summary_text:
+        raise Checkpoint1ReviewError(
+            "Review summary must not contain absolute repository paths"
+        )
+    if APTAMERBASE_PIPELINE_STOP_STATEMENT not in summary_text:
+        raise Checkpoint1ReviewError("Review summary missing pipeline stop statement")
+    if "No human decision has yet been recorded." not in summary_text:
+        raise Checkpoint1ReviewError(
+            "Review summary must state that no human decision has been recorded"
+        )
+    if "fail closed" not in summary_text.lower():
+        raise Checkpoint1ReviewError(
+            "Review summary must state that apply will fail closed"
+        )
+    _write_text_atomic(out_summary, summary_text)
+    return result
+
+
 def build_ena_manual_review_row(
     *,
     review_row: Mapping[str, str],
@@ -3011,7 +3505,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, or ena)",
+        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, ena, or aptamerbase)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -3066,10 +3560,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             "riboaptamer",
             "aptaindex",
             "ena",
+            "aptamerbase",
         }:
             raise Checkpoint1ReviewError(
                 f"Unsupported source_key={args.source!r}; "
-                "supported: aptabase, utexas, aptadb, riboaptamer, aptaindex, ena"
+                "supported: aptabase, utexas, aptadb, riboaptamer, aptaindex, "
+                "ena, aptamerbase"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -3089,6 +3585,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             default_checkpoint = Path("data/interim/checkpoints/aptaindex_cp1")
         elif args.source == "ena":
             default_checkpoint = Path("data/interim/checkpoints/ena_cp1")
+        elif args.source == "aptamerbase":
+            default_checkpoint = Path("data/interim/checkpoints/aptamerbase_cp1")
         else:
             default_checkpoint = Path("data/interim/checkpoints/aptabase_cp1")
         checkpoint_dir = (
@@ -3161,6 +3659,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                     else args.expected_total_rows
                 ),
             )
+        elif args.source == "aptamerbase":
+            result = prepare_aptamerbase_checkpoint1_review(
+                repo_root=repo_root,
+                checkpoint_dir=checkpoint_dir,
+                output_dir=output_dir,
+                expected_active_rows=args.expected_active_rows,
+                expected_total_rows=(
+                    APTAMERBASE_EXPECTED_TOTAL_ROWS
+                    if args.expected_total_rows is None
+                    else args.expected_total_rows
+                ),
+            )
         else:
             result = prepare_aptabase_checkpoint1_review(
                 repo_root=repo_root,
@@ -3178,7 +3688,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ),
                 enforce_expected_batch_counts=not args.skip_expected_batch_counts,
             )
-    except (Checkpoint1ReviewError, EnaCheckpoint1ReviewError) as exc:
+    except (
+        Checkpoint1ReviewError,
+        EnaCheckpoint1ReviewError,
+        AptamerBaseCheckpoint1ReviewError,
+        AptamerBaseCheckpoint1AuditError,
+    ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
@@ -3201,6 +3716,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         batch_order = APTAINDEX_BATCH_ORDER
     elif result.source_key == "ena":
         batch_order = ENA_BATCH_ORDER
+    elif result.source_key == "aptamerbase":
+        batch_order = APTAMERBASE_BATCH_ORDER
     else:
         batch_order = BATCH_ORDER
     for batch in batch_order:
