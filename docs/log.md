@@ -7050,3 +7050,15 @@ Dataset-A replication not built
 All ordinary AptaDiff A/B records remain parked DNA
 ```
 
+## 2026-09-10 — Source-preparation methodology brought under version control
+
+Repository provenance only. No scientific pipeline was rerun. Completed
+ENA, AptaBase, and AptaDiff source decisions were not changed.
+
+The previously untracked AptaBase scrape/parser/cleaner and ENA
+inspection/candidate/review-v2 scripts, READMEs, synthetic tests, and
+synthetic EMBL fixture are now tracked. They document the pre-S1
+preparation of the frozen registered AptaBase cleaned scrape and the ENA
+679-row selected lane. They are not part of the live S1–S3 execution path.
+See `docs/data_curation/source_preparation_methodology.md`.
+
