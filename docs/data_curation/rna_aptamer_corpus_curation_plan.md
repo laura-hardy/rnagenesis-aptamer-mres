@@ -2,8 +2,9 @@
 
 **Project:** RNAGenesis aptamer MRes (`rnagenesis-aptamer-mres`)
 **Owner:** Laura
-**Version:** 1.2 — 2026-08-04
-**Status:** Ready for implementation. All blocking questions resolved.
+**Version:** 1.3 — 2026-09-10
+**Status:** Ready for implementation. All blocking questions resolved. AptaDiff A/B
+canonical molecule identity is ssDNA (see §2.1).
 
 **Companion documents (authoritative inputs):**
 
@@ -110,31 +111,47 @@ polyspecificity data or arbitrarily pick one target. Consequences:
 - `corpus_final.txt` is deduplicated **on sequence** within the `FT` partition, so a polyspecific
   aptamer is not over-represented in the training text.
 
-### 2.1 AptaDiff downsampling — **DECIDED**
+### 2.1 AptaDiff A/B molecule identity and replication — **DECIDED (v1.3)**
 
-`datasetA_IGFBP3_P6.csv` (13,803 rows) and `datasetB_PTK7_P6.csv` (11,547 rows) hold ~25,000
-sequences against **two** targets. Everything else combined is low thousands across hundreds of
-targets, far fewer after clustering. Ingested whole, AptaDiff would be ~90% of the corpus and the
-model would learn two SELEX libraries' statistics — including their fixed 36 nt length — not
-transferable grammar.
+`aptadiff_a` (`datasetA_IGFBP3_P6.csv`, 13,803 rows) and `aptadiff_b`
+(`datasetB_PTK7_P6.csv`, 11,547 rows) are **Tier-1 ssDNA HT-SELEX** sources.
+Primary-source review of the AptaDiff paper establishes an experimental
+single-stranded DNA library, model alphabet A/C/G/T, a 36-nt variable
+region already stripped of fixed primers, and targets IGFBP3 (A) and
+PTK7 (B). They are **not** RNA molecules merely printed using T.
 
-**Aggressive downsampling via a per-target cap at balancing time:**
+Therefore:
 
-- Config parameter `MAX_TARGET_FRACTION`, default **0.05**.
-- The cap applies to **clusters**, not raw records — capping raw records would still let one target
-  dominate through near-identical family members. Select cluster representatives first, then cap.
-- Selection within an over-represented target: highest `binding_evidence_score` → highest abundance
-  (`p6` for count tables) → longest `sequence_core`, seeded RNG breaking ties.
-- **Final value set at CHECKPOINT-3** (§6, S6), once the profile report shows real cluster counts.
-  Re-running S7 with a different value must be a one-line change.
+- Canonical S2 retains DNA. Do **not** convert T→U.
+  `molecule_type = ssDNA`, `chemistry = DNA`, `t_to_u_applied = false`.
+- The 36-nt P6 `seq` values are `construct_scope = random_region_only`
+  (`sequence_core == sequence_full`). Do not reattach or infer primers.
+- A/B are curated through the source pipeline, but ordinary technically
+  valid rows later **park as ssDNA** and are excluded from the primary
+  RNA corpus by default.
+- A/B therefore do **not** participate in ordinary primary-RNA target
+  capping / balancing unless the DNA-parking policy is explicitly changed
+  later.
+- The previous instruction to computationally transcribe A/B to RNA for
+  the canonical corpus is **superseded**.
 
-**Dataset A is also preserved whole, separately**, since RNAGenesis/AptaDiff used it directly:
+**Dataset A remains separately available, uncapped**, for AptaDiff /
+RNAGenesis replication and comparability:
 
-- `corpus_final.csv` — capped, multi-target. The fine-tuning corpus.
-- `corpus_replication_datasetA.csv` — Dataset A alone, same schema, uncapped, for the comparability
-  run against published baselines.
+- `corpus_final.csv` — primary RNA fine-tuning corpus (A/B excluded by
+  default under the ssDNA parking policy).
+- `corpus_replication_datasetA.csv` — Dataset A alone, same schema,
+  uncapped. Any future RNA-alphabet Dataset-A representation is a
+  **derived replication-specific transformation** with explicit
+  provenance, not a change to experimental molecule identity.
 
-Never merge these. Report both.
+Never merge these. Do not reduce Dataset A to the 13,802-row `x_z`
+derivative.
+
+Per-target capping (`MAX_TARGET_FRACTION`, default 0.05, finalised at
+CHECKPOINT-3) remains the balancing tool for sources that **do** enter
+the primary RNA corpus. It is not an AptaDiff A/B RNA-corpus
+downsampling instruction.
 
 ### 2.2 Sequence columns — original, full construct, and random region — **DECIDED**
 
@@ -150,19 +167,22 @@ Three sequence columns, all retained on every record:
 | Column | Definition |
 |---|---|
 | `sequence_raw` | Verbatim from the source. No edits. Audit trail. |
-| `sequence_full` | Normalised RNA — uppercase, whitespace and terminal chemical labels stripped, `T`→`U` — **including** any promoter/primer constants present. |
-| `sequence_core` | `sequence_full` with T7 promoter and identified constant primer-binding regions removed: random region only, where identifiable. |
+| `sequence_full` | Normalised molecule-native sequence — uppercase, whitespace and terminal chemical labels stripped; `T`→`U` **for RNA records only** — **including** any promoter/primer constants present. AptaDiff A/B retain DNA (`T`). |
+| `sequence_core` | `sequence_full` with T7 promoter and identified constant primer-binding regions removed: random region only, where identifiable. AptaDiff A/B do not trim: the P6 value is already the random region. |
 
-For records arriving as random region only (e.g. Dataset A), `sequence_core == sequence_full`. Where
+For records arriving as random region only (AptaDiff A/B), `sequence_core == sequence_full`. Where
 constants are suspected but unresolvable, `sequence_core` is set equal to `sequence_full` and
-flagged — never left empty, so downstream code always has a usable value.
+flagged — never left empty, so downstream code always has a usable value. AptaDiff A/B disable
+constant-region inference by source contract: selected-sequence motifs are not residual primers.
 
 Supporting columns: `sequence_length_full`, `sequence_length_core`, `construct_scope`,
 `trim_status`, `trim_confidence`, `detected_constant_5p`, `detected_constant_3p`.
 
-**`TRAINING_SEQUENCE_COLUMN` = `sequence_core`** — the random region, matching the original
-RNAGenesis paper's use of AptaDiff Dataset A. Both columns are retained, so the alternative is an
-ablation switch rather than a re-run.
+**`TRAINING_SEQUENCE_COLUMN` = `sequence_core`** — the random region for the primary RNA
+corpus. Both columns are retained, so the alternative is an ablation switch rather than a re-run.
+RNAGenesis used AptaDiff Dataset A as a replication/comparability reference; that use does **not**
+reclassify A/B as RNA. Any future RNA-alphabet Dataset-A representation is derived and
+replication-specific.
 
 #### 2.2.1 Constant-region detection — the algorithm
 
@@ -225,8 +245,9 @@ must survive into the corpus. Two columns:
 
 `molecule_type` records the **experimental molecule** (RNA or ssDNA), independent of how the source
 printed it. So the selektion clones are `molecule_type = RNA`, `alphabet_as_reported = DNA_T`,
-`t_to_u_applied = true`. The precision-SELEX XK sequences are genuinely ssDNA and get
-`molecule_type = ssDNA` with no transcription.
+`t_to_u_applied = true`. AptaDiff A/B and the precision-SELEX XK sequences are genuinely ssDNA and
+get `molecule_type = ssDNA` with no transcription. Do not infer AptaDiff molecule identity from
+alphabet.
 
 **Modified chemistries** are included, tagged, never silently dropped: `chemistry` ∈ `RNA`,
 `2F-RNA`, `2NH2-RNA`, `2OMe-RNA`, `DNA`, `mixed`, `unknown`. Caveat for the thesis: these fold and
@@ -238,7 +259,8 @@ is an ablation lever and an unmodified-only run is a one-line filter.
 
 ### 2.5 ssDNA and non-protein targets — **DECIDED: excluded from the corpus, parked, not discarded**
 
-- ssDNA → `parked_ssdna.csv`, same schema, `T` retained.
+- ssDNA → `parked_ssdna.csv`, same schema, `T` retained. Ordinary technically valid AptaDiff A/B
+  rows follow this lane at S3; they are not parked at S2.
 - Non-protein targets (small molecule, ion, cell, organism, nucleic acid, unknown) →
   `parked_non_protein_targets.csv`, same schema.
 
@@ -401,8 +423,8 @@ One record = one (sequence, target) pair (§2.0).
 
 | Key | Dataset / input | Rows | Notes |
 |---|---|---:|---|
-| `aptadiff_a` | `Aptadiff_datasetA/datasetA_IGFBP3_P6.csv` | 13,803 | Capped; also builds the replication file |
-| `aptadiff_b` | `Aptadiff_otherdata/datasetB_PTK7_P6.csv` | 11,547 | Capped |
+| `aptadiff_a` | `Aptadiff_datasetA/datasetA_IGFBP3_P6.csv` | 13,803 | Tier-1 ssDNA HT-SELEX (IGFBP3). Canonical DNA retained; no T→U. Ordinary valid rows later park as ssDNA. Uncapped Dataset A remains available for replication/comparability. |
+| `aptadiff_b` | `Aptadiff_otherdata/datasetB_PTK7_P6.csv` | 11,547 | Tier-1 ssDNA HT-SELEX (PTK7). Canonical DNA retained; no T→U. Ordinary valid rows later park as ssDNA. |
 | `ena` | `ENA/review_v2/ena_selected_after_manual_review.csv` | 679 | Retains both ID columns — see §5.2 |
 | `riboaptamer` | `riboaptamer/all_sequences_509_rows.csv` | 509 | Corrected full-sequence export — see §5.1 |
 | `aptadb` | `AptaDB/interaction.csv` (spine) + `aptamer.csv` + `protein.csv` | 1,350 / 1,293 / 194 | Interaction-grain — see §5.4 |
@@ -647,10 +669,13 @@ notes in §7.
 `normalised/detected_constants_{source}.csv`.
 
 In order: strip BOM/whitespace → strip terminal chemical labels → uppercase → classify
-`molecule_type`, `alphabet_as_reported`, `chemistry` → build `sequence_full` (`T`→`U` for RNA,
-setting `t_to_u_applied`) → detect and trim constants to build `sequence_core` (§2.2.1) → compute
-both lengths → emit non-fatal `qc_flags`. Nothing dropped here. Source-specific assertions (e.g. the
-riboaptamer truncation regression, §5.1; the AptaDB sequence-agreement check, §5.4) run here.
+`molecule_type`, `alphabet_as_reported`, `chemistry` from the source contract (do not infer
+molecule from alphabet) → build `sequence_full` (`T`→`U` for RNA only, setting
+`t_to_u_applied`; AptaDiff A/B retain DNA) → detect and trim constants to build `sequence_core`
+(§2.2.1) except where the source contract disables inference (AptaDiff A/B:
+`construct_scope = random_region_only`, empty proposal artefact) → compute both lengths → emit
+non-fatal `qc_flags`. Nothing dropped here. Source-specific assertions (e.g. the riboaptamer
+truncation regression, §5.1; the AptaDB sequence-agreement check, §5.4) run here.
 
 ### S3 — Per-source filtering + **CHECKPOINT-1**
 
@@ -719,7 +744,8 @@ wanted now, and whether the E4 threshold or protein-only policy should be relaxe
 
 **Out:** `data/processed/`.
 
-1. Apply the per-target cap at cluster level (§2.1), seeded.
+1. Apply the per-target cap at cluster level for sources that enter the primary RNA corpus
+   (§2.1). AptaDiff A/B do not participate in that RNA-corpus cap.
 2. Assign `FT`/`REF`/`EVAL` at cluster level, stratified by `target_family` (§1.1).
 3. Write:
 
@@ -742,7 +768,7 @@ wanted now, and whether the E4 threshold or protein-only policy should be relaxe
 
 | Source | Sequence | Target | Evidence | Specific handling |
 |---|---|---|---|---|
-| `aptadiff_a` / `_b` | `seq` | Constant: IGFBP3 / PTK7 (filename + readme, not a column) | E4; `p6` is round-6 count | `construct_scope = random_region_only` (fixed 36 nt), so `sequence_core == sequence_full`. Resolve target to UniProt manually. Rank by `p6` for cap subsampling |
+| `aptadiff_a` / `_b` | `seq` (36-nt random region) | Canonical `target_name_raw` empty. Documented IGFBP3 / PTK7 is sidecar provenance until global S4 | Not assigned at S2. Later evidence/affinity must not be read from `p6` at S2 | Experimental molecule `ssDNA`, chemistry `DNA`, no T→U. `construct_scope = random_region_only`, so `sequence_core == sequence_full`. Constant inference disabled. Ordinary valid rows later park as ssDNA and are excluded from the primary RNA corpus by default. Dataset A remains uncapped for a separate replication file. Do not transcribe A/B to RNA for the canonical corpus. |
 | `ena` | `sequence` | `target` | Evidence fields → ladder | §5.2 |
 | `riboaptamer` | `Sequence` | **Parsed from `Aptamer Name` + `Description`** | `mmCIF Download URL` → E1 + `pdb_id`; `Affinity (Kd)` → E2; else E4 | §5.1. `Category` is a prior in `notes`, never the target. Truncation regression assertion at S2 |
 | `aptadb` | `aptamer.csv.Sequence` via `interaction.csv` spine | `interaction.TargetID` → `protein.Uni-port ID` | `Binding Conditions/Buffer` → E3 | §5.4. One record per interaction row. 37 aptamers without interactions → `missing_target`. Non-protein TargetIDs unresolvable (lookup tables absent) |
@@ -870,7 +896,7 @@ sequences and AptaDB's interaction join unlocks structured protein targets.
 
 | Lane | Rows in | Rough survivors after RNA + protein-target + evidence + length | Notes |
 |---|---:|---:|---|
-| AptaDiff A + B | 25,350 | capped to ≤5% of total each | 2 targets |
+| AptaDiff A + B | 25,350 | **0 in the primary RNA corpus by default** (ssDNA parking at S3). Dataset A remains available uncapped for a separate replication file | 2 DNA HT-SELEX targets (IGFBP3, PTK7) |
 | AptamerBase | 2,128 | ~400–900 | 179 missing, 184 dup, RNA-like |
 | riboaptamer | 509 | ~200–350 | **Revised up.** ~364 records in protein-leaning categories; RNA throughout; some E1/E2 |
 | UTexas | 1,894 | ~250–500 | RNA subset of a mixed DB, 399 missing |
@@ -882,9 +908,10 @@ sequences and AptaDB's interaction join unlocks structured protein targets.
 | **Diverse (non-AptaDiff) total, pre-dedup** | | **~1,400–3,000** | |
 | **After 90% clustering** | | **~500–1,700 clusters** | SELEX families collapse hard |
 
-So roughly **one to three thousand sequences across a few hundred targets**, AptaDiff capped to a
-modest share. Small, but not unreasonable for parameter-efficient fine-tuning of the generative
-components on a frozen encoder — which is exactly why the plan freezes the encoder.
+So roughly **one to three thousand sequences across a few hundred targets** from the diverse
+(non-AptaDiff) RNA lane. AptaDiff A/B do not inflate that primary-RNA total under the current
+ssDNA parking policy. Small, but not unreasonable for parameter-efficient fine-tuning of the
+generative components on a frozen encoder — which is exactly why the plan freezes the encoder.
 
 **Trigger points.** If the diverse lane yields fewer than ~500 clusters, relax in this order:
 (1) admit E5 records, (2) admit non-protein targets, (3) raise the length ceiling, (4) fetch the
@@ -1108,7 +1135,8 @@ to be written up rather than pasted:
 - **Principal findings:** a large fraction of the `ENA/` tree is derived review output rather than
   source data, so only one ENA file is a legitimate input; several sources carry mixed DNA/RNA and
   modified chemistries; target annotation is heterogeneous and in one source absent entirely; and
-  the AptaDiff datasets, while by far the largest, cover only two targets.
+  the AptaDiff datasets, while by far the largest row counts, are ssDNA HT-SELEX libraries
+  against only two targets and therefore park outside the primary RNA corpus by default.
 - **Questions raised and resolved:** the six Q1–Q6 items in `raw_data_curation_questions.csv`, with
   their resolutions — most usefully that the selektion D9 clones are RNA aptamers against NDM-1,
   which sharpens the methods framing (§1.2).
@@ -1173,3 +1201,4 @@ sequences, so both are safe to track under `docs/`.
 | 1.0 | 2026-08-04 | Initial specification from the curation notes, raw-data state assessment, and inventory of 201 files across 21 sources. |
 | 1.1 | 2026-08-04 | Confirmed AptaDiff downsampling; three sequence columns plus constant-region detection; three-way partition and evidence ladder confirmed; supervisor profile report added as its own stage and checkpoint before balancing; target normalisation made to precede all grouping and splitting; corroboration-as-reliability and redistribution status added; riboaptamer promoted after the truncation fix; source registry made authoritative over the inventory. |
 | 1.2 | 2026-08-04 | Q1–Q6 resolved against the refreshed 203-file inventory. Record grain defined as (sequence, target) and dedup keyed accordingly. ENA input registered as the 679-row review_v2 file with a required 679-vs-676 reconciliation and an explicit singleton policy. riboaptamer resolved to `all_sequences_509_rows.csv` with Category treated as a prior rather than a rule. AptaDB resolved to interaction-grain via `interaction.csv`, upgrading it from E5-by-default and seeding the target dictionary with 194 UniProt entries. Precision-SELEX layout resolved (column B primary, even rows from row 4). Selektion D9 confirmed RNA, with the resulting thesis reframing recorded. `li_et_al` removed. Added `alphabet_as_reported` / `t_to_u_applied` transcription provenance and `target_type_source`. `TRAINING_SEQUENCE_COLUMN` fixed to `sequence_core`. Added §17 project log and §18 version-control and data-handling policy. |
+| 1.3 | 2026-09-10 | AptaDiff A/B source identity corrected from primary-paper review: experimental molecule is ssDNA, canonical S2 retains DNA with no T→U, P6 sequences are random-region-only, and ordinary valid rows later park as ssDNA. They do not enter ordinary primary-RNA target capping. Dataset A remains uncapped for a separate replication/comparability file; any future RNA-alphabet Dataset-A representation is derived and replication-specific. The previous instruction to computationally transcribe A/B to RNA for the canonical corpus is superseded. |

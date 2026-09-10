@@ -146,6 +146,27 @@ from adapters.aptamerbase_s3 import (  # noqa: E402
     refresh_stats_after_audit as refresh_aptamerbase_stats_after_audit,
     update_stats_from_row as update_aptamerbase_stats_from_row,
 )
+from adapters.aptadiff_s3 import (  # noqa: E402
+    DECISION_COLUMNS as APTADIFF_DECISION_COLUMNS,
+    LOCAL_DETAIL_COLUMNS as APTADIFF_LOCAL_DETAIL_COLUMNS,
+    PARK_COLUMNS as APTADIFF_PARK_COLUMNS,
+    PRIMARY_ROUTE_ELIGIBLE as APTADIFF_PRIMARY_ROUTE_ELIGIBLE,
+    PRIMARY_ROUTE_REJECT as APTADIFF_PRIMARY_ROUTE_REJECT,
+    PRIMARY_ROUTE_SSDNA as APTADIFF_PRIMARY_ROUTE_SSDNA,
+    REASON_COUNT_COLUMNS as APTADIFF_REASON_COUNT_COLUMNS,
+    REJECTION_COLUMNS as APTADIFF_REJECTION_COLUMNS,
+    AptaDiffS3Error,
+    AptaDiffS3Stats,
+    apply_random_accept_audit as apply_aptadiff_random_accept_audit,
+    assert_aptadiff_accept_invariants,
+    assert_aptadiff_reject_park_invariants,
+    build_local_detail_row as build_aptadiff_local_detail_row,
+    classify_aptadiff_record,
+    expected_documented_target as aptadiff_expected_documented_target,
+    refresh_stats_after_audit as refresh_aptadiff_stats_after_audit,
+    update_stats_from_row as update_aptadiff_stats_from_row,
+)
+from adapters.aptadiff import SOURCE_PROFILES as APTADIFF_SOURCE_PROFILES  # noqa: E402
 from adapters.utexas_s3 import (  # noqa: E402
     DECISION_COLUMNS as UTEXAS_DECISION_COLUMNS,
     LOCAL_DETAIL_COLUMNS as UTEXAS_LOCAL_DETAIL_COLUMNS,
@@ -230,6 +251,40 @@ EXPECTED_APTAMERBASE_S1_SIDECAR_SHA256 = (
 EXPECTED_APTAMERBASE_S2_HASH = (
     "69bcfb97592255bc0d70727991bd68d7bf5dc18f1c47db532b182461ba6d81f8"
 )
+EXPECTED_APTADIFF_A_ROWS = 13803
+EXPECTED_APTADIFF_B_ROWS = 11547
+EXPECTED_APTADIFF_A_SOURCE_DATASET = "aptadiff_a_igfbp3_p6_2026-06-22"
+EXPECTED_APTADIFF_B_SOURCE_DATASET = "aptadiff_b_ptk7_p6_2026-06-22"
+EXPECTED_APTADIFF_A_RAW_SHA256 = (
+    "ec970c478aaba1aa089ecbaf7f5bc8aa7a11f6eacd0f7b3d3c418de6a27e8c77"
+)
+EXPECTED_APTADIFF_B_RAW_SHA256 = (
+    "546de810e34035731502caf6476c73cc06feab8156ec8178efaade2d21bf4d72"
+)
+EXPECTED_APTADIFF_A_RAW_PATH = "data/raw/Aptadiff_datasetA/datasetA_IGFBP3_P6.csv"
+EXPECTED_APTADIFF_B_RAW_PATH = "data/raw/Aptadiff_otherdata/datasetB_PTK7_P6.csv"
+EXPECTED_APTADIFF_A_S1_CANONICAL_SHA256 = (
+    "22bd7357311ce5d9d0a000c20f75fc439942b16c37105a71509fb8329ee7b083"
+)
+EXPECTED_APTADIFF_A_S1_SIDECAR_SHA256 = (
+    "ec0453c50205854dc1648c833a2f96a40b691ee39b8c49433d0024480c9314ea"
+)
+EXPECTED_APTADIFF_B_S1_CANONICAL_SHA256 = (
+    "321ef00b4e7a78834f431b4335bf21e89752c8e596523480676f2d5ac2e50921"
+)
+EXPECTED_APTADIFF_B_S1_SIDECAR_SHA256 = (
+    "3f7183e5999d2f729b1fd1d225287b3515414cec2d7b91e44de46cf84a5ec4a0"
+)
+EXPECTED_APTADIFF_A_S2_HASH = (
+    "c88e6f12dea4d60377a1c5a7a95861fcc666e47be27920a234f828b70df6ca55"
+)
+EXPECTED_APTADIFF_B_S2_HASH = (
+    "c40bc662f4c79fcc24c161c5a82e74c2d58f96fbb6ca74fbb84b105bf8bc98f6"
+)
+EXPECTED_APTADIFF_A_PARKED = 13802
+EXPECTED_APTADIFF_A_REJECT = 1
+EXPECTED_APTADIFF_B_PARKED = 11532
+EXPECTED_APTADIFF_B_REJECT = 15
 EXPECTED_APTADB_MOLECULE = {"RNA": 289, "ssDNA": 1061}
 EXPECTED_UTEXAS_MISSING = 399
 EXPECTED_UTEXAS_NONEMPTY = 1495
@@ -279,6 +334,14 @@ APTAMERBASE_PIPELINE_STOP_STATEMENT = (
     "The pipeline is stopped awaiting Laura CHECKPOINT-1 review.\n"
     "Global S4 has not been run."
 )
+APTADIFF_PIPELINE_STOP_STATEMENT = (
+    "CHECKPOINT-1 package generated.\n"
+    "No human decisions applied.\n"
+    "No AptaDiff record is authorised for S4 yet.\n"
+    "The pipeline is stopped awaiting Laura CHECKPOINT-1 review.\n"
+    "Dataset-A replication remains deferred.\n"
+    "Global S4 has not been run."
+)
 
 
 class S3ClassifyError(ValueError):
@@ -298,6 +361,7 @@ class S3RunResult:
         | AptaIndexS3Stats
         | EnaS3Stats
         | AptamerBaseS3Stats
+        | AptaDiffS3Stats
     )
     output_canonical: Path
     output_decisions: Path
@@ -5365,6 +5429,757 @@ def run_aptamerbase_s3(
     return run_result
 
 
+def _aptadiff_production_profile(source_key: str) -> dict[str, object]:
+    if source_key == "aptadiff_a":
+        return {
+            "expected_rows": EXPECTED_APTADIFF_A_ROWS,
+            "source_dataset": EXPECTED_APTADIFF_A_SOURCE_DATASET,
+            "raw_path": EXPECTED_APTADIFF_A_RAW_PATH,
+            "raw_sha256": EXPECTED_APTADIFF_A_RAW_SHA256,
+            "s1_canonical_sha256": EXPECTED_APTADIFF_A_S1_CANONICAL_SHA256,
+            "s1_sidecar_sha256": EXPECTED_APTADIFF_A_S1_SIDECAR_SHA256,
+            "s2_hash": EXPECTED_APTADIFF_A_S2_HASH,
+            "parked": EXPECTED_APTADIFF_A_PARKED,
+            "rejected": EXPECTED_APTADIFF_A_REJECT,
+        }
+    if source_key == "aptadiff_b":
+        return {
+            "expected_rows": EXPECTED_APTADIFF_B_ROWS,
+            "source_dataset": EXPECTED_APTADIFF_B_SOURCE_DATASET,
+            "raw_path": EXPECTED_APTADIFF_B_RAW_PATH,
+            "raw_sha256": EXPECTED_APTADIFF_B_RAW_SHA256,
+            "s1_canonical_sha256": EXPECTED_APTADIFF_B_S1_CANONICAL_SHA256,
+            "s1_sidecar_sha256": EXPECTED_APTADIFF_B_S1_SIDECAR_SHA256,
+            "s2_hash": EXPECTED_APTADIFF_B_S2_HASH,
+            "parked": EXPECTED_APTADIFF_B_PARKED,
+            "rejected": EXPECTED_APTADIFF_B_REJECT,
+        }
+    raise S3ClassifyError(
+        f"Unknown AptaDiff S3 source_key={source_key!r}; expected "
+        "aptadiff_a or aptadiff_b"
+    )
+
+
+def _assert_aptadiff_s2_invariants(
+    canonical_rows: Sequence[Mapping[str, str]],
+    *,
+    source_key: str,
+) -> None:
+    profile = APTADIFF_SOURCE_PROFILES[source_key]
+    molecule_counts: dict[str, int] = {}
+    chemistry_counts: dict[str, int] = {}
+    alphabet_counts: dict[str, int] = {}
+    t_to_u = 0
+    core_differs = 0
+    nonempty_target = 0
+    nonempty_forbidden = 0
+    length_36 = 0
+    for row in canonical_rows:
+        if row.get("source_db") != source_key:
+            raise S3ClassifyError(
+                f"S2 source_db must be {source_key}; got {row.get('source_db')!r}"
+            )
+        molecule = row.get("molecule_type") or "unknown"
+        molecule_counts[molecule] = molecule_counts.get(molecule, 0) + 1
+        chemistry = row.get("chemistry") or "unknown"
+        chemistry_counts[chemistry] = chemistry_counts.get(chemistry, 0) + 1
+        alphabet = row.get("alphabet_as_reported") or "missing"
+        alphabet_counts[alphabet] = alphabet_counts.get(alphabet, 0) + 1
+        if row.get("t_to_u_applied") == "true":
+            t_to_u += 1
+        if row.get("sequence_core") != row.get("sequence_full"):
+            core_differs += 1
+        if row.get("target_name_raw"):
+            nonempty_target += 1
+        if any(row.get(field) for field in (
+            "target_name",
+            "target_uniprot",
+            "target_type",
+            "binding_evidence_type",
+            "binding_evidence_score",
+            "affinity_value",
+            "affinity_unit",
+            "affinity_type",
+        )):
+            nonempty_forbidden += 1
+        if row.get("sequence_length_core") == "36":
+            length_36 += 1
+        if row.get("construct_scope") != "random_region_only":
+            raise S3ClassifyError(
+                "AptaDiff S2 construct_scope must remain random_region_only"
+            )
+    if molecule_counts != {"ssDNA": profile.expected_input_rows}:
+        raise S3ClassifyError(f"S2 molecule_type counts drifted: {molecule_counts}")
+    if chemistry_counts != {"DNA": profile.expected_input_rows}:
+        raise S3ClassifyError(f"S2 chemistry counts drifted: {chemistry_counts}")
+    if alphabet_counts.get("DNA_T", 0) != profile.expected_acgt_only:
+        raise S3ClassifyError(f"S2 DNA_T count drifted: {alphabet_counts}")
+    if alphabet_counts.get("ambiguous", 0) != profile.expected_n_containing:
+        raise S3ClassifyError(f"S2 ambiguous count drifted: {alphabet_counts}")
+    if t_to_u != 0:
+        raise S3ClassifyError("AptaDiff S2 must not have applied T→U")
+    if core_differs != 0:
+        raise S3ClassifyError("AptaDiff S2 must keep sequence_core == sequence_full")
+    if nonempty_target != 0:
+        raise S3ClassifyError("AptaDiff S2 must keep target_name_raw empty")
+    if nonempty_forbidden != 0:
+        raise S3ClassifyError("AptaDiff S2 must not populate deferred S4 fields")
+    if length_36 != profile.expected_length_36:
+        raise S3ClassifyError("AptaDiff S2 length-36 count drifted")
+
+
+def build_aptadiff_checkpoint1_summary(
+    *,
+    repo_root: Path,
+    result: S3RunResult,
+    policy_path: Path,
+) -> str:
+    """Build an aggregate-only Markdown CHECKPOINT-1 summary (no sequences)."""
+    stats = result.stats
+    if not isinstance(stats, AptaDiffS3Stats):
+        raise S3ClassifyError("AptaDiff summary requires AptaDiffS3Stats")
+    source_key = result.source_key
+    label = "Dataset A" if source_key == "aptadiff_a" else "Dataset B"
+
+    def _count(mapping: Mapping[str, int], key: str) -> int:
+        return int(mapping.get(key, 0))
+
+    rejected = _count(stats.primary_route_counts, APTADIFF_PRIMARY_ROUTE_REJECT)
+    parked_ssdna = _count(stats.primary_route_counts, APTADIFF_PRIMARY_ROUTE_SSDNA)
+    eligible = _count(stats.primary_route_counts, APTADIFF_PRIMARY_ROUTE_ELIGIBLE)
+    routed_sum = rejected + parked_ssdna + eligible
+    documented = aptadiff_expected_documented_target(source_key)
+
+    lines = [
+        f"# AptaDiff {label} S3 / CHECKPOINT-1 summary",
+        "",
+        "## Reconciliation",
+        "",
+        f"- source_key = `{source_key}`",
+        f"- experimental molecule = `ssDNA`",
+        f"- chemistry = `DNA`",
+        f"- rows in = `{stats.s2_rows}`",
+        f"- technical rejects = `{rejected}`",
+        f"- parked ssDNA = `{parked_ssdna}`",
+        f"- technically eligible RNA = `{eligible}`",
+        f"- sum = `{routed_sum}`",
+        f"- Unique record IDs: `{stats.unique_record_ids}`",
+        f"- Unique native IDs: `{stats.unique_native_ids}`",
+        f"- S2 order preserved: `{'pass' if stats.order_preserved else 'fail'}`",
+        "",
+        "Technical sequence failure is applied before ordinary ssDNA parking.",
+        "A malformed DNA record is a technical failure, not a hidden DNA park.",
+        "",
+        "## Technical rejection breakdown",
+        "",
+        f"- `ambiguous_bases`: `{_count(stats.primary_reason_counts, 'ambiguous_bases')}`",
+        f"- `missing_sequence`: `{_count(stats.primary_reason_counts, 'missing_sequence')}`",
+        f"- `length_out_of_range`: `{_count(stats.primary_reason_counts, 'length_out_of_range')}`",
+        f"- `mixed_T_and_U`: `{_count(stats.primary_reason_counts, 'mixed_T_and_U')}`",
+        f"- `alignment_gaps`: `{_count(stats.primary_reason_counts, 'alignment_gaps')}`",
+        f"- `invalid_alphabet`: `{_count(stats.primary_reason_counts, 'invalid_alphabet')}`",
+        "",
+        "Condition tallies (a record may contribute to more than one):",
+        "",
+        f"- ambiguous-bases condition: `{stats.ambiguous_bases_count}`",
+        f"- missing-sequence condition: `{stats.missing_sequence_count}`",
+        f"- mixed T/U condition: `{stats.mixed_t_u_count}`",
+        f"- alignment-gaps condition: `{stats.alignment_gaps_count}`",
+        f"- invalid-alphabet condition: `{stats.invalid_alphabet_count}`",
+        f"- length-out-of-range condition: `{stats.length_out_of_range_count}`",
+        "",
+        "## Parking",
+        "",
+        f"- source ssDNA total before technical rejection = `{stats.source_ssdna_before_technical}`",
+        f"- technically rejected ssDNA = `{stats.technically_rejected_ssdna}`",
+        f"- actually parked ssDNA = `{parked_ssdna}`",
+        f"- ordinary clean ssDNA parks do not require manual scientific review",
+        "",
+        "## Eligible corpus lane",
+        "",
+        f"- technically eligible RNA = `{eligible}`",
+        "- No RNA records are technically eligible because the source contract is ssDNA.",
+        "",
+        "## CHECKPOINT-1",
+        "",
+        f"- unique review records: `{stats.unique_checkpoint_review_records}`",
+        f"- judgement-dependent technical records: "
+        f"`{stats.judgement_dependent_review_count}`",
+        f"- constant-proposal records in review: `{stats.constant_review_count}`",
+        f"- boundary-length records in review: `{stats.boundary_review_count}`",
+        f"- random kept audit sampled: `{stats.random_accept_audit_count}`",
+        f"- random kept audit pool: `{stats.random_accept_audit_pool_size}`",
+        f"- random kept audit shortfall: `{stats.random_accept_audit_shortfall}`",
+        "- Zero technically eligible RNA means no fabricated random-kept audit.",
+        "",
+        "### Counts by checkpoint review reason",
+        "",
+    ]
+    if stats.checkpoint_review_reason_counts:
+        for name, count in _count_sorted(stats.checkpoint_review_reason_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+
+    lines.extend(["", "### Counts by review batch", ""])
+    for batch in (
+        "01_judgement_dependent_technical",
+        "02_constant_region_proposal",
+        "03_length_boundary",
+        "04_random_kept_audit",
+    ):
+        lines.append(f"- `{batch}`: `{_count(stats.review_batch_counts, batch)}`")
+
+    lines.extend(
+        [
+            "",
+            "## Deferred / not performed",
+            "",
+            f"- Documented sidecar target ({documented}) remains provenance only.",
+            "- Canonical `target_name_raw` remains empty.",
+            "- Target canonicalisation, UniProt, target type/family, evidence,",
+            "  affinity, leakage, capping, clustering, balancing and partitioning",
+            "  remain deferred. `p6` is preserved uninterpreted and is not a gate.",
+            "- Constant-region inference remains disabled. Applied trims = 0.",
+            "- Dataset-A replication (`corpus_replication_datasetA.csv`) is not",
+            "  built here. Whether a later replication file should preserve all",
+            "  P6 rows or the x_z 13,802-row consumed set is deferred.",
+            "",
+            "- Target type inferred: `no`",
+            "- Evidence scored: `no`",
+            "- Leakage exclusions applied: `no`",
+            "- Constant-region proposals applied: `no`",
+            "- T→U applied: `no`",
+            "- Human CHECKPOINT-1 decisions applied: `no`",
+            "- S4 started: `no`",
+            "- authorised_for_s4: `0`",
+            "",
+            "## Integrity",
+            "",
+            f"- S2 canonical hash before: `{result.s2_hash_before}`",
+            f"- S2 canonical hash after: `{result.s2_hash_after}`",
+            f"- S2 QC hash before: `{result.qc_hash_before}`",
+            f"- S2 QC hash after: `{result.qc_hash_after}`",
+            f"- Source-metadata hash before: `{result.sidecar_hash_before}`",
+            f"- Source-metadata hash after: `{result.sidecar_hash_after}`",
+            f"- S2 input integrity: "
+            f"`{'pass' if result.s2_integrity_ok else 'fail'}`",
+            f"- Inputs unchanged: "
+            f"`{'pass' if result.inputs_unchanged else 'fail'}`",
+            (
+                f"- Deterministic rerun result: "
+                f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+                if result.deterministic_rerun_ok is not None
+                else "- Deterministic rerun result: `not_checked`"
+            ),
+            f"- Raw SHA-256 before: `{result.raw_sha_before or 'not_checked'}`",
+            f"- Raw SHA-256 after: `{result.raw_sha_after or 'not_checked'}`",
+            "",
+            "## Inputs",
+            "",
+            f"- Eligibility policy: `{_relative_display(policy_path, repo_root)}`",
+            "",
+            "## Outputs",
+            "",
+            f"- Canonical: `{_relative_display(result.output_canonical, repo_root)}`",
+            f"- Decisions: `{_relative_display(result.output_decisions, repo_root)}`",
+            f"- Checkpoint review (sequence-free index of all rows): "
+            f"`{_relative_display(result.output_review, repo_root)}`",
+            f"- Checkpoint local detail (sequence-bearing scientific review): "
+            f"`{_relative_display(result.output_local_detail, repo_root)}`",
+            f"- Reason counts: "
+            f"`{_relative_display(result.output_reason_counts, repo_root)}`",
+        ]
+    )
+    if result.output_rejected is not None:
+        lines.append(
+            f"- Rejection log: `{_relative_display(result.output_rejected, repo_root)}`"
+        )
+    if result.output_parked_ssdna is not None:
+        lines.append(
+            f"- Parked ssDNA: "
+            f"`{_relative_display(result.output_parked_ssdna, repo_root)}`"
+        )
+    lines.extend(
+        [
+            f"- Summary: `{_relative_display(result.output_summary, repo_root)}`",
+            "",
+            "## Local-detail warning",
+            "",
+            f"WARNING: `{source_key}_checkpoint1_local_detail.csv` and",
+            f"`rejected_{source_key}.csv` contain source sequences. They must",
+            "remain beneath ignored `data/` and must never be staged or tracked.",
+            "",
+            "## Pipeline stop",
+            "",
+            APTADIFF_PIPELINE_STOP_STATEMENT,
+            "",
+            "CHECKPOINT-1 generated = yes",
+            "CHECKPOINT-1 human decisions applied = no",
+            "records authorised_for_s4 = 0",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_aptadiff_s3(
+    *,
+    repo_root: Path,
+    source_key: str,
+    input_dir: Path,
+    source_metadata_dir: Path,
+    eligibility_policy: Path,
+    output_dir: Path,
+    expected_rows: int | None = None,
+    check_deterministic_rerun: bool = False,
+) -> S3RunResult:
+    """Execute AptaDiff A or B S3 technical eligibility and CHECKPOINT-1."""
+    if source_key not in {"aptadiff_a", "aptadiff_b"}:
+        raise S3ClassifyError(
+            f"Unknown AptaDiff S3 source_key={source_key!r}; expected "
+            "aptadiff_a or aptadiff_b"
+        )
+    profile = _aptadiff_production_profile(source_key)
+    if expected_rows is None:
+        expected_rows = int(profile["expected_rows"])
+
+    repo_root = repo_root.resolve()
+    input_dir = (
+        input_dir if input_dir.is_absolute() else (repo_root / input_dir)
+    ).resolve()
+    source_metadata_dir = (
+        source_metadata_dir
+        if source_metadata_dir.is_absolute()
+        else (repo_root / source_metadata_dir)
+    ).resolve()
+    eligibility_policy = (
+        eligibility_policy
+        if eligibility_policy.is_absolute()
+        else (repo_root / eligibility_policy)
+    ).resolve()
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+
+    canonical_path = input_dir / f"{source_key}_normalised.csv"
+    qc_path = input_dir / f"{source_key}_s2_qc.csv"
+    sidecar_path = source_metadata_dir / f"{source_key}_source_metadata.csv"
+    s1_canonical_path = source_metadata_dir / f"{source_key}_extracted.csv"
+    for path, label in (
+        (canonical_path, "S2 canonical"),
+        (qc_path, "S2 QC"),
+        (sidecar_path, "source-metadata"),
+    ):
+        if not path.is_file():
+            raise S3ClassifyError(f"Missing {label} input: {path.name}")
+
+    raw_path = repo_root / str(profile["raw_path"])
+    raw_sha_before = ""
+    check_raw = expected_rows == profile["expected_rows"]
+    if check_raw:
+        if not raw_path.is_file():
+            raise S3ClassifyError(f"Missing registered {source_key} raw file")
+        digest = _sha256_file(raw_path)
+        if digest != profile["raw_sha256"]:
+            raise S3ClassifyError(
+                f"{source_key} raw SHA-256 does not match registry expectation"
+            )
+        raw_sha_before = digest
+        if s1_canonical_path.is_file():
+            s1_digest = _sha256_file(s1_canonical_path)
+            if s1_digest != profile["s1_canonical_sha256"]:
+                raise S3ClassifyError(
+                    f"{source_key} S1 canonical SHA-256 does not match freeze"
+                )
+        sidecar_s1 = _sha256_file(sidecar_path)
+        if sidecar_s1 != profile["s1_sidecar_sha256"]:
+            raise S3ClassifyError(
+                f"{source_key} S1 sidecar SHA-256 does not match freeze"
+            )
+        s2_digest = _sha256_file(canonical_path)
+        if s2_digest != profile["s2_hash"]:
+            raise S3ClassifyError(
+                f"{source_key} S2 canonical SHA-256 does not match freeze"
+            )
+
+    s2_hash_before = _sha256_file(canonical_path)
+    qc_hash_before = _sha256_file(qc_path)
+    sidecar_hash_before = _sha256_file(sidecar_path)
+
+    policy = load_eligibility_policy(eligibility_policy)
+    if policy.source_key != source_key:
+        raise S3ClassifyError(
+            f"Eligibility policy source_key must be {source_key}; "
+            f"got {policy.source_key!r}"
+        )
+    if not policy.defer_target_classification or not policy.defer_evidence_scoring:
+        raise S3ClassifyError(
+            "AptaDiff S3 policy must defer target classification and evidence scoring"
+        )
+    if (
+        policy.sequence_leakage_matching_enabled
+        or policy.target_leakage_matching_enabled
+        or not policy.defer_leakage_exclusion
+    ):
+        raise S3ClassifyError("AptaDiff S3 must not apply leakage exclusions")
+    if policy.explicit_non_rna_requires_manual_review:
+        raise S3ClassifyError(
+            "AptaDiff S3 must not require manual review of ordinary ssDNA parks"
+        )
+
+    canonical_rows = _read_corpus_csv(canonical_path)
+    qc_rows = _read_sidecar_csv(qc_path, label="S2 QC")
+    sidecar_rows = _read_sidecar_csv(sidecar_path, label="source-metadata")
+    aligned_qc = _match_sidecar_one_to_one(
+        canonical_rows, qc_rows, label="S2 QC"
+    )
+    aligned_sidecar = _match_sidecar_one_to_one(
+        canonical_rows, sidecar_rows, label="source-metadata"
+    )
+
+    if expected_rows is not None and len(canonical_rows) != expected_rows:
+        raise S3ClassifyError(
+            f"S2 row count must be {expected_rows}; got {len(canonical_rows)}"
+        )
+    if expected_rows == profile["expected_rows"]:
+        _assert_aptadiff_s2_invariants(canonical_rows, source_key=source_key)
+
+    documented_target = aptadiff_expected_documented_target(source_key)
+    stats = AptaDiffS3Stats()
+    stats.s2_rows = len(canonical_rows)
+    stats.order_preserved = True
+
+    s3_canonical: list[dict[str, str]] = []
+    decision_rows: list[dict[str, str]] = []
+    rejection_rows: list[dict[str, str]] = []
+    parked_ssdna_rows: list[dict[str, str]] = []
+    local_detail_by_id: dict[str, dict[str, str]] = {}
+    core_by_id = {row["record_id"]: row["sequence_core"] for row in canonical_rows}
+
+    for s2_row, qc_row, meta_row in zip(
+        canonical_rows, aligned_qc, aligned_sidecar, strict=True
+    ):
+        if check_raw and meta_row.get("aptadiff_documented_target") != documented_target:
+            raise S3ClassifyError(
+                f"Documented target must remain {documented_target}"
+            )
+        classified = classify_aptadiff_record(
+            s2_row,
+            qc_row,
+            meta_row,
+            policy=policy,
+        )
+        if classified.canonical["record_id"] != s2_row["record_id"]:
+            stats.order_preserved = False
+            raise S3ClassifyError("S3 altered record_id or row identity")
+        for column in CORPUS_COLUMNS:
+            if classified.canonical[column] != s2_row[column]:
+                raise S3ClassifyError(
+                    f"S3 altered S2 canonical field {column!r}"
+                )
+        s3_canonical.append(classified.canonical)
+        decision_rows.append(classified.decision)
+        if classified.rejection_row is not None:
+            rejection_rows.append(classified.rejection_row)
+        if classified.park_row is not None:
+            if classified.primary_route == APTADIFF_PRIMARY_ROUTE_SSDNA:
+                parked_ssdna_rows.append(classified.park_row)
+            else:
+                raise S3ClassifyError(
+                    f"Park row has unexpected primary_route {classified.primary_route}"
+                )
+        local_detail_by_id[classified.canonical["record_id"]] = (
+            build_aptadiff_local_detail_row(
+                canonical=classified.canonical,
+                s2_qc=qc_row,
+                source_metadata=meta_row,
+                decision=classified.decision,
+            )
+        )
+        update_aptadiff_stats_from_row(stats, classified)
+
+    sampled, pool, shortfall = apply_aptadiff_random_accept_audit(
+        decision_rows,
+        local_detail_by_id,
+        seed=policy.random_seed,
+        sample_size=policy.random_accept_audit_size,
+    )
+    stats.random_accept_audit_pool_size = pool
+    stats.random_accept_audit_shortfall = shortfall
+    refresh_aptadiff_stats_after_audit(stats, decision_rows)
+
+    stats.s3_rows = len(s3_canonical)
+    stats.unique_record_ids = len({row["record_id"] for row in s3_canonical})
+    stats.unique_native_ids = len({row["native_id"] for row in s3_canonical})
+    stats.constant_region_proposals = 0
+
+    if stats.s3_rows != len(canonical_rows):
+        raise S3ClassifyError("S3 must preserve every S2 row")
+    if stats.unique_record_ids != len(s3_canonical):
+        raise S3ClassifyError("S3 record_id values are not unique")
+    if len({row["record_id"] for row in decision_rows}) != len(decision_rows):
+        raise S3ClassifyError("Decision sidecar contains duplicate record_id values")
+
+    rejected_n = stats.primary_route_counts.get(APTADIFF_PRIMARY_ROUTE_REJECT, 0)
+    parked_ssdna_n = stats.primary_route_counts.get(APTADIFF_PRIMARY_ROUTE_SSDNA, 0)
+    eligible_n = stats.primary_route_counts.get(APTADIFF_PRIMARY_ROUTE_ELIGIBLE, 0)
+    if rejected_n + parked_ssdna_n + eligible_n != stats.s3_rows:
+        raise S3ClassifyError(
+            "technical_rejects + parked_ssdna + technically_eligible "
+            "does not equal S3 rows"
+        )
+    if len(rejection_rows) != rejected_n:
+        raise S3ClassifyError(
+            "Rejection log count does not match technical_reject route"
+        )
+    if len(parked_ssdna_rows) != parked_ssdna_n:
+        raise S3ClassifyError("Parked ssDNA count does not match parked_ssdna route")
+    if sampled != stats.random_accept_audit_count:
+        raise S3ClassifyError("Random-accept audit count mismatch")
+    if eligible_n != 0 and pool == 0:
+        raise S3ClassifyError("RNA-eligible rows exist but audit pool is empty")
+    if eligible_n == 0 and sampled != 0:
+        raise S3ClassifyError(
+            "Zero technically eligible RNA must not fabricate a random-kept audit"
+        )
+    if stats.t_to_u_applied_count != 0:
+        raise S3ClassifyError("AptaDiff S3 must not apply T→U")
+    if stats.applied_trims != 0:
+        raise S3ClassifyError("AptaDiff S3 must not apply trims")
+    if stats.sequence_repaired_count != 0:
+        raise S3ClassifyError("AptaDiff S3 must not repair N-containing sequences")
+    if stats.nonempty_canonical_target_fields != 0:
+        raise S3ClassifyError("AptaDiff S3 must not populate deferred S4 fields")
+    if stats.sequence_leakage_count != 0 or stats.target_leakage_count != 0:
+        raise S3ClassifyError("AptaDiff S3 must not apply leakage exclusions")
+
+    if expected_rows == profile["expected_rows"]:
+        if parked_ssdna_n != profile["parked"]:
+            raise S3ClassifyError(
+                f"{source_key} parked ssDNA must be {profile['parked']}; "
+                f"got {parked_ssdna_n}"
+            )
+        if rejected_n != profile["rejected"]:
+            raise S3ClassifyError(
+                f"{source_key} technical rejects must be {profile['rejected']}; "
+                f"got {rejected_n}"
+            )
+        if eligible_n != 0:
+            raise S3ClassifyError(
+                f"{source_key} technically eligible RNA must be 0; got {eligible_n}"
+            )
+        if stats.unique_checkpoint_review_records != profile["rejected"]:
+            raise S3ClassifyError(
+                f"{source_key} active CHECKPOINT review must be "
+                f"{profile['rejected']}; got {stats.unique_checkpoint_review_records}"
+            )
+        if stats.random_accept_audit_count != 0:
+            raise S3ClassifyError(
+                f"{source_key} random-kept audit must be 0; "
+                f"got {stats.random_accept_audit_count}"
+            )
+        if stats.random_accept_audit_pool_size != 0:
+            raise S3ClassifyError(
+                f"{source_key} random-kept audit pool must be 0"
+            )
+        if stats.constant_review_count != 0 or stats.boundary_review_count != 0:
+            raise S3ClassifyError(
+                f"{source_key} must not create trim or length-boundary review"
+            )
+
+    for row in decision_rows:
+        if not row["primary_reason"]:
+            raise S3ClassifyError("Decision row missing primary_reason")
+
+    assert_aptadiff_accept_invariants(decision_rows)
+    assert_aptadiff_reject_park_invariants(decision_rows)
+
+    reason_count_rows: list[dict[str, str]] = []
+    combo_counts: dict[tuple[str, str], int] = {}
+    for row in decision_rows:
+        key = (row["proposed_decision"], row["primary_reason"])
+        combo_counts[key] = combo_counts.get(key, 0) + 1
+    for (decision, reason), count in sorted(combo_counts.items()):
+        reason_count_rows.append(
+            {
+                "proposed_decision": decision,
+                "primary_reason": reason,
+                "record_count": str(count),
+            }
+        )
+    if sum(int(row["record_count"]) for row in reason_count_rows) != len(decision_rows):
+        raise S3ClassifyError("Reason counts do not reconcile to decision rows")
+
+    review_rows = sorted(decision_rows, key=review_sort_key)
+    local_detail_rows: list[dict[str, str]] = []
+    for review_row in review_rows:
+        record_id = review_row["record_id"]
+        if record_id not in local_detail_by_id:
+            raise S3ClassifyError(
+                f"Missing local-detail row for record_id={record_id!r}"
+            )
+        detail = local_detail_by_id[record_id]
+        if detail["sequence_core"] != core_by_id[record_id]:
+            raise S3ClassifyError("CHECKPOINT-1 must not apply constant-region trims")
+        if detail.get("manual_decision"):
+            raise S3ClassifyError("Local-detail must not pre-fill manual_decision")
+        for field_name in (
+            "manual_sequence_corrected",
+            "manual_molecule_type_override",
+            "manual_trim_action",
+            "manual_notes",
+        ):
+            if detail.get(field_name):
+                raise S3ClassifyError(
+                    f"Local-detail must not pre-fill {field_name}"
+                )
+        local_detail_rows.append(detail)
+    for review_row, detail_row in zip(review_rows, local_detail_rows, strict=True):
+        if review_row["record_id"] != detail_row["record_id"]:
+            raise S3ClassifyError(
+                "Local-detail ordering does not match sequence-free review"
+            )
+        if review_row["review_batch"] != detail_row.get("review_batch", ""):
+            raise S3ClassifyError("Local-detail review_batch mismatch")
+
+    forbidden_seq_cols = {"sequence_raw", "sequence_full", "sequence_core"}
+    for col in forbidden_seq_cols:
+        if col in APTADIFF_DECISION_COLUMNS or col in APTADIFF_PARK_COLUMNS:
+            raise S3ClassifyError(f"Sequence column leaked into sidecar schema: {col}")
+    for col in ("sequence_raw", "sequence_full", "sequence_core"):
+        if col not in APTADIFF_LOCAL_DETAIL_COLUMNS:
+            raise S3ClassifyError(
+                f"Local-detail schema missing required sequence column: {col}"
+            )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_canonical = output_dir / f"{source_key}_s3_canonical.csv"
+    out_decisions = output_dir / f"{source_key}_s3_decisions.csv"
+    out_review = output_dir / f"{source_key}_checkpoint1_review.csv"
+    out_local_detail = output_dir / f"{source_key}_checkpoint1_local_detail.csv"
+    out_reason_counts = output_dir / f"{source_key}_checkpoint1_reason_counts.csv"
+    out_rejected = output_dir / f"rejected_{source_key}.csv"
+    out_parked_ssdna = output_dir / f"{source_key}_s3_parked_ssdna.csv"
+    out_summary = output_dir / f"{source_key}_checkpoint1_summary.md"
+
+    write_corpus_csv_atomic(out_canonical, s3_canonical)
+    write_csv_atomic(out_decisions, APTADIFF_DECISION_COLUMNS, decision_rows)
+    write_csv_atomic(out_review, APTADIFF_DECISION_COLUMNS, review_rows)
+    write_csv_atomic(out_local_detail, APTADIFF_LOCAL_DETAIL_COLUMNS, local_detail_rows)
+    write_csv_atomic(out_reason_counts, APTADIFF_REASON_COUNT_COLUMNS, reason_count_rows)
+    write_csv_atomic(out_rejected, APTADIFF_REJECTION_COLUMNS, rejection_rows)
+    write_csv_atomic(out_parked_ssdna, APTADIFF_PARK_COLUMNS, parked_ssdna_rows)
+
+    s2_hash_after = _sha256_file(canonical_path)
+    qc_hash_after = _sha256_file(qc_path)
+    sidecar_hash_after = _sha256_file(sidecar_path)
+    raw_sha_after = raw_sha_before
+    if check_raw:
+        digest = _sha256_file(raw_path)
+        if digest != profile["raw_sha256"]:
+            raise S3ClassifyError(f"{source_key} raw SHA-256 changed during S3")
+        raw_sha_after = digest
+        if s1_canonical_path.is_file():
+            if _sha256_file(s1_canonical_path) != profile["s1_canonical_sha256"]:
+                raise S3ClassifyError(f"{source_key} S1 canonical hash changed during S3")
+        if _sha256_file(sidecar_path) != profile["s1_sidecar_sha256"]:
+            raise S3ClassifyError(f"{source_key} S1 sidecar hash changed during S3")
+    inputs_unchanged = (
+        s2_hash_before == s2_hash_after
+        and qc_hash_before == qc_hash_after
+        and sidecar_hash_before == sidecar_hash_after
+        and (not check_raw or raw_sha_before == raw_sha_after)
+    )
+    if not inputs_unchanged:
+        raise S3ClassifyError("S2/source inputs were modified during S3 execution")
+
+    s2_integrity_ok = True
+    if _sha256_file(out_canonical) != s2_hash_before:
+        raise S3ClassifyError(
+            "S3 canonical output is not byte-identical to S2 normalised input"
+        )
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        first_hashes = {
+            "canonical": _sha256_file(out_canonical),
+            "decisions": _sha256_file(out_decisions),
+            "review": _sha256_file(out_review),
+            "local_detail": _sha256_file(out_local_detail),
+            "reason_counts": _sha256_file(out_reason_counts),
+            "rejected": _sha256_file(out_rejected),
+            "parked_ssdna": _sha256_file(out_parked_ssdna),
+        }
+        second = run_aptadiff_s3(
+            repo_root=repo_root,
+            source_key=source_key,
+            input_dir=input_dir,
+            source_metadata_dir=source_metadata_dir,
+            eligibility_policy=eligibility_policy,
+            output_dir=output_dir,
+            expected_rows=expected_rows,
+            check_deterministic_rerun=False,
+        )
+        second_hashes = {
+            "canonical": _sha256_file(second.output_canonical),
+            "decisions": _sha256_file(second.output_decisions),
+            "review": _sha256_file(second.output_review),
+            "local_detail": _sha256_file(second.output_local_detail),
+            "reason_counts": _sha256_file(second.output_reason_counts),
+            "rejected": _sha256_file(second.output_rejected)
+            if second.output_rejected
+            else "",
+            "parked_ssdna": _sha256_file(second.output_parked_ssdna)
+            if second.output_parked_ssdna
+            else "",
+        }
+        if first_hashes != second_hashes:
+            raise S3ClassifyError("Deterministic AptaDiff S3 rerun is not byte-identical")
+        deterministic_ok = True
+
+    run_result = S3RunResult(
+        source_key=source_key,
+        stats=stats,
+        output_canonical=out_canonical,
+        output_decisions=out_decisions,
+        output_review=out_review,
+        output_local_detail=out_local_detail,
+        output_summary=out_summary,
+        output_reason_counts=out_reason_counts,
+        output_leakage_matches=None,
+        s2_hash_before=s2_hash_before,
+        s2_hash_after=s2_hash_after,
+        qc_hash_before=qc_hash_before,
+        qc_hash_after=qc_hash_after,
+        sidecar_hash_before=sidecar_hash_before,
+        sidecar_hash_after=sidecar_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        deterministic_rerun_ok=deterministic_ok,
+        s2_integrity_ok=s2_integrity_ok,
+        output_rejected=out_rejected,
+        output_parked_ssdna=out_parked_ssdna,
+        raw_sha_before=raw_sha_before,
+        raw_sha_after=raw_sha_after,
+    )
+    summary_text = build_aptadiff_checkpoint1_summary(
+        repo_root=repo_root,
+        result=run_result,
+        policy_path=eligibility_policy,
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in summary_text:
+        raise S3ClassifyError(
+            "CHECKPOINT-1 summary must not contain absolute repository paths"
+        )
+    if APTADIFF_PIPELINE_STOP_STATEMENT not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary missing pipeline stop statement")
+    if "authorised_for_s4: `0`" not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary must keep authorised_for_s4 at 0")
+    if "Evidence scored: `no`" not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary missing evidence deferral")
+    _write_text_atomic(out_summary, summary_text)
+    return run_result
+
+
 def run_s3_classification(
     *,
     repo_root: Path,
@@ -5463,6 +6278,17 @@ def run_s3_classification(
             expected_rows=(
                 EXPECTED_APTAMERBASE_ROWS if expected_rows is None else expected_rows
             ),
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key in {"aptadiff_a", "aptadiff_b"}:
+        return run_aptadiff_s3(
+            repo_root=repo_root,
+            source_key=source_key,
+            input_dir=input_dir,
+            source_metadata_dir=source_metadata_dir,
+            eligibility_policy=eligibility_policy,
+            output_dir=output_dir,
+            expected_rows=expected_rows,
             check_deterministic_rerun=check_deterministic_rerun,
         )
     raise S3ClassifyError(f"Unknown S3 source_key={source_key!r}")
@@ -5591,6 +6417,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_path = Path("config/source_eligibility/ena.json")
         elif args.source == "aptamerbase":
             policy_path = Path("config/source_eligibility/aptamerbase.json")
+        elif args.source == "aptadiff_a":
+            policy_path = Path("config/source_eligibility/aptadiff_a.json")
+        elif args.source == "aptadiff_b":
+            policy_path = Path("config/source_eligibility/aptadiff_b.json")
         else:
             raise S3ClassifyError(
                 "--eligibility-policy is required for unknown sources"
@@ -5609,6 +6439,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_dir = Path("data/interim/checkpoints/ena_cp1")
         elif args.source == "aptamerbase":
             output_dir = Path("data/interim/checkpoints/aptamerbase_cp1")
+        elif args.source == "aptadiff_a":
+            output_dir = Path("data/interim/checkpoints/aptadiff_a_cp1")
+        elif args.source == "aptadiff_b":
+            output_dir = Path("data/interim/checkpoints/aptadiff_b_cp1")
         else:
             output_dir = Path("data/interim/checkpoints/aptabase_cp1")
 
@@ -5633,6 +6467,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         AptaIndexS3Error,
         EnaS3Error,
         AptamerBaseS3Error,
+        AptaDiffS3Error,
         EligibilityError,
         CorpusSchemaError,
     ) as exc:

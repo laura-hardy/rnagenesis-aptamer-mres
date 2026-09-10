@@ -19,5 +19,7 @@ ADAPTER_KEYS: Final[frozenset[str]] = frozenset(
         "aptaindex",
         "ena",
         "aptamerbase",
+        "aptadiff_a",
+        "aptadiff_b",
     }
 )

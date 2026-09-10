@@ -238,6 +238,12 @@ def test_forbidden_companion_cannot_be_substituted(
         "data/raw/riboaptamer/RNA_APTAMER_SEQS.CSV",
         "data/raw/riboaptamer/rna_aptamer_seqs.xlsx",
         "data/raw/riboaptamer/RNA_APTAMER_SEQS.XLSX",
+        "data/raw/Aptadiff_datasetA/datasetA_IGFBP3_x_z.csv",
+        "data/raw/Aptadiff_datasetA/DATASETA_IGFBP3_X_Z.CSV",
+        "data/raw/Aptadiff_otherdata/datasetC.fastq",
+        "data/raw/Aptadiff_otherdata/DATASETC.FASTQ",
+        "data/raw/Aptadiff_otherdata/datasetD.fastq",
+        "data/raw/Aptadiff_otherdata/DATASETD.FASTQ",
     ],
 )
 def test_forbidden_companion_basename_check_is_case_insensitive(
@@ -295,6 +301,8 @@ def test_forbidden_fixtures_directory_check_is_case_insensitive(
         "data/raw/aptabase/Aptamer Search Page Notes.html",
         "data/raw/riboaptamer/all_sequences_509_rows.csv",
         "data/raw/riboaptamer/rna_aptamer_seqs_backup.csv",
+        "data/raw/Aptadiff_datasetA/datasetA_IGFBP3_P6.csv",
+        "data/raw/Aptadiff_otherdata/datasetB_PTK7_P6.csv",
     ],
 )
 def test_similar_filename_not_falsely_rejected_as_forbidden_companion(

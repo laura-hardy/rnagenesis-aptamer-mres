@@ -1,0 +1,16 @@
+{
+  "source_key": "aptadiff_a",
+  "contract_version": "1.0",
+  "molecule_type": "ssDNA",
+  "chemistry": "DNA",
+  "molecule_evidence_source": "source_contract",
+  "do_not_infer_molecule_from_alphabet": true,
+  "construct_scope": "random_region_only",
+  "apply_approved_trims": false,
+  "approved_trims": [],
+  "group_inference_key": "disabled",
+  "do_not_apply_inferred_trims": true,
+  "p6_field": "aptadiff_p6",
+  "documented_target_field": "aptadiff_documented_target",
+  "dataset_field": "aptadiff_dataset"
+}

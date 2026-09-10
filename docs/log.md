@@ -6392,3 +6392,661 @@ AptamerBase target/evidence enrichment has NOT been run.
 Global S4 has not been run.
 ```
 
+## 2026-09-10 — AptaDiff Dataset A/B S0 registration and S1 verbatim extraction
+
+**Stage:** Aim 2 / data curation / AptaDiff A/B S0 registration + S1
+verbatim extraction only. AptaDiff S2 was not started.
+
+### What was done
+
+AptaDiff Dataset A and Dataset B were registered as two distinct Tier-1
+sources and extracted independently. There is no combined `aptadiff`
+source identity or output. Every physical P6 CSV row was retained.
+Sequence normalisation, molecule/chemistry decisions, T→U conversion,
+constant-region inference, target canonicalisation, evidence/affinity
+mapping, eligibility, parking, capping, downsampling, clustering,
+deduplication, CHECKPOINT-1, and global S4 were not performed.
+
+### Decisions made
+
+- Two source keys: `aptadiff_a` and `aptadiff_b`. They are not merged.
+- `native_id` is the zero-padded 1-based CSV data-row ordinal (five
+  digits). `record_id` is `aptadiff_a:{native_id}` or
+  `aptadiff_b:{native_id}`. Sequence is not used as a native ID.
+- Source `seq` is copied verbatim into `sequence_raw`. No uppercase,
+  whitespace stripping, T→U, N repair, alphabet exclusion, trimming,
+  or row collapse.
+- There is no per-row target column. `target_name_raw` remains empty.
+  Documented IGFBP3 (A) and PTK7 (B) identity is sidecar-only
+  (`aptadiff_documented_target`, `aptadiff_target_provenance`).
+- Source `p6` is preserved exactly in each sidecar and is not mapped
+  to affinity, evidence, a binding score, or a sampling/capping weight.
+  Its later use for abundance-aware capping and Dataset A replication
+  remains available; S1 does not interpret it as round-6 read count.
+- S1 is molecule-neutral. Primary-source review outside Cursor
+  indicates ssDNA HT-SELEX libraries with a DNA_T alphabet and
+  random-region-only 36-nt constructs; that evidence will govern the
+  forthcoming S2 decision. It was not applied at S1.
+- `datasetA_IGFBP3_x_z.csv` is a derived latent-coordinate file and is
+  forbidden as a parallel input. Dataset A remains 13803 rows; it is
+  not reduced to the 13802-row x_z derivative. Dataset A is retained
+  whole for a later uncapped replication role.
+- Dataset C and Dataset D are not companion corpus inputs.
+- `redistribution_status = unknown` because no explicit sequence-data
+  redistribution licence has been established.
+- No capping or downsampling during S1–S3.
+
+### Inputs used
+
+- `source_key = aptadiff_a`
+- `source_dataset = aptadiff_a_igfbp3_p6_2026-06-22`
+- `data/raw/Aptadiff_datasetA/datasetA_IGFBP3_P6.csv`
+- SHA-256:
+  `ec970c478aaba1aa089ecbaf7f5bc8aa7a11f6eacd0f7b3d3c418de6a27e8c77`
+- 13803 rows; schema `seq,p6`
+- Snapshot date: `2026-06-22`; tier `1`;
+  `redistribution_status = unknown`
+
+- `source_key = aptadiff_b`
+- `source_dataset = aptadiff_b_ptk7_p6_2026-06-22`
+- `data/raw/Aptadiff_otherdata/datasetB_PTK7_P6.csv`
+- SHA-256:
+  `546de810e34035731502caf6476c73cc06feab8156ec8178efaade2d21bf4d72`
+- 11547 rows; schema `seq,p6`
+- Snapshot date: `2026-06-22`; tier `1`;
+  `redistribution_status = unknown`
+
+### Outputs produced
+
+Ignored under `/data/`:
+
+- `data/interim/registry/source_registry.csv` (operational S0 registry;
+  17 validated registered files; exactly one `aptadiff_a` and one
+  `aptadiff_b` entry)
+- `data/interim/extracted/aptadiff_a_extracted.csv` (13803 rows)
+- `data/interim/extracted/aptadiff_a_source_metadata.csv` (13803 rows)
+- `data/interim/extracted/aptadiff_a_s1_report.md`
+- `data/interim/extracted/aptadiff_b_extracted.csv` (11547 rows)
+- `data/interim/extracted/aptadiff_b_source_metadata.csv` (11547 rows)
+- `data/interim/extracted/aptadiff_b_s1_report.md`
+
+Tracked scripts, tests and this log entry. Nothing under `data/` is
+tracked. The governing curation plan was not updated.
+
+### Numbers
+
+Dataset A:
+
+- 13803 rows in / 13803 canonical / 13803 sidecar
+- 13803 unique `record_id`; 13803 unique `native_id`
+- first native ID `00001`; last native ID `13803`
+- all length 36; 13802 A/C/G/T-only; 1 N-containing row retained
+- no missing rows; no duplicate sequences
+- p6 sidecar exact copy; diagnostic min/median/max 5 / 9 / 194981
+- `target_name_raw` populated: 0
+
+Dataset B:
+
+- 11547 rows in / 11547 canonical / 11547 sidecar
+- 11547 unique `record_id`; 11547 unique `native_id`
+- first native ID `00001`; last native ID `11547`
+- all length 36; 11532 A/C/G/T-only; 15 N-containing rows retained
+- no missing rows; no duplicate sequences
+- p6 sidecar exact copy; diagnostic min/median/max 2 / 4 / 36136
+- `target_name_raw` populated: 0
+
+A vs B exact sequence overlap: 0. No combined output. 0 S1
+rejections, parking, filtering, capping, or deduplication.
+
+S0: 15 registered files before, 17 after; 17 validated; existing
+AptaBase and ENA inventory-override warnings only. x_z, C, and D are
+not registered.
+
+Source raw hashes unchanged before and after S0/S1. Deterministic S1
+rerun: byte-identical canonical, sidecar, and report files.
+
+### Open questions carried forward
+
+- S2 molecule/chemistry/alphabet decision (ssDNA / DNA_T; no T→U;
+  random_region_only) is authorised only as a forthcoming S2 task.
+- Later abundance-aware target capping using preserved `p6`.
+- Dataset A uncapped replication export later.
+- CHECKPOINT-1 later. Global S4 later.
+
+### Pipeline status
+
+```text
+AptaDiff Dataset A S0 complete
+AptaDiff Dataset A S1 complete
+AptaDiff Dataset A S2 has not started
+AptaDiff Dataset B S0 complete
+AptaDiff Dataset B S1 complete
+AptaDiff Dataset B S2 has not started
+No AptaDiff A/B record is authorised for global S4
+```
+
+## 2026-09-10 — AptaDiff Dataset A/B S2 sequence normalisation
+
+**Stage:** Aim 2 / data curation / AptaDiff A/B S2 sequence normalisation only.
+AptaDiff S3 was not started. Records were not parked.
+
+### What was done
+
+Accepted S1 canonical tables for `aptadiff_a` and `aptadiff_b` were
+normalised independently through the shared sequence-normalisation
+machinery and two separate source-normalisation contracts. There is
+still no combined `aptadiff` source identity. Every S1 row was
+retained. S3 eligibility, ssDNA parking, N-row rejection, CHECKPOINT-1,
+global-S4 handoffs, capping, downsampling, clustering, balancing,
+partitioning, and Dataset-A replication export were not performed.
+
+The governing plan was corrected so future implementation does not treat
+A/B as RNA.
+
+### Decisions made
+
+- Laura's explicit source-level decision, from primary AptaDiff paper
+  review: both A and B are genuine ssDNA HT-SELEX libraries, not RNA
+  molecules printed using T. Canonical chemistry is DNA.
+- Molecule identity is not inferred from sequence alphabet.
+- Canonical S2 retains DNA. `t_to_u_applied = false` for every row.
+  No ordinary AptaDiff sequence is computationally transcribed to RNA.
+- The registered P6 `seq` values are 36-nt random regions. Experimental
+  fixed primer constructs were already excluded.
+  `construct_scope = random_region_only`; `sequence_core == sequence_full`.
+- Constant-region inference is disabled by source contract. No known-motif
+  trim, T7-promoter trim, group-wise consensus trim, or selected-sequence
+  end scanning. Shared SELEX motifs are not treated as residual primers.
+  The constant-region proposal artefact is header-only.
+- N-containing rows (A: 1; B: 15) survive S2, remain ssDNA, are classified
+  `alphabet_as_reported = ambiguous`, carry `ambiguous_base`, and are
+  review candidates. N is not repaired, dropped, or used to exclude the
+  row. Later S3 technical rejection is not applied here.
+- `p6` is preserved uninterpreted in the S1 sidecar and copied into S2 QC
+  only. It does not populate affinity or evidence fields and is not used
+  for filtering or sampling.
+- Canonical `target_name_raw` remains empty. Documented IGFBP3 (A) and
+  PTK7 (B) identity remains sidecar provenance. Target canonicalisation
+  remains global S4.
+- Binding evidence, evidence score, affinity, leakage, and target
+  eligibility are not evaluated at S2. HT-SELEX provenance is not an
+  instruction to assign E4 here.
+- Dataset A remains 13,803 rows (not reduced to the 13,802-row `x_z`
+  derivative) and remains available, uncapped, for later AptaDiff /
+  RNAGenesis replication/comparability. Any future RNA-alphabet Dataset-A
+  representation would be a derived replication-specific transformation
+  with explicit provenance, not a change to experimental molecule identity.
+  That derived representation was not built.
+- The previous plan instruction to computationally transcribe A/B to RNA
+  for the canonical corpus is superseded. Ordinary technically valid rows
+  will later park as ssDNA and are excluded from the primary RNA corpus by
+  default. They do not participate in ordinary primary-RNA target capping
+  unless the DNA-parking policy is later changed.
+
+### Inputs used
+
+S1 canonical outputs (unchanged hashes):
+
+- `data/interim/extracted/aptadiff_a_extracted.csv`
+  SHA-256: `22bd7357311ce5d9d0a000c20f75fc439942b16c37105a71509fb8329ee7b083`
+- `data/interim/extracted/aptadiff_a_source_metadata.csv`
+  SHA-256: `ec0453c50205854dc1648c833a2f96a40b691ee39b8c49433d0024480c9314ea`
+- `data/interim/extracted/aptadiff_b_extracted.csv`
+  SHA-256: `321ef00b4e7a78834f431b4335bf21e89752c8e596523480676f2d5ac2e50921`
+- `data/interim/extracted/aptadiff_b_source_metadata.csv`
+  SHA-256: `3f7183e5999d2f729b1fd1d225287b3515414cec2d7b91e44de46cf84a5ec4a0`
+
+Registered raw files (hash-verification only; unchanged):
+
+- `data/raw/Aptadiff_datasetA/datasetA_IGFBP3_P6.csv`
+  SHA-256: `ec970c478aaba1aa089ecbaf7f5bc8aa7a11f6eacd0f7b3d3c418de6a27e8c77`
+- `data/raw/Aptadiff_otherdata/datasetB_PTK7_P6.csv`
+  SHA-256: `546de810e34035731502caf6476c73cc06feab8156ec8178efaade2d21bf4d72`
+
+Source policies:
+
+- `config/source_normalisation/aptadiff_a.json`
+- `config/source_normalisation/aptadiff_b.json`
+- Shared rules: `config/sequence_normalisation_rules.json`
+
+### Outputs produced
+
+Ignored under `/data/`:
+
+- `data/interim/normalised/aptadiff_a_normalised.csv` (13803 rows)
+- `data/interim/normalised/aptadiff_a_s2_qc.csv`
+- `data/interim/normalised/aptadiff_a_s2_review_candidates.csv` (1 row)
+- `data/interim/normalised/detected_constants_aptadiff_a.csv` (header only)
+- `data/interim/normalised/aptadiff_a_s2_report.md`
+- `data/interim/normalised/aptadiff_b_normalised.csv` (11547 rows)
+- `data/interim/normalised/aptadiff_b_s2_qc.csv`
+- `data/interim/normalised/aptadiff_b_s2_review_candidates.csv` (15 rows)
+- `data/interim/normalised/detected_constants_aptadiff_b.csv` (header only)
+- `data/interim/normalised/aptadiff_b_s2_report.md`
+
+Tracked: source-normalisation configs, AptaDiff S2 adapter, S2 dispatcher,
+synthetic tests, governing-plan correction, and this log entry. Nothing
+under `data/` is tracked.
+
+### Numbers
+
+Dataset A:
+
+- 13803 S1 rows in / 13803 S2 rows out; 0 dropped; 0 parked
+- `molecule_type=ssDNA` 13803; `chemistry=DNA` 13803
+- `alphabet_as_reported=DNA_T` 13802; `ambiguous` 1
+- T→U applied: 0; applied trims: 0; core differs from full: 0
+- length 36 for every row; `random_region_only` 13803
+- review candidates: 1 (the N-containing row)
+
+Dataset B:
+
+- 11547 S1 rows in / 11547 S2 rows out; 0 dropped; 0 parked
+- `molecule_type=ssDNA` 11547; `chemistry=DNA` 11547
+- `alphabet_as_reported=DNA_T` 11532; `ambiguous` 15
+- T→U applied: 0; applied trims: 0; core differs from full: 0
+- length 36 for every row; `random_region_only` 11547
+- review candidates: 15 (N-containing rows)
+
+S1 canonical, sidecar, and S1 report hashes were unchanged after S2.
+Registered raw hashes were unchanged. Deterministic S2 rerun:
+byte-identical normalised, QC, review, and proposal files. `git ls-files
+data` remains empty.
+
+### Open questions carried forward
+
+- S3 technical eligibility, including routing of ordinary valid ssDNA
+  rows to the parked-ssDNA lane and separate handling of the 16
+  N-containing rows, is authorised only as a forthcoming S3 task.
+- Dataset A uncapped replication export later, including any optional
+  derived RNA-alphabet representation.
+- CHECKPOINT-1 later. Global S4 later.
+
+### Pipeline status
+
+```text
+AptaDiff Dataset A S0 complete
+AptaDiff Dataset A S1 complete
+AptaDiff Dataset A S2 complete
+AptaDiff Dataset A S3 has not started
+AptaDiff Dataset B S0 complete
+AptaDiff Dataset B S1 complete
+AptaDiff Dataset B S2 complete
+AptaDiff Dataset B S3 has not started
+No AptaDiff A/B record has been parked
+No AptaDiff A/B record is authorised for global S4
+```
+
+## 2026-09-10 — AptaDiff Dataset A/B S3 technical classification and CHECKPOINT-1 preparation
+
+**Stage:** Aim 2 / data curation / AptaDiff A/B S3 technical classification +
+CHECKPOINT-1 package preparation only. Human review was not entered.
+CHECKPOINT-1 was not applied or closed. Global-S4 handoffs were not prepared.
+Dataset-A replication output was not built.
+
+### What was done
+
+Accepted S2 tables for `aptadiff_a` and `aptadiff_b` were classified
+independently through source-specific eligibility policies and a shared
+AptaDiff S3 adapter. There is still no combined `aptadiff` source identity.
+Every S2 row was retained and assigned exactly one primary route. Technical
+sequence failure was applied before otherwise-valid ssDNA parking. Unresolved
+CHECKPOINT-1 packages were generated for Laura; human decision fields were left
+blank.
+
+### Decisions made
+
+- Both sources remain experimentally `molecule_type = ssDNA`, `chemistry =
+  DNA`. Canonical DNA was retained. No T→U.
+- Ordinary clean A/C/G/T 36-nt `random_region_only` records park as
+  `ssdna_parked`. They are not RNA accepts, not global-S4-authorised, and not
+  CHECKPOINT scientific anomalies. They do not require manual confirmation.
+- N-containing rows remain experimentally ssDNA, but the unresolved IUPAC N
+  is a technical sequence failure (`proposed_reject`, `ambiguous_bases`) rather
+  than an ordinary DNA park. N was not repaired, inferred, deleted, or
+  transcribed. These 16 rows are the only active CHECKPOINT-1 scientific
+  exceptions.
+- Machine recommendation for those exceptions is `confirm_current_reject`
+  (no source-supported deterministic repair). Human `manual_*` fields remain
+  blank. CHECKPOINT-1 remains unresolved.
+- Empty `target_name_raw` is not a missing-target rejection. Documented IGFBP3
+  (A) and PTK7 (B) identity remains sidecar provenance.
+- `p6` is preserved uninterpreted and is not a technical gate.
+- Constant-region inference remains disabled. Applied trims = 0. Length 36
+  is inside the technical window (`length_out_of_range = 0`).
+- Zero technically eligible RNA records. The random-kept audit pool is empty
+  (sampled 0 / requested 30 / shortfall 30). No fabricated RNA audit.
+- `authorised_for_s4` remains 0 for both sources. No global-S4 handoff was
+  prepared.
+- Dataset-A replication (`corpus_replication_datasetA.csv`) was not built.
+  Whether a later replication file should preserve all 13,803 P6 rows or
+  the 13,802-row x_z consumed set is deferred. Canonical S3 may reject the one
+  N-containing Dataset-A row; the source row remains in raw/S1/S2.
+
+### Inputs used
+
+S2 canonical hashes (unchanged):
+
+- `data/interim/normalised/aptadiff_a_normalised.csv`
+  SHA-256: `c88e6f12dea4d60377a1c5a7a95861fcc666e47be27920a234f828b70df6ca55`
+- `data/interim/normalised/aptadiff_b_normalised.csv`
+  SHA-256: `c40bc662f4c79fcc24c161c5a82e74c2d58f96fbb6ca74fbb84b105bf8bc98f6`
+
+S1 hashes (unchanged):
+
+- `data/interim/extracted/aptadiff_a_extracted.csv`
+  SHA-256: `22bd7357311ce5d9d0a000c20f75fc439942b16c37105a71509fb8329ee7b083`
+- `data/interim/extracted/aptadiff_a_source_metadata.csv`
+  SHA-256: `ec0453c50205854dc1648c833a2f96a40b691ee39b8c49433d0024480c9314ea`
+- `data/interim/extracted/aptadiff_b_extracted.csv`
+  SHA-256: `321ef00b4e7a78834f431b4335bf21e89752c8e596523480676f2d5ac2e50921`
+- `data/interim/extracted/aptadiff_b_source_metadata.csv`
+  SHA-256: `3f7183e5999d2f729b1fd1d225287b3515414cec2d7b91e44de46cf84a5ec4a0`
+
+Registered raw hashes (unchanged):
+
+- `data/raw/Aptadiff_datasetA/datasetA_IGFBP3_P6.csv`
+  SHA-256: `ec970c478aaba1aa089ecbaf7f5bc8aa7a11f6eacd0f7b3d3c418de6a27e8c77`
+- `data/raw/Aptadiff_otherdata/datasetB_PTK7_P6.csv`
+  SHA-256: `546de810e34035731502caf6476c73cc06feab8156ec8178efaade2d21bf4d72`
+
+Policies:
+
+- `config/source_eligibility/aptadiff_a.json`
+- `config/source_eligibility/aptadiff_b.json`
+
+### Outputs produced
+
+Ignored under `/data/`:
+
+- `data/interim/checkpoints/aptadiff_a_cp1/` (S3 decisions, parked ssDNA,
+  rejection log, all-record sequence-free review index, local-detail, summary)
+- `data/interim/checkpoints/aptadiff_a_cp1/manual_review/` (1-row active queue;
+  human fields blank)
+- `data/interim/checkpoints/aptadiff_b_cp1/` (separate B artefacts)
+- `data/interim/checkpoints/aptadiff_b_cp1/manual_review/` (15-row active queue;
+  human fields blank)
+
+Tracked: eligibility policies, recommendation configs, AptaDiff S3 adapter,
+CHECKPOINT-1 prepare helper, S3/CHECKPOINT dispatch, synthetic tests, and this
+log entry. Nothing under `data/` is tracked.
+
+### Numbers
+
+Dataset A:
+
+- S3 input = 13803
+- parked ssDNA = 13802 (`ssdna_parked`)
+- technical reject = 1 (`ambiguous_bases`)
+- technically eligible RNA = 0
+- 13803 = 13802 + 1 + 0
+- active CHECKPOINT review = 1
+- `authorised_for_s4` = 0
+
+Dataset B:
+
+- S3 input = 11547
+- parked ssDNA = 11532 (`ssdna_parked`)
+- technical reject = 15 (`ambiguous_bases`)
+- technically eligible RNA = 0
+- 11547 = 11532 + 15 + 0
+- active CHECKPOINT review = 15
+- `authorised_for_s4` = 0
+
+Combined diagnostic only (outputs remain separate): 25350 rows; 25334 parked
+ssDNA; 16 ambiguous-N technical rejects; 0 RNA eligible.
+
+T→U applied: 0. Applied trims: 0. Constant-region proposals: 0.
+`length_out_of_range` = 0. Human decision fields blank. CHECKPOINT-1 not closed.
+
+### Open questions carried forward
+
+- Laura CHECKPOINT-1 review of the 16 N-containing technical exceptions.
+- After closure: whether the live architecture wants no global-S4 handoff
+  because authorised count = 0, or an explicit empty/zero-record closure
+  handoff for provenance.
+- Dataset-A replication row-count decision (13,803 P6 vs 13,802 x_z).
+- Later abundance-aware target capping using preserved `p6`.
+
+### Pipeline status
+
+```text
+AptaDiff Dataset A S0 complete
+AptaDiff Dataset A S1 complete
+AptaDiff Dataset A S2 complete
+AptaDiff Dataset A S3 complete
+AptaDiff Dataset A CHECKPOINT-1 package generated; human review pending
+AptaDiff Dataset B S0 complete
+AptaDiff Dataset B S1 complete
+AptaDiff Dataset B S2 complete
+AptaDiff Dataset B S3 complete
+AptaDiff Dataset B CHECKPOINT-1 package generated; human review pending
+CHECKPOINT-1 not applied
+CHECKPOINT-1 not closed
+No AptaDiff A/B record is authorised for global S4
+Dataset-A replication not built
+```
+
+## 2026-09-10 — AptaDiff Dataset A/B CHECKPOINT-1 closed
+
+**Stage:** Aim 2 / data curation / AptaDiff A/B CHECKPOINT-1 human
+decision recording, fail-closed validation, dry-run, actual apply, and
+closure. Global S4 was not prepared or run. Dataset-A replication was
+not built. No T→U was introduced. The replication denominator remains a
+later decision.
+
+### What was done
+
+Laura approved the complete CHECKPOINT-1 decision set in advance: all
+16 unresolved-IUPAC-N review records (1 in Dataset A, 15 in Dataset B)
+were confirmed as current technical rejects. There was no
+source-supported deterministic nucleotide repair. No nucleotide
+replacement was invented. Ordinary ssDNA parks were not reviewed as
+scientific exceptions and were left on their existing park route.
+
+Human decisions were recorded in the existing AptaDiff CHECKPOINT-1
+review files using the live `keep` / `drop` / `edit` vocabulary.
+Confirming the current reject is encoded as `manual_decision=keep` so
+the technical reason remains `ambiguous_bases`. Correction fields were
+left empty. No-review parked rows were not marked as reviewed exceptions
+and were not authorised for S4.
+
+Fail-closed validation passed for both sources. The empty RNA-eligible
+audit pool was not treated as an unresolved human decision and no audit
+rows were fabricated. A production dry-run used the same
+`apply_aptadiff_checkpoint1_package` transformation as actual apply and
+was GO for both sources, including a byte-identical deterministic
+rerun. Actual apply then matched the locked dry-run preview
+(`semantic_mismatches=0`; compared artefacts were byte-identical).
+Sequence-safe tracked closure artefacts were written separately for
+`aptadiff_a` and `aptadiff_b`.
+
+These two Tier-1 sources are now completely curated at CHECKPOINT-1.
+They contribute no records to primary global S4. Ordinary records
+remain parked DNA. AptaDiff A/B do not contribute to the RNA corpus at
+this stage.
+
+### Decisions made
+
+- All 16 reviewed records: confirm current rejection (`keep`).
+- Technical rejection reason remains `ambiguous_bases`.
+- 0 approved repairs; 0 sequence edits; 0 molecule overrides;
+  0 chemistry overrides; 0 trim decisions; 0 target corrections;
+  0 source-review deferrals.
+- Ordinary ssDNA parks: A 13802 and B 11532 remain parked; not converted
+  to rejects; not marked reviewed exceptions; not authorised for S4.
+- `authorised_for_s4 = 0` is a valid final count.
+- No ordinary global-S4 handoff was prepared. No empty/synthetic
+  global-S4 input was created.
+- `corpus_replication_datasetA.csv` was not built. Whether a later
+  replication file should use 13803 P6 rows or the 13802-row x_z
+  consumed set remains deferred.
+
+### Inputs used
+
+Human review queues after recording:
+
+- `data/interim/checkpoints/aptadiff_a_cp1/manual_review/aptadiff_a_checkpoint1_manual_review.csv`
+  (1 row; `keep`; SHA-256
+  `5a60217e6df22bd70746865cf50ec15fc151bd249dd7ffa0928ffba593e94b23`)
+- `data/interim/checkpoints/aptadiff_b_cp1/manual_review/aptadiff_b_checkpoint1_manual_review.csv`
+  (15 rows; `keep`; SHA-256
+  `9ac8a27bbdc2dafde1b7bf3c6aa89f73b6b80a3748edc011a33552a2122019dc`)
+
+Frozen raw / S1 / S2 / pre-review S3 hashes were unchanged (see Integrity).
+
+### Numbers
+
+Fail-closed validation:
+
+- aptadiff_a: active review records = 1; resolved human decisions = 1;
+  unresolved = 0; blocking issues = 0
+- aptadiff_b: active review records = 15; resolved human decisions = 15;
+  unresolved = 0; blocking issues = 0
+
+Dry-run and actual apply routing (unchanged from provisional S3):
+
+Dataset A:
+
+- total = 13803
+- parked ssDNA = 13802
+- rejected = 1 (`ambiguous_bases`)
+- authorised_for_s4 = 0
+- 13803 = 13802 + 1
+
+Dataset B:
+
+- total = 11547
+- parked ssDNA = 11532
+- rejected = 15 (`ambiguous_bases`)
+- authorised_for_s4 = 0
+- 11547 = 11532 + 15
+
+Combined diagnostic only (outputs remain source-separate): 25350
+records; 25334 parked ssDNA; 16 rejected ambiguous-N; 0 authorised for
+S4.
+
+Sequence corrections = 0. Molecule/chemistry overrides = 0. Trim
+changes = 0. Target corrections = 0. T→U applied = 0. N was not
+replaced. Reviewed rows remain experimentally `molecule_type=ssDNA`,
+`chemistry=DNA`, with unresolved N in sequence provenance.
+
+### Outputs produced
+
+Ignored under `/data/`:
+
+- `data/interim/checkpoints/aptadiff_a_cp1/dry_run/`
+- `data/interim/checkpoints/aptadiff_a_cp1/resolved/`
+- `data/interim/checkpoints/aptadiff_b_cp1/dry_run/`
+- `data/interim/checkpoints/aptadiff_b_cp1/resolved/`
+
+Tracked sequence-safe closure artefacts (no aptamer sequences):
+
+- `config/checkpoint_reviews/aptadiff_a_checkpoint1_resolutions.csv`
+  SHA-256: `700fec79d4ff22beef9c1ce3ea567993946f6986c03d1e94ef00745db8d9dfbf`
+- `config/checkpoint_reviews/aptadiff_a_checkpoint1_metadata.json`
+- `config/checkpoint_reviews/aptadiff_b_checkpoint1_resolutions.csv`
+  SHA-256: `b2224e30306ef78c738f6ff4435b3ff2e1ed023afca8a874f921e4e4e98c2687`
+- `config/checkpoint_reviews/aptadiff_b_checkpoint1_metadata.json`
+
+Closure metadata: `checkpoint1_closed = true` for both;
+`authorised_for_s4 = 0` / `0`; `global_s4_run = false`;
+`dataset_a_replication_built = false`. Dry-run/apply preview comparison
+passed with 0 semantic mismatches and byte-identical canonical,
+routing, rejection, parked-ssDNA, eligible, change-report, and
+decision-audit artefacts.
+
+Nothing under `data/` is tracked. No AptaDiff global-S4 input was
+written under `data/interim/global_s4_ready/`.
+
+### Integrity
+
+Registered raw hashes unchanged:
+
+- `data/raw/Aptadiff_datasetA/datasetA_IGFBP3_P6.csv`
+  SHA-256: `ec970c478aaba1aa089ecbaf7f5bc8aa7a11f6eacd0f7b3d3c418de6a27e8c77`
+- `data/raw/Aptadiff_otherdata/datasetB_PTK7_P6.csv`
+  SHA-256: `546de810e34035731502caf6476c73cc06feab8156ec8178efaade2d21bf4d72`
+
+S1 canonical/sidecar hashes unchanged:
+
+- `data/interim/extracted/aptadiff_a_extracted.csv`
+  SHA-256: `22bd7357311ce5d9d0a000c20f75fc439942b16c37105a71509fb8329ee7b083`
+- `data/interim/extracted/aptadiff_a_source_metadata.csv`
+  SHA-256: `ec0453c50205854dc1648c833a2f96a40b691ee39b8c49433d0024480c9314ea`
+- `data/interim/extracted/aptadiff_b_extracted.csv`
+  SHA-256: `321ef00b4e7a78834f431b4335bf21e89752c8e596523480676f2d5ac2e50921`
+- `data/interim/extracted/aptadiff_b_source_metadata.csv`
+  SHA-256: `3f7183e5999d2f729b1fd1d225287b3515414cec2d7b91e44de46cf84a5ec4a0`
+
+S2 canonical hashes unchanged:
+
+- `data/interim/normalised/aptadiff_a_normalised.csv`
+  SHA-256: `c88e6f12dea4d60377a1c5a7a95861fcc666e47be27920a234f828b70df6ca55`
+- `data/interim/normalised/aptadiff_b_normalised.csv`
+  SHA-256: `c40bc662f4c79fcc24c161c5a82e74c2d58f96fbb6ca74fbb84b105bf8bc98f6`
+
+Pre-review S3 inputs unchanged:
+
+- `aptadiff_a_s3_canonical.csv` SHA-256:
+  `c88e6f12dea4d60377a1c5a7a95861fcc666e47be27920a234f828b70df6ca55`
+- `aptadiff_a_s3_decisions.csv` SHA-256:
+  `d17c68aa2b97d9b4836a1dcf77de6c5cf596145aa4064f8f46ca76a9bda45af1`
+- `aptadiff_b_s3_canonical.csv` SHA-256:
+  `c40bc662f4c79fcc24c161c5a82e74c2d58f96fbb6ca74fbb84b105bf8bc98f6`
+- `aptadiff_b_s3_decisions.csv` SHA-256:
+  `921b4eb4d7799e7ffcf12da5154665c111e0b9ccca5ddde71af0ce23aaae5433`
+
+Human review files changed only in permitted review fields
+(`manual_decision`, `manual_notes`). `git ls-files data` remains empty.
+Deterministic dry-run and apply reruns were byte-identical.
+
+### Tests
+
+Synthetic non-biological fixtures only. Targeted suite:
+
+`tests/data_preparation/test_aptadiff_checkpoint1_apply.py`,
+`test_aptadiff_checkpoint1_prepare_review.py`, AptaDiff S1/S2/S3 adapter
+tests, and completed-source CHECKPOINT regressions
+(`test_aptamerbase_checkpoint1_apply.py`,
+`test_checkpoint1_apply_review.py`,
+`test_checkpoint1_prepare_review.py`): **203 passed**.
+
+Covered: completed 1-row A-style and multi-row B-style validation;
+confirm-current-reject preserves `ambiguous_bases`; no sequence
+correction; reviewed ambiguous ssDNA remains rejected; no-review
+ssDNA remains parked; no reviewed record becomes S4-authorised; final
+authorised count may be zero; empty RNA audit pool does not manufacture
+review rows; unresolved decisions fail closed; dry-run does not write
+resolved outputs; actual apply uses the same transformation; dry-run
+and apply routing parity; tracked artefacts are sequence-free and
+source-separate.
+
+### Open questions carried forward
+
+- Dataset-A replication row-count decision (13,803 P6 vs 13,802 x_z)
+  and any later optional derived RNA-alphabet representation.
+- Later abundance-aware target capping using preserved `p6`.
+- Global S4 remains a later, separate corpus-wide step. AptaDiff A/B
+  currently contribute 0 authorised primary-RNA records to that step.
+
+### Pipeline status
+
+```text
+AptaDiff Dataset A S0 complete
+AptaDiff Dataset A S1 complete
+AptaDiff Dataset A S2 complete
+AptaDiff Dataset A S3 complete
+aptadiff_a CHECKPOINT-1 closed
+AptaDiff Dataset B S0 complete
+AptaDiff Dataset B S1 complete
+AptaDiff Dataset B S2 complete
+AptaDiff Dataset B S3 complete
+aptadiff_b CHECKPOINT-1 closed
+authorised_for_s4 = 0 / 0
+global S4 not prepared
+global S4 not run
+Dataset-A replication not built
+All ordinary AptaDiff A/B records remain parked DNA
+```
+

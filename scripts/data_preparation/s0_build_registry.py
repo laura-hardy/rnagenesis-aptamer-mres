@@ -64,6 +64,18 @@ FORBIDDEN_RIBOAPTAMER_TRUNCATED_BASENAMES = frozenset(
 # AptaDB non-protein lookup tables are deliberately not ingested in v1.
 FORBIDDEN_APTADB_BASENAMES = frozenset({"molecule.csv", "cell.csv", "other.csv"})
 
+# AptaDiff Dataset A/B P6 tables are the only authorised AptaDiff corpus
+# inputs. The Dataset A latent-coordinate derivative, Dataset C/D FASTQs,
+# and the repository README are forbidden companions.
+FORBIDDEN_APTADIFF_BASENAMES = frozenset(
+    {
+        "dataseta_igfbp3_x_z.csv",
+        "datasetc.fastq",
+        "datasetd.fastq",
+        "aptadiff_repo_readme.rtf",
+    }
+)
+
 APTABASE_CLEANED_REL = "data/raw/aptabase/aptabase_cleaned.csv"
 APTABASE_RAW_REL = "data/raw/aptabase/aptabase_raw.csv"
 
@@ -470,6 +482,11 @@ def assert_path_allowed(repo_root: Path, relative_path: str) -> Path:
     if basename_lower in FORBIDDEN_APTADB_BASENAMES and "aptadb" in lower:
         raise RegistryError(
             f"Forbidden AptaDB non-protein lookup table registered as input: "
+            f"{rel}"
+        )
+    if basename_lower in FORBIDDEN_APTADIFF_BASENAMES:
+        raise RegistryError(
+            "Forbidden AptaDiff companion registered as input: "
             f"{rel}"
         )
     if ".ds_store" in lower or lower.endswith(".ds_store"):

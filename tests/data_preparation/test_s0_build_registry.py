@@ -1064,6 +1064,48 @@ def test_aptadb_nonprotein_lookup_registration_rejected(demo_repo: Path) -> None
         )
 
 
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "data/raw/Aptadiff_datasetA/datasetA_IGFBP3_x_z.csv",
+        "data/raw/Aptadiff_otherdata/datasetC.fastq",
+        "data/raw/Aptadiff_otherdata/datasetD.fastq",
+        "data/raw/Aptadiff_datasetA/aptadiff_repo_readme.rtf",
+    ],
+)
+def test_aptadiff_companion_registration_rejected(
+    demo_repo: Path,
+    relative_path: str,
+) -> None:
+    forbidden = demo_repo / relative_path
+    forbidden.parent.mkdir(parents=True, exist_ok=True)
+    forbidden.write_bytes(b"synthetic-token\n")
+    digest = _hash_path(forbidden)
+    _write_csv(
+        demo_repo / "config" / "source_registry.csv",
+        list(REQUIRED_COLUMNS),
+        [
+            _spec_row(
+                source_key="aptadiff_a",
+                source_dataset="aptadiff_forbidden_companion",
+                path=relative_path,
+                sha256=digest,
+                n_rows_expected=1,
+            )
+        ],
+    )
+    with pytest.raises(RegistryError, match="Forbidden AptaDiff companion"):
+        build_registry(
+            repo_root=demo_repo,
+            registry_spec=demo_repo / "config" / "source_registry.csv",
+            inventory_path=demo_repo
+            / "docs"
+            / "data_curation"
+            / "raw_data_inventory.csv",
+            output_path=demo_repo / "data" / "interim" / "registry" / "out.csv",
+        )
+
+
 SYNTHETIC_NT_STATEMENTS = [
     "<http://example.org/s1> <http://example.org/p1> <http://example.org/o1> .",
     "<http://example.org/s1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.org/Item> .",

@@ -27,6 +27,16 @@ from adapters.aptabase import (  # noqa: E402
     extract_aptabase,
     write_sidecar_csv_atomic as write_aptabase_sidecar_csv_atomic,
 )
+from adapters.aptadiff import (  # noqa: E402
+    APTADIFF_SOURCE_KEYS,
+    FORBIDDEN_APTADIFF_BASENAMES,
+    AptaDiffAdapterError,
+    AptaDiffExtractionResult,
+    extract_aptadiff_a,
+    extract_aptadiff_b,
+    required_basename_for_source,
+    write_sidecar_csv_atomic as write_aptadiff_sidecar_csv_atomic,
+)
 from adapters.aptamerbase import (  # noqa: E402
     AptamerBaseAdapterError,
     AptamerBaseExtractionResult,
@@ -139,6 +149,7 @@ AdapterFn = Callable[
     ...,
     AptaBaseExtractionResult
     | AptamerBaseExtractionResult
+    | AptaDiffExtractionResult
     | UTexasExtractionResult
     | RiboAptamerExtractionResult
     | AptaIndexExtractionResult
@@ -159,6 +170,10 @@ def _get_adapter(source_key: str) -> AdapterFn:
         return extract_aptaindex
     if source_key == "ena":
         return extract_ena
+    if source_key == "aptadiff_a":
+        return extract_aptadiff_a
+    if source_key == "aptadiff_b":
+        return extract_aptadiff_b
     raise S1ExtractError(f"Unknown S1 adapter for source_key={source_key!r}")
 
 
@@ -265,6 +280,11 @@ def _assert_not_forbidden_companion(relative_path: str) -> None:
     if name_lower in FORBIDDEN_COMPANION_BASENAMES:
         raise S1ExtractError(
             f"Forbidden AptaBase companion cannot be used as S1 input: "
+            f"{relative_path}"
+        )
+    if name_lower in FORBIDDEN_APTADIFF_BASENAMES:
+        raise S1ExtractError(
+            "Forbidden AptaDiff companion cannot be used as S1 input: "
             f"{relative_path}"
         )
     if "/html/" in f"/{lower}/" or lower.endswith("/html"):
@@ -1056,6 +1076,169 @@ def build_riboaptamer_s1_report(
     return "\n".join(lines)
 
 
+def build_aptadiff_s1_report(
+    *,
+    repo_root: Path,
+    registry_row: RegistrySpecRow,
+    result: S1RunResult,
+) -> str:
+    """Build an aggregate-only Markdown AptaDiff A/B S1 report (no sequences)."""
+    stats = result.stats
+    source_key = result.source_key
+    dataset_label = stats.dataset_label
+    lines = [
+        f"# AptaDiff Dataset {dataset_label} S1 extraction report",
+        "",
+        "## SOURCE",
+        "",
+        f"- source_key: `{source_key}`",
+        f"- source_dataset: `{registry_row.source_dataset}`",
+        f"- path: `{registry_row.path}`",
+        f"- SHA-256: `{registry_row.sha256}`",
+        f"- Observed SHA-256: `{result.observed_sha256}`",
+        f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+        f"- registered rows: `{registry_row.n_rows_expected}`",
+        f"- redistribution_status: `{registry_row.redistribution_status}`",
+        f"- AptaDiff dataset: `{dataset_label}`",
+        f"- documented source target (sidecar only): `{stats.documented_target}`",
+        "",
+        "## RECONCILIATION",
+        "",
+        f"- rows in: `{stats.input_rows}`",
+        f"- canonical rows: `{stats.canonical_rows}`",
+        f"- sidecar rows: `{stats.sidecar_rows}`",
+        f"- unique record_id: `{stats.unique_record_ids}`",
+        f"- unique native_id: `{stats.unique_native_ids}`",
+        f"- first native ID: `{stats.first_native_id}`",
+        f"- last native ID: `{stats.last_native_id}`",
+        f"- source order preserved: "
+        f"`{'pass' if stats.order_preserved else 'fail'}`",
+        f"- exact sequence_raw copy: "
+        f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+        f"- exact sidecar p6 copy: "
+        f"`{'pass' if stats.p6_exact_copy_ok else 'fail'}`",
+        "- S1 records filtered, rejected, or parked: `0`",
+        "",
+        "## Native-ID strategy",
+        "",
+        f"- Strategy: `{stats.native_id_strategy}`",
+        f"- `record_id` = `{source_key}:{{native_id}}`",
+        "- Sequence is not used as `native_id`.",
+        "",
+        "## Canonical mapping summary",
+        "",
+        "- source `seq` → `sequence_raw` (verbatim; no cleaning)",
+        "- source `p6` is sidecar-only and is not mapped to affinity or evidence",
+        "- no canonical target column exists; `target_name_raw` is empty",
+        "- documented Dataset A/B target identity is sidecar-only",
+        "",
+        "## SEQUENCE RAW STATUS",
+        "",
+        f"- nonempty sequence_raw: `{stats.nonempty_sequences}`",
+        f"- missing sequence_raw: `{stats.missing_sequences}`",
+        f"- unique sequences: `{stats.unique_sequences}`",
+        f"- duplicate sequence groups: `{stats.duplicate_sequence_groups}`",
+        f"- rows in duplicated sequence groups: "
+        f"`{stats.rows_in_duplicate_sequence_groups}`",
+        f"- length-36 sequences: `{stats.length_36}`",
+        f"- other lengths: `{stats.other_lengths}`",
+        f"- A/C/G/T-only (diagnostic, not an exclusion): `{stats.acgt_only}`",
+        f"- N-containing retained (not repaired or excluded): "
+        f"`{stats.n_containing}`",
+        "- Alphabet is not classified at S1. N-containing rows are retained.",
+        "",
+        "## TARGET",
+        "",
+        f"- target_name_raw populated: `{stats.nonempty_target_name_raw}`",
+        "- There is no per-row target column. Documented IGFBP3/PTK7",
+        "  identity is preserved only in the source-metadata sidecar.",
+        "- Canonical target, UniProt, target type/family/Pfam, and",
+        "  evidence fields remain empty.",
+        "",
+        "## p6 (source field; uninterpreted)",
+        "",
+        f"- exact sidecar copy: "
+        f"`{'pass' if stats.p6_exact_copy_ok else 'fail'}`",
+        f"- all p6 tokens integer: `{stats.p6_all_integer}`",
+        f"- p6 min/median/max (diagnostic only): `{stats.p6_min}` / "
+        f"`{stats.p6_median}` / `{stats.p6_max}`",
+        "- p6 is not treated as affinity, evidence, a binding score, or",
+        "  a sampling/capping weight at S1.",
+        "",
+        "## SOURCE METADATA",
+        "",
+        f"- Sidecar rows: `{stats.sidecar_rows}`",
+        "- Sidecar retains record_id, native_id, the CSV data-row",
+        "  ordinal, original seq, original p6, Dataset A/B identity,",
+        "  documented source target, and target provenance.",
+        "- Derived x_z coordinates are not included.",
+        "",
+        "## Validation results",
+        "",
+        f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+        f"- Row retention (rows_in == rows_out == "
+        f"{registry_row.n_rows_expected}): "
+        f"`{'pass' if stats.canonical_rows == registry_row.n_rows_expected else 'fail'}`",
+        f"- Unique native/record IDs: "
+        f"`{'pass' if stats.unique_native_ids == stats.canonical_rows and stats.unique_record_ids == stats.canonical_rows else 'fail'}`",
+        f"- Sequence exact-copy: "
+        f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+        f"- p6 exact-copy: "
+        f"`{'pass' if stats.p6_exact_copy_ok else 'fail'}`",
+        f"- No row consolidation: "
+        f"`{'pass' if stats.no_row_consolidation else 'fail'}`",
+        f"- Canonical target inference at S1: "
+        f"`{'none' if stats.nonempty_target_name_raw == 0 else 'fail'}`",
+        "",
+        "## Integrity / raw-data immutability",
+        "",
+        f"- Source-input hash before: `{result.input_hash_before}`",
+        f"- Source-input hash after: `{result.input_hash_after}`",
+        f"- Source-input pre/post hash result: "
+        f"`{'pass' if result.input_hash_unchanged else 'fail'}`",
+        (
+            f"- Deterministic rerun result: "
+            f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+            if result.deterministic_rerun_ok is not None
+            else "- Deterministic rerun result: `not_checked`"
+        ),
+        "",
+        "## Outputs",
+        "",
+        f"- Canonical: `{_relative_display(result.output_canonical, repo_root)}`",
+        f"- Sidecar: `{_relative_display(result.output_sidecar, repo_root)}`",
+        f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+        "",
+        "## DEFERRED",
+        "",
+        "- molecule type unresolved; S1 is molecule-neutral",
+        "- chemistry unresolved",
+        "- no T→U",
+        "- no sequence normalisation",
+        "- no constant-region inference or trimming",
+        "- no target canonicalisation",
+        "- no evidence scoring",
+        "- no affinity mapping from p6",
+        "- no leakage",
+        "- no filtering/parking/rejection",
+        "- no capping or downsampling",
+        "- no deduplication/clustering",
+        "- no CHECKPOINT-1",
+        "- no global S4",
+        "- Dataset A x_z latent-coordinate file is not a corpus input",
+        "- Dataset C/D are not companion inputs",
+        "",
+        "## Pipeline status",
+        "",
+        f"- AptaDiff Dataset {dataset_label} S0 complete.",
+        f"- AptaDiff Dataset {dataset_label} S1 complete.",
+        f"- AptaDiff Dataset {dataset_label} S2 has not started.",
+        f"- No AptaDiff Dataset {dataset_label} record is authorised for global S4.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def build_aptaindex_s1_report(
     *,
     repo_root: Path,
@@ -1549,6 +1732,13 @@ def run_s1_extraction(
         row = _resolve_single_source_row(spec_rows, source_key)
         registered_paths = (row.path,)
     _assert_not_forbidden_companion(row.path)
+    if source_key in APTADIFF_SOURCE_KEYS:
+        required = required_basename_for_source(source_key)
+        actual = Path(row.path).name
+        if actual.lower() != required.lower():
+            raise S1ExtractError(
+                f"{source_key} S1 input must be {required}; got {row.path}"
+            )
 
     adapter = _get_adapter(source_key)
 
@@ -1568,6 +1758,8 @@ def run_s1_extraction(
         "riboaptamer",
         "aptaindex",
         "ena",
+        "aptadiff_a",
+        "aptadiff_b",
     }:
         extraction = adapter(
             input_path,
@@ -1611,6 +1803,9 @@ def run_s1_extraction(
     elif source_key == "ena":
         write_ena_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
         report_builder = build_ena_s1_report
+    elif source_key in APTADIFF_SOURCE_KEYS:
+        write_aptadiff_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
+        report_builder = build_aptadiff_s1_report
     else:
         raise S1ExtractError(f"No sidecar writer for source_key={source_key!r}")
 
@@ -1654,6 +1849,8 @@ def run_s1_extraction(
                 write_ena_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
             elif source_key == "riboaptamer":
                 write_riboaptamer_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
+            elif source_key in APTADIFF_SOURCE_KEYS:
+                write_aptadiff_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
             else:
                 raise S1ExtractError(
                     f"No sidecar writer for source_key={source_key!r}"
@@ -1717,7 +1914,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Registry source_key to extract (e.g. aptabase, aptamerbase, utexas, aptadb, riboaptamer, aptaindex, ena)",
+        help="Registry source_key to extract (e.g. aptabase, aptamerbase, utexas, aptadb, riboaptamer, aptaindex, ena, aptadiff_a, aptadiff_b)",
     )
     parser.add_argument(
         "--registry-spec",
@@ -1784,6 +1981,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         RegistryError,
         AptaBaseAdapterError,
         AptamerBaseAdapterError,
+        AptaDiffAdapterError,
         AptaDBAdapterError,
         AptaIndexAdapterError,
         EnaAdapterError,

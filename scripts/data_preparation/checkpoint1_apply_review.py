@@ -2887,7 +2887,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, ena, or aptamerbase)",
+        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, ena, aptamerbase, aptadiff_a, or aptadiff_b)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -7057,6 +7057,732 @@ def run_aptamerbase_checkpoint1_apply(
     )
 
 
+@dataclass
+class AptaDiffApplyResult:
+    """Paths and aggregates from one AptaDiff CHECKPOINT-1 apply."""
+
+    source_key: str
+    output_dir: Path
+    metadata_out: Path
+    tracked_manifest: Path
+    summary_out: Path
+    output_hashes: dict[str, str]
+    stats: dict[str, object]
+    preview_comparison_ok: bool
+    deterministic_rerun_ok: bool
+    semantic_mismatches: int
+    checkpoint_closed: bool
+
+
+def _aptadiff_paths(source_key: str, repo_root: Path, checkpoint_dir: Path) -> dict[str, Path]:
+    review_dir = checkpoint_dir / "manual_review"
+    if source_key == "aptadiff_a":
+        raw = repo_root / "data" / "raw" / "Aptadiff_datasetA" / "datasetA_IGFBP3_P6.csv"
+    else:
+        raw = repo_root / "data" / "raw" / "Aptadiff_otherdata" / "datasetB_PTK7_P6.csv"
+    return {
+        "queue": review_dir / f"{source_key}_checkpoint1_manual_review.csv",
+        "index": review_dir / f"{source_key}_checkpoint1_manual_review_index.csv",
+        "group": review_dir / f"{source_key}_checkpoint1_constant_group_review.csv",
+        "bulk": review_dir / f"{source_key}_checkpoint1_bulk_audit_confirmation.csv",
+        "canonical": checkpoint_dir / f"{source_key}_s3_canonical.csv",
+        "decisions": checkpoint_dir / f"{source_key}_s3_decisions.csv",
+        "rejection": checkpoint_dir / f"rejected_{source_key}.csv",
+        "parked": checkpoint_dir / f"{source_key}_s3_parked_ssdna.csv",
+        "s3_review": checkpoint_dir / f"{source_key}_checkpoint1_review.csv",
+        "s3_local": checkpoint_dir / f"{source_key}_checkpoint1_local_detail.csv",
+        "s1": repo_root / "data" / "interim" / "extracted" / f"{source_key}_extracted.csv",
+        "sidecar": repo_root
+        / "data"
+        / "interim"
+        / "extracted"
+        / f"{source_key}_source_metadata.csv",
+        "s2": repo_root / "data" / "interim" / "normalised" / f"{source_key}_normalised.csv",
+        "raw": raw,
+        "rec_json": repo_root
+        / "config"
+        / "checkpoint_reviews"
+        / f"{source_key}_checkpoint1_recommendations.json",
+    }
+
+
+def _write_aptadiff_transform_csvs(
+    output_dir: Path,
+    simulation: object,
+    *,
+    source_key: str,
+    prefix: str,
+) -> dict[str, Path]:
+    from adapters.aptadiff_checkpoint1_dry_run import (
+        CHANGE_REPORT_COLUMNS,
+        DECISION_AUDIT_COLUMNS,
+        ELIGIBLE_COLUMNS,
+        AptaDiffDryRunSimulation,
+    )
+    from adapters.aptadiff_s3 import DECISION_COLUMNS, PARK_COLUMNS, REJECTION_COLUMNS
+    from common.corpus_schema import write_corpus_csv_atomic
+
+    if not isinstance(simulation, AptaDiffDryRunSimulation):
+        raise Checkpoint1ApplyError("AptaDiff simulation has unexpected type")
+    if prefix.startswith("dry_run"):
+        paths = {
+            "canonical": output_dir
+            / f"{source_key}_checkpoint1_dry_run_canonical_preview.csv",
+            "routing": output_dir
+            / f"{source_key}_checkpoint1_dry_run_routing_preview.csv",
+            "rejection": output_dir
+            / f"{source_key}_checkpoint1_dry_run_rejection_preview.csv",
+            "parked_ssdna": output_dir
+            / f"{source_key}_checkpoint1_dry_run_parked_ssdna_preview.csv",
+            "eligible": output_dir
+            / f"{source_key}_checkpoint1_dry_run_eligible_preview.csv",
+            "change_report": output_dir
+            / f"{source_key}_checkpoint1_dry_run_change_report.csv",
+            "decision_audit": output_dir
+            / f"{source_key}_checkpoint1_dry_run_decision_audit.csv",
+        }
+    else:
+        paths = {
+            "canonical": output_dir
+            / f"{source_key}_checkpoint1_applied_canonical.csv",
+            "routing": output_dir
+            / f"{source_key}_checkpoint1_applied_routing.csv",
+            "rejection": output_dir
+            / f"{source_key}_checkpoint1_applied_rejection.csv",
+            "parked_ssdna": output_dir
+            / f"{source_key}_checkpoint1_applied_parked_ssdna.csv",
+            "eligible": output_dir
+            / f"{source_key}_checkpoint1_applied_eligible.csv",
+            "change_report": output_dir
+            / f"{source_key}_checkpoint1_applied_change_report.csv",
+            "decision_audit": output_dir
+            / f"{source_key}_checkpoint1_decision_audit.csv",
+        }
+    write_corpus_csv_atomic(paths["canonical"], simulation.preview_canonical)
+    write_csv_atomic(paths["routing"], DECISION_COLUMNS, simulation.preview_decisions)
+    write_csv_atomic(paths["rejection"], REJECTION_COLUMNS, simulation.preview_rejections)
+    write_csv_atomic(paths["parked_ssdna"], PARK_COLUMNS, simulation.preview_parked_ssdna)
+    write_csv_atomic(paths["eligible"], ELIGIBLE_COLUMNS, simulation.preview_eligible)
+    write_csv_atomic(
+        paths["change_report"], CHANGE_REPORT_COLUMNS, simulation.change_report
+    )
+    write_csv_atomic(
+        paths["decision_audit"], DECISION_AUDIT_COLUMNS, simulation.decision_audit
+    )
+    return paths
+
+
+def _simulate_aptadiff(
+    *,
+    source_key: str,
+    paths: Mapping[str, Path],
+    expected_source_rows: int | None,
+    expected_reviewed_rows: int | None,
+) -> object:
+    from adapters.aptadb_checkpoint1_review import read_csv_rows
+    from adapters.aptadiff_checkpoint1_dry_run import (
+        simulate_aptadiff_checkpoint1_application,
+    )
+
+    queue_rows = read_csv_rows(paths["queue"])
+    group_rows = read_csv_rows(paths["group"]) if paths["group"].is_file() else []
+    bulk_rows = read_csv_rows(paths["bulk"]) if paths["bulk"].is_file() else []
+    bulk = bulk_rows[0] if bulk_rows else None
+    canonical_rows = read_csv_rows(paths["canonical"])
+    decision_rows = read_csv_rows(paths["decisions"])
+    rejection_rows = (
+        read_csv_rows(paths["rejection"]) if paths["rejection"].is_file() else []
+    )
+    parked_rows = read_csv_rows(paths["parked"]) if paths["parked"].is_file() else []
+    return simulate_aptadiff_checkpoint1_application(
+        source_key=source_key,
+        queue_rows=queue_rows,
+        group_rows=group_rows,
+        canonical_rows=canonical_rows,
+        decision_rows=decision_rows,
+        existing_rejection_rows=rejection_rows,
+        existing_parked_ssdna=parked_rows,
+        bulk_confirmation=bulk,
+        expected_source_rows=expected_source_rows,
+        expected_reviewed_rows=expected_reviewed_rows,
+    )
+
+
+def _aptadiff_semantic_mismatches(
+    *,
+    source_key: str,
+    preview_dir: Path,
+    applied_paths: Mapping[str, Path],
+) -> int:
+    from adapters.aptadiff_checkpoint1_apply import SEMANTIC_RECORD_FIELDS
+
+    preview_canonical = (
+        preview_dir / f"{source_key}_checkpoint1_dry_run_canonical_preview.csv"
+    )
+    preview_routing = (
+        preview_dir / f"{source_key}_checkpoint1_dry_run_routing_preview.csv"
+    )
+    preview_eligible = (
+        preview_dir / f"{source_key}_checkpoint1_dry_run_eligible_preview.csv"
+    )
+    _, canonical_preview = _aptamerbase_csv_rows(preview_canonical)
+    _, routing_preview = _aptamerbase_csv_rows(preview_routing)
+    _, eligible_preview = _aptamerbase_csv_rows(preview_eligible)
+    _, canonical_applied = _aptamerbase_csv_rows(applied_paths["canonical"])
+    _, routing_applied = _aptamerbase_csv_rows(applied_paths["routing"])
+    _, eligible_applied = _aptamerbase_csv_rows(applied_paths["eligible"])
+    if len(canonical_preview) != len(canonical_applied):
+        return abs(len(canonical_preview) - len(canonical_applied)) or 1
+    if len(routing_preview) != len(routing_applied):
+        return abs(len(routing_preview) - len(routing_applied)) or 1
+
+    def _join(
+        canonical_rows: list[dict[str, str]], routing_rows: list[dict[str, str]]
+    ) -> dict[str, dict[str, str]]:
+        joined: dict[str, dict[str, str]] = {}
+        routing_by_id = {row["record_id"]: row for row in routing_rows}
+        for canon in canonical_rows:
+            record_id = canon["record_id"]
+            joined[record_id] = {**canon, **routing_by_id.get(record_id, {})}
+        return joined
+
+    preview_by_id = _join(canonical_preview, routing_preview)
+    applied_by_id = _join(canonical_applied, routing_applied)
+    if set(preview_by_id) != set(applied_by_id):
+        return len(set(preview_by_id).symmetric_difference(applied_by_id)) or 1
+    mismatches = 0
+    for record_id, preview_row in preview_by_id.items():
+        applied_row = applied_by_id[record_id]
+        for field_name in SEMANTIC_RECORD_FIELDS:
+            if (preview_row.get(field_name) or "") != (applied_row.get(field_name) or ""):
+                mismatches += 1
+    preview_eligible_ids = {row["record_id"] for row in eligible_preview}
+    applied_eligible_ids = {row["record_id"] for row in eligible_applied}
+    if preview_eligible_ids != applied_eligible_ids:
+        mismatches += len(preview_eligible_ids.symmetric_difference(applied_eligible_ids))
+    return mismatches
+
+
+def run_aptadiff_checkpoint1_dry_run(
+    *,
+    repo_root: Path,
+    source_key: str,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    check_deterministic_rerun: bool = True,
+    expected_source_rows: int | None = None,
+    expected_reviewed_rows: int | None = None,
+    verify_frozen_inputs: bool = True,
+    compare_to_pristine: bool = True,
+) -> dict[str, str]:
+    """Simulate AptaDiff CHECKPOINT-1 application without closing it."""
+    from adapters.aptadiff_checkpoint1_apply import (
+        AptaDiffCheckpoint1ApplyError,
+        check_production_expectations,
+        frozen_pipeline_hashes,
+    )
+    from adapters.aptadiff_checkpoint1_dry_run import (
+        DRY_RUN_BANNER,
+        format_dry_run_markdown,
+        serialise_aptadiff_simulation_sequence_free,
+    )
+    from adapters.aptadiff_checkpoint1_review import (
+        AptaDiffCheckpoint1ReviewError,
+        compare_review_to_pristine,
+        read_csv_rows,
+        validate_review_package,
+    )
+    from checkpoint1_prepare_review import prepare_aptadiff_checkpoint1_review
+
+    if source_key not in {"aptadiff_a", "aptadiff_b"}:
+        raise Checkpoint1ApplyError(f"Unknown AptaDiff source_key={source_key!r}")
+    output_dir = _assert_aptadb_dry_run_output(output_dir)
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    paths = _aptadiff_paths(source_key, repo_root, checkpoint_dir)
+    queue_path = paths["queue"]
+    if not queue_path.is_file():
+        raise Checkpoint1ApplyError("Missing AptaDiff manual-review CSV")
+
+    queue_rows = read_csv_rows(queue_path)
+    group_rows = read_csv_rows(paths["group"]) if paths["group"].is_file() else []
+    bulk_rows = read_csv_rows(paths["bulk"]) if paths["bulk"].is_file() else []
+    bulk = bulk_rows[0] if bulk_rows else None
+    report = validate_review_package(
+        queue_rows=queue_rows,
+        group_rows=group_rows,
+        bulk_confirmation=bulk,
+    )
+    if not report.ok:
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 cannot be dry-run while required human decisions "
+            f"remain unresolved ({len(report.blocking_issues)} blocking issues)"
+        )
+    if compare_to_pristine:
+        pristine_dir = checkpoint_dir / "manual_review" / "pristine_blank"
+        pristine_dir = _assert_output_dir_allowed(repo_root, pristine_dir)
+        prepare_aptadiff_checkpoint1_review(
+            repo_root=repo_root,
+            source_key=source_key,
+            checkpoint_dir=checkpoint_dir,
+            output_dir=pristine_dir,
+            expected_active_rows=expected_reviewed_rows,
+            expected_total_rows=expected_source_rows,
+        )
+        pristine_rows = read_csv_rows(
+            pristine_dir / f"{source_key}_checkpoint1_manual_review.csv"
+        )
+        drift = compare_review_to_pristine(queue_rows, pristine_rows)
+        if drift:
+            raise Checkpoint1ApplyError(
+                "Review file drifted from pristine baseline: " + ", ".join(drift[:10])
+            )
+
+    hashes_before = {
+        "queue": sha256_file(paths["queue"]),
+        "bulk": sha256_file(paths["bulk"]) if paths["bulk"].is_file() else "",
+        "s1": sha256_file(paths["s1"]) if paths["s1"].is_file() else "",
+        "sidecar": sha256_file(paths["sidecar"]) if paths["sidecar"].is_file() else "",
+        "s2": sha256_file(paths["s2"]) if paths["s2"].is_file() else "",
+        "s3": sha256_file(paths["canonical"]),
+        "s3_decisions": sha256_file(paths["decisions"]),
+        "raw": sha256_file(paths["raw"]) if paths["raw"].is_file() else "",
+    }
+    if verify_frozen_inputs:
+        frozen = frozen_pipeline_hashes(source_key)
+        for key in ("raw", "s1", "sidecar", "s2"):
+            if hashes_before.get(key) and hashes_before[key] != frozen[key]:
+                raise Checkpoint1ApplyError(
+                    f"{source_key} {key} hash does not match the frozen pre-review snapshot"
+                )
+
+    try:
+        simulation = _simulate_aptadiff(
+            source_key=source_key,
+            paths=paths,
+            expected_source_rows=expected_source_rows,
+            expected_reviewed_rows=expected_reviewed_rows,
+        )
+    except (AptaDiffCheckpoint1ReviewError, AptaDiffCheckpoint1ApplyError) as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+    if simulation.nogo_reasons:
+        raise Checkpoint1ApplyError(
+            "Dry-run NO-GO: " + "; ".join(simulation.nogo_reasons)
+        )
+    if expected_source_rows in {13803, 11547}:
+        check_production_expectations(
+            source_key=source_key,
+            simulation=simulation,
+            queue_rows=queue_rows,
+        )
+
+    first_serialised = serialise_aptadiff_simulation_sequence_free(simulation)
+    if check_deterministic_rerun:
+        second = _simulate_aptadiff(
+            source_key=source_key,
+            paths=paths,
+            expected_source_rows=expected_source_rows,
+            expected_reviewed_rows=expected_reviewed_rows,
+        )
+        if first_serialised != serialise_aptadiff_simulation_sequence_free(second):
+            raise Checkpoint1ApplyError(
+                "Repeated AptaDiff dry-run was not byte-identical"
+            )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    preview_paths = _write_aptadiff_transform_csvs(
+        output_dir, simulation, source_key=source_key, prefix="dry_run"
+    )
+    report_text = format_dry_run_markdown(
+        simulation,
+        review_hashes=hashes_before,
+        integrity=hashes_before,
+    )
+    if DRY_RUN_BANNER not in report_text:
+        raise Checkpoint1ApplyError("Dry-run report missing banner")
+    if "CHECKPOINT-1 is not closed" not in report_text:
+        raise Checkpoint1ApplyError("Dry-run report must not claim closure")
+    report_path = output_dir / f"{source_key}_checkpoint1_dry_run_report.md"
+    _write_text_atomic(report_path, report_text)
+
+    hashes_after = {
+        "queue": sha256_file(paths["queue"]),
+        "bulk": sha256_file(paths["bulk"]) if paths["bulk"].is_file() else "",
+        "s1": sha256_file(paths["s1"]) if paths["s1"].is_file() else "",
+        "sidecar": sha256_file(paths["sidecar"]) if paths["sidecar"].is_file() else "",
+        "s2": sha256_file(paths["s2"]) if paths["s2"].is_file() else "",
+        "s3": sha256_file(paths["canonical"]),
+        "s3_decisions": sha256_file(paths["decisions"]),
+        "raw": sha256_file(paths["raw"]) if paths["raw"].is_file() else "",
+    }
+    if hashes_after != hashes_before:
+        raise Checkpoint1ApplyError("Dry-run mutated an immutable input artefact")
+    if output_dir.resolve() == (checkpoint_dir / "resolved").resolve():
+        raise Checkpoint1ApplyError("Dry-run must not write resolved outputs")
+
+    output_hashes = {name: sha256_file(path) for name, path in preview_paths.items()}
+    output_hashes["report"] = sha256_file(report_path)
+    stats = simulation.stats
+    print(
+        f"source={source_key}\n"
+        "mode=dry_run\n"
+        "checkpoint_status=unapplied\n"
+        f"total_records={stats['total_records']}\n"
+        f"reviewed_records={stats['reviewed_records']}\n"
+        f"parked_ssdna={stats['parked_ssdna']}\n"
+        f"technical_rejects={stats['technical_rejects_after_review']}\n"
+        f"authorised_for_s4={stats['authorised_for_s4']}\n"
+        f"sequence_corrections={stats['sequence_corrections']}\n"
+        f"unresolved_manual_decisions=0\n"
+        "blocking_issues=0\n"
+        f"deterministic_rerun={'pass' if check_deterministic_rerun else 'skipped'}\n"
+        "CHECKPOINT-1 is not closed\n"
+        "S4 remains blocked"
+    )
+    return output_hashes
+
+
+def run_aptadiff_checkpoint1_apply(
+    *,
+    repo_root: Path,
+    source_key: str,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    tracked_manifest: Path,
+    metadata_out: Path,
+    check_deterministic_rerun: bool = True,
+    expected_source_rows: int | None = None,
+    expected_reviewed_rows: int | None = None,
+    verify_frozen_inputs: bool = True,
+    compare_to_pristine: bool = True,
+    compare_to_preview: bool = True,
+) -> AptaDiffApplyResult:
+    """Apply AptaDiff CHECKPOINT-1 using the same transform as the dry-run."""
+    from adapters.aptadiff_checkpoint1_apply import (
+        APTADIFF_CHECKPOINT_CLOSED_STATEMENT,
+        APTADIFF_TRACKED_RESOLUTION_COLUMNS,
+        CLOSURE_ONLY_FIELDS,
+        SOURCE_DATASETS,
+        AptaDiffCheckpoint1ApplyError,
+        build_tracked_resolutions,
+        check_production_expectations,
+        count_manual_decisions,
+        format_closure_markdown,
+        frozen_pipeline_hashes,
+        preview_comparison_files,
+        tracked_payload_contains_sequence,
+    )
+    from adapters.aptadiff_checkpoint1_dry_run import (
+        serialise_aptadiff_simulation_sequence_free,
+    )
+    from adapters.aptadiff_checkpoint1_review import (
+        AptaDiffCheckpoint1ReviewError,
+        compare_review_to_pristine,
+        read_csv_rows,
+        validate_review_package,
+    )
+    from checkpoint1_prepare_review import prepare_aptadiff_checkpoint1_review
+
+    if source_key not in {"aptadiff_a", "aptadiff_b"}:
+        raise Checkpoint1ApplyError(f"Unknown AptaDiff source_key={source_key!r}")
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    if not tracked_manifest.is_absolute():
+        tracked_manifest = repo_root / tracked_manifest
+    if not metadata_out.is_absolute():
+        metadata_out = repo_root / metadata_out
+    tracked_manifest = _assert_tracked_path_allowed(repo_root, tracked_manifest)
+    metadata_out = _assert_tracked_path_allowed(repo_root, metadata_out)
+
+    paths = _aptadiff_paths(source_key, repo_root, checkpoint_dir)
+    queue_rows = read_csv_rows(paths["queue"])
+    group_rows = read_csv_rows(paths["group"]) if paths["group"].is_file() else []
+    bulk_rows = read_csv_rows(paths["bulk"]) if paths["bulk"].is_file() else []
+    bulk = bulk_rows[0] if bulk_rows else None
+    report = validate_review_package(
+        queue_rows=queue_rows,
+        group_rows=group_rows,
+        bulk_confirmation=bulk,
+    )
+    if not report.ok:
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 cannot be applied while required human decisions "
+            f"remain unresolved ({len(report.blocking_issues)} blocking issues)"
+        )
+    if compare_to_pristine:
+        pristine_dir = checkpoint_dir / "manual_review" / "pristine_blank"
+        pristine_dir = _assert_output_dir_allowed(repo_root, pristine_dir)
+        prepare_aptadiff_checkpoint1_review(
+            repo_root=repo_root,
+            source_key=source_key,
+            checkpoint_dir=checkpoint_dir,
+            output_dir=pristine_dir,
+            expected_active_rows=expected_reviewed_rows,
+            expected_total_rows=expected_source_rows,
+        )
+        pristine_rows = read_csv_rows(
+            pristine_dir / f"{source_key}_checkpoint1_manual_review.csv"
+        )
+        drift = compare_review_to_pristine(queue_rows, pristine_rows)
+        if drift:
+            raise Checkpoint1ApplyError(
+                "Review file drifted from pristine baseline: " + ", ".join(drift[:10])
+            )
+
+    hashes_before = {
+        "queue": sha256_file(paths["queue"]),
+        "bulk": sha256_file(paths["bulk"]) if paths["bulk"].is_file() else "",
+        "s1": sha256_file(paths["s1"]) if paths["s1"].is_file() else "",
+        "sidecar": sha256_file(paths["sidecar"]) if paths["sidecar"].is_file() else "",
+        "s2": sha256_file(paths["s2"]) if paths["s2"].is_file() else "",
+        "s3": sha256_file(paths["canonical"]),
+        "s3_decisions": sha256_file(paths["decisions"]),
+        "s3_review": sha256_file(paths["s3_review"]) if paths["s3_review"].is_file() else "",
+        "s3_local": sha256_file(paths["s3_local"]) if paths["s3_local"].is_file() else "",
+        "raw": sha256_file(paths["raw"]) if paths["raw"].is_file() else "",
+        "rec_json": sha256_file(paths["rec_json"]) if paths["rec_json"].is_file() else "",
+    }
+    preview_dir = checkpoint_dir / "dry_run"
+    preview_hash_paths = {
+        key: preview_dir / preview_name
+        for key, preview_name, _applied in preview_comparison_files(source_key)
+    }
+    preview_hashes_before = {}
+    if compare_to_preview:
+        missing = [str(path) for path in preview_hash_paths.values() if not path.is_file()]
+        if missing:
+            raise Checkpoint1ApplyError(
+                "Validated dry-run preview is incomplete; refusing real apply"
+            )
+        preview_hashes_before = {
+            key: sha256_file(path) for key, path in preview_hash_paths.items() if path.is_file()
+        }
+    if verify_frozen_inputs:
+        frozen = frozen_pipeline_hashes(source_key)
+        for key in ("raw", "s1", "sidecar", "s2"):
+            if hashes_before.get(key) and hashes_before[key] != frozen[key]:
+                raise Checkpoint1ApplyError(
+                    f"{source_key} {key} hash does not match the frozen pre-review snapshot"
+                )
+
+    try:
+        simulation = _simulate_aptadiff(
+            source_key=source_key,
+            paths=paths,
+            expected_source_rows=expected_source_rows,
+            expected_reviewed_rows=expected_reviewed_rows,
+        )
+    except (AptaDiffCheckpoint1ReviewError, AptaDiffCheckpoint1ApplyError) as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+    if simulation.nogo_reasons:
+        raise Checkpoint1ApplyError("Apply NO-GO: " + "; ".join(simulation.nogo_reasons))
+    if expected_source_rows in {13803, 11547}:
+        check_production_expectations(
+            source_key=source_key,
+            simulation=simulation,
+            queue_rows=queue_rows,
+        )
+
+    scientific_serialised = serialise_aptadiff_simulation_sequence_free(simulation)
+    if check_deterministic_rerun:
+        second = _simulate_aptadiff(
+            source_key=source_key,
+            paths=paths,
+            expected_source_rows=expected_source_rows,
+            expected_reviewed_rows=expected_reviewed_rows,
+        )
+        if scientific_serialised != serialise_aptadiff_simulation_sequence_free(
+            second
+        ):
+            raise Checkpoint1ApplyError(
+                "Repeated AptaDiff apply transform was not byte-identical"
+            )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    applied_paths = _write_aptadiff_transform_csvs(
+        output_dir, simulation, source_key=source_key, prefix="applied"
+    )
+    byte_identical: dict[str, bool] = {}
+    semantic_mismatches = 0
+    if compare_to_preview:
+        for key, preview_name, _applied_name in preview_comparison_files(source_key):
+            preview_path = preview_dir / preview_name
+            applied_path = applied_paths[key]
+            byte_identical[key] = preview_path.read_bytes() == applied_path.read_bytes()
+        if not all(byte_identical.values()):
+            semantic_mismatches = _aptadiff_semantic_mismatches(
+                source_key=source_key,
+                preview_dir=preview_dir,
+                applied_paths=applied_paths,
+            )
+        if semantic_mismatches:
+            raise Checkpoint1ApplyError(
+                f"Actual apply differed from dry-run: semantic_mismatches="
+                f"{semantic_mismatches}"
+            )
+
+    record_decisions = count_manual_decisions(queue_rows)
+    tracked_rows = build_tracked_resolutions(
+        decisions=simulation.preview_decisions,
+        queue_rows=queue_rows,
+        route_changed_ids=simulation.route_changed_ids,
+    )
+    write_csv_atomic(
+        tracked_manifest, APTADIFF_TRACKED_RESOLUTION_COLUMNS, tracked_rows
+    )
+    tracked_text = tracked_manifest.read_text(encoding="utf-8")
+    if tracked_payload_contains_sequence(tracked_text):
+        raise Checkpoint1ApplyError("Tracked resolutions must not contain sequences")
+
+    output_hashes = {name: sha256_file(path) for name, path in applied_paths.items()}
+    output_hashes["tracked_manifest"] = sha256_file(tracked_manifest)
+
+    summary_path = output_dir / f"{source_key}_checkpoint1_resolution_summary.md"
+    summary_text = format_closure_markdown(
+        simulation,
+        review_hashes=hashes_before,
+        integrity=hashes_before,
+        output_hashes=output_hashes,
+        record_decisions=record_decisions,
+        semantic_mismatches=semantic_mismatches,
+        deterministic_ok=check_deterministic_rerun,
+        preview_comparison_ok=(
+            (not compare_to_preview)
+            or (bool(byte_identical) and all(byte_identical.values()))
+        ),
+    )
+    if APTADIFF_CHECKPOINT_CLOSED_STATEMENT.split("\n", 1)[0] not in summary_text:
+        raise Checkpoint1ApplyError("Closure summary missing closed statement")
+    _write_text_atomic(summary_path, summary_text)
+    output_hashes["summary"] = sha256_file(summary_path)
+
+    authorised_n = int(simulation.stats["authorised_for_s4"])
+    metadata = {
+        "source_key": source_key,
+        "source_dataset": SOURCE_DATASETS[source_key],
+        "checkpoint": "CHECKPOINT-1",
+        "review_model": "single_reviewer",
+        "checkpoint_status": "closed",
+        "checkpoint_closed": True,
+        "checkpoint1_closed": True,
+        "application_status": "applied",
+        "s4_started": False,
+        "global_s4_handoff_prepared": False,
+        "global_s4_run": False,
+        "dataset_a_replication_built": False,
+        "next_stage": "no_global_s4_handoff_zero_authorised_records",
+        "source_records": int(simulation.stats["total_records"]),
+        "reviewed_records": int(simulation.stats["reviewed_records"]),
+        "record_decisions": record_decisions,
+        "final_parked_ssdna": int(simulation.stats["parked_ssdna"]),
+        "final_rejected": int(simulation.stats["technical_rejects_after_review"]),
+        "authorised_for_s4": authorised_n,
+        "reviewed_reject_reason": "ambiguous_bases",
+        "reviewed_reject_note": (
+            "unresolved IUPAC N; no source-supported deterministic repair"
+        ),
+        "sequence_corrections": 0,
+        "molecule_overrides": 0,
+        "records_trimmed": 0,
+        "target_corrections": 0,
+        "review_file_sha256": hashes_before["queue"],
+        "review_bulk_sha256": hashes_before["bulk"],
+        "raw_sha256": hashes_before["raw"],
+        "s1_sha256": hashes_before["s1"],
+        "sidecar_sha256": hashes_before["sidecar"],
+        "s2_sha256": hashes_before["s2"],
+        "s3_sha256": hashes_before["s3"],
+        "s3_decisions_sha256": hashes_before["s3_decisions"],
+        "output_hashes": output_hashes,
+        "preview_comparison_ok": (not compare_to_preview)
+        or (bool(byte_identical) and all(byte_identical.values())),
+        "byte_identical": byte_identical,
+        "semantic_mismatches": semantic_mismatches,
+        "deterministic_rerun_ok": check_deterministic_rerun,
+        "accepted_dry_run_routes": {
+            "parked_ssdna": int(simulation.stats["parked_ssdna"]),
+            "technical_rejects_after_review": int(
+                simulation.stats["technical_rejects_after_review"]
+            ),
+            "technically_eligible": 0,
+        },
+        "closure_only_fields": list(CLOSURE_ONLY_FIELDS),
+        "application_mode": "apply",
+        "code_identity": {
+            "apply_adapter": "adapters.aptadiff_checkpoint1_apply",
+            "dispatcher": "scripts/data_preparation/checkpoint1_apply_review.py",
+            "eligibility_policy": f"config/source_eligibility/{source_key}.json",
+        },
+    }
+    metadata_text = json.dumps(metadata, indent=2, sort_keys=False)
+    if tracked_payload_contains_sequence(metadata_text):
+        raise Checkpoint1ApplyError(
+            "Tracked metadata must not contain biological sequence fields"
+        )
+    _write_json_atomic(metadata_out, metadata)
+    output_hashes["metadata"] = sha256_file(metadata_out)
+
+    hashes_after = {
+        "queue": sha256_file(paths["queue"]),
+        "bulk": sha256_file(paths["bulk"]) if paths["bulk"].is_file() else "",
+        "s1": sha256_file(paths["s1"]) if paths["s1"].is_file() else "",
+        "sidecar": sha256_file(paths["sidecar"]) if paths["sidecar"].is_file() else "",
+        "s2": sha256_file(paths["s2"]) if paths["s2"].is_file() else "",
+        "s3": sha256_file(paths["canonical"]),
+        "s3_decisions": sha256_file(paths["decisions"]),
+        "s3_review": sha256_file(paths["s3_review"]) if paths["s3_review"].is_file() else "",
+        "s3_local": sha256_file(paths["s3_local"]) if paths["s3_local"].is_file() else "",
+        "raw": sha256_file(paths["raw"]) if paths["raw"].is_file() else "",
+        "rec_json": sha256_file(paths["rec_json"]) if paths["rec_json"].is_file() else "",
+    }
+    if hashes_after != hashes_before:
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 apply mutated an immutable input artefact"
+        )
+    if compare_to_preview:
+        preview_hashes_final = {
+            key: sha256_file(path)
+            for key, path in preview_hash_paths.items()
+            if path.is_file()
+        }
+        if preview_hashes_final != preview_hashes_before:
+            raise Checkpoint1ApplyError(
+                "Dry-run preview files changed after real application"
+            )
+
+    stats = dict(simulation.stats)
+    stats["checkpoint_closed"] = True
+    stats["preview_comparison_ok"] = metadata["preview_comparison_ok"]
+    stats["deterministic_rerun_ok"] = check_deterministic_rerun
+    stats["semantic_mismatches"] = semantic_mismatches
+    print(
+        f"source={source_key}\n"
+        "mode=apply\n"
+        "checkpoint_status=closed\n"
+        "checkpoint_closed=true\n"
+        f"total_records={stats['total_records']}\n"
+        f"reviewed_records={stats['reviewed_records']}\n"
+        f"parked_ssdna={stats['parked_ssdna']}\n"
+        f"technical_rejects_after_review={stats['technical_rejects_after_review']}\n"
+        f"authorised_for_s4={stats['authorised_for_s4']}\n"
+        f"semantic_mismatches={semantic_mismatches}\n"
+        f"deterministic_rerun={'pass' if check_deterministic_rerun else 'skipped'}\n"
+        "CHECKPOINT-1 is closed\n"
+        "S4 was not started"
+    )
+    return AptaDiffApplyResult(
+        source_key=source_key,
+        output_dir=output_dir,
+        metadata_out=metadata_out,
+        tracked_manifest=tracked_manifest,
+        summary_out=summary_path,
+        output_hashes=output_hashes,
+        stats=stats,
+        preview_comparison_ok=bool(stats["preview_comparison_ok"]),
+        deterministic_rerun_ok=check_deterministic_rerun,
+        semantic_mismatches=semantic_mismatches,
+        checkpoint_closed=True,
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -7070,11 +7796,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             "aptaindex",
             "ena",
             "aptamerbase",
+            "aptadiff_a",
+            "aptadiff_b",
         }:
             raise Checkpoint1ApplyError(
                 f"Unsupported source_key={args.source!r}; "
                 "supported: aptabase, utexas, aptadb, riboaptamer, "
-                "aptaindex, ena, aptamerbase"
+                "aptaindex, ena, aptamerbase, aptadiff_a, aptadiff_b"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -7083,6 +7811,81 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if not repo_root.is_dir():
             raise Checkpoint1ApplyError(f"Repository root does not exist: {repo_root}")
+
+        if args.source in {"aptadiff_a", "aptadiff_b"}:
+            checkpoint_dir = (
+                args.checkpoint_dir
+                if args.checkpoint_dir is not None
+                else Path(f"data/interim/checkpoints/{args.source}_cp1")
+            )
+            if not Path(checkpoint_dir).is_absolute():
+                checkpoint_dir = repo_root / checkpoint_dir
+            expected_total = (
+                (13803 if args.source == "aptadiff_a" else 11547)
+                if args.expected_total_rows is None
+                else args.expected_total_rows
+            )
+            expected_active = (
+                (1 if args.source == "aptadiff_a" else 15)
+                if args.expected_active_rows is None
+                else args.expected_active_rows
+            )
+            if args.dry_run:
+                output_dir = (
+                    args.output_dir
+                    if args.output_dir is not None
+                    else Path(checkpoint_dir) / "dry_run"
+                )
+                if not Path(output_dir).is_absolute():
+                    output_dir = repo_root / output_dir
+                run_aptadiff_checkpoint1_dry_run(
+                    repo_root=repo_root,
+                    source_key=args.source,
+                    checkpoint_dir=Path(checkpoint_dir),
+                    output_dir=Path(output_dir),
+                    check_deterministic_rerun=not args.skip_deterministic_rerun,
+                    expected_source_rows=expected_total,
+                    expected_reviewed_rows=expected_active,
+                    verify_frozen_inputs=not args.skip_pipeline_integrity,
+                    compare_to_pristine=not args.skip_pipeline_integrity,
+                )
+                return 0
+            output_dir = (
+                args.output_dir
+                if args.output_dir is not None
+                else Path(checkpoint_dir) / "resolved"
+            )
+            if not Path(output_dir).is_absolute():
+                output_dir = repo_root / output_dir
+            tracked_manifest = (
+                args.tracked_manifest
+                if args.tracked_manifest is not None
+                else Path(
+                    f"config/checkpoint_reviews/{args.source}_checkpoint1_resolutions.csv"
+                )
+            )
+            metadata_out = (
+                args.metadata_out
+                if args.metadata_out is not None
+                else Path(
+                    f"config/checkpoint_reviews/{args.source}_checkpoint1_metadata.json"
+                )
+            )
+            run_aptadiff_checkpoint1_apply(
+                repo_root=repo_root,
+                source_key=args.source,
+                checkpoint_dir=Path(checkpoint_dir),
+                output_dir=Path(output_dir),
+                tracked_manifest=tracked_manifest,
+                metadata_out=metadata_out,
+                check_deterministic_rerun=not args.skip_deterministic_rerun,
+                expected_source_rows=expected_total,
+                expected_reviewed_rows=expected_active,
+                verify_frozen_inputs=not args.skip_pipeline_integrity,
+                compare_to_pristine=not args.skip_pipeline_integrity,
+                compare_to_preview=not args.skip_pipeline_integrity,
+            )
+            return 0
 
         if args.source == "aptamerbase":
             checkpoint_dir = (

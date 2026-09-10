@@ -1,0 +1,17 @@
+{
+  "source_key": "aptadiff_a",
+  "review_plan_version": "aptadiff_checkpoint1_structured_review_v1",
+  "notes": "Recommendation/guidance only. Never copy these values into manual_* fields. Contains no sequences. Production record IDs are not listed; recommendations are applied by primary_reason.",
+  "default_by_primary_reason": {
+    "ambiguous_bases": {
+      "review_recommendation": "confirm_current_reject",
+      "recommended_manual_decision": "",
+      "sequence_correction_op": "",
+      "requires_specific_human_decision": true,
+      "rationale": "unresolved IUPAC N in the authoritative 36-nt source sequence; no source-supported deterministic repair available."
+    }
+  },
+  "records": {},
+  "groups": {},
+  "audit_only": {}
+}
