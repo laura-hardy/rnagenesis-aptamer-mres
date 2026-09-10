@@ -51,6 +51,7 @@ docs/run_notes/*.log
 !results/
 !results/phase4_1_unadapted_rnagenesis_30k/
 !results/phase4_1_unadapted_rnagenesis_30k/**
+results/phase4_1_unadapted_rnagenesis_30k/.DS_Store
 
 # Data is local-only — never committed
 # (replaces the narrower /data/raw/ rule; entire top-level data/ is ignored)
