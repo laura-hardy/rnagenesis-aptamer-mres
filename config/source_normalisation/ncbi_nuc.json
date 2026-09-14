@@ -1,0 +1,38 @@
+{
+  "source_key": "ncbi_nuc",
+  "contract_version": "1.0",
+  "molecule_evidence_source": "approved_genbank_source_identity",
+  "reported_length_field": "ncbi_nuc_origin_length",
+  "apply_approved_trims": false,
+  "group_inference_key": "disabled",
+  "do_not_infer_molecule_from_alphabet": true,
+  "do_not_apply_inferred_trims": true,
+  "do_not_create_experiment_group_id": true,
+  "do_not_coerce_dna_to_ssdna": true,
+  "default_molecule_type": "unknown",
+  "default_chemistry": "unknown",
+  "default_construct_scope": "unknown",
+  "molecule_identity_by_accession": {
+    "U34759": {"molecule_type": "RNA", "chemistry": "RNA"},
+    "U37124": {"molecule_type": "RNA", "chemistry": "RNA"},
+    "U37123": {"molecule_type": "RNA", "chemistry": "RNA"},
+    "AF083271": {"molecule_type": "RNA", "chemistry": "RNA"},
+    "BD161067": {"molecule_type": "RNA", "chemistry": "RNA"},
+    "QT662269": {"molecule_type": "DNA", "chemistry": "DNA"}
+  },
+  "construct_scope_by_accession": {
+    "FW366678": "partial_construct",
+    "FZ422269": "partial_construct",
+    "DJ028182": "partial_construct",
+    "DD421991": "full_construct"
+  },
+  "source_object_class_by_accession": {
+    "FW366678": "primer_associated",
+    "FZ422269": "primer_associated",
+    "DJ028182": "poly_a_fragment",
+    "DD421991": "transcription_template",
+    "HV507922": "cdna_template_associated",
+    "HW065069": "cdna_template_associated",
+    "QT662269": "possible_non_aptamer_method_object"
+  }
+}

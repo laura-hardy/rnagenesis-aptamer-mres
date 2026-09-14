@@ -131,6 +131,19 @@ from adapters.utexas_s3 import (  # noqa: E402
     DEFAULT_UTEXAS_BATCHES,
     LOCAL_DETAIL_COLUMNS as UTEXAS_LOCAL_DETAIL_COLUMNS,
 )
+from adapters.ncbi_nuc_checkpoint1_review import (  # noqa: E402
+    DEFAULT_RECOMMENDATIONS_REL as NCBI_NUC_RECOMMENDATIONS_REL,
+    NcbiNucCheckpoint1ReviewError,
+    build_review_readme as build_ncbi_nuc_review_readme,
+    format_ncbi_nuc_validation_markdown,
+    load_review_recommendations as load_ncbi_nuc_recommendations,
+    populate_ncbi_nuc_recommendations,
+    validate_ncbi_nuc_review_package,
+)
+from adapters.ncbi_nuc_s3 import (  # noqa: E402
+    DEFAULT_NCBI_NUC_BATCHES,
+    LOCAL_DETAIL_COLUMNS as NCBI_NUC_LOCAL_DETAIL_COLUMNS,
+)
 
 EXPECTED_ACTIVE_ROWS = 431
 EXPECTED_TOTAL_ROWS = 610
@@ -241,6 +254,16 @@ APTADIFF_PIPELINE_STOP_STATEMENT = (
     "Global S4 has not been run."
 )
 APTADIFF_PERMITTED_DECISIONS: tuple[str, ...] = ("keep", "drop", "edit")
+NCBI_NUC_EXPECTED_TOTAL_ROWS = 18
+NCBI_NUC_BATCH_ORDER: tuple[str, ...] = DEFAULT_NCBI_NUC_BATCHES
+NCBI_NUC_PIPELINE_STOP_STATEMENT = (
+    "CHECKPOINT-1 package generated.\n"
+    "No human decisions applied.\n"
+    "No NCBI Nucleotide record is authorised for S4 yet.\n"
+    "The pipeline is stopped awaiting Laura CHECKPOINT-1 review.\n"
+    "Global S4 has not been run."
+)
+NCBI_NUC_PERMITTED_DECISIONS: tuple[str, ...] = ("keep", "drop", "edit")
 
 UTEXAS_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
     "review_batch",
@@ -424,6 +447,30 @@ APTADIFF_INDEX_COLUMNS: tuple[str, ...] = tuple(
     column
     for column in APTADIFF_MANUAL_REVIEW_COLUMNS
     if column not in APTADIFF_SEQUENCE_COLUMNS
+)
+
+NCBI_NUC_SEQUENCE_COLUMNS: tuple[str, ...] = (
+    "sequence_raw",
+    "sequence_full",
+    "sequence_core",
+    "manual_sequence_corrected",
+    "recommended_sequence_corrected",
+)
+
+NCBI_NUC_MANUAL_REVIEW_COLUMNS: tuple[str, ...] = (
+    ("review_order",)
+    + NCBI_NUC_LOCAL_DETAIL_COLUMNS
+    + tuple(
+        column
+        for column in RECOMMENDATION_FIELDS
+        if column not in NCBI_NUC_LOCAL_DETAIL_COLUMNS
+    )
+)
+
+NCBI_NUC_INDEX_COLUMNS: tuple[str, ...] = tuple(
+    column
+    for column in NCBI_NUC_MANUAL_REVIEW_COLUMNS
+    if column not in NCBI_NUC_SEQUENCE_COLUMNS
 )
 
 UTEXAS_INDEX_COLUMNS: tuple[str, ...] = tuple(
@@ -3974,6 +4021,338 @@ def prepare_aptadiff_checkpoint1_review(
     return result
 
 
+def build_ncbi_nuc_manual_review_row(
+    *,
+    review_row: Mapping[str, str],
+    local_detail: Mapping[str, str],
+    review_batch: str,
+    review_order: int,
+) -> dict[str, str]:
+    """Build one NCBI Nucleotide sequence-bearing active-review row."""
+    if review_row["record_id"] != local_detail["record_id"]:
+        raise Checkpoint1ReviewError("Joined record_id mismatch")
+    for field_name in (
+        "proposed_decision",
+        "primary_reason",
+        "secondary_reasons",
+        "manual_review_priority",
+        "checkpoint_review_reasons",
+    ):
+        if review_row.get(field_name, "") != local_detail.get(field_name, ""):
+            raise Checkpoint1ReviewError(
+                f"Checkpoint field mismatch for {field_name!r} on "
+                f"{review_row['record_id']!r}"
+            )
+    row = {column: "" for column in NCBI_NUC_MANUAL_REVIEW_COLUMNS}
+    for column in NCBI_NUC_LOCAL_DETAIL_COLUMNS:
+        row[column] = local_detail.get(column, "")
+    row["review_batch"] = review_batch
+    row["review_order"] = str(review_order)
+    row["record_id"] = review_row["record_id"]
+    for name in MANUAL_FIELDS:
+        row[name] = ""
+    return row
+
+
+def build_ncbi_nuc_index_row(queue_row: Mapping[str, str]) -> dict[str, str]:
+    return {column: queue_row.get(column, "") for column in NCBI_NUC_INDEX_COLUMNS}
+
+
+def ncbi_nuc_review_package_sort_key(
+    row: Mapping[str, str],
+) -> tuple[int, int, str, str]:
+    batch = row.get("review_batch", "")
+    try:
+        batch_rank = NCBI_NUC_BATCH_ORDER.index(batch)
+    except ValueError:
+        batch_rank = len(NCBI_NUC_BATCH_ORDER)
+    return (
+        batch_rank,
+        _priority_rank(row.get("manual_review_priority", "none")),
+        row.get("primary_reason", ""),
+        row.get("record_id", ""),
+    )
+
+
+def build_ncbi_nuc_review_summary(
+    *,
+    repo_root: Path,
+    result: ReviewPackageResult,
+) -> str:
+    stats = result.stats
+    lines = [
+        "# NCBI Nucleotide CHECKPOINT-1 manual-review package",
+        "",
+        "## Totals",
+        "",
+        f"- Total checkpoint records: `{stats.total_checkpoint_records}`",
+        f"- Active review rows: `{stats.active_review_rows}`",
+        f"- No-review records: `{stats.no_review_records}`",
+        f"- Human decisions recorded: `0`",
+        "",
+        "## Review model",
+        "",
+        "- `review_model` = `single_reviewer`",
+        "- Permitted `manual_decision` values: `keep` / `drop` / `edit`",
+        "- Permitted molecule overrides: `RNA` / `DNA`",
+        "- Permitted `manual_trim_action` values: `approve` / `override` / `reject` / `defer`",
+        "- Do not invent an aptamer core. Do not infer molecule type from alphabet.",
+        "- `manual_*` fields are blank until Laura completes review.",
+        "- Machine `proposed_decision` and `review_recommendation` are not human decisions.",
+        "",
+        "## Counts by review batch",
+        "",
+    ]
+    for batch in NCBI_NUC_BATCH_ORDER:
+        lines.append(f"- `{batch}`: `{stats.batch_counts.get(batch, 0)}`")
+    lines.extend(
+        [
+            "",
+            "## Counts by proposed decision",
+            "",
+        ]
+    )
+    for decision, count in sorted(stats.decision_counts.items()):
+        lines.append(f"- `{decision}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Counts by primary reason",
+            "",
+        ]
+    )
+    for reason, count in sorted(stats.primary_reason_counts.items()):
+        lines.append(f"- `{reason}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Outputs",
+            "",
+            f"- `{_relative_display(result.output_queue, repo_root)}`",
+            f"- `{_relative_display(result.output_index, repo_root)}`",
+            f"- `{_relative_display(result.output_summary, repo_root)}`",
+            "",
+            "WARNING: `ncbi_nuc_checkpoint1_manual_review.csv` contains source "
+            "sequences. It must remain local under `data/` and must not be committed.",
+            "",
+            "No human decision has yet been recorded.",
+            "",
+            NCBI_NUC_PIPELINE_STOP_STATEMENT,
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def prepare_ncbi_nuc_checkpoint1_review(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    expected_active_rows: int | None = None,
+    expected_total_rows: int | None = NCBI_NUC_EXPECTED_TOTAL_ROWS,
+) -> ReviewPackageResult:
+    """Build the NCBI Nucleotide CHECKPOINT-1 active manual-review package."""
+    repo_root = repo_root.resolve()
+    checkpoint_dir = _resolve_under_repo(repo_root, checkpoint_dir)
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+
+    review_path = checkpoint_dir / "ncbi_nuc_checkpoint1_review.csv"
+    local_detail_path = checkpoint_dir / "ncbi_nuc_checkpoint1_local_detail.csv"
+    for path, label in (
+        (review_path, "checkpoint review"),
+        (local_detail_path, "local-detail"),
+    ):
+        if not path.is_file():
+            raise Checkpoint1ReviewError(f"Missing {label} input: {path.name}")
+
+    review_hash_before = _sha256_file(review_path)
+    local_detail_hash_before = _sha256_file(local_detail_path)
+
+    review_rows = _read_csv(review_path, label="checkpoint review")
+    local_detail_rows = _read_csv(local_detail_path, label="local-detail")
+    paired = _join_review_and_local_detail(review_rows, local_detail_rows)
+
+    if expected_total_rows is not None and len(paired) != expected_total_rows:
+        raise Checkpoint1ReviewError(
+            f"Checkpoint row count must be {expected_total_rows}; got {len(paired)}"
+        )
+
+    stats = ReviewPackageStats()
+    stats.total_checkpoint_records = len(paired)
+
+    active_pairs: list[tuple[dict[str, str], dict[str, str], str]] = []
+    for review_row, detail_row in paired:
+        required = (review_row.get("manual_review_required") or "").strip()
+        if required not in {"true", "false"}:
+            raise Checkpoint1ReviewError(
+                "manual_review_required must be lowercase true/false; "
+                f"got {required!r} for {review_row['record_id']!r}"
+            )
+        if required == "false":
+            stats.no_review_records += 1
+            if review_row.get("review_batch"):
+                raise Checkpoint1ReviewError(
+                    "No-review ncbi_nuc row must not carry review_batch: "
+                    f"{review_row['record_id']!r}"
+                )
+            continue
+        if (
+            review_row.get("proposed_decision") == "proposed_reject"
+            and review_row.get("primary_reason") == "missing_sequence"
+        ):
+            raise Checkpoint1ReviewError(
+                "Missing-sequence reject must not enter the active review queue: "
+                f"{review_row['record_id']!r}"
+            )
+        batch = (review_row.get("review_batch") or "").strip()
+        if not batch:
+            raise Checkpoint1ReviewError(
+                "Review-required ncbi_nuc row missing review_batch: "
+                f"{review_row['record_id']!r}"
+            )
+        if batch not in NCBI_NUC_BATCH_ORDER:
+            raise Checkpoint1ReviewError(
+                f"Unknown ncbi_nuc review_batch {batch!r} for "
+                f"{review_row['record_id']!r}"
+            )
+        detail_batch = (detail_row.get("review_batch") or "").strip()
+        if detail_batch and detail_batch != batch:
+            raise Checkpoint1ReviewError(
+                f"review_batch mismatch for {review_row['record_id']!r}"
+            )
+        if detail_row.get("manual_decision"):
+            raise Checkpoint1ReviewError(
+                "Prepared review must not pre-fill manual_decision: "
+                f"{review_row['record_id']!r}"
+            )
+        active_pairs.append((review_row, detail_row, batch))
+
+    if expected_active_rows is not None and len(active_pairs) != expected_active_rows:
+        raise Checkpoint1ReviewError(
+            f"Active review row count must be {expected_active_rows}; "
+            f"got {len(active_pairs)}"
+        )
+
+    recommendations_path = repo_root / NCBI_NUC_RECOMMENDATIONS_REL
+    recommendations: dict[str, object] = {"records": {}, "groups": {}, "audit_only": {}}
+    if recommendations_path.is_file():
+        recommendations = load_ncbi_nuc_recommendations(recommendations_path)
+
+    draft_rows: list[dict[str, str]] = []
+    for review_row, detail_row, batch in active_pairs:
+        built = build_ncbi_nuc_manual_review_row(
+            review_row=review_row,
+            local_detail=detail_row,
+            review_batch=batch,
+            review_order=0,
+        )
+        try:
+            built = populate_ncbi_nuc_recommendations(
+                built, recommendations=recommendations
+            )
+        except NcbiNucCheckpoint1ReviewError as exc:
+            raise Checkpoint1ReviewError(str(exc)) from exc
+        draft_rows.append(built)
+
+    draft_rows.sort(key=ncbi_nuc_review_package_sort_key)
+    queue_rows: list[dict[str, str]] = []
+    for index, row in enumerate(draft_rows, start=1):
+        ordered = dict(row)
+        ordered["review_order"] = str(index)
+        if any(ordered.get(name) for name in MANUAL_FIELDS):
+            raise Checkpoint1ReviewError(
+                "Reviewer fields must be empty in the prepared package"
+            )
+        queue_rows.append(ordered)
+        batch = ordered["review_batch"]
+        stats.batch_counts[batch] = stats.batch_counts.get(batch, 0) + 1
+        decision = ordered["proposed_decision"]
+        stats.decision_counts[decision] = stats.decision_counts.get(decision, 0) + 1
+        primary = ordered["primary_reason"]
+        stats.primary_reason_counts[primary] = (
+            stats.primary_reason_counts.get(primary, 0) + 1
+        )
+        priority = ordered["manual_review_priority"]
+        stats.priority_counts[priority] = stats.priority_counts.get(priority, 0) + 1
+
+    stats.active_review_rows = len(queue_rows)
+    if len({row["record_id"] for row in queue_rows}) != len(queue_rows):
+        raise Checkpoint1ReviewError("Active review queue has duplicate record_id")
+
+    index_rows = [build_ncbi_nuc_index_row(row) for row in queue_rows]
+    if any(column in NCBI_NUC_INDEX_COLUMNS for column in NCBI_NUC_SEQUENCE_COLUMNS):
+        raise Checkpoint1ReviewError("Sequence columns leaked into index schema")
+
+    bulk_row = build_bulk_confirmation_row(queue_rows)
+    try:
+        validation = validate_ncbi_nuc_review_package(
+            queue_rows=queue_rows,
+            group_rows=[],
+            bulk_confirmation=bulk_row,
+        )
+    except NcbiNucCheckpoint1ReviewError as exc:
+        raise Checkpoint1ReviewError(str(exc)) from exc
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_queue = output_dir / "ncbi_nuc_checkpoint1_manual_review.csv"
+    out_index = output_dir / "ncbi_nuc_checkpoint1_manual_review_index.csv"
+    out_summary = output_dir / "ncbi_nuc_checkpoint1_manual_review_summary.md"
+    out_group = output_dir / "ncbi_nuc_checkpoint1_constant_group_review.csv"
+    out_bulk = output_dir / "ncbi_nuc_checkpoint1_bulk_audit_confirmation.csv"
+    out_readme = output_dir / "README.md"
+    out_validation = output_dir / "ncbi_nuc_checkpoint1_validation.md"
+
+    write_csv_atomic(out_queue, NCBI_NUC_MANUAL_REVIEW_COLUMNS, queue_rows)
+    write_csv_atomic(out_index, NCBI_NUC_INDEX_COLUMNS, index_rows)
+    write_csv_atomic(out_group, GROUP_REVIEW_COLUMNS, [])
+    write_csv_atomic(out_bulk, BULK_CONFIRMATION_COLUMNS, [bulk_row])
+    _write_text_atomic(out_readme, build_ncbi_nuc_review_readme())
+    _write_text_atomic(out_validation, format_ncbi_nuc_validation_markdown(validation))
+
+    review_hash_after = _sha256_file(review_path)
+    local_detail_hash_after = _sha256_file(local_detail_path)
+    inputs_unchanged = (
+        review_hash_before == review_hash_after
+        and local_detail_hash_before == local_detail_hash_after
+    )
+    if not inputs_unchanged:
+        raise Checkpoint1ReviewError(
+            "CHECKPOINT-1 inputs were modified during review-package preparation"
+        )
+
+    result = ReviewPackageResult(
+        source_key="ncbi_nuc",
+        stats=stats,
+        output_queue=out_queue,
+        output_index=out_index,
+        output_summary=out_summary,
+        review_hash_before=review_hash_before,
+        review_hash_after=review_hash_after,
+        local_detail_hash_before=local_detail_hash_before,
+        local_detail_hash_after=local_detail_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        output_group_review=out_group,
+        output_bulk_confirmation=out_bulk,
+        output_readme=out_readme,
+        output_validation=out_validation,
+    )
+    summary_text = build_ncbi_nuc_review_summary(repo_root=repo_root, result=result)
+    abs_root = str(repo_root.resolve())
+    if abs_root in summary_text:
+        raise Checkpoint1ReviewError(
+            "Review summary must not contain absolute repository paths"
+        )
+    if NCBI_NUC_PIPELINE_STOP_STATEMENT not in summary_text:
+        raise Checkpoint1ReviewError("Review summary missing pipeline stop statement")
+    if "No human decision has yet been recorded." not in summary_text:
+        raise Checkpoint1ReviewError(
+            "Review summary must state that no human decision has been recorded"
+        )
+    _write_text_atomic(out_summary, summary_text)
+    return result
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -3984,7 +4363,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, ena, aptamerbase, aptadiff_a, or aptadiff_b)",
+        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, ena, aptamerbase, aptadiff_a, aptadiff_b, or ncbi_nuc)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -4042,11 +4421,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             "aptamerbase",
             "aptadiff_a",
             "aptadiff_b",
+            "ncbi_nuc",
         }:
             raise Checkpoint1ReviewError(
                 f"Unsupported source_key={args.source!r}; "
                 "supported: aptabase, utexas, aptadb, riboaptamer, aptaindex, "
-                "ena, aptamerbase, aptadiff_a, aptadiff_b"
+                "ena, aptamerbase, aptadiff_a, aptadiff_b, ncbi_nuc"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -4072,6 +4452,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             default_checkpoint = Path("data/interim/checkpoints/aptadiff_a_cp1")
         elif args.source == "aptadiff_b":
             default_checkpoint = Path("data/interim/checkpoints/aptadiff_b_cp1")
+        elif args.source == "ncbi_nuc":
+            default_checkpoint = Path("data/interim/checkpoints/ncbi_nuc_cp1")
         else:
             default_checkpoint = Path("data/interim/checkpoints/aptabase_cp1")
         checkpoint_dir = (
@@ -4165,6 +4547,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 expected_active_rows=args.expected_active_rows,
                 expected_total_rows=args.expected_total_rows,
             )
+        elif args.source == "ncbi_nuc":
+            result = prepare_ncbi_nuc_checkpoint1_review(
+                repo_root=repo_root,
+                checkpoint_dir=checkpoint_dir,
+                output_dir=output_dir,
+                expected_active_rows=args.expected_active_rows,
+                expected_total_rows=(
+                    NCBI_NUC_EXPECTED_TOTAL_ROWS
+                    if args.expected_total_rows is None
+                    else args.expected_total_rows
+                ),
+            )
         else:
             result = prepare_aptabase_checkpoint1_review(
                 repo_root=repo_root,
@@ -4188,6 +4582,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         AptamerBaseCheckpoint1ReviewError,
         AptamerBaseCheckpoint1AuditError,
         AptaDiffCheckpoint1ReviewError,
+        NcbiNucCheckpoint1ReviewError,
     ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -4215,6 +4610,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         batch_order = APTAMERBASE_BATCH_ORDER
     elif result.source_key in {"aptadiff_a", "aptadiff_b"}:
         batch_order = APTADIFF_BATCH_ORDER
+    elif result.source_key == "ncbi_nuc":
+        batch_order = NCBI_NUC_BATCH_ORDER
     else:
         batch_order = BATCH_ORDER
     for batch in batch_order:

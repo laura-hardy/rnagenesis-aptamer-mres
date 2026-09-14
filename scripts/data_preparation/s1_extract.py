@@ -62,6 +62,12 @@ from adapters.ena import (  # noqa: E402
     extract_ena,
     write_sidecar_csv_atomic as write_ena_sidecar_csv_atomic,
 )
+from adapters.ncbi_nuc import (  # noqa: E402
+    NcbiNucAdapterError,
+    NcbiNucRegisteredInput,
+    extract_ncbi_nuc,
+    write_sidecar_csv_atomic as write_ncbi_nuc_sidecar_csv_atomic,
+)
 from adapters.riboaptamer import (  # noqa: E402
     RiboAptamerAdapterError,
     RiboAptamerExtractionResult,
@@ -1693,6 +1699,321 @@ def _run_aptadb_s1(
     return run_result
 
 
+def _ncbi_nuc_hash_token(
+    rows: Sequence[RegistrySpecRow],
+    hashes: Mapping[str, str],
+) -> str:
+    return "|".join(f"{row.path}:{hashes[row.path]}" for row in rows)
+
+
+def build_ncbi_nuc_s1_report(
+    *,
+    repo_root: Path,
+    registry_rows: Sequence[RegistrySpecRow],
+    result: S1RunResult,
+) -> str:
+    """Build an aggregate-only Markdown NCBI Nucleotide S1 report."""
+    stats = result.stats
+    pmid_ids = ", ".join(f"`{item}`" for item in stats.pmid_native_ids) or "(none)"
+    lines = [
+        "# NCBI Nucleotide S1 extraction report",
+        "",
+        "## Registered source",
+        "",
+        "- Logical source_key: `ncbi_nuc`",
+        f"- source_dataset: `{result.source_dataset}`",
+        f"- Registered GenBank files: `{len(registry_rows)}`",
+        f"- Redistribution status: `{registry_rows[0].redistribution_status}`",
+        f"- snapshot_date `{registry_rows[0].snapshot_date}` is a local",
+        "  source-snapshot/download-date proxy for this logical source,",
+        "  not an NCBI database release date.",
+        "- Filenames are opaque local downloads and are not biological IDs.",
+        "- Registry order is the processing order (not filesystem glob order).",
+        "",
+        "## Registered files",
+        "",
+    ]
+    for row in registry_rows:
+        lines.append(
+            f"- `{row.path}` SHA-256 `{row.sha256}` "
+            f"n_rows_expected=`{row.n_rows_expected}`"
+        )
+    lines.extend(
+        [
+            "",
+            "## SHA-256 agreement",
+            "",
+            f"- Combined observed SHA-256 token: `{result.observed_sha256}`",
+            f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+            "",
+            "## RECONCILIATION",
+            "",
+            f"- files in: `{stats.input_files}`",
+            f"- parsed GenBank records in: `{stats.input_rows}`",
+            f"- canonical rows: `{stats.canonical_rows}`",
+            f"- sidecar rows: `{stats.sidecar_rows}`",
+            f"- unique record_id: `{stats.unique_record_ids}`",
+            f"- unique native_id: `{stats.unique_native_ids}`",
+            f"- first native ID: `{stats.first_native_id}`",
+            f"- last native ID: `{stats.last_native_id}`",
+            f"- source order preserved: "
+            f"`{'pass' if stats.order_preserved else 'fail'}`",
+            f"- ORIGIN exact-copy into sequence_raw: "
+            f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+            f"- ORIGIN length agrees with LOCUS length: "
+            f"`{stats.origin_length_matches_locus}`",
+            "- S1 records filtered, rejected, or parked: `0`",
+            "",
+            "## Native-ID strategy",
+            "",
+            f"- Strategy: `{stats.native_id_strategy}`",
+            "- `record_id` = `ncbi_nuc:{ACCESSION}`",
+            "- LOCUS and VERSION are sidecar provenance only.",
+            "- Opaque local filenames are sidecar provenance only.",
+            "",
+            "## Canonical mapping summary",
+            "",
+            "- ORIGIN residue letters → `sequence_raw` after removing only",
+            "  GenBank display line numbers, grouping spaces, and line breaks",
+            "- Deposited letter case is preserved; Biopython `str(record.seq)`",
+            "  is not used as `sequence_raw` because it uppercases",
+            "- No T→U, no U→T, no IUPAC/N removal, no trimming",
+            "- `target_name_raw` is empty; DEFINITION/COMMENT/reference titles",
+            "  remain sidecar context for later target resolution",
+            "- Canonical `accession` remains empty under the live S1 stage guard",
+            "- Canonical `publication` remains empty because records mix",
+            "  article, patent, and direct-submission references",
+            "- Canonical `doi` is empty unless a structured GenBank DOI exists",
+            "- Canonical `pubmed_id` is populated only when exactly one",
+            "  unambiguous structured PUBMED value exists",
+            "",
+            "## SEQUENCE RAW STATUS",
+            "",
+            f"- nonempty sequence_raw: `{stats.nonempty_sequences}`",
+            f"- missing sequence_raw: `{stats.missing_sequences}`",
+            "- Alphabet/molecule/chemistry are not classified at S1.",
+            "",
+            "## TARGET",
+            "",
+            f"- target_name_raw populated: `{stats.nonempty_target_name_raw}`",
+            f"- target_name_raw empty: `{stats.empty_target_name_raw}`",
+            "- No record was split into multiple (sequence, target) rows.",
+            "",
+            "## Publication fields",
+            "",
+            f"- nonempty canonical publication: `{stats.nonempty_publication}`",
+            f"- nonempty canonical DOI: `{stats.nonempty_doi}`",
+            f"- nonempty canonical PMID: `{stats.nonempty_pmid}`",
+            f"- ACCESSIONS with exactly one structured PMID: {pmid_ids}",
+            "",
+            "## SOURCE METADATA",
+            "",
+            f"- Sidecar rows: `{stats.sidecar_rows}`",
+            "- Sidecar retains registered path, basename, file SHA-256,",
+            "  LOCUS fields, ACCESSION, VERSION, GI, DEFINITION, COMMENT,",
+            "  keywords, source organism, source /mol_type, FEATURES,",
+            "  complete REFERENCES, dbxrefs, ORIGIN length, and ORIGIN",
+            "  residues.",
+            "",
+            "## Validation results",
+            "",
+            f"- SHA-256 agreement: `{'pass' if result.sha256_ok else 'fail'}`",
+            f"- Record retention (records_in == rows_out == "
+            f"{stats.input_rows}): "
+            f"`{'pass' if stats.canonical_rows == stats.input_rows else 'fail'}`",
+            f"- Unique native/record IDs: "
+            f"`{'pass' if stats.unique_native_ids == stats.canonical_rows and stats.unique_record_ids == stats.canonical_rows else 'fail'}`",
+            f"- Sequence exact-copy: "
+            f"`{'pass' if stats.sequence_exact_copy_ok else 'fail'}`",
+            f"- Canonical target inference at S1: "
+            f"`{'none' if stats.nonempty_target_name_raw == 0 else 'fail'}`",
+            "",
+            "## Integrity / raw-data immutability",
+            "",
+            f"- Source-input hash before: `{result.input_hash_before}`",
+            f"- Source-input hash after: `{result.input_hash_after}`",
+            f"- Source-input pre/post hash result: "
+            f"`{'pass' if result.input_hash_unchanged else 'fail'}`",
+            (
+                f"- Deterministic rerun result: "
+                f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+                if result.deterministic_rerun_ok is not None
+                else "- Deterministic rerun result: `not_checked`"
+            ),
+            "",
+            "## Outputs",
+            "",
+            f"- Canonical: `{_relative_display(result.output_canonical, repo_root)}`",
+            f"- Sidecar: `{_relative_display(result.output_sidecar, repo_root)}`",
+            f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+            "",
+            "## DEFERRED",
+            "",
+            "- molecule identity not assigned",
+            "- chemistry not assigned",
+            "- no T→U",
+            "- no sequence normalisation or trimming",
+            "- aptamer/non-aptamer status not adjudicated",
+            "- construct/core not adjudicated",
+            "- no record rejected or parked",
+            "- no target canonicalisation",
+            "- no UniProt/Pfam/family assignment",
+            "- no evidence score or E1–E5",
+            "- no affinity normalisation",
+            "- no leakage exclusion",
+            "- NO NCBI↔ENA DEDUPLICATION",
+            "- no within-NCBI deduplication, clustering, balancing, or partition",
+            "- no CHECKPOINT-1",
+            "- no global S4",
+            "",
+            "## Pipeline status",
+            "",
+            "- NCBI Nucleotide S0 complete.",
+            "- NCBI Nucleotide S1 complete.",
+            "- NCBI Nucleotide S2 has not started.",
+            "- No NCBI Nucleotide record is authorised for global S4.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _run_ncbi_nuc_s1(
+    *,
+    repo_root: Path,
+    spec_rows: Sequence[RegistrySpecRow],
+    output_dir: Path,
+    check_deterministic_rerun: bool,
+) -> S1RunResult:
+    matches = _resolve_source_rows(spec_rows, "ncbi_nuc")
+    for row in matches:
+        _assert_not_forbidden_companion(row.path)
+        suffix = Path(row.path).suffix.lower()
+        if suffix not in {".gb", ".gbk", ".genbank"}:
+            raise S1ExtractError(
+                f"ncbi_nuc registered path must be a GenBank flatfile; "
+                f"got {row.path}"
+            )
+        validate_registered_file(repo_root, row)
+
+    resolved = {
+        row.path: resolve_registered_path(repo_root, row.path) for row in matches
+    }
+    hashes_before = {
+        row.path: sha256_file(resolved[row.path]) for row in matches
+    }
+    for row in matches:
+        if hashes_before[row.path] != row.sha256:
+            raise S1ExtractError(
+                f"SHA-256 mismatch before adapter execution for ncbi_nuc "
+                f"file {row.path}"
+            )
+
+    registered_inputs = [
+        NcbiNucRegisteredInput(
+            path=resolved[row.path],
+            relative_path=row.path,
+            sha256=row.sha256,
+            n_rows_expected=row.n_rows_expected,
+        )
+        for row in matches
+    ]
+    expected_records = sum(row.n_rows_expected for row in matches)
+    extraction = extract_ncbi_nuc(
+        registered_inputs,
+        source_dataset=matches[0].source_dataset,
+        redistribution_status=matches[0].redistribution_status,
+        expected_records=expected_records,
+    )
+
+    hashes_after = {
+        row.path: sha256_file(resolved[row.path]) for row in matches
+    }
+    if hashes_after != hashes_before:
+        raise S1ExtractError(
+            "Source input was modified during S1 extraction of ncbi_nuc"
+        )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    canonical_path = output_dir / "ncbi_nuc_extracted.csv"
+    sidecar_path = output_dir / "ncbi_nuc_source_metadata.csv"
+    report_path = output_dir / "ncbi_nuc_s1_report.md"
+    write_corpus_csv_atomic(canonical_path, extraction.canonical_rows)
+    write_ncbi_nuc_sidecar_csv_atomic(sidecar_path, extraction.sidecar_rows)
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        fd_c, tmp_c_name = tempfile.mkstemp(
+            prefix=".ncbi_nuc_extracted.",
+            suffix=".csv.tmp",
+            dir=str(output_dir),
+        )
+        os.close(fd_c)
+        tmp_c = Path(tmp_c_name)
+        fd_s, tmp_s_name = tempfile.mkstemp(
+            prefix=".ncbi_nuc_sidecar.",
+            suffix=".csv.tmp",
+            dir=str(output_dir),
+        )
+        os.close(fd_s)
+        tmp_s = Path(tmp_s_name)
+        try:
+            second = extract_ncbi_nuc(
+                registered_inputs,
+                source_dataset=matches[0].source_dataset,
+                redistribution_status=matches[0].redistribution_status,
+                expected_records=expected_records,
+            )
+            write_corpus_csv_atomic(tmp_c, second.canonical_rows)
+            write_ncbi_nuc_sidecar_csv_atomic(tmp_s, second.sidecar_rows)
+            deterministic_ok = (
+                tmp_c.read_bytes() == canonical_path.read_bytes()
+                and tmp_s.read_bytes() == sidecar_path.read_bytes()
+            )
+            if not deterministic_ok:
+                raise S1ExtractError(
+                    "S1 outputs were not byte-identical across deterministic rerun"
+                )
+        finally:
+            for tmp in (tmp_c, tmp_s):
+                if tmp.exists():
+                    tmp.unlink()
+
+    hash_before_token = _ncbi_nuc_hash_token(matches, hashes_before)
+    hash_after_token = _ncbi_nuc_hash_token(matches, hashes_after)
+    run_result = S1RunResult(
+        source_key="ncbi_nuc",
+        source_dataset=matches[0].source_dataset,
+        registered_path=matches[0].path,
+        registered_sha256=matches[0].sha256,
+        observed_sha256=hash_before_token,
+        sha256_ok=all(
+            hashes_before[row.path] == row.sha256 for row in matches
+        ),
+        input_hash_before=hash_before_token,
+        input_hash_after=hash_after_token,
+        input_hash_unchanged=hashes_before == hashes_after,
+        deterministic_rerun_ok=deterministic_ok,
+        stats=extraction.stats,
+        output_canonical=canonical_path,
+        output_sidecar=sidecar_path,
+        output_report=report_path,
+        registered_paths=tuple(row.path for row in matches),
+    )
+    report_text = build_ncbi_nuc_s1_report(
+        repo_root=repo_root,
+        registry_rows=matches,
+        result=run_result,
+    )
+    _write_text_atomic(report_path, report_text)
+    abs_root = str(repo_root.resolve())
+    if abs_root in report_text:
+        raise S1ExtractError(
+            "S1 report must not contain absolute repository paths"
+        )
+    return run_result
+
+
 def run_s1_extraction(
     *,
     repo_root: Path,
@@ -1716,6 +2037,13 @@ def run_s1_extraction(
     spec_rows = load_registry_spec(registry_spec)
     if source_key == "aptadb":
         return _run_aptadb_s1(
+            repo_root=repo_root,
+            spec_rows=spec_rows,
+            output_dir=output_dir,
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key == "ncbi_nuc":
+        return _run_ncbi_nuc_s1(
             repo_root=repo_root,
             spec_rows=spec_rows,
             output_dir=output_dir,
@@ -1914,7 +2242,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Registry source_key to extract (e.g. aptabase, aptamerbase, utexas, aptadb, riboaptamer, aptaindex, ena, aptadiff_a, aptadiff_b)",
+        help="Registry source_key to extract (e.g. aptabase, aptamerbase, utexas, aptadb, riboaptamer, aptaindex, ena, aptadiff_a, aptadiff_b, ncbi_nuc)",
     )
     parser.add_argument(
         "--registry-spec",
@@ -1985,6 +2313,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         AptaDBAdapterError,
         AptaIndexAdapterError,
         EnaAdapterError,
+        NcbiNucAdapterError,
         RiboAptamerAdapterError,
         UTexasAdapterError,
         CorpusSchemaError,

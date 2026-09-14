@@ -435,7 +435,7 @@ def _molecule_chemistry_consistent(molecule: str, chemistry: str) -> bool:
         return True
     if molecule == "RNA" and chemistry in DNA_CHEMISTRIES:
         return False
-    if molecule == "ssDNA" and chemistry in RNA_CHEMISTRIES:
+    if molecule in {"ssDNA", "DNA"} and chemistry in RNA_CHEMISTRIES:
         return False
     if chemistry and chemistry not in CHEMISTRY_VOCABULARY:
         return False
@@ -844,9 +844,15 @@ def validate_review_package(
     group_rows: Sequence[Mapping[str, str]],
     bulk_confirmation: Mapping[str, str] | None = None,
     allow_deferred: bool = False,
+    allowed_molecule_overrides: frozenset[str] | None = None,
 ) -> ValidationReport:
     report = ValidationReport(total_review_records=len(queue_rows))
-    groups_by_id = {row["constant_group_id"]: row for row in group_rows}
+    allowed_molecules = allowed_molecule_overrides or ALLOWED_MOLECULE_OVERRIDES
+    groups_by_id = {
+        row["constant_group_id"]: row
+        for row in group_rows
+        if row.get("constant_group_id")
+    }
     bulk_confirmed = (
         bulk_confirmation is not None
         and _blank(bulk_confirmation.get("confirm")).lower() == "true"
@@ -917,7 +923,7 @@ def validate_review_package(
                 )
         molecule = _blank(row.get("manual_molecule_type_override"))
         chemistry = _blank(row.get("manual_chemistry_override"))
-        if molecule not in ALLOWED_MOLECULE_OVERRIDES:
+        if molecule not in allowed_molecules:
             report.contradictory_records += 1
             report.blocking_issues.append(
                 f"Invalid molecule override for {record_id}"

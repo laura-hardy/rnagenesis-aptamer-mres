@@ -29,6 +29,10 @@ from adapters.aptadiff_checkpoint1_review import (  # noqa: E402
     read_csv_rows as read_aptadiff_csv_rows,
     validate_review_package as validate_aptadiff_review_package,
 )
+from adapters.ncbi_nuc_checkpoint1_review import (  # noqa: E402
+    NcbiNucCheckpoint1ReviewError,
+    validate_ncbi_nuc_review_package,
+)
 from s0_build_registry import find_repo_root  # noqa: E402
 
 SUPPORTED_SOURCES = (
@@ -39,6 +43,7 @@ SUPPORTED_SOURCES = (
     "aptamerbase",
     "aptadiff_a",
     "aptadiff_b",
+    "ncbi_nuc",
 )
 
 
@@ -49,7 +54,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptadb, riboaptamer, aptaindex, ena, aptamerbase, aptadiff_a, or aptadiff_b)",
+        help="Source key (aptadb, riboaptamer, aptaindex, ena, aptamerbase, aptadiff_a, aptadiff_b, or ncbi_nuc)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -110,6 +115,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         queue_name = f"{args.source}_checkpoint1_manual_review.csv"
         group_name = f"{args.source}_checkpoint1_constant_group_review.csv"
         bulk_name = f"{args.source}_checkpoint1_bulk_audit_confirmation.csv"
+    elif args.source == "ncbi_nuc":
+        default_checkpoint = Path("data/interim/checkpoints/ncbi_nuc_cp1")
+        queue_name = "ncbi_nuc_checkpoint1_manual_review.csv"
+        group_name = "ncbi_nuc_checkpoint1_constant_group_review.csv"
+        bulk_name = "ncbi_nuc_checkpoint1_bulk_audit_confirmation.csv"
     else:
         default_checkpoint = Path("data/interim/checkpoints/aptadb_cp1")
         queue_name = "aptadb_checkpoint1_manual_review.csv"
@@ -165,6 +175,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 group_rows=group_rows,
                 bulk_confirmation=bulk,
             )
+        elif args.source == "ncbi_nuc":
+            queue_rows = read_csv_rows(queue_path)
+            group_rows = read_csv_rows(group_path) if group_path.is_file() else []
+            bulk_rows = read_csv_rows(bulk_path) if bulk_path.is_file() else []
+            bulk = bulk_rows[0] if bulk_rows else None
+            report = validate_ncbi_nuc_review_package(
+                queue_rows=queue_rows,
+                group_rows=group_rows,
+                bulk_confirmation=bulk,
+            )
         else:
             if args.source == "riboaptamer":
                 from adapters.riboaptamer_checkpoint1_review import (
@@ -189,6 +209,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         AptaDBCheckpoint1ReviewError,
         EnaCheckpoint1ReviewError,
         AptaDiffCheckpoint1ReviewError,
+        NcbiNucCheckpoint1ReviewError,
     ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

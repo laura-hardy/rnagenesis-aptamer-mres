@@ -1846,3 +1846,613 @@ def test_aptamerbase_expected_count_mismatch_hard_fails(tmp_path: Path) -> None:
     with pytest.raises(GlobalS4HandoffError, match="Expected 881"):
         _run(repo, config_path)
 
+
+NCBI_NUC_SIDECAR_COLUMNS = [
+    "record_id",
+    "native_id",
+    "ncbi_nuc_registered_path",
+    "ncbi_nuc_input_basename",
+    "ncbi_nuc_file_sha256",
+    "ncbi_nuc_locus",
+    "ncbi_nuc_locus_length",
+    "ncbi_nuc_locus_molecule",
+    "ncbi_nuc_topology",
+    "ncbi_nuc_division",
+    "ncbi_nuc_date",
+    "ncbi_nuc_accession",
+    "ncbi_nuc_version",
+    "ncbi_nuc_gi",
+    "ncbi_nuc_definition",
+    "ncbi_nuc_comment",
+    "ncbi_nuc_keywords",
+    "ncbi_nuc_source_organism",
+    "ncbi_nuc_source_mol_type",
+    "ncbi_nuc_dbxrefs_json",
+    "ncbi_nuc_features_json",
+    "ncbi_nuc_references_json",
+    "ncbi_nuc_origin_length",
+    "ncbi_nuc_origin_residues",
+]
+
+NCBI_NUC_EXTRA_FIELDS = [
+    "ncbi_nuc_registered_path",
+    "ncbi_nuc_input_basename",
+    "ncbi_nuc_file_sha256",
+    "ncbi_nuc_locus",
+    "ncbi_nuc_locus_length",
+    "ncbi_nuc_locus_molecule",
+    "ncbi_nuc_topology",
+    "ncbi_nuc_division",
+    "ncbi_nuc_date",
+    "ncbi_nuc_accession",
+    "ncbi_nuc_version",
+    "ncbi_nuc_gi",
+    "ncbi_nuc_definition",
+    "ncbi_nuc_comment",
+    "ncbi_nuc_keywords",
+    "ncbi_nuc_source_organism",
+    "ncbi_nuc_source_mol_type",
+    "ncbi_nuc_dbxrefs_json",
+    "ncbi_nuc_features_json",
+    "ncbi_nuc_references_json",
+    "ncbi_nuc_origin_length",
+]
+
+
+def _ncbi_nuc_specs() -> list[dict[str, str]]:
+    return [
+        {
+            "record_id": "ncbi_nuc:SYN001",
+            "native_id": "SYN001",
+            "resolved": "accept",
+            "status": "approved_for_s4",
+            "auth": "true",
+            "seq_raw": "ACGTACGT",
+            "seq_full": "ACGUACGU",
+            "molecule": "RNA",
+            "chemistry": "RNA",
+            "trim": "no_constants_detected",
+            "pubmed": "12345",
+            "definition": "synthetic construct demo aptamer",
+        },
+        {
+            "record_id": "ncbi_nuc:SYN002",
+            "native_id": "SYN002",
+            "resolved": "accept",
+            "status": "approved_for_s4",
+            "auth": "true",
+            "seq_raw": "TTGGAACC",
+            "seq_full": "UUGGAACC",
+            "molecule": "RNA",
+            "chemistry": "RNA",
+            "trim": "no_constants_detected",
+            "pubmed": "",
+            "definition": "another synthetic construct",
+        },
+        {
+            "record_id": "ncbi_nuc:SYN003",
+            "native_id": "SYN003",
+            "resolved": "accept",
+            "status": "approved_for_s4",
+            "auth": "true",
+            "seq_raw": "CCGGAATT",
+            "seq_full": "CCGGAAUU",
+            "molecule": "RNA",
+            "chemistry": "RNA",
+            "trim": "no_constants_detected",
+            "pubmed": "",
+            "definition": "third synthetic construct",
+        },
+        {
+            "record_id": "ncbi_nuc:PARK1",
+            "native_id": "PARK1",
+            "resolved": "park",
+            "status": "parked_after_checkpoint1",
+            "auth": "false",
+            "seq_raw": "AAUUGGCC",
+            "seq_full": "AAUUGGCC",
+            "molecule": "unknown",
+            "chemistry": "unknown",
+            "trim": "no_constants_detected",
+            "pubmed": "",
+            "definition": "parked unresolved-molecule record",
+        },
+        {
+            "record_id": "ncbi_nuc:REJ1",
+            "native_id": "REJ1",
+            "resolved": "reject",
+            "status": "rejected_after_checkpoint1",
+            "auth": "false",
+            "seq_raw": "GGCCGGCC",
+            "seq_full": "GGCCGGCC",
+            "molecule": "unknown",
+            "chemistry": "unknown",
+            "trim": "no_constants_detected",
+            "pubmed": "",
+            "definition": "rejected non-aptamer record",
+        },
+    ]
+
+
+def _ncbi_nuc_sidecar_row(spec: dict[str, str]) -> dict[str, str]:
+    native = spec["native_id"]
+    length = str(len(spec["seq_raw"]))
+    features = (
+        '[{"location":"1..'
+        + length
+        + '","qualifiers":{"mol_type":"genomic RNA"},"type":"source"}]'
+    )
+    references = (
+        '[{"authors":"Demo","journal":"Demo J","pubmed_id":"'
+        + spec["pubmed"]
+        + '","title":"Demo title"}]'
+    )
+    return {
+        "record_id": spec["record_id"],
+        "native_id": native,
+        "ncbi_nuc_registered_path": f"data/raw/NCBI_nucleotide/{native}.gb",
+        "ncbi_nuc_input_basename": f"{native}.gb",
+        "ncbi_nuc_file_sha256": "ab" * 32,
+        "ncbi_nuc_locus": native,
+        "ncbi_nuc_locus_length": length,
+        "ncbi_nuc_locus_molecule": spec["molecule"] if spec["molecule"] != "unknown" else "DNA",
+        "ncbi_nuc_topology": "linear",
+        "ncbi_nuc_division": "SYN",
+        "ncbi_nuc_date": "01-JAN-1996",
+        "ncbi_nuc_accession": native,
+        "ncbi_nuc_version": f"{native}.1",
+        "ncbi_nuc_gi": "",
+        "ncbi_nuc_definition": spec["definition"],
+        "ncbi_nuc_comment": "demo comment" if native == "SYN001" else "",
+        "ncbi_nuc_keywords": ".",
+        "ncbi_nuc_source_organism": "synthetic construct",
+        "ncbi_nuc_source_mol_type": "genomic RNA",
+        "ncbi_nuc_dbxrefs_json": "[]",
+        "ncbi_nuc_features_json": features,
+        "ncbi_nuc_references_json": references,
+        "ncbi_nuc_origin_length": length,
+        "ncbi_nuc_origin_residues": spec["seq_raw"],
+    }
+
+
+def _ncbi_nuc_handoff_tree(
+    tmp_path: Path, *, expected: int | None = None
+) -> tuple[Path, Path]:
+    repo, config_path = _make_tree(tmp_path, source_key="ncbi_nuc", expected=expected or 3)
+    specs = _ncbi_nuc_specs()
+    authorised = [spec for spec in specs if spec["auth"] == "true"]
+    if expected is None:
+        expected = len(authorised)
+
+    applied_dir = repo / "data/interim/checkpoints/ncbi_nuc_cp1/resolved"
+    applied_dir.mkdir(parents=True, exist_ok=True)
+    pre_review = (
+        repo / "data/interim/checkpoints/ncbi_nuc_cp1/ncbi_nuc_s3_canonical.csv"
+    )
+    sidecar_dir = repo / "data/interim/extracted"
+    sidecar_dir.mkdir(parents=True, exist_ok=True)
+
+    canonical: list[dict[str, str]] = []
+    pre_rows: list[dict[str, str]] = []
+    resolutions: list[dict[str, str]] = []
+    for spec in specs:
+        row = _empty_corpus(
+            record_id=spec["record_id"],
+            sequence_raw=spec["seq_raw"],
+            sequence_full=spec["seq_full"],
+            sequence_core=spec["seq_full"],
+            sequence_length_full=str(len(spec["seq_full"])),
+            sequence_length_core=str(len(spec["seq_full"])),
+            molecule_type=spec["molecule"],
+            alphabet_as_reported="DNA_T" if spec["auth"] == "true" else "RNA",
+            t_to_u_applied="true" if spec["auth"] == "true" else "false",
+            chemistry=spec["chemistry"],
+            trim_status=spec["trim"],
+            target_name_raw="",
+            target_name="",
+            target_type="",
+            target_uniprot="",
+            accession="",
+            pubmed_id=spec["pubmed"],
+            source_db="ncbi_nuc",
+            source_dataset="ncbi_nuc_genbank_2026-07-27",
+            contributing_sources="ncbi_nuc",
+            contributing_datasets="ncbi_nuc_genbank_2026-07-27",
+            corroboration_count="1",
+            redistribution_status="unknown",
+            independently_attested_by_permissive_source="false",
+            native_id=spec["native_id"],
+        )
+        canonical.append(row)
+        pre = dict(row)
+        if spec["record_id"] == "ncbi_nuc:SYN001":
+            pre["sequence_core"] = "ACGU"
+            pre["sequence_length_core"] = "4"
+        pre_rows.append(pre)
+        resolutions.append(
+            {
+                "record_id": spec["record_id"],
+                "proposed_decision": f"proposed_{spec['resolved']}",
+                "resolved_decision": spec["resolved"],
+                "checkpoint1_resolution_status": spec["status"],
+                "authorised_for_s4": spec["auth"],
+            }
+        )
+
+    applied_path = applied_dir / "ncbi_nuc_checkpoint1_applied_canonical.csv"
+    _write_csv(applied_path, list(CORPUS_COLUMNS), canonical)
+    _write_csv(pre_review, list(CORPUS_COLUMNS), pre_rows)
+    res_path = repo / "config/checkpoint_reviews/ncbi_nuc_checkpoint1_resolutions.csv"
+    _write_csv(res_path, RESOLUTION_COLUMNS, resolutions)
+    auth_path = applied_dir / "ncbi_nuc_checkpoint1_s4_authorised_ids.csv"
+    _write_csv(
+        auth_path,
+        AUTH_ID_COLUMNS,
+        [
+            {
+                "record_id": spec["record_id"],
+                "resolved_decision": "accept",
+                "checkpoint1_resolution_status": "approved_for_s4",
+            }
+            for spec in authorised
+        ],
+    )
+    _write_csv(
+        sidecar_dir / "ncbi_nuc_source_metadata.csv",
+        NCBI_NUC_SIDECAR_COLUMNS,
+        [_ncbi_nuc_sidecar_row(spec) for spec in specs],
+    )
+
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["source_key"] = "ncbi_nuc"
+    payload["source_dataset"] = "ncbi_nuc_genbank_2026-07-27"
+    payload["canonical_input"] = (
+        "data/interim/checkpoints/ncbi_nuc_cp1/resolved/"
+        "ncbi_nuc_checkpoint1_applied_canonical.csv"
+    )
+    payload["resolution_manifest"] = (
+        "config/checkpoint_reviews/ncbi_nuc_checkpoint1_resolutions.csv"
+    )
+    payload["authorised_ids_input"] = (
+        "data/interim/checkpoints/ncbi_nuc_cp1/resolved/"
+        "ncbi_nuc_checkpoint1_s4_authorised_ids.csv"
+    )
+    payload["expected_authorised_records"] = expected
+    payload["global_s4_run"] = False
+    payload["redistribution_status"] = "unknown"
+    payload["physical_row_join_key"] = "record_id"
+    payload["emit_target_evidence_boundary"] = True
+    payload["emit_source_metadata_only_disclaimer"] = True
+    payload["handoff_extra_fields"] = list(NCBI_NUC_EXTRA_FIELDS)
+    payload["required_nonempty_handoff_fields"] = [
+        "ncbi_nuc_accession",
+        "ncbi_nuc_version",
+    ]
+    payload["require_empty_canonical_fields"] = [
+        "accession",
+        "target_name_raw",
+        "target_name",
+        "target_uniprot",
+        "target_type",
+        "target_type_source",
+        "target_family",
+        "target_pfam",
+        "pdb_id",
+        "binding_evidence_type",
+        "binding_evidence_score",
+        "affinity_value",
+        "affinity_unit",
+        "affinity_type",
+        "cluster_id",
+        "is_cluster_representative",
+        "partition",
+    ]
+    payload["handoff_summary_provenance_counts"] = {
+        "trim_status_value": "no_constants_detected",
+        "report_t_to_u_applied": True,
+        "unique_count_fields": ["ncbi_nuc_accession", "native_id"],
+        "nonempty_count_fields": [
+            "ncbi_nuc_accession",
+            "ncbi_nuc_version",
+            "ncbi_nuc_definition",
+            "pubmed_id",
+        ],
+        "value_count_fields": ["molecule_type", "chemistry", "trim_status"],
+    }
+    payload["handoff_summary_additional_notes"] = [
+        "authorised_for_s4=true / inclusion in this handoff means only technically eligible after NCBI sequence/molecule/source-object review.",
+        "Canonical target_name_raw is deliberately empty.",
+        "NO NCBI↔ENA DEDUPLICATION PERFORMED.",
+        "Global S4 has not been run.",
+    ]
+    payload["handoff_ready_statement"] = (
+        "NCBI Nucleotide CHECKPOINT-1 is closed and this source is prepared as "
+        "one input to the future corpus-wide global S4 stage. Global S4 has "
+        "not been run."
+    )
+    payload["future_enrichment_join"] = {
+        "physical_row_key": "record_id",
+        "join_path": (
+            "record_id -> S1 GenBank sidecar ACCESSION/DEFINITION/COMMENT/"
+            "FEATURES/REFERENCES"
+        ),
+    }
+    payload["future_global_s4_prerequisites"] = [
+        "Do not parse GenBank DEFINITION, COMMENT, FEATURES, or REFERENCE titles into canonical target_name_raw."
+    ]
+    payload["target_metadata"]["source_metadata_path"] = (
+        "data/interim/extracted/ncbi_nuc_source_metadata.csv"
+    )
+    payload["target_metadata"]["canonical_raw_field"] = "target_name_raw"
+    payload["target_metadata"]["source_specific_field"] = ""
+    payload["target_metadata"]["specific_target_present_in_authorised_records"] = 0
+    payload["target_metadata"]["specific_target_missing_in_authorised_records"] = expected
+    payload["global_s4_rules"]["final_target_normalisation_performed_here"] = False
+    payload["global_s4_handoff_output"] = (
+        "data/interim/global_s4_ready/ncbi_nuc_global_s4_input.csv"
+    )
+    payload["global_s4_handoff_summary"] = (
+        "data/interim/global_s4_ready/ncbi_nuc_global_s4_handoff_summary.md"
+    )
+    _write_json(config_path, payload)
+    return repo, config_path
+
+
+def test_ncbi_nuc_live_source_config_loads() -> None:
+    path = REPO_ROOT / "config" / "global_s4_sources" / "ncbi_nuc.json"
+    config = load_source_config(path)
+    assert config["source_key"] == "ncbi_nuc"
+    assert config["source_dataset"] == "ncbi_nuc_genbank_2026-07-27"
+    assert config["expected_authorised_records"] == 5
+    assert config["authorisation_field"] == "authorised_for_s4"
+    assert config["checkpoint_status"] == "closed"
+    assert config["global_s4_run"] is False
+    assert config["physical_row_join_key"] == "record_id"
+    assert config["canonical_input"].endswith(
+        "ncbi_nuc_checkpoint1_applied_canonical.csv"
+    )
+    assert "resolved/" in config["canonical_input"]
+    assert "ncbi_nuc_s3_canonical.csv" not in config["canonical_input"]
+    assert "extracted/ncbi_nuc_extracted.csv" not in config["canonical_input"]
+    extras = config["handoff_extra_fields"]
+    assert "ncbi_nuc_accession" in extras
+    assert "ncbi_nuc_version" in extras
+    assert "ncbi_nuc_definition" in extras
+    assert "ncbi_nuc_comment" in extras
+    assert "ncbi_nuc_features_json" in extras
+    assert "ncbi_nuc_references_json" in extras
+    assert "ncbi_nuc_origin_residues" not in extras
+    assert "accession" in config["require_empty_canonical_fields"]
+    assert "target_name_raw" in config["require_empty_canonical_fields"]
+    assert config["required_nonempty_handoff_fields"] == [
+        "ncbi_nuc_accession",
+        "ncbi_nuc_version",
+    ]
+    assert config["target_metadata"]["specific_target_present_in_authorised_records"] == 0
+    assert config["target_metadata"]["specific_target_missing_in_authorised_records"] == 5
+    rules = config["global_s4_rules"]
+    assert rules["final_target_normalisation_performed_here"] is False
+    assert rules["evidence_threshold_performed_here"] is False
+    assert rules["deduplication_performed_here"] is False
+    text = path.read_text(encoding="utf-8")
+    assert SEQ_LEAK_RE.search(text) is None
+    assert "U34759" not in text
+
+
+def test_ncbi_nuc_selects_only_authorised_and_excludes_parks_rejects(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    rows = list(csv.DictReader(result.output_csv.open(encoding="utf-8")))
+    ids = [row["record_id"] for row in rows]
+    assert ids == ["ncbi_nuc:SYN001", "ncbi_nuc:SYN002", "ncbi_nuc:SYN003"]
+    assert "ncbi_nuc:PARK1" not in ids
+    assert "ncbi_nuc:REJ1" not in ids
+    assert result.stats.handoff_records == 3
+    assert len({row["record_id"] for row in rows}) == 3
+    assert len({row["native_id"] for row in rows}) == 3
+
+
+def test_ncbi_nuc_uses_applied_canonical_not_prereview_s3(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    by_id = {
+        row["record_id"]: row
+        for row in csv.DictReader(result.output_csv.open(encoding="utf-8"))
+    }
+    assert by_id["ncbi_nuc:SYN001"]["sequence_core"] == "ACGUACGU"
+    pre = {
+        row["record_id"]: row
+        for row in csv.DictReader(
+            (
+                repo
+                / "data/interim/checkpoints/ncbi_nuc_cp1/ncbi_nuc_s3_canonical.csv"
+            ).open(encoding="utf-8")
+        )
+    }
+    assert pre["ncbi_nuc:SYN001"]["sequence_core"] == "ACGU"
+    assert by_id["ncbi_nuc:SYN001"]["sequence_core"] != pre[
+        "ncbi_nuc:SYN001"
+    ]["sequence_core"]
+
+
+def test_ncbi_nuc_sidecar_join_is_one_to_one_by_record_id(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    rows = list(csv.DictReader(result.output_csv.open(encoding="utf-8")))
+    by_id = {row["record_id"]: row for row in rows}
+    assert by_id["ncbi_nuc:SYN001"]["ncbi_nuc_accession"] == "SYN001"
+    assert by_id["ncbi_nuc:SYN001"]["ncbi_nuc_version"] == "SYN001.1"
+    assert by_id["ncbi_nuc:SYN002"]["ncbi_nuc_accession"] == "SYN002"
+    assert by_id["ncbi_nuc:SYN003"]["ncbi_nuc_features_json"]
+    assert "ncbi_nuc_origin_residues" not in by_id["ncbi_nuc:SYN001"]
+    assert len(rows) == len({row["record_id"] for row in rows})
+
+
+def test_ncbi_nuc_missing_sidecar_identity_fails(tmp_path: Path) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    sidecar = repo / "data/interim/extracted/ncbi_nuc_source_metadata.csv"
+    rows = [
+        row
+        for row in csv.DictReader(sidecar.open(encoding="utf-8"))
+        if row["record_id"] != "ncbi_nuc:SYN002"
+    ]
+    _write_csv(sidecar, NCBI_NUC_SIDECAR_COLUMNS, rows)
+    with pytest.raises(GlobalS4HandoffError, match="missing from source metadata"):
+        _run(repo, config_path)
+
+
+def test_ncbi_nuc_duplicate_sidecar_join_fails(tmp_path: Path) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    sidecar = repo / "data/interim/extracted/ncbi_nuc_source_metadata.csv"
+    rows = list(csv.DictReader(sidecar.open(encoding="utf-8")))
+    rows.append(dict(rows[0]))
+    _write_csv(sidecar, NCBI_NUC_SIDECAR_COLUMNS, rows)
+    with pytest.raises(GlobalS4HandoffError, match="duplicate record_id"):
+        _run(repo, config_path)
+
+
+def test_ncbi_nuc_required_accession_version_enforced(tmp_path: Path) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    sidecar = repo / "data/interim/extracted/ncbi_nuc_source_metadata.csv"
+    rows = list(csv.DictReader(sidecar.open(encoding="utf-8")))
+    for row in rows:
+        if row["record_id"] == "ncbi_nuc:SYN002":
+            row["ncbi_nuc_accession"] = ""
+    _write_csv(sidecar, NCBI_NUC_SIDECAR_COLUMNS, rows)
+    with pytest.raises(GlobalS4HandoffError, match="required and nonempty"):
+        _run(repo, config_path)
+
+    rows = list(csv.DictReader(sidecar.open(encoding="utf-8")))
+    for row in rows:
+        if row["record_id"] == "ncbi_nuc:SYN002":
+            row["ncbi_nuc_accession"] = "SYN002"
+            row["ncbi_nuc_version"] = ""
+    _write_csv(sidecar, NCBI_NUC_SIDECAR_COLUMNS, rows)
+    with pytest.raises(GlobalS4HandoffError, match="required and nonempty"):
+        _run(repo, config_path)
+
+
+def test_ncbi_nuc_canonical_sequence_molecule_state_preserved(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    for row in csv.DictReader(result.output_csv.open(encoding="utf-8")):
+        assert row["molecule_type"] == "RNA"
+        assert row["chemistry"] == "RNA"
+        assert row["t_to_u_applied"] == "true"
+        assert row["trim_status"] == "no_constants_detected"
+        assert row["sequence_core"] == row["sequence_full"]
+        assert row["sequence_raw"] != row["sequence_full"]
+        assert row["source_db"] == "ncbi_nuc"
+        assert row["source_dataset"] == "ncbi_nuc_genbank_2026-07-27"
+        assert row["contributing_sources"] == "ncbi_nuc"
+        assert row["contributing_datasets"] == "ncbi_nuc_genbank_2026-07-27"
+        assert row["redistribution_status"] == "unknown"
+
+
+def test_ncbi_nuc_target_evidence_fields_remain_empty(tmp_path: Path) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    for row in csv.DictReader(result.output_csv.open(encoding="utf-8")):
+        assert row["target_name_raw"] == ""
+        assert row["target_name"] == ""
+        assert row["target_uniprot"] == ""
+        assert row["target_type"] == ""
+        assert row["target_type_source"] == ""
+        assert row["target_family"] == ""
+        assert row["target_pfam"] == ""
+        assert row["pdb_id"] == ""
+        assert row["binding_evidence_type"] == ""
+        assert row["binding_evidence_score"] == ""
+        assert row["affinity_value"] == ""
+        assert row["affinity_unit"] == ""
+        assert row["affinity_type"] == ""
+        assert row["cluster_id"] == ""
+        assert row["is_cluster_representative"] == ""
+        assert row["partition"] == ""
+        assert row["accession"] == ""
+        assert row["ncbi_nuc_accession"] != ""
+
+
+def test_ncbi_nuc_definition_does_not_populate_target_name_raw(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    for row in csv.DictReader(result.output_csv.open(encoding="utf-8")):
+        assert row["target_name_raw"] == ""
+        assert row["ncbi_nuc_definition"]
+        assert row["ncbi_nuc_definition"] != row["target_name_raw"]
+        assert row["binding_evidence_type"] == ""
+        if row["record_id"] == "ncbi_nuc:SYN001":
+            assert row["pubmed_id"] == "12345"
+
+
+def test_ncbi_nuc_genbank_extras_do_not_overwrite_canonical_columns(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["handoff_extra_fields"] = list(payload["handoff_extra_fields"]) + [
+        "native_id"
+    ]
+    _write_json(config_path, payload)
+    with pytest.raises(GlobalS4HandoffError, match="overwrite corpus"):
+        _run(repo, config_path)
+
+
+def test_ncbi_nuc_origin_residues_sequence_bearing_field_rejected(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["handoff_extra_fields"] = list(payload["handoff_extra_fields"]) + [
+        "ncbi_nuc_origin_residues"
+    ]
+    _write_json(config_path, payload)
+    with pytest.raises(GlobalS4HandoffError, match="sequence-bearing"):
+        _run(repo, config_path)
+
+
+def test_ncbi_nuc_handoff_deterministic(tmp_path: Path) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    first = _run(repo, config_path)
+    h1 = _sha256(first.output_csv)
+    h1s = _sha256(first.output_summary)
+    second = _run(repo, config_path)
+    assert _sha256(second.output_csv) == h1
+    assert _sha256(second.output_summary) == h1s
+
+
+def test_ncbi_nuc_does_not_invoke_global_s4(tmp_path: Path) -> None:
+    import prepare_global_s4_source as mod
+
+    assert not hasattr(mod, "run_global_s4")
+    assert not hasattr(mod, "normalise_targets")
+    assert not hasattr(mod, "score_evidence")
+    assert not hasattr(mod, "deduplicate_against_ena")
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path)
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    assert payload["global_s4_run"] is False
+    result = _run(repo, config_path)
+    text = result.output_summary.read_text(encoding="utf-8")
+    assert "Global S4 has not been run." in text
+    assert "NO NCBI↔ENA DEDUPLICATION PERFORMED." in text
+    assert "SOURCE METADATA ONLY" in text
+    assert SEQ_LEAK_RE.search(text) is None
+    assert "ACGUACGU" not in text
+    assert str(repo.resolve()) not in text
+
+
+def test_ncbi_nuc_expected_count_mismatch_hard_fails(tmp_path: Path) -> None:
+    repo, config_path = _ncbi_nuc_handoff_tree(tmp_path, expected=5)
+    with pytest.raises(GlobalS4HandoffError, match="Expected 5"):
+        _run(repo, config_path)
+

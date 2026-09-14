@@ -21,5 +21,6 @@ ADAPTER_KEYS: Final[frozenset[str]] = frozenset(
         "aptamerbase",
         "aptadiff_a",
         "aptadiff_b",
+        "ncbi_nuc",
     }
 )

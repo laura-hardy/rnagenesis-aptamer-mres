@@ -2,9 +2,9 @@
 """S0a: validate the tracked source-registry specification and write the operational registry.
 
 This stage freezes registered inputs by verifying path, SHA-256 and expected
-record counts (CSV data rows, XLSX physical worksheet rows, or gzip
-N-Triples physical statements). It does not build the leakage-exclusion set,
-extract sequences, or implement S1 adapters.
+record counts (CSV data rows, XLSX physical worksheet rows, gzip N-Triples
+physical statements, or GenBank physical records). It does not build the
+leakage-exclusion set, extract sequences, or implement S1 adapters.
 """
 
 from __future__ import annotations
@@ -277,6 +277,57 @@ def is_ntriples_gzip_path(path: Path | str) -> bool:
     return Path(path).name.lower().endswith(".nt.gz")
 
 
+GENBANK_SUFFIXES = frozenset({".gb", ".gbk", ".genbank"})
+
+
+def is_genbank_path(path: Path | str) -> bool:
+    """Return True when ``path`` is a GenBank flatfile by suffix."""
+    return Path(path).suffix.lower() in GENBANK_SUFFIXES
+
+
+def count_genbank_records(path: Path) -> int:
+    """Count physical GenBank records in a registered flatfile.
+
+    Uses Biopython's standard GenBank parser. ``n_rows_expected`` for these
+    inputs is the number of parsed records, not LOCUS length, text lines,
+    FEATURES, or any later cleaned-sequence count. Read-only: the file is
+    not rewritten or transcoded. Hard-fails if the file cannot be parsed.
+    """
+    try:
+        from Bio import SeqIO
+    except ImportError as exc:
+        raise RegistryError(
+            "Biopython is required to count registered GenBank records"
+        ) from exc
+
+    try:
+        records = list(SeqIO.parse(str(path), "genbank"))
+    except Exception as exc:
+        raise RegistryError(
+            f"Registered GenBank file could not be parsed: {path.name}"
+        ) from exc
+
+    if records:
+        return len(records)
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise RegistryError(
+            f"Registered GenBank file is not valid UTF-8: {path.name}"
+        ) from exc
+    except OSError as exc:
+        raise RegistryError(
+            f"Registered GenBank file could not be read: {path.name}"
+        ) from exc
+
+    if text.strip():
+        raise RegistryError(
+            f"Registered GenBank file could not be parsed: {path.name}"
+        )
+    raise RegistryError(f"Registered GenBank file is empty: {path.name}")
+
+
 def count_ntriples_gzip_statements(path: Path) -> int:
     """Count decompressed N-Triples physical statements without writing a file.
 
@@ -315,6 +366,8 @@ def count_registered_rows(path: Path) -> int:
     """Count rows or statements for a registered input according to its file type."""
     if is_ntriples_gzip_path(path):
         return count_ntriples_gzip_statements(path)
+    if is_genbank_path(path):
+        return count_genbank_records(path)
     suffix = path.suffix.lower()
     if suffix == ".csv":
         return count_csv_data_rows(path)
@@ -634,11 +687,12 @@ def validate_registered_file(
         )
     actual_rows = count_registered_rows(resolved)
     if actual_rows != row.n_rows_expected:
-        kind = (
-            "N-Triples statement-count"
-            if is_ntriples_gzip_path(resolved)
-            else "Row-count"
-        )
+        if is_ntriples_gzip_path(resolved):
+            kind = "N-Triples statement-count"
+        elif is_genbank_path(resolved):
+            kind = "GenBank record-count"
+        else:
+            kind = "Row-count"
         raise RegistryError(
             f"{kind} mismatch for source_key={row.source_key!r} "
             f"path={row.path}: expected {row.n_rows_expected}, "

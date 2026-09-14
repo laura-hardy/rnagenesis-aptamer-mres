@@ -87,6 +87,7 @@ SEQUENCE_BEARING_HANDOFF_EXTRAS: frozenset[str] = frozenset(
         "aptamer_sequence",
         "riboaptamer_sequence",
         "aptamerbase_sequence",
+        "ncbi_nuc_origin_residues",
         "sequence",
     }
 )

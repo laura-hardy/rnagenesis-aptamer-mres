@@ -7062,3 +7062,698 @@ preparation of the frozen registered AptaBase cleaned scrape and the ENA
 679-row selected lane. They are not part of the live S1–S3 execution path.
 See `docs/data_curation/source_preparation_methodology.md`.
 
+## 2026-09-12 — NCBI Nucleotide S0 registration and S1 GenBank extraction
+
+**Stage:** Aim 2 / data curation / NCBI Nucleotide (`ncbi_nuc`) S0
+registration + S1 verbatim GenBank extraction only. S2 was not
+started. CHECKPOINT-1 was not opened. Global S4 was not run.
+
+### What was done
+
+All 18 authoritative NCBI Nucleotide `.gb` files under
+`data/raw/NCBI_nucleotide` were registered as one logical Tier-1 source
+and frozen by SHA-256 plus expected GenBank record count. S0 gained
+generic GenBank record-count support: `n_rows_expected` for `.gb`
+inputs is the number of physical GenBank records parsed from that file
+(here `1` per file), not LOCUS length, text lines, FEATURES, or any
+later cleaned-sequence count. One `ncbi_nuc` S1 adapter then consumed
+every registered row of the shared `source_dataset` in registry order
+and emitted one canonical record per parsed GenBank record. Filenames
+were treated as opaque. Sequence normalisation, T→U, molecule or
+chemistry assignment, trimming, target extraction, eligibility
+classification, evidence scoring, leakage, NCBI↔ENA deduplication,
+within-NCBI deduplication, clustering, balancing, partition, and
+CHECKPOINT-1 were deliberately not performed.
+
+### Decisions made
+
+- Logical source: `source_key = ncbi_nuc`;
+  `source_dataset = ncbi_nuc_genbank_2026-07-27`.
+- `snapshot_date = 2026-07-27` is a local source-snapshot/download-date
+  proxy supported by the tight 2026-07-27 file-mtime cluster. It is
+  not an NCBI database release date.
+- `tier = 1`; `redistribution_status = unknown` because no local
+  licence/reuse documentation establishes something stronger.
+- `native_id` is GenBank ACCESSION. `record_id` is
+  `ncbi_nuc:{ACCESSION}`. LOCUS, VERSION, and local filename remain
+  sidecar provenance. ACCESSION is populated and unique 18/18.
+  Canonical `accession` remains empty under the live S1 stage guard.
+- `sequence_raw` is the deposited ORIGIN residue string after removing
+  only flatfile display syntax (line numbers, grouping spaces, line
+  breaks). Deposited lowercase case is preserved. No T→U, no IUPAC/N
+  removal, no trimming.
+- Canonical `target_name_raw` is empty for all 18 records. Target-like
+  strings in DEFINITION, COMMENT, and reference titles are sidecar
+  context only.
+- Canonical `pubmed_id` is populated only where a record has exactly
+  one unambiguous structured PUBMED value: U34759 → 9222504 and
+  AF083271 → 9751715. Canonical `publication` and `doi` remain empty.
+  Complete FEATURES, COMMENT, and REFERENCE sets are in the sidecar.
+- No record was rejected or parked. One physical GenBank record remains
+  one S1 row.
+
+### Inputs used
+
+- 18 registered `.gb` files under `data/raw/NCBI_nucleotide`
+- 18 GenBank records; `n_rows_expected = 1` per file
+- Snapshot date: `2026-07-27`; tier `1`;
+  `redistribution_status = unknown`
+
+### Outputs produced
+
+Ignored under `data/`:
+
+- `data/interim/registry/source_registry.csv` (operational S0
+  registry; 35 validated registered files, 18 `ncbi_nuc` rows)
+- `data/interim/extracted/ncbi_nuc_extracted.csv` (18 rows)
+- `data/interim/extracted/ncbi_nuc_source_metadata.csv` (18 rows)
+- `data/interim/extracted/ncbi_nuc_s1_report.md`
+
+Tracked scripts, tests, registry rows, and this log entry. Nothing
+under `data/` is tracked.
+
+### Numbers
+
+- 18 files / 18 GenBank records in; 18 extracted; 18 unique
+  `record_id`; 18 unique `native_id`
+- 0 S1 rejections, parking, filtering, or deduplication
+- `sequence_raw` nonempty 18/18; ORIGIN length agrees with LOCUS
+  length 18/18; deposited lowercase preserved; 0 U introduced
+- `target_name_raw` empty 18/18; canonical accession empty 18/18
+- canonical publication/DOI: 0; structured unique PMID: 2
+  (U34759, AF083271)
+- S0: 35 registered, 35 validated; warnings=3 (two AptaBase inventory
+  overrides plus the existing ENA `derived_output_not_raw_input`
+  warning). No new NCBI inventory warning.
+- Deterministic S1 rerun: byte-identical canonical and sidecar
+- 18 NCBI raw SHA-256 values unchanged; `git ls-files data` empty
+
+### Tests
+
+Synthetic non-biological fixtures only.
+
+Focused:
+
+`tests/data_preparation/test_s0_build_registry.py`
+`tests/data_preparation/test_adapter_ncbi_nuc.py`: **61 passed**.
+
+S0/S1 regression for completed sources (S0, S1 runner, ncbi_nuc,
+ENA, AptaBase, AptamerBase, AptaDB, RiboAptamer, UTexas, AptaIndex,
+AptaDiff, corpus schema): **345 passed**.
+
+Hang-prone legacy AptaBase/ENA preparation suites were not run.
+
+### Open questions carried forward
+
+- NCBI Nucleotide S2 scientific normalisation and construct
+  investigation, including molecule/chemistry conflicts, construct
+  vs aptamer-core identity, unresolved N, short records, and
+  non-protein target context.
+- NCBI↔ENA accession and T/U-equivalent sequence deduplication is
+  deferred to later S2/S3/CHECKPOINT/S4 work.
+
+### Pipeline status
+
+```text
+NCBI Nucleotide S0 complete
+NCBI Nucleotide S1 complete
+NCBI Nucleotide S2 has not started
+No NCBI Nucleotide CHECKPOINT-1 decision has been made
+No NCBI Nucleotide records are yet authorised for global S4
+```
+
+## 2026-09-12 — NCBI Nucleotide S2 sequence/molecule/construct normalisation
+
+**Stage:** Aim 2 / data curation / NCBI Nucleotide (`ncbi_nuc`) S2
+sequence/molecule/construct normalisation only. S3 was not started.
+CHECKPOINT-1 was not opened. Global S4 was not run.
+
+### What was done
+
+The 18 accepted S1 NCBI Nucleotide records were normalised with the
+shared sequence-normalisation and known-motif machinery plus one
+source-specific accession policy. Molecule identity was assigned only
+from the approved GenBank preflight decisions, not from T/U alphabet,
+patent titles, or ENA overlap. Construct scope was assigned only where
+the S1 sidecar COMMENT unambiguously identified a primer, reverse
+primer, poly-A fragment, or DNA transcription template. Group-wise
+constant-region inference was disabled. No trim was applied.
+`sequence_raw` was preserved. Canonical target, evidence, affinity,
+leakage, NCBI↔ENA deduplication, and eligibility were not performed.
+
+### Decisions made
+
+- 18 in / 18 out; 0 dropped; 0 parked.
+- RNA + chemistry RNA, T→U applied: U34759, U37124, U37123,
+  AF083271, BD161067. Alphabet provenance remains `DNA_T`.
+- DNA + chemistry DNA, no T→U: QT662269. Generic `DNA` is supported
+  by the live schema; ssDNA was not assigned.
+- Remaining 12 ACCESSION values: molecule_type unknown, chemistry
+  unknown, no T→U. Alphabet alone did not manufacture molecule type.
+- Ambiguous `N` in HV200497 was retained and flagged. No gaps or other
+  invalid ORIGIN symbols were present; none were repaired.
+- Construct: FW366678 and FZ422269 `partial_construct` (primer);
+  DJ028182 `partial_construct` (poly-A fragment); DD421991
+  `full_construct` (DNA transcription template; no core extracted);
+  HV507922 and HW065069 construct unknown (cDNA/template, boundaries
+  unresolved). Remaining records construct unknown.
+- QT662269 flagged as a possible non-aptamer method/object for later
+  review; not rejected.
+- Group-wise constant inference disabled. Shared known-motif
+  detection ran; 0 proposals because the configured T7 motif is
+  5′-anchored and was not terminal. No motif was added. Applied trims
+  = 0; `sequence_core == sequence_full` for 18/18.
+- Target/evidence/leakage/dedup deferred.
+
+### Inputs used
+
+- S1 `ncbi_nuc_extracted.csv` (18) and `ncbi_nuc_source_metadata.csv` (18)
+- 18 registered `.gb` files under `data/raw/NCBI_nucleotide`
+- `config/source_normalisation/ncbi_nuc.json`
+- `config/sequence_normalisation_rules.json`
+
+### Outputs produced
+
+Ignored under `data/`:
+
+- `data/interim/normalised/ncbi_nuc_normalised.csv`
+- `data/interim/normalised/ncbi_nuc_s2_qc.csv`
+- `data/interim/normalised/ncbi_nuc_s2_review_candidates.csv`
+- `data/interim/normalised/detected_constants_ncbi_nuc.csv`
+- `data/interim/normalised/ncbi_nuc_s2_report.md`
+
+Tracked policy, adapter, dispatcher, tests, and this log entry.
+Nothing under `data/` is tracked.
+
+### Numbers
+
+- 18 in; 18 out; 18 unique `record_id`; 18 unique `native_id`
+- molecule: RNA 5, DNA 1, unknown 12
+- chemistry: RNA 5, DNA 1, unknown 12
+- alphabet: DNA_T 16, RNA 1 (A/C/G-only poly-A), ambiguous 1
+- T→U 5; ambiguous 1; gaps 0; invalid 0; mixed T/U 0
+- construct_scope: partial_construct 3; full_construct 1; unknown 14
+- length full/core: `<20` 5; `20-25` 2; `26-89` 9; `90-100` 1; `>100` 1
+- review candidates 18; known-motif proposals 0; applied trims 0
+- Deterministic S2 rerun: byte-identical
+- 18 NCBI raw SHA-256 values unchanged; S1 canonical/sidecar unchanged;
+  `git ls-files data` empty
+
+### Tests
+
+Synthetic non-biological fixtures only.
+
+Focused:
+
+`tests/data_preparation/test_adapter_ncbi_nuc_s2.py`: **24 passed**.
+
+Shared S2 regressions for completed sources (sequence normalisation,
+generic S2 runner, NCBI, ENA, AptaBase, AptamerBase, AptaDB,
+RiboAptamer, UTexas, AptaIndex, AptaDiff): **396 passed**.
+
+Hang-prone legacy AptaBase/ENA preparation suites were not run.
+
+### Open questions carried forward
+
+- NCBI Nucleotide S3 technical eligibility and CHECKPOINT-1
+  preparation, including unresolved molecule identity, primer /
+  cDNA / template / poly-A construct state, possible non-aptamer
+  source object, ambiguous N, and length diagnostics.
+- NCBI↔ENA accession and T/U-equivalent sequence deduplication remains
+  deferred.
+
+### Pipeline status
+
+```text
+NCBI Nucleotide S0 complete
+NCBI Nucleotide S1 complete
+NCBI Nucleotide S2 complete
+NCBI Nucleotide S3 has not started
+No NCBI Nucleotide CHECKPOINT-1 decision has been made
+No NCBI Nucleotide records are yet authorised for global S4
+```
+
+## 2026-09-12 — NCBI Nucleotide S3 technical eligibility and CHECKPOINT-1 preparation
+
+**Stage:** Aim 2 / data curation / NCBI Nucleotide (`ncbi_nuc`) S3
+technical/source-object eligibility and CHECKPOINT-1 package
+preparation only. Human decisions were not entered, applied, or
+closed. Global S4 was not prepared.
+
+### What was done
+
+The 18 accepted S2 NCBI Nucleotide records were classified with the
+shared eligibility/CHECKPOINT infrastructure plus a source-specific
+policy. Molecule routing used S2 `molecule_type`, never
+`alphabet_as_reported`. Primer and non-aptamer source objects were
+proposed rejects with active review. Unresolved-molecule records
+were parked with molecule review before ordinary length/alphabet
+disposition. No trim was applied. Target extraction, evidence,
+affinity, leakage, NCBI↔ENA deduplication, clustering, and global
+S4 were not performed. Human `manual_*` fields remain blank.
+
+### Decisions made
+
+- 18 in / 18 out; 0 dropped; 0 disappearing rows.
+- Technically eligible RNA (5): U34759, U37124, U37123, AF083271,
+  BD161067. Unknown construct alone did not block them. U34759
+  (99 nt) is an upper-boundary retained audit.
+- Judgement-dependent proposed rejects (4): FW366678 and FZ422269
+  `primer_like`; DJ028182 and QT662269 `non_aptamer_source_object`.
+  DJ028182 remains `molecule_type=unknown` despite
+  `alphabet_as_reported=RNA`. QT662269 remains DNA/chemistry DNA and
+  was not parked as a validated DNA aptamer.
+- Unresolved molecule/construct parks (9): HW308409, DI203649,
+  DI198507, DI183534, HV507922, DD421991, DI115369, HW065069,
+  HV200497. Primary reason `molecule_type_unresolved`. cDNA and
+  transcription-template records were not auto-rejected, transcribed,
+  or trimmed.
+- Secondary technical conditions preserved: `<20` (5), `20–25`
+  (2), `90–100` (1), `>100` (1); HV200497 `ambiguous_bases` retained
+  unrepaired. Length did not erase molecule/source-object review.
+- Applied trims = 0; known-motif proposals 0; group inference
+  disabled; `sequence_core == sequence_full` 18/18.
+- Target/evidence/leakage/NCBI↔ENA dedup deferred. `target_name_raw`
+  empty 18/18. `authorised_for_s4 = 0`.
+- CHECKPOINT-1: all 18 rows have a genuine judgement or audit reason.
+  Human fields blank. Fail-closed validator:
+  `ready_for_application = 0`, `checkpoint_closed = false`.
+
+### Inputs used
+
+- S2 `ncbi_nuc_normalised.csv` (18) and `ncbi_nuc_s2_qc.csv` (18)
+- S1 `ncbi_nuc_extracted.csv` / `ncbi_nuc_source_metadata.csv`
+- 18 registered `.gb` files under `data/raw/NCBI_nucleotide`
+- `config/source_eligibility/ncbi_nuc.json`
+- `config/checkpoint_reviews/ncbi_nuc_checkpoint1_recommendations.json`
+- Shared AptaDB structured-review schema (`keep`/`drop`/`edit`,
+  molecule/chemistry overrides `RNA`/`DNA`)
+
+### Outputs produced
+
+Ignored under `data/interim/checkpoints/ncbi_nuc_cp1/`:
+
+- `ncbi_nuc_s3_canonical.csv`
+- `ncbi_nuc_s3_decisions.csv`
+- `ncbi_nuc_checkpoint1_review.csv`
+- `ncbi_nuc_checkpoint1_local_detail.csv`
+- `ncbi_nuc_checkpoint1_reason_counts.csv`
+- `rejected_ncbi_nuc.csv`
+- `ncbi_nuc_s3_parked.csv`
+- `ncbi_nuc_checkpoint1_summary.md`
+- `manual_review/` queue, index, empty group review, blank bulk
+  confirmation, README, validation snapshot, summary
+
+Tracked policy, adapter, dispatcher, tests, and this log entry.
+Nothing under `data/` is tracked.
+
+### Numbers
+
+- `18 = 5 eligible + 9 parked + 4 proposed reject`
+- Primary reasons: technically_eligible_rna 5; molecule_type_unresolved 9;
+  primer_like 2; non_aptamer_source_object 2
+- Review batches: 01 judgement-dependent 4; 02 unresolved molecule 9;
+  03 construct/motif 0; 04 length-boundary 1; 05 random-kept 4
+- Random-audit pool 5 / sample 5 / shortfall 25 (requested 30; no
+  fabricated rows)
+- Length-boundary review reasons 3 (U34759 plus two unresolved
+  20–25 parks); judgement-required 13; audit-only 5
+- Rejection log 4; park sidecar 9
+- Deterministic S3 rerun: byte-identical
+- Fail-closed: unresolved_manual_decisions 18;
+  unresolved_judgement_required 13; ready_for_application 0
+- 18 NCBI raw SHA-256 values unchanged; S1 canonical/sidecar unchanged;
+  S2 canonical/QC unchanged; `git ls-files data` empty
+
+### Tests
+
+Synthetic non-biological fixtures only.
+
+Focused NCBI S3/CHECKPOINT:
+
+`tests/data_preparation/test_adapter_ncbi_nuc_s3.py`,
+`test_ncbi_nuc_s3_classify.py`,
+`test_ncbi_nuc_checkpoint1_prepare_review.py`: **25 passed**.
+
+Related completed-source S3/CHECKPOINT regressions (AptaDB, UTexas,
+AptaDiff, RiboAptamer, AptaIndex adapters and CHECKPOINT prepare/
+structured review): **137 passed**.
+
+Hang-prone legacy AptaBase/ENA preparation suites were not run.
+
+### Open questions carried forward
+
+- NCBI Nucleotide CHECKPOINT-1 human scientific review (molecule
+  identity, primer/source-object rejects, cDNA/template/poly-A
+  construct questions, ambiguous N, length-boundary/random audits).
+- NCBI↔ENA accession and T/U-equivalent sequence deduplication remains
+  deferred to later global work.
+
+### Pipeline status
+
+```text
+NCBI Nucleotide S0 complete
+NCBI Nucleotide S1 complete
+NCBI Nucleotide S2 complete
+NCBI Nucleotide S3 complete (provisional; CHECKPOINT-1 not closed)
+NCBI Nucleotide CHECKPOINT-1 package generated
+No NCBI Nucleotide CHECKPOINT-1 decision has been made
+No NCBI Nucleotide records are yet authorised for global S4
+```
+
+## 2026-09-12 — NCBI Nucleotide CHECKPOINT-1 human review entered (unapplied)
+
+**Stage:** Aim 2 / data curation / NCBI Nucleotide (`ncbi_nuc`)
+CHECKPOINT-1 human scientific review entry and fail-closed validation
+only. Decisions were not applied. CHECKPOINT-1 remains open. Global S4
+was not prepared.
+
+### What was done
+
+Live AptaDB-compatible CHECKPOINT semantics treat
+`manual_decision=keep` as confirm/preserve the current proposed route.
+It does not force technical acceptance. `drop` would convert a
+proposed reject into a human-reviewed exclusion. Machine
+`recommended_manual_decision=drop` on primer/non-aptamer rows was
+left as guidance and was not copied into `manual_*` fields.
+
+Human review confirmed the current S3 routes for all 18 records.
+Judgement-required rows received `manual_decision=keep`. The five
+technically eligible RNA records are audit-only and were confirmed
+together with `confirm=true` in
+`ncbi_nuc_checkpoint1_bulk_audit_confirmation.csv`. No sequence,
+molecule, chemistry, target, or trim edits were entered.
+
+The fail-closed validator passed. CHECKPOINT-1 was not applied, not
+closed, and not authorised for global S4.
+
+### Decisions made
+
+- 18/18 review decisions resolved; 0 remaining unresolved.
+- 13 judgement-required rows: `keep` (preserve current route).
+- 5 audit-only rows: bulk `confirm=true`; individual `manual_decision`
+  left blank (U34759 length-boundary plus four random-kept RNA).
+- 5 technically eligible RNA confirmed/audited: U34759, U37124,
+  U37123, AF083271, BD161067.
+- 9 unresolved-molecule parks confirmed: HW308409, DI203649,
+  DI198507, DI183534, HV507922, DD421991, DI115369, HW065069,
+  HV200497.
+- 4 source-object rejects confirmed: FW366678 and FZ422269
+  `primer_like`; DJ028182 and QT662269 `non_aptamer_source_object`.
+- Intended routing unchanged: `5 eligible + 9 park + 4 reject = 18`.
+- Edits: sequence corrections 0; molecule overrides 0; chemistry
+  overrides 0; target corrections 0; trim approvals 0; trim
+  overrides 0.
+- No rows were added to compensate for the random-audit shortfall
+  of 25.
+
+### Inputs used
+
+- Live CHECKPOINT-1 review package under
+  `data/interim/checkpoints/ncbi_nuc_cp1/manual_review/`
+- Pre-review S3 review/local-detail artefacts
+- `config/checkpoint_reviews/ncbi_nuc_checkpoint1_recommendations.json`
+  (guidance only)
+
+### Outputs produced
+
+Human fields written only in ignored `data/` review files plus the
+existing open-checkpoint metadata counters:
+
+- `ncbi_nuc_checkpoint1_manual_review.csv` (13 `keep`; 5 audit-only blank)
+- `ncbi_nuc_checkpoint1_manual_review_index.csv`
+- `ncbi_nuc_checkpoint1_bulk_audit_confirmation.csv` (`confirm=true`)
+- `ncbi_nuc_checkpoint1_validation.md` (fail-closed snapshot)
+- `config/checkpoint_reviews/ncbi_nuc_checkpoint1_metadata.json`
+  (`human_decisions_recorded=18`, `ready_for_application=18`,
+  `checkpoint_closed=false`)
+
+No `resolved/` outputs. No tracked final resolutions. No global-S4
+handoff. Nothing under `data/` is tracked.
+
+### Numbers
+
+Fail-closed validation:
+
+```text
+total_review_records=18
+unresolved_manual_decisions=0
+unresolved_judgement_required=0
+unresolved_constant_groups=0
+unresolved_exceptions=0
+audit_only_rows=5
+audit_only_unconfirmed=0
+bulk_audit_confirmed=true
+ready_for_application=18
+blocking_issues=0
+checkpoint_closed=false
+s4_started=false
+```
+
+Pristine reconstruction differed only in permitted human fields
+(`manual_decision`, `manual_notes`, bulk `confirm`). Scientific
+machine fields, review order, proposed routes, and source metadata
+were unchanged.
+
+### Integrity
+
+- 18 NCBI raw SHA-256 values match the registry
+- S1 canonical
+  `329f518e94e0813080545fe61d823ad44607ec8a193e14498fc62a91d647e9dc`
+- S1 sidecar
+  `f1d003f64e7a9619d94b7025838e229b4ec7655fa93f9bda2bf34e2ba0021fe1`
+- S2 canonical
+  `965cd5a88426c40f54b43afb9fbe7fdb9688c16ff53fad3ef8858ee9ef86824c`
+- S2 QC
+  `6639c15db9752370f3bd65702d8740776d50e0082aa9724181fdea7aa6729342`
+- Pre-review S3 canonical equals S2
+- S3 decisions
+  `1fc014981832b83be04eab7d5a3cf957f2b66174dd11f1126d440b25b32b9c8d`
+- ENA S1/S2 hashes unchanged
+- `git ls-files data` empty
+- No sequence values entered into tracked config/docs
+
+### Open questions carried forward
+
+- NCBI Nucleotide CHECKPOINT-1 application dry-run of these reviewed
+  decisions.
+- NCBI↔ENA accession and T/U-equivalent sequence deduplication remains
+  deferred to later global work.
+
+### Pipeline status
+
+```text
+NCBI Nucleotide S0 complete
+NCBI Nucleotide S1 complete
+NCBI Nucleotide S2 complete
+NCBI Nucleotide S3 complete (provisional; CHECKPOINT-1 not closed)
+NCBI Nucleotide CHECKPOINT-1 human review complete
+NCBI Nucleotide CHECKPOINT-1 not applied
+NCBI Nucleotide CHECKPOINT-1 not closed
+No NCBI Nucleotide records are yet authorised for global S4
+Global S4 has not been run
+```
+
+## 2026-09-12 — NCBI Nucleotide CHECKPOINT-1 application dry-run — unapplied
+
+**Stage:** Aim 2 / data curation / NCBI Nucleotide (`ncbi_nuc`)
+CHECKPOINT-1 application **dry-run only**. Decisions were not applied.
+CHECKPOINT-1 remains open. Global S4 was not prepared.
+
+### What was done
+
+Human review is fully resolved (`ready_for_application=18`,
+`blocking_issues=0`). `manual_decision=keep` preserved the current
+proposed route; it did not force technical acceptance. The five
+audit-only RNA accepts were bulk-confirmed. Zero sequence, molecule,
+chemistry, target, or trim edits were requested or invented.
+
+An NCBI-specific CHECKPOINT-1 apply/dry-run adapter was added to the
+shared dispatcher. Dry-run and future actual apply share
+`apply_reviewed_record` / `simulate_ncbi_nuc_checkpoint1_application`.
+Actual apply without an explicit later authorisation remains refused.
+No `resolved/` outputs, tracked resolutions, closure metadata, or
+`config/global_s4_sources/ncbi_nuc.json` were written. ENA was not
+consulted.
+
+Projected post-review 18-row reconciliation (derived, not targeted):
+
+`5` technically eligible + `9` parked (`molecule_type_unresolved`) +
+`4` technical rejects = `18`.
+
+Projected `authorised_for_s4 = 5`. Current authoritative
+`authorised_for_s4 = 0`. This is **projected after apply**, not final
+authorisation.
+
+Production dry-run was run twice against the frozen review and was
+byte-identical for all scientific CSVs. Sequence-free local report:
+
+`data/interim/checkpoints/ncbi_nuc_cp1/dry_run/ncbi_nuc_checkpoint1_dry_run_report.md`
+
+SHA-256:
+`077a4c8459071db1292b996ec78655081115ceb86f52e36c47c35df01ea90442`
+
+Actual CHECKPOINT apply was **not** performed. CHECKPOINT-1 is not
+closed. NCBI Nucleotide is not authorised for global S4. Global S4
+was not run. Raw / S1 / S2 / pre-review S3 / completed-review / ENA
+hashes were unchanged. `git ls-files data` remains empty.
+
+### Pipeline stop
+
+```text
+CHECKPOINT-1 human review is complete.
+NCBI Nucleotide apply/dry-run adapter implemented.
+Dry-run complete. Actual apply was not run.
+CHECKPOINT-1 is not closed.
+S4 remains blocked.
+```
+
+## 2026-09-12 — NCBI Nucleotide CHECKPOINT-1 applied and closed
+
+**Stage:** Aim 2 / data curation / NCBI Nucleotide (`ncbi_nuc`)
+CHECKPOINT-1 **applied and closed**. Global-S4 handoff was not prepared.
+Global S4 was not run. NCBI was not deduplicated against ENA.
+
+### What was done
+
+Human review remained fully resolved (`ready_for_application=18`,
+`blocking_issues=0`). Actual apply consumed the accepted S3 state, the
+completed human review, and the bulk audit confirmation through the same
+`apply_reviewed_record` transformation used by the accepted dry-run.
+No sequence, molecule, chemistry, target, or trim edits were applied.
+`sequence_core == sequence_full` for 18/18. T→U provenance from S2 is
+unchanged. The five source-supported RNA records retain their S2
+transcription state.
+
+Final source reconciliation:
+
+`5` technically eligible + `9` parked (`molecule_type_unresolved`) +
+`4` technical rejects = `18`.
+
+`authorised_for_s4 = 5`. This means only technical
+sequence/molecule/source-object eligibility after NCBI CHECKPOINT-1 and
+permission to enter future corpus-wide global S4 preparation. It does
+**not** mean protein target confirmed, target canonicalised, `target_name`
+resolved, UniProt resolved, target family assigned, evidence threshold
+passed, affinity resolved, leakage cleared, deduplicated against ENA,
+final corpus included, clustered, balanced, or partitioned.
+
+Authorised ACCESSION values: `U34759`, `U37124`, `U37123`, `AF083271`,
+`BD161067`. These are not final corpus inclusions.
+
+Parked ACCESSION values remain unresolved-molecule parks, including
+cDNA/template/transcription-template and ambiguous-N diagnostics, with no
+computational transcription or T7/core trim.
+
+Rejected ACCESSION values: `FW366678` and `FZ422269` (`primer_like`);
+`DJ028182` and `QT662269` (`non_aptamer_source_object`). A-only shared
+alphabet classification did not convert `DJ028182` into RNA. `QT662269`
+remains experimental DNA / chemistry DNA.
+
+Dry-run/apply byte parity: semantic mismatches = 0, byte mismatches = 0
+for all seven scientific CSV payloads. Authoritative rerun was
+byte-identical. No `config/global_s4_sources/ncbi_nuc.json` was written.
+
+Genuine pytest (Conda `rnagenesis-mac`): pre-apply NCBI suite
+`20 passed / 0 skipped`; after apply-path tests
+`22 passed / 0 skipped`. Focused completed-source CHECKPOINT subset
+(AptaDiff apply/prepare + NCBI S3 classify): `20 passed / 0 skipped`.
+
+### Integrity
+
+- 18 NCBI raw SHA-256 values match the registry
+- S1/S2/pre-review S3/completed-review/ENA hashes unchanged
+- `git ls-files data` empty
+- Tracked resolutions and metadata are sequence-safe
+
+### Pipeline status
+
+```text
+NCBI Nucleotide S0 complete
+NCBI Nucleotide S1 complete
+NCBI Nucleotide S2 complete
+NCBI Nucleotide S3 complete
+NCBI Nucleotide CHECKPOINT-1 applied and closed
+authorised_for_s4 = 5
+global_s4_handoff_prepared = false
+global_s4_run = false
+```
+
+## 2026-09-14 — NCBI Nucleotide prepared for future global S4
+
+NCBI Nucleotide S1–S3 are complete and CHECKPOINT-1 is already closed.
+The five CHECKPOINT-authorised records were materialised from the
+authoritative applied checkpoint state as one future corpus-wide
+global S4 input. Global S4 was not run. Target canonicalisation,
+evidence scoring, leakage exclusion, and NCBI↔ENA deduplication
+were not performed.
+
+`authorised_for_s4=true` / inclusion in this handoff means only
+technically eligible after NCBI sequence/molecule/source-object
+review. It does not mean protein target confirmed, target
+canonicalised, UniProt resolved, evidence scored, affinity resolved,
+leakage cleared, deduplicated against ENA, final corpus included,
+clustered, balanced, or partitioned.
+
+Handoff denominator: 18 source rows → 5 authorised after
+CHECKPOINT-1 → 5 handoff rows. Unique `record_id` = 5; unique
+`native_id` = 5. Parked (9) and rejected (4) records are excluded.
+Authorised ACCESSION values: `U34759`, `U37124`, `U37123`,
+`AF083271`, `BD161067`.
+
+The applied five-record canonical subset was joined one-to-one by
+`record_id` to the frozen S1 GenBank source-metadata sidecar (5/5;
+ACCESSION and VERSION nonempty 5/5). Sidecar fields carried for later
+target/evidence interpretation include registered path/basename/file
+SHA-256, LOCUS identity/length/molecule/topology/division, ACCESSION,
+VERSION, DEFINITION, COMMENT, keywords, source organism/`mol_type`,
+FEATURES JSON, and REFERENCES JSON. ORIGIN residues were not copied.
+Canonical `accession` remains empty; `ncbi_nuc_accession` is source
+provenance only.
+
+Canonical scientific state is unchanged from applied CHECKPOINT-1:
+molecule_type RNA = 5; chemistry RNA = 5; T→U retained from S2 = 5;
+no trim applied (`no_constants_detected` = 5);
+`sequence_core == sequence_full` for 5/5. Canonical `target_name_raw`
+remains empty. DEFINITION, COMMENT, FEATURES, and REFERENCE titles were
+not parsed into target fields. Evidence scores, affinity, PDB, and
+E1–E5 assignments were not produced.
+
+No currently known NCBI↔ENA accession overlaps are present among the
+five authorised handoff records. The three known preflight overlaps
+(`HW308409`, `DI203649`, `DI183534`) remain parked and are outside the
+handoff. NO NCBI↔ENA DEDUPLICATION PERFORMED. Corpus-wide
+deduplication remains a later global stage.
+
+`redistribution_status` remains `unknown` for all five records.
+Tracked CHECKPOINT scientific counts were not mutated. Handoff
+status is recorded in `config/global_s4_sources/ncbi_nuc.json`
+(`handoff_status = ready_for_global_s4`, `global_s4_run = false`).
+
+Tracked: `config/global_s4_sources/ncbi_nuc.json`, a reusable
+sequence-bearing extra (`ncbi_nuc_origin_residues`) on
+`prepare_global_s4_source.py`, and tests. Ignored:
+`ncbi_nuc_global_s4_input.csv` (5 rows) and the sequence-free handoff
+summary. Deterministic rerun was byte-identical. Raw / S1 / sidecar /
+S2 / pre-review S3 / completed review / CHECKPOINT closure / applied /
+ENA / other completed-source hashes were unchanged. `git ls-files data`
+remains empty.
+
+Genuine pytest (Conda `rnagenesis-mac`):
+`tests/data_preparation/test_prepare_global_s4_source.py`
+`75 passed / 0 skipped` (15 NCBI-specific + 60 existing
+completed-source/generic handoff regressions).
+
+### Pipeline status
+
+```text
+NCBI S0 complete
+NCBI S1 complete
+NCBI S2 complete
+NCBI S3 complete
+NCBI CHECKPOINT-1 closed
+NCBI global-S4 handoff prepared for 5 records
+Global S4 NOT run
+```
+
+

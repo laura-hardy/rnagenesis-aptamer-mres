@@ -183,6 +183,29 @@ from adapters.utexas_s3 import (  # noqa: E402
     refresh_stats_after_audit,
     update_stats_from_row as update_utexas_stats_from_row,
 )
+from adapters.ncbi_nuc_s3 import (  # noqa: E402
+    DECISION_COLUMNS as NCBI_NUC_DECISION_COLUMNS,
+    LOCAL_DETAIL_COLUMNS as NCBI_NUC_LOCAL_DETAIL_COLUMNS,
+    PARK_COLUMNS as NCBI_NUC_PARK_COLUMNS,
+    PRIMARY_ROUTE_ELIGIBLE as NCBI_NUC_PRIMARY_ROUTE_ELIGIBLE,
+    PRIMARY_ROUTE_MOLECULE as NCBI_NUC_PRIMARY_ROUTE_MOLECULE,
+    PRIMARY_ROUTE_REJECT as NCBI_NUC_PRIMARY_ROUTE_REJECT,
+    REASON_COUNT_COLUMNS as NCBI_NUC_REASON_COUNT_COLUMNS,
+    REJECTION_COLUMNS as NCBI_NUC_REJECTION_COLUMNS,
+    APPROVED_DNA_ACCESSIONS as NCBI_NUC_APPROVED_DNA,
+    APPROVED_RNA_ACCESSIONS as NCBI_NUC_APPROVED_RNA,
+    NcbiNucS3Error,
+    NcbiNucS3Stats,
+    apply_random_accept_audit as apply_ncbi_nuc_random_accept_audit,
+    assert_ncbi_nuc_accept_invariants,
+    assert_ncbi_nuc_reject_park_invariants,
+    build_local_detail_row as build_ncbi_nuc_local_detail_row,
+    classify_ncbi_nuc_record,
+    index_constant_proposals as index_ncbi_nuc_constant_proposals,
+    read_constant_proposals as read_ncbi_nuc_constant_proposals,
+    refresh_stats_after_audit as refresh_ncbi_nuc_stats_after_audit,
+    update_stats_from_row as update_ncbi_nuc_stats_from_row,
+)
 from common.corpus_schema import (  # noqa: E402
     CORPUS_COLUMNS,
     CorpusSchemaError,
@@ -342,6 +365,84 @@ APTADIFF_PIPELINE_STOP_STATEMENT = (
     "Dataset-A replication remains deferred.\n"
     "Global S4 has not been run."
 )
+NCBI_NUC_PIPELINE_STOP_STATEMENT = (
+    "CHECKPOINT-1 package generated.\n"
+    "No human decisions applied.\n"
+    "No NCBI Nucleotide record is authorised for S4 yet.\n"
+    "The pipeline is stopped awaiting Laura CHECKPOINT-1 review.\n"
+    "Global S4 has not been run."
+)
+EXPECTED_NCBI_NUC_ROWS = 18
+EXPECTED_NCBI_NUC_SOURCE_DATASET = "ncbi_nuc_genbank_2026-07-27"
+EXPECTED_NCBI_NUC_MOLECULE = {"RNA": 5, "DNA": 1, "unknown": 12}
+EXPECTED_NCBI_NUC_S1_CANONICAL_SHA256 = (
+    "329f518e94e0813080545fe61d823ad44607ec8a193e14498fc62a91d647e9dc"
+)
+EXPECTED_NCBI_NUC_S1_SIDECAR_SHA256 = (
+    "f1d003f64e7a9619d94b7025838e229b4ec7655fa93f9bda2bf34e2ba0021fe1"
+)
+EXPECTED_NCBI_NUC_S2_HASH = (
+    "965cd5a88426c40f54b43afb9fbe7fdb9688c16ff53fad3ef8858ee9ef86824c"
+)
+EXPECTED_NCBI_NUC_S2_QC_SHA256 = (
+    "6639c15db9752370f3bd65702d8740776d50e0082aa9724181fdea7aa6729342"
+)
+EXPECTED_NCBI_NUC_RAW_SHA256: dict[str, str] = {
+    "data/raw/NCBI_nucleotide/sequence (1).gb": (
+        "0cfcbb085f86501c541bdf5eb5a3b7344d0554319db3f2e0a97509e28cb5c05a"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (10).gb": (
+        "d47bb0d8ab74f202ff3b4a336ac49abc8a0e29d9cde67b710896b0234acbab3f"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (11).gb": (
+        "950b13e83474ad066360bacd4a4d2ef1c7e8f4219259d50079a862c6771ce080"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (12).gb": (
+        "a27b6cddb546565055911873fce2fdde1bd29d064435d8badf2754af6fac055c"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (13).gb": (
+        "0b74ea872b31e09af5d10ef4ead998e1874c83e975c846b30e15e24d3bbed2fb"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (14).gb": (
+        "3490c7e66ba22df5f451ce0a05ec86cbee6a8cdef446ea9fa73eb15679b7f56c"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (15).gb": (
+        "a49fb40c880af0ea16662d9c88305264276ef5182a51bc40830d67416bc1ff5f"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (16).gb": (
+        "d2275cbd2e1134ad7de5f9e687297179d936059470e8357f1dce446a33571db2"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (17).gb": (
+        "78289052d3d0cc769bd2318af269f0ab6e4652cea7b4fd068733aa9456cf1ec4"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (2).gb": (
+        "b34e78d3754b7f1147df984d3f796f8bdb9bfad288287d318fd49e6a20c83be8"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (3).gb": (
+        "7d58262d81ddfc4af5899cc78341794948ecac826513c339b8bb2de4dd137227"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (4).gb": (
+        "62431cd2b251c63b0ccf96b99ecdd2b814397be2b40d50722dabf77175778380"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (5).gb": (
+        "3cf2cf0193095d3b74ed07617c28fc55222ad7ccba8d31a5a602c1d892172228"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (6).gb": (
+        "3d4227ef665d9f4fe210b4999654e8bccbee38c6d4b2ed2a93ed194fbfdd8562"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (7).gb": (
+        "9114ec869c8401a54cc88219b2920bc8910275748c0d2bce2df06b33ea258647"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (8).gb": (
+        "22e417676d8fdff7ca6fbdc3f887d34eac3f19d3906d7100f1c9d0d600dd038f"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (9).gb": (
+        "2d866410f1ee6748b4256d34ffb6231b019ed2c3261fd46e42b68120ef1b158f"
+    ),
+    "data/raw/NCBI_nucleotide/sequence.gb": (
+        "59f078113f4e3b2bdb6cd0c2cc14b76bf542c9b3042b34a71a47a2ef10c02ede"
+    ),
+}
 
 
 class S3ClassifyError(ValueError):
@@ -362,6 +463,7 @@ class S3RunResult:
         | EnaS3Stats
         | AptamerBaseS3Stats
         | AptaDiffS3Stats
+        | NcbiNucS3Stats
     )
     output_canonical: Path
     output_decisions: Path
@@ -6180,6 +6282,572 @@ def run_aptadiff_s3(
     return run_result
 
 
+def _ncbi_nuc_raw_hashes(repo_root: Path) -> dict[str, str]:
+    observed: dict[str, str] = {}
+    for relative, expected in EXPECTED_NCBI_NUC_RAW_SHA256.items():
+        path = repo_root / relative
+        if not path.is_file():
+            raise S3ClassifyError(f"Missing registered NCBI Nucleotide file: {relative}")
+        digest = _sha256_file(path)
+        if digest != expected:
+            raise S3ClassifyError(
+                f"NCBI Nucleotide raw SHA-256 does not match registry for {relative}"
+            )
+        observed[relative] = digest
+    return observed
+
+
+def _assert_ncbi_nuc_s2_invariants(canonical_rows: Sequence[dict[str, str]]) -> None:
+    """Hard-fail if the accepted NCBI S2 starting invariants drifted."""
+    if len(canonical_rows) != EXPECTED_NCBI_NUC_ROWS:
+        raise S3ClassifyError(
+            f"S3 input rows must be {EXPECTED_NCBI_NUC_ROWS}; got {len(canonical_rows)}"
+        )
+    record_ids = [row["record_id"] for row in canonical_rows]
+    native_ids = [row["native_id"] for row in canonical_rows]
+    if len(set(record_ids)) != EXPECTED_NCBI_NUC_ROWS:
+        raise S3ClassifyError("S2 record_id values are not unique")
+    if len(set(native_ids)) != EXPECTED_NCBI_NUC_ROWS:
+        raise S3ClassifyError("S2 native_id values are not unique")
+    molecule_counts: dict[str, int] = {}
+    rna_ids: set[str] = set()
+    dna_ids: set[str] = set()
+    for row in canonical_rows:
+        molecule = row.get("molecule_type") or ""
+        molecule_counts[molecule] = molecule_counts.get(molecule, 0) + 1
+        if row.get("sequence_core") != row.get("sequence_full"):
+            raise S3ClassifyError(
+                "ncbi_nuc S2 starting state requires sequence_core == sequence_full"
+            )
+        if row.get("source_db") != "ncbi_nuc":
+            raise S3ClassifyError("S2 source_db must be ncbi_nuc")
+        if row.get("source_dataset") != EXPECTED_NCBI_NUC_SOURCE_DATASET:
+            raise S3ClassifyError(
+                f"S2 source_dataset must be {EXPECTED_NCBI_NUC_SOURCE_DATASET}"
+            )
+        if row.get("target_name_raw"):
+            raise S3ClassifyError("ncbi_nuc S2 must leave target_name_raw empty")
+        for field_name in (
+            "target_name",
+            "target_type",
+            "target_type_source",
+            "binding_evidence_score",
+            "affinity_value",
+            "cluster_id",
+            "partition",
+            "pdb_id",
+        ):
+            if row.get(field_name):
+                raise S3ClassifyError(
+                    f"S2 canonical unexpectedly populated {field_name}"
+                )
+        native = row.get("native_id") or ""
+        if molecule == "RNA":
+            rna_ids.add(native)
+        elif molecule == "DNA":
+            dna_ids.add(native)
+    if molecule_counts != EXPECTED_NCBI_NUC_MOLECULE:
+        raise S3ClassifyError(f"S2 molecule_type counts drifted: {molecule_counts}")
+    if rna_ids != NCBI_NUC_APPROVED_RNA:
+        raise S3ClassifyError("Approved RNA ACCESSION set drifted at S3 entry")
+    if dna_ids != NCBI_NUC_APPROVED_DNA:
+        raise S3ClassifyError("Approved DNA ACCESSION set drifted at S3 entry")
+
+
+def build_ncbi_nuc_checkpoint1_summary(
+    *,
+    repo_root: Path,
+    result: S3RunResult,
+    policy_path: Path,
+) -> str:
+    """Build an aggregate-only Markdown CHECKPOINT-1 summary (no sequences)."""
+    stats = result.stats
+    if not isinstance(stats, NcbiNucS3Stats):
+        raise S3ClassifyError("NCBI Nucleotide summary requires NcbiNucS3Stats")
+
+    def _count(mapping: Mapping[str, int], key: str) -> int:
+        return int(mapping.get(key, 0))
+
+    rejected = _count(stats.primary_route_counts, NCBI_NUC_PRIMARY_ROUTE_REJECT)
+    parked = _count(stats.primary_route_counts, NCBI_NUC_PRIMARY_ROUTE_MOLECULE)
+    eligible = _count(stats.primary_route_counts, NCBI_NUC_PRIMARY_ROUTE_ELIGIBLE)
+    routed_sum = rejected + parked + eligible
+    accept_n = _count(stats.decision_counts, "proposed_accept")
+    park_n = _count(stats.decision_counts, "proposed_park")
+    reject_n = _count(stats.decision_counts, "proposed_reject")
+
+    lines = [
+        "# NCBI Nucleotide S3 / CHECKPOINT-1 summary",
+        "",
+        "Aggregate counts only. Deposited sequences are not included.",
+        "",
+        "## Reconciliation",
+        "",
+        f"- Source key: `ncbi_nuc`",
+        f"- Source dataset: `{EXPECTED_NCBI_NUC_SOURCE_DATASET}`",
+        f"- S2 input rows: `{stats.s2_rows}`",
+        f"- S3 output rows: `{stats.s3_rows}`",
+        f"- Unique record IDs: `{stats.unique_record_ids}`",
+        f"- Unique native IDs: `{stats.unique_native_ids}`",
+        f"- proposed_accept: `{accept_n}`",
+        f"- proposed_park: `{park_n}`",
+        f"- proposed_reject: `{reject_n}`",
+        f"- input = eligible + parked + rejected: `{stats.s3_rows} = {eligible} + {parked} + {rejected}`",
+        f"- primary-route sum: `{routed_sum}`",
+        f"- S2 order preserved: `{'pass' if stats.order_preserved else 'fail'}`",
+        f"- applied trims: `{stats.applied_trims}`",
+        f"- sequence_core == sequence_full: `{stats.core_equals_full}/{stats.s3_rows}`",
+        f"- nonempty target_name_raw: `{stats.nonempty_target_name_raw}`",
+        f"- nonempty S4 fields: `{stats.nonempty_s4_fields}`",
+        f"- authorised_for_s4: `0`",
+        "",
+        "## Primary reasons",
+        "",
+    ]
+    for reason, count in sorted(stats.primary_reason_counts.items()):
+        lines.append(f"- `{reason}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Secondary technical conditions",
+            "",
+            "A record may contribute to more than one condition.",
+            "",
+            f"- length_out_of_range: `{stats.length_out_of_range_count}`",
+            f"- ambiguous_bases: `{stats.ambiguous_bases_count}`",
+            f"- primer_like: `{stats.primer_like_count}`",
+            f"- non_aptamer_source_object: `{stats.non_aptamer_source_object_count}`",
+            f"- molecule_type_unresolved: `{stats.molecule_type_unresolved_count}`",
+            f"- trim/construct diagnostic: `{stats.trim_construct_unresolved_count}`",
+            f"- known-motif proposal: `{stats.known_motif_proposal_count}`",
+            f"- mixed T/U: `{stats.mixed_t_u_count}`",
+            f"- alignment gaps: `{stats.alignment_gaps_count}`",
+            f"- invalid alphabet: `{stats.invalid_alphabet_count}`",
+            f"- missing sequence: `{stats.missing_sequence_count}`",
+            "",
+            "## CHECKPOINT-1 review",
+            "",
+            f"- manual_review_required true: `{stats.manual_review_required_true_count}`",
+            f"- unique active review records: `{stats.unique_checkpoint_review_records}`",
+            f"- random-audit pool: `{stats.random_accept_audit_pool_size}`",
+            f"- random-audit sample: `{stats.random_accept_audit_count}`",
+            f"- random-audit shortfall: `{stats.random_accept_audit_shortfall}`",
+            f"- length-boundary audits: `{stats.boundary_review_count}`",
+            f"- judgement-dependent reviews: `{stats.judgement_dependent_review_count}`",
+            f"- molecule-unresolved reviews: `{stats.molecule_review_count}`",
+            f"- construct/motif reviews: `{stats.construct_review_count}`",
+            "",
+            "Review batches:",
+            "",
+        ]
+    )
+    for batch, count in sorted(stats.review_batch_counts.items()):
+        lines.append(f"- `{batch}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "Checkpoint review reasons:",
+            "",
+        ]
+    )
+    for reason, count in sorted(stats.checkpoint_review_reason_counts.items()):
+        lines.append(f"- `{reason}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Scientific boundary",
+            "",
+            "- Target extraction/canonicalisation: deferred.",
+            "- Evidence scored: `no`.",
+            "- Affinity normalisation: `no`.",
+            "- Leakage exclusion: `no`.",
+            "- NCBI↔ENA deduplication: `no`.",
+            "- Global S4: not run.",
+            "- Human fields: blank. Machine recommendations are not decisions.",
+            "",
+            "## Integrity",
+            "",
+            f"- Eligibility policy: `{_relative_display(policy_path, repo_root)}`",
+            f"- S2 canonical hash: `{result.s2_hash_after}`",
+            f"- S2 QC hash: `{result.qc_hash_after}`",
+            f"- S1 sidecar hash: `{result.sidecar_hash_after}`",
+            f"- Inputs unchanged: `{'pass' if result.inputs_unchanged else 'fail'}`",
+            f"- Deterministic rerun: "
+            f"`{'pass' if result.deterministic_rerun_ok else ('n/a' if result.deterministic_rerun_ok is None else 'fail')}`",
+            "",
+            NCBI_NUC_PIPELINE_STOP_STATEMENT,
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_ncbi_nuc_s3(
+    *,
+    repo_root: Path,
+    input_dir: Path,
+    source_metadata_dir: Path,
+    eligibility_policy: Path,
+    output_dir: Path,
+    expected_rows: int | None = EXPECTED_NCBI_NUC_ROWS,
+    check_deterministic_rerun: bool = False,
+) -> S3RunResult:
+    """Execute NCBI Nucleotide S3 technical eligibility and CHECKPOINT-1."""
+    repo_root = repo_root.resolve()
+    input_dir = (
+        input_dir if input_dir.is_absolute() else (repo_root / input_dir)
+    ).resolve()
+    source_metadata_dir = (
+        source_metadata_dir
+        if source_metadata_dir.is_absolute()
+        else (repo_root / source_metadata_dir)
+    ).resolve()
+    eligibility_policy = (
+        eligibility_policy
+        if eligibility_policy.is_absolute()
+        else (repo_root / eligibility_policy)
+    ).resolve()
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+
+    canonical_path = input_dir / "ncbi_nuc_normalised.csv"
+    qc_path = input_dir / "ncbi_nuc_s2_qc.csv"
+    sidecar_path = source_metadata_dir / "ncbi_nuc_source_metadata.csv"
+    s1_canonical_path = source_metadata_dir / "ncbi_nuc_extracted.csv"
+    proposals_path = input_dir / "detected_constants_ncbi_nuc.csv"
+    for path, label in (
+        (canonical_path, "S2 canonical"),
+        (qc_path, "S2 QC"),
+        (sidecar_path, "source-metadata"),
+    ):
+        if not path.is_file():
+            raise S3ClassifyError(f"Missing {label} input: {path.name}")
+
+    check_raw = expected_rows == EXPECTED_NCBI_NUC_ROWS
+    raw_sha_before = ""
+    if check_raw:
+        observed_raw = _ncbi_nuc_raw_hashes(repo_root)
+        raw_sha_before = ";".join(
+            f"{path}={digest}" for path, digest in sorted(observed_raw.items())
+        )
+        if s1_canonical_path.is_file():
+            s1_digest = _sha256_file(s1_canonical_path)
+            if s1_digest != EXPECTED_NCBI_NUC_S1_CANONICAL_SHA256:
+                raise S3ClassifyError(
+                    "ncbi_nuc S1 canonical SHA-256 does not match freeze"
+                )
+        sidecar_s1 = _sha256_file(sidecar_path)
+        if sidecar_s1 != EXPECTED_NCBI_NUC_S1_SIDECAR_SHA256:
+            raise S3ClassifyError("ncbi_nuc S1 sidecar SHA-256 does not match freeze")
+        s2_digest = _sha256_file(canonical_path)
+        if s2_digest != EXPECTED_NCBI_NUC_S2_HASH:
+            raise S3ClassifyError("ncbi_nuc S2 canonical SHA-256 does not match freeze")
+        qc_digest = _sha256_file(qc_path)
+        if qc_digest != EXPECTED_NCBI_NUC_S2_QC_SHA256:
+            raise S3ClassifyError("ncbi_nuc S2 QC SHA-256 does not match freeze")
+
+    s2_hash_before = _sha256_file(canonical_path)
+    qc_hash_before = _sha256_file(qc_path)
+    sidecar_hash_before = _sha256_file(sidecar_path)
+
+    policy = load_eligibility_policy(eligibility_policy)
+    if policy.source_key != "ncbi_nuc":
+        raise S3ClassifyError(
+            f"Eligibility policy source_key must be ncbi_nuc; got {policy.source_key!r}"
+        )
+    if not policy.defer_target_classification or not policy.defer_evidence_scoring:
+        raise S3ClassifyError(
+            "ncbi_nuc S3 policy must defer target classification and evidence scoring"
+        )
+    if (
+        policy.sequence_leakage_matching_enabled
+        or policy.target_leakage_matching_enabled
+        or not policy.defer_leakage_exclusion
+    ):
+        raise S3ClassifyError("ncbi_nuc S3 must not apply leakage exclusions")
+
+    canonical_rows = _read_corpus_csv(canonical_path)
+    qc_rows = _read_sidecar_csv(qc_path, label="S2 QC")
+    sidecar_rows = _read_sidecar_csv(sidecar_path, label="source-metadata")
+    aligned_qc = _match_sidecar_one_to_one(canonical_rows, qc_rows, label="S2 QC")
+    aligned_sidecar = _match_sidecar_one_to_one(
+        canonical_rows, sidecar_rows, label="source-metadata"
+    )
+    proposals = (
+        read_ncbi_nuc_constant_proposals(proposals_path)
+        if proposals_path.is_file()
+        else []
+    )
+    proposals_by_record = index_ncbi_nuc_constant_proposals(proposals)
+
+    if expected_rows is not None and len(canonical_rows) != expected_rows:
+        raise S3ClassifyError(
+            f"S2 row count must be {expected_rows}; got {len(canonical_rows)}"
+        )
+    if expected_rows == EXPECTED_NCBI_NUC_ROWS:
+        _assert_ncbi_nuc_s2_invariants(canonical_rows)
+
+    stats = NcbiNucS3Stats()
+    stats.s2_rows = len(canonical_rows)
+    stats.order_preserved = True
+
+    s3_canonical: list[dict[str, str]] = []
+    decision_rows: list[dict[str, str]] = []
+    rejection_rows: list[dict[str, str]] = []
+    park_rows: list[dict[str, str]] = []
+    local_detail_by_id: dict[str, dict[str, str]] = {}
+    core_by_id = {row["record_id"]: row["sequence_core"] for row in canonical_rows}
+
+    for s2_row, qc_row, meta_row in zip(
+        canonical_rows, aligned_qc, aligned_sidecar, strict=True
+    ):
+        classified = classify_ncbi_nuc_record(
+            s2_row,
+            qc_row,
+            meta_row,
+            policy=policy,
+            proposals=proposals_by_record.get(s2_row["record_id"], ()),
+        )
+        if classified.canonical["record_id"] != s2_row["record_id"]:
+            stats.order_preserved = False
+            raise S3ClassifyError("S3 altered record_id or row identity")
+        for column in CORPUS_COLUMNS:
+            if classified.canonical[column] != s2_row[column]:
+                raise S3ClassifyError(f"S3 altered S2 canonical field {column!r}")
+        s3_canonical.append(classified.canonical)
+        decision_rows.append(classified.decision)
+        if classified.rejection_row is not None:
+            rejection_rows.append(classified.rejection_row)
+        if classified.park_row is not None:
+            park_rows.append(classified.park_row)
+        local_detail_by_id[classified.canonical["record_id"]] = (
+            build_ncbi_nuc_local_detail_row(
+                canonical=classified.canonical,
+                s2_qc=qc_row,
+                decision=classified.decision,
+            )
+        )
+        update_ncbi_nuc_stats_from_row(stats, classified)
+
+    sampled, pool, shortfall = apply_ncbi_nuc_random_accept_audit(
+        decision_rows,
+        local_detail_by_id,
+        seed=policy.random_seed,
+        sample_size=policy.random_accept_audit_size,
+    )
+    stats.random_accept_audit_pool_size = pool
+    stats.random_accept_audit_shortfall = shortfall
+    refresh_ncbi_nuc_stats_after_audit(stats, decision_rows)
+
+    stats.s3_rows = len(s3_canonical)
+    stats.unique_record_ids = len({row["record_id"] for row in s3_canonical})
+    stats.unique_native_ids = len({row["native_id"] for row in s3_canonical})
+
+    if stats.s3_rows != len(canonical_rows):
+        raise S3ClassifyError("S3 must preserve every S2 row")
+    if stats.unique_record_ids != len(s3_canonical):
+        raise S3ClassifyError("S3 record_id values are not unique")
+    accept_n = stats.decision_counts.get("proposed_accept", 0)
+    park_n = stats.decision_counts.get("proposed_park", 0)
+    reject_n = stats.decision_counts.get("proposed_reject", 0)
+    if accept_n + park_n + reject_n != stats.s3_rows:
+        raise S3ClassifyError("accept + park + reject does not equal S3 rows")
+    if len(rejection_rows) != reject_n:
+        raise S3ClassifyError("Rejection log count does not match proposed_reject")
+    if len(park_rows) != park_n:
+        raise S3ClassifyError("Park sidecar count does not match proposed_park")
+    if sampled != stats.random_accept_audit_count:
+        raise S3ClassifyError("Random-accept audit count mismatch")
+    if sampled > pool:
+        raise S3ClassifyError("Random-accept audit fabricated rows beyond the pool")
+    if stats.applied_trims != 0:
+        raise S3ClassifyError("ncbi_nuc S3 must not apply trims")
+    if stats.nonempty_target_name_raw != 0:
+        raise S3ClassifyError("ncbi_nuc S3 must not populate target_name_raw")
+    if stats.nonempty_s4_fields != 0:
+        raise S3ClassifyError("ncbi_nuc S3 must not populate S4 fields")
+
+    for row in decision_rows:
+        if not row["primary_reason"]:
+            raise S3ClassifyError("Decision row missing primary_reason")
+
+    assert_ncbi_nuc_accept_invariants(decision_rows)
+    assert_ncbi_nuc_reject_park_invariants(decision_rows)
+
+    reason_count_rows: list[dict[str, str]] = []
+    combo_counts: dict[tuple[str, str], int] = {}
+    for row in decision_rows:
+        key = (row["proposed_decision"], row["primary_reason"])
+        combo_counts[key] = combo_counts.get(key, 0) + 1
+    for (decision, reason), count in sorted(combo_counts.items()):
+        reason_count_rows.append(
+            {
+                "proposed_decision": decision,
+                "primary_reason": reason,
+                "record_count": str(count),
+            }
+        )
+    if sum(int(row["record_count"]) for row in reason_count_rows) != len(decision_rows):
+        raise S3ClassifyError("Reason counts do not reconcile to decision rows")
+
+    review_rows = sorted(decision_rows, key=review_sort_key)
+    local_detail_rows: list[dict[str, str]] = []
+    for review_row in review_rows:
+        record_id = review_row["record_id"]
+        if record_id not in local_detail_by_id:
+            raise S3ClassifyError(f"Missing local-detail row for record_id={record_id!r}")
+        detail = local_detail_by_id[record_id]
+        if detail["sequence_core"] != core_by_id[record_id]:
+            raise S3ClassifyError("CHECKPOINT-1 must not apply trims")
+        if detail.get("manual_decision"):
+            raise S3ClassifyError("Local-detail must not pre-fill manual_decision")
+        local_detail_rows.append(detail)
+    for review_row, detail_row in zip(review_rows, local_detail_rows, strict=True):
+        if review_row["record_id"] != detail_row["record_id"]:
+            raise S3ClassifyError(
+                "Local-detail ordering does not match sequence-free review"
+            )
+        if review_row["review_batch"] != detail_row.get("review_batch", ""):
+            raise S3ClassifyError("Local-detail review_batch mismatch")
+
+    forbidden_seq_cols = {"sequence_raw", "sequence_full", "sequence_core"}
+    for col in forbidden_seq_cols:
+        if col in NCBI_NUC_DECISION_COLUMNS or col in NCBI_NUC_PARK_COLUMNS:
+            raise S3ClassifyError(f"Sequence column leaked into sidecar schema: {col}")
+    for col in ("sequence_raw", "sequence_full", "sequence_core"):
+        if col not in NCBI_NUC_LOCAL_DETAIL_COLUMNS:
+            raise S3ClassifyError(
+                f"Local-detail schema missing required sequence column: {col}"
+            )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_canonical = output_dir / "ncbi_nuc_s3_canonical.csv"
+    out_decisions = output_dir / "ncbi_nuc_s3_decisions.csv"
+    out_review = output_dir / "ncbi_nuc_checkpoint1_review.csv"
+    out_local_detail = output_dir / "ncbi_nuc_checkpoint1_local_detail.csv"
+    out_reason_counts = output_dir / "ncbi_nuc_checkpoint1_reason_counts.csv"
+    out_rejected = output_dir / "rejected_ncbi_nuc.csv"
+    out_parked = output_dir / "ncbi_nuc_s3_parked.csv"
+    out_summary = output_dir / "ncbi_nuc_checkpoint1_summary.md"
+
+    write_corpus_csv_atomic(out_canonical, s3_canonical)
+    write_csv_atomic(out_decisions, NCBI_NUC_DECISION_COLUMNS, decision_rows)
+    write_csv_atomic(out_review, NCBI_NUC_DECISION_COLUMNS, review_rows)
+    write_csv_atomic(out_local_detail, NCBI_NUC_LOCAL_DETAIL_COLUMNS, local_detail_rows)
+    write_csv_atomic(out_reason_counts, NCBI_NUC_REASON_COUNT_COLUMNS, reason_count_rows)
+    write_csv_atomic(out_rejected, NCBI_NUC_REJECTION_COLUMNS, rejection_rows)
+    write_csv_atomic(out_parked, NCBI_NUC_PARK_COLUMNS, park_rows)
+
+    s2_hash_after = _sha256_file(canonical_path)
+    qc_hash_after = _sha256_file(qc_path)
+    sidecar_hash_after = _sha256_file(sidecar_path)
+    raw_sha_after = raw_sha_before
+    if check_raw:
+        observed_after = _ncbi_nuc_raw_hashes(repo_root)
+        raw_sha_after = ";".join(
+            f"{path}={digest}" for path, digest in sorted(observed_after.items())
+        )
+        if s1_canonical_path.is_file():
+            if _sha256_file(s1_canonical_path) != EXPECTED_NCBI_NUC_S1_CANONICAL_SHA256:
+                raise S3ClassifyError("ncbi_nuc S1 canonical hash changed during S3")
+        if _sha256_file(sidecar_path) != EXPECTED_NCBI_NUC_S1_SIDECAR_SHA256:
+            raise S3ClassifyError("ncbi_nuc S1 sidecar hash changed during S3")
+        if _sha256_file(canonical_path) != EXPECTED_NCBI_NUC_S2_HASH:
+            raise S3ClassifyError("ncbi_nuc S2 canonical hash changed during S3")
+        if _sha256_file(qc_path) != EXPECTED_NCBI_NUC_S2_QC_SHA256:
+            raise S3ClassifyError("ncbi_nuc S2 QC hash changed during S3")
+    inputs_unchanged = (
+        s2_hash_before == s2_hash_after
+        and qc_hash_before == qc_hash_after
+        and sidecar_hash_before == sidecar_hash_after
+        and (not check_raw or raw_sha_before == raw_sha_after)
+    )
+    if not inputs_unchanged:
+        raise S3ClassifyError("S2/source inputs were modified during S3 execution")
+
+    s2_integrity_ok = True
+    if _sha256_file(out_canonical) != s2_hash_before:
+        raise S3ClassifyError(
+            "S3 canonical output is not byte-identical to S2 normalised input"
+        )
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        first_hashes = {
+            "canonical": _sha256_file(out_canonical),
+            "decisions": _sha256_file(out_decisions),
+            "review": _sha256_file(out_review),
+            "local_detail": _sha256_file(out_local_detail),
+            "reason_counts": _sha256_file(out_reason_counts),
+            "rejected": _sha256_file(out_rejected),
+            "parked": _sha256_file(out_parked),
+        }
+        second = run_ncbi_nuc_s3(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            source_metadata_dir=source_metadata_dir,
+            eligibility_policy=eligibility_policy,
+            output_dir=output_dir,
+            expected_rows=expected_rows,
+            check_deterministic_rerun=False,
+        )
+        deterministic_ok = (
+            first_hashes["canonical"] == _sha256_file(second.output_canonical)
+            and first_hashes["decisions"] == _sha256_file(second.output_decisions)
+            and first_hashes["review"] == _sha256_file(second.output_review)
+            and first_hashes["local_detail"] == _sha256_file(second.output_local_detail)
+            and first_hashes["reason_counts"] == _sha256_file(second.output_reason_counts)
+            and first_hashes["rejected"] == _sha256_file(second.output_rejected)
+            and first_hashes["parked"] == _sha256_file(second.output_parks)
+        )
+        if not deterministic_ok:
+            raise S3ClassifyError(
+                "S3 outputs were not byte-identical across deterministic rerun"
+            )
+
+    run_result = S3RunResult(
+        source_key="ncbi_nuc",
+        stats=stats,
+        output_canonical=out_canonical,
+        output_decisions=out_decisions,
+        output_review=out_review,
+        output_local_detail=out_local_detail,
+        output_summary=out_summary,
+        output_reason_counts=out_reason_counts,
+        output_leakage_matches=None,
+        s2_hash_before=s2_hash_before,
+        s2_hash_after=s2_hash_after,
+        qc_hash_before=qc_hash_before,
+        qc_hash_after=qc_hash_after,
+        sidecar_hash_before=sidecar_hash_before,
+        sidecar_hash_after=sidecar_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        deterministic_rerun_ok=deterministic_ok,
+        s2_integrity_ok=s2_integrity_ok,
+        output_rejected=out_rejected,
+        output_parks=out_parked,
+        raw_sha_before=raw_sha_before,
+        raw_sha_after=raw_sha_after,
+    )
+    summary_text = build_ncbi_nuc_checkpoint1_summary(
+        repo_root=repo_root,
+        result=run_result,
+        policy_path=eligibility_policy,
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in summary_text:
+        raise S3ClassifyError(
+            "CHECKPOINT-1 summary must not contain absolute repository paths"
+        )
+    if NCBI_NUC_PIPELINE_STOP_STATEMENT not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary missing pipeline stop statement")
+    if "authorised_for_s4: `0`" not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary must keep authorised_for_s4 at 0")
+    if "Evidence scored: `no`" not in summary_text:
+        raise S3ClassifyError("CHECKPOINT-1 summary missing evidence deferral")
+    _write_text_atomic(out_summary, summary_text)
+    return run_result
+
+
 def run_s3_classification(
     *,
     repo_root: Path,
@@ -6289,6 +6957,18 @@ def run_s3_classification(
             eligibility_policy=eligibility_policy,
             output_dir=output_dir,
             expected_rows=expected_rows,
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key == "ncbi_nuc":
+        return run_ncbi_nuc_s3(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            source_metadata_dir=source_metadata_dir,
+            eligibility_policy=eligibility_policy,
+            output_dir=output_dir,
+            expected_rows=(
+                EXPECTED_NCBI_NUC_ROWS if expected_rows is None else expected_rows
+            ),
             check_deterministic_rerun=check_deterministic_rerun,
         )
     raise S3ClassifyError(f"Unknown S3 source_key={source_key!r}")
@@ -6421,6 +7101,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_path = Path("config/source_eligibility/aptadiff_a.json")
         elif args.source == "aptadiff_b":
             policy_path = Path("config/source_eligibility/aptadiff_b.json")
+        elif args.source == "ncbi_nuc":
+            policy_path = Path("config/source_eligibility/ncbi_nuc.json")
         else:
             raise S3ClassifyError(
                 "--eligibility-policy is required for unknown sources"
@@ -6443,6 +7125,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_dir = Path("data/interim/checkpoints/aptadiff_a_cp1")
         elif args.source == "aptadiff_b":
             output_dir = Path("data/interim/checkpoints/aptadiff_b_cp1")
+        elif args.source == "ncbi_nuc":
+            output_dir = Path("data/interim/checkpoints/ncbi_nuc_cp1")
         else:
             output_dir = Path("data/interim/checkpoints/aptabase_cp1")
 
@@ -6468,6 +7152,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         EnaS3Error,
         AptamerBaseS3Error,
         AptaDiffS3Error,
+        NcbiNucS3Error,
         EligibilityError,
         CorpusSchemaError,
     ) as exc:

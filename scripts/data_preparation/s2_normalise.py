@@ -117,6 +117,20 @@ from adapters.ena_s2 import (  # noqa: E402
     summarise_lengths as summarise_ena_lengths,
     update_stats_from_row as update_ena_stats_from_row,
 )
+from adapters.ncbi_nuc_s2 import (  # noqa: E402
+    CONSTANT_PROPOSAL_COLUMNS as NCBI_NUC_CONSTANT_PROPOSAL_COLUMNS,
+    S2_QC_COLUMNS as NCBI_NUC_S2_QC_COLUMNS,
+    NcbiNucS2Error,
+    NcbiNucS2Stats,
+    assert_genuine_proposals as assert_ncbi_nuc_genuine_proposals,
+    build_known_motif_proposals as build_ncbi_nuc_known_motif_proposals,
+    finalise_review_stats as finalise_ncbi_nuc_review_stats,
+    is_review_candidate as ncbi_nuc_is_review_candidate,
+    load_ncbi_nuc_policy,
+    normalise_ncbi_nuc_record,
+    summarise_lengths as summarise_ncbi_nuc_lengths,
+    update_stats_from_row as update_ncbi_nuc_stats_from_row,
+)
 from adapters.riboaptamer_s2 import (  # noqa: E402
     CONSTANT_PROPOSAL_COLUMNS as RIBOAPTAMER_CONSTANT_PROPOSAL_COLUMNS,
     S2_QC_COLUMNS as RIBOAPTAMER_S2_QC_COLUMNS,
@@ -280,6 +294,74 @@ EXPECTED_APTADIFF_B_CHEMISTRY = {"DNA": 11547}
 EXPECTED_APTADIFF_A_ALPHABET = {"DNA_T": 13802, "ambiguous": 1}
 EXPECTED_APTADIFF_B_ALPHABET = {"DNA_T": 11532, "ambiguous": 15}
 
+EXPECTED_NCBI_NUC_ROWS = 18
+EXPECTED_NCBI_NUC_MOLECULE = {"RNA": 5, "DNA": 1, "unknown": 12}
+EXPECTED_NCBI_NUC_CHEMISTRY = {"RNA": 5, "DNA": 1, "unknown": 12}
+EXPECTED_NCBI_NUC_T_TO_U = 5
+EXPECTED_NCBI_NUC_SOURCE_DATASET = "ncbi_nuc_genbank_2026-07-27"
+EXPECTED_NCBI_NUC_S1_CANONICAL_SHA256 = (
+    "329f518e94e0813080545fe61d823ad44607ec8a193e14498fc62a91d647e9dc"
+)
+EXPECTED_NCBI_NUC_S1_SIDECAR_SHA256 = (
+    "f1d003f64e7a9619d94b7025838e229b4ec7655fa93f9bda2bf34e2ba0021fe1"
+)
+EXPECTED_NCBI_NUC_RAW_SHA256: dict[str, str] = {
+    "data/raw/NCBI_nucleotide/sequence (1).gb": (
+        "0cfcbb085f86501c541bdf5eb5a3b7344d0554319db3f2e0a97509e28cb5c05a"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (10).gb": (
+        "d47bb0d8ab74f202ff3b4a336ac49abc8a0e29d9cde67b710896b0234acbab3f"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (11).gb": (
+        "950b13e83474ad066360bacd4a4d2ef1c7e8f4219259d50079a862c6771ce080"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (12).gb": (
+        "a27b6cddb546565055911873fce2fdde1bd29d064435d8badf2754af6fac055c"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (13).gb": (
+        "0b74ea872b31e09af5d10ef4ead998e1874c83e975c846b30e15e24d3bbed2fb"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (14).gb": (
+        "3490c7e66ba22df5f451ce0a05ec86cbee6a8cdef446ea9fa73eb15679b7f56c"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (15).gb": (
+        "a49fb40c880af0ea16662d9c88305264276ef5182a51bc40830d67416bc1ff5f"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (16).gb": (
+        "d2275cbd2e1134ad7de5f9e687297179d936059470e8357f1dce446a33571db2"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (17).gb": (
+        "78289052d3d0cc769bd2318af269f0ab6e4652cea7b4fd068733aa9456cf1ec4"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (2).gb": (
+        "b34e78d3754b7f1147df984d3f796f8bdb9bfad288287d318fd49e6a20c83be8"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (3).gb": (
+        "7d58262d81ddfc4af5899cc78341794948ecac826513c339b8bb2de4dd137227"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (4).gb": (
+        "62431cd2b251c63b0ccf96b99ecdd2b814397be2b40d50722dabf77175778380"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (5).gb": (
+        "3cf2cf0193095d3b74ed07617c28fc55222ad7ccba8d31a5a602c1d892172228"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (6).gb": (
+        "3d4227ef665d9f4fe210b4999654e8bccbee38c6d4b2ed2a93ed194fbfdd8562"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (7).gb": (
+        "9114ec869c8401a54cc88219b2920bc8910275748c0d2bce2df06b33ea258647"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (8).gb": (
+        "22e417676d8fdff7ca6fbdc3f887d34eac3f19d3906d7100f1c9d0d600dd038f"
+    ),
+    "data/raw/NCBI_nucleotide/sequence (9).gb": (
+        "2d866410f1ee6748b4256d34ffb6231b019ed2c3261fd46e42b68120ef1b158f"
+    ),
+    "data/raw/NCBI_nucleotide/sequence.gb": (
+        "59f078113f4e3b2bdb6cd0c2cc14b76bf542c9b3042b34a71a47a2ef10c02ede"
+    ),
+}
+
 
 class S2NormaliseError(ValueError):
     """Hard failure during S2 normalisation orchestration."""
@@ -299,6 +381,7 @@ class S2RunResult:
         | RiboAptamerS2Stats
         | AptaIndexS2Stats
         | EnaS2Stats
+        | NcbiNucS2Stats
     )
     output_normalised: Path
     output_qc: Path
@@ -5767,6 +5850,647 @@ def run_aptadiff_s2(
     return run_result
 
 
+def _ncbi_nuc_raw_hashes(repo_root: Path) -> dict[str, str]:
+    """Return relative-path → SHA-256 for every registered NCBI GenBank file."""
+    observed: dict[str, str] = {}
+    for relative, expected in EXPECTED_NCBI_NUC_RAW_SHA256.items():
+        path = repo_root / relative
+        if not path.is_file():
+            raise S2NormaliseError(f"Missing registered NCBI Nucleotide file: {relative}")
+        digest = _sha256_file(path)
+        if digest != expected:
+            raise S2NormaliseError(
+                f"NCBI Nucleotide raw SHA-256 does not match registry for {relative}"
+            )
+        observed[relative] = digest
+    return observed
+
+
+def build_ncbi_nuc_s2_report(
+    *,
+    repo_root: Path,
+    result: S2RunResult,
+    rules_path: Path,
+    policy_path: Path,
+) -> str:
+    """Build an aggregate-only Markdown NCBI Nucleotide S2 report (no sequences)."""
+    stats = result.stats
+    if not isinstance(stats, NcbiNucS2Stats):
+        raise S2NormaliseError("NCBI Nucleotide report requires NcbiNucS2Stats")
+    full_min, full_med, full_max = summarise_ncbi_nuc_lengths(stats.length_full_values)
+    core_min, core_med, core_max = summarise_ncbi_nuc_lengths(stats.length_core_values)
+    scanned = ", ".join(f"`{name}`" for name in stats.known_motifs_scanned) or "(none)"
+    lines = [
+        "# NCBI Nucleotide S2 normalisation report",
+        "",
+        "Aggregate counts only. Deposited sequences are not included.",
+        "",
+        "## Reconciliation",
+        "",
+        f"- Source key: `ncbi_nuc`",
+        f"- Source dataset: `{EXPECTED_NCBI_NUC_SOURCE_DATASET}`",
+        f"- S1 canonical rows: `{stats.s1_rows}`",
+        f"- Source-metadata rows: `{stats.source_metadata_rows}`",
+        f"- S2 output rows: `{stats.s2_rows}`",
+        f"- Records dropped: `{stats.records_dropped}`",
+        f"- Records parked: `{stats.records_parked}`",
+        f"- Unique record_id values: `{stats.unique_record_ids}`",
+        f"- Unique native_id values: `{stats.unique_native_ids}`",
+        f"- Row disappearance: `{stats.s1_rows - stats.s2_rows}`",
+        f"- S1 row order preserved: `{'pass' if stats.order_preserved else 'fail'}`",
+        f"- S1 provenance preserved: "
+        f"`{'pass' if stats.provenance_preserved else 'fail'}`",
+        f"- sequence_raw unchanged: "
+        f"`{'pass' if stats.sequence_raw_unchanged else 'fail'}`",
+        f"- target_name_raw unchanged: "
+        f"`{'pass' if stats.target_name_raw_unchanged else 'fail'}`",
+        f"- notes unchanged: `{'pass' if stats.notes_unchanged else 'fail'}`",
+        f"- pubmed_id unchanged: `{'pass' if stats.pubmed_id_unchanged else 'fail'}`",
+        f"- Missing sequence rows: `{stats.missing_sequence_rows}`",
+        f"- Nonempty sequence rows: `{stats.nonempty_sequence_rows}`",
+        f"- Shared rules: `{_relative_display(rules_path, repo_root)}`",
+        f"- Source policy: `{_relative_display(policy_path, repo_root)}`",
+        "",
+        "## Molecule / chemistry",
+        "",
+        "Experimental molecule identity is accession-approved from structured",
+        "GenBank evidence (LOCUS RNA state plus RNA-compatible `/mol_type`",
+        "and RNA-aptamer source annotation for the five RNA records; LOCUS DNA",
+        "plus `/mol_type=\"other DNA\"` for QT662269). Alphabet, patent titles,",
+        "and ENA overlap are not used to assign molecule type. Remaining",
+        "ACCESSION values stay `unknown`. Generic `DNA` is used where the",
+        "live schema allows it; ssDNA is not inferred from canonical DNA",
+        "aptamer convention.",
+        "",
+        "### Canonical molecule_type",
+        "",
+    ]
+    for name, count in _count_sorted(stats.molecule_type_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### Canonical chemistry", ""])
+    for name, count in _count_sorted(stats.chemistry_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Reported alphabet",
+            "",
+            "Shared alphabet vocabulary is `RNA` / `DNA_T` / `mixed_T_U` /",
+            "`ambiguous` / `invalid`. A/C/G-only values use the shared",
+            "classifier tie-break and do not manufacture molecule type.",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.alphabet_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Computational transcription",
+            "",
+            "T→U is applied only for the five source-supported RNA records.",
+            "Unresolved T-alphabet records and the DNA record are not",
+            "transcribed.",
+            "",
+            f"- total `t_to_u_applied=true`: `{stats.t_to_u_count}`",
+            "",
+        ]
+    )
+    if stats.t_to_u_by_molecule:
+        for name, count in _count_sorted(stats.t_to_u_by_molecule):
+            lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Display cleaning",
+            "",
+        ]
+    )
+    if stats.transformation_counts:
+        for name, count in _count_sorted(stats.transformation_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+    lines.extend(
+        [
+            "",
+            "## QC",
+            "",
+            f"- Invalid character rows: `{stats.invalid_character_count}`",
+            f"- Alignment-gap rows: `{stats.alignment_gaps_count}`",
+            f"- Ambiguous base rows: `{stats.ambiguous_base_count}`",
+            f"- Mixed T/U rows: `{stats.mixed_t_u_count}`",
+            f"- Core below minimum length: `{stats.core_below_min_count}`",
+            f"- Core above maximum length: `{stats.core_above_max_count}`",
+            f"- Source length mismatches: `{stats.length_mismatch_count}`",
+            f"- Rows with any QC flag: `{stats.rows_with_any_qc_flag}`",
+            f"- Rows with multiple QC flags: `{stats.rows_with_multiple_qc_flags}`",
+            f"- Review-candidate rows: `{stats.review_candidate_rows}`",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.qc_flag_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### review reasons", ""])
+    if stats.review_reason_counts:
+        for name, count in _count_sorted(stats.review_reason_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+    lines.extend(
+        [
+            "",
+            "## Length",
+            "",
+            "Lengths are computed from the shared normalised representation.",
+            "These buckets are descriptive at S2; they do not filter records.",
+            "",
+            f"- sequence_length_full min / median / max: "
+            f"`{full_min}` / `{full_med}` / `{full_max}`",
+            f"- sequence_length_core min / median / max: "
+            f"`{core_min}` / `{core_med}` / `{core_max}`",
+            "",
+            "### sequence_length_full buckets",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.length_full_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### sequence_length_core buckets", ""])
+    for name, count in _count_sorted(stats.length_core_buckets):
+        lines.append(f"- `{name}`: `{count}`")
+    if stats.core_differs_from_full == 0:
+        lines.extend(
+            [
+                "",
+                "Full and core length distributions are identical because no",
+                "trim was applied (`sequence_core == sequence_full`).",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Construct / trim state",
+            "",
+            "Construct scope is assigned only from explicit GenBank source",
+            "evidence (primer, reverse primer, poly-A fragment, or DNA",
+            "transcription template). cDNA records with unresolved aptamer",
+            "boundaries remain `unknown`. No aptamer core is extracted.",
+            "",
+            "### construct_scope",
+            "",
+        ]
+    )
+    for name, count in _count_sorted(stats.construct_scope_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### source_object_class", ""])
+    for name, count in _count_sorted(stats.source_object_class_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### trim_status", ""])
+    for name, count in _count_sorted(stats.trim_status_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(["", "### trim_confidence", ""])
+    for name, count in _count_sorted(stats.trim_confidence_counts):
+        lines.append(f"- `{name}`: `{count}`")
+    lines.extend(
+        [
+            "",
+            "## Constant-region detection",
+            "",
+            "group-wise inference disabled for ncbi_nuc in this run. No",
+            "artificial grouping by target, title, molecule, accession",
+            "prefix, or patent family was created. Known-motif detections",
+            "are proposals only (`applied=false`).",
+            "",
+            f"- Approved known motifs scanned: {scanned}",
+            f"- Records with known-motif detection: "
+            f"`{stats.known_motif_detection_count}`",
+            f"- Genuine proposal rows: `{stats.constant_region_proposals}`",
+            f"- 5′ known-motif proposals: `{stats.five_prime_proposals}`",
+            f"- 3′ known-motif proposals: `{stats.three_prime_proposals}`",
+            f"- Group-consensus proposals: `0`",
+            f"- Groups considered: `{stats.groups_considered}`",
+            f"- Groups meeting minimum size: `{stats.groups_meeting_min_size}`",
+            f"- Records associated with medium-confidence proposals: "
+            f"`{stats.records_with_medium_confidence_proposal}`",
+            f"- Previously approved high-confidence trims applied: "
+            f"`{stats.high_confidence_trims_applied}`",
+            f"- Records actually trimmed: `{stats.applied_trims}`",
+            f"- Rows where sequence_core != sequence_full: "
+            f"`{stats.core_differs_from_full}`",
+            f"- Reason: `{stats.constant_region_reason}`",
+            "",
+            "### proposal sources",
+            "",
+        ]
+    )
+    if stats.proposal_source_counts:
+        for name, count in _count_sorted(stats.proposal_source_counts):
+            lines.append(f"- `{name}`: `{count}`")
+    else:
+        lines.append("- (none)")
+    lines.extend(
+        [
+            "",
+            "## Invariants",
+            "",
+            f"- sequence_raw unchanged: "
+            f"`{'pass' if stats.sequence_raw_unchanged else 'fail'}`",
+            f"- Records retained: `{stats.s2_rows}`",
+            f"- Provenance unchanged: "
+            f"`{'pass' if stats.provenance_preserved else 'fail'}`",
+            "- S4 target/evidence/affinity/PDB/cluster/partition fields remain blank",
+            (
+                f"- Raw input hashes unchanged: "
+                f"`{'pass' if result.raw_sha_unchanged else 'fail'}`"
+                if result.raw_sha_unchanged is not None
+                else "- Raw input hashes unchanged: `not_checked`"
+            ),
+            f"- S1 inputs unchanged: "
+            f"`{'pass' if result.inputs_unchanged else 'fail'}`",
+            (
+                f"- Deterministic rerun result: "
+                f"`{'pass' if result.deterministic_rerun_ok else 'fail'}`"
+                if result.deterministic_rerun_ok is not None
+                else "- Deterministic rerun result: `not_checked`"
+            ),
+            "",
+            f"- S1 canonical hash before: `{result.s1_hash_before}`",
+            f"- S1 canonical hash after: `{result.s1_hash_after}`",
+            f"- Source-metadata hash before: `{result.sidecar_hash_before}`",
+            f"- Source-metadata hash after: `{result.sidecar_hash_after}`",
+            (
+                f"- Combined raw SHA-256 token: `{result.raw_sha256}`"
+                if result.raw_sha256
+                else "- Combined raw SHA-256 token: `not_checked`"
+            ),
+            "",
+            "## Outputs",
+            "",
+            f"- Normalised: "
+            f"`{_relative_display(result.output_normalised, repo_root)}`",
+            f"- QC: `{_relative_display(result.output_qc, repo_root)}`",
+            f"- Review candidates: "
+            f"`{_relative_display(result.output_review, repo_root)}`",
+            f"- Detected constants / proposals: "
+            f"`{_relative_display(result.output_proposals, repo_root)}`",
+            f"- Report: `{_relative_display(result.output_report, repo_root)}`",
+            "",
+            "## Stage boundary",
+            "",
+            "NCBI Nucleotide S2 sequence/molecule/construct normalisation only.",
+            "",
+            "- No record was rejected or parked.",
+            "- No target extraction or canonicalisation was performed.",
+            "- No affinity/evidence/PDB decision was performed.",
+            "- No leakage, clustering, balancing or partitioning was performed.",
+            "- No NCBI↔ENA deduplication was performed.",
+            "- S3 has not started.",
+            "- CHECKPOINT-1 has not been opened.",
+            "- Known-motif detections were not applied as trims.",
+            "- group-wise inference disabled for ncbi_nuc in this run.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_ncbi_nuc_s2(
+    *,
+    repo_root: Path,
+    input_dir: Path,
+    output_dir: Path,
+    rules_path: Path,
+    policy_path: Path,
+    expected_rows: int | None = EXPECTED_NCBI_NUC_ROWS,
+    check_deterministic_rerun: bool = False,
+) -> S2RunResult:
+    """Execute NCBI Nucleotide S2 normalisation."""
+    repo_root = repo_root.resolve()
+    input_dir = input_dir if input_dir.is_absolute() else (repo_root / input_dir)
+    input_dir = input_dir.resolve()
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    rules_path = (
+        rules_path if rules_path.is_absolute() else (repo_root / rules_path)
+    ).resolve()
+    policy_path = (
+        policy_path if policy_path.is_absolute() else (repo_root / policy_path)
+    ).resolve()
+
+    canonical_path = input_dir / "ncbi_nuc_extracted.csv"
+    sidecar_path = input_dir / "ncbi_nuc_source_metadata.csv"
+    if not canonical_path.is_file():
+        raise S2NormaliseError(f"Missing S1 canonical input: {canonical_path.name}")
+    if not sidecar_path.is_file():
+        raise S2NormaliseError(f"Missing S1 sidecar input: {sidecar_path.name}")
+
+    raw_sha_before: str | None = None
+    if expected_rows == EXPECTED_NCBI_NUC_ROWS:
+        observed_raw = _ncbi_nuc_raw_hashes(repo_root)
+        raw_sha_before = "|".join(
+            f"{path}:{digest}" for path, digest in sorted(observed_raw.items())
+        )
+        s1_expected = _sha256_file(canonical_path)
+        sidecar_expected = _sha256_file(sidecar_path)
+        if s1_expected != EXPECTED_NCBI_NUC_S1_CANONICAL_SHA256:
+            raise S2NormaliseError(
+                "ncbi_nuc S1 canonical SHA-256 does not match the accepted S1 freeze"
+            )
+        if sidecar_expected != EXPECTED_NCBI_NUC_S1_SIDECAR_SHA256:
+            raise S2NormaliseError(
+                "ncbi_nuc S1 sidecar SHA-256 does not match the accepted S1 freeze"
+            )
+
+    s1_hash_before = _sha256_file(canonical_path)
+    sidecar_hash_before = _sha256_file(sidecar_path)
+
+    rules = load_normalisation_rules(rules_path)
+    policy = load_ncbi_nuc_policy(policy_path)
+    if policy.apply_approved_trims:
+        raise S2NormaliseError("ncbi_nuc S2 must not apply approved trims")
+    if policy.group_inference_key != "disabled":
+        raise S2NormaliseError("ncbi_nuc S2 must keep group-wise inference disabled")
+
+    canonical_rows = _read_corpus_csv(canonical_path)
+    sidecar_rows = _read_sidecar_csv(sidecar_path)
+    aligned_sidecar = _match_sidecar_one_to_one(canonical_rows, sidecar_rows)
+
+    if expected_rows is not None and len(canonical_rows) != expected_rows:
+        raise S2NormaliseError(
+            f"S1 row count must be {expected_rows}; got {len(canonical_rows)}"
+        )
+
+    for index, row in enumerate(canonical_rows, start=1):
+        if row["source_db"] != "ncbi_nuc":
+            raise S2NormaliseError(f"row {index}: source_db must be ncbi_nuc")
+        if expected_rows == EXPECTED_NCBI_NUC_ROWS:
+            if row["source_dataset"] != EXPECTED_NCBI_NUC_SOURCE_DATASET:
+                raise S2NormaliseError(
+                    f"row {index}: source_dataset must be "
+                    f"{EXPECTED_NCBI_NUC_SOURCE_DATASET}"
+                )
+            if row["target_name_raw"] != "":
+                raise S2NormaliseError("ncbi_nuc S2 must not populate target_name_raw")
+            if row["accession"] != "":
+                raise S2NormaliseError("ncbi_nuc canonical accession must remain empty")
+
+    stats = NcbiNucS2Stats()
+    stats.s1_rows = len(canonical_rows)
+    stats.source_metadata_rows = len(aligned_sidecar)
+    stats.order_preserved = True
+    stats.provenance_preserved = True
+    stats.sequence_raw_unchanged = True
+    stats.target_name_raw_unchanged = True
+    stats.notes_unchanged = True
+    stats.pubmed_id_unchanged = True
+    stats.known_motifs_scanned = tuple(
+        motif.name for motif in rules.known_non_core_motifs
+    )
+    stats.constant_region_reason = (
+        "group-wise inference disabled for ncbi_nuc in this run;"
+        "known_motif_detection_only_not_applied"
+    )
+
+    normalised_rows: list[dict[str, str]] = []
+    qc_rows: list[dict[str, str]] = []
+    review_rows: list[dict[str, str]] = []
+    row_results: list = []
+
+    for s1_row, meta_row in zip(canonical_rows, aligned_sidecar, strict=True):
+        result = normalise_ncbi_nuc_record(
+            s1_row,
+            meta_row,
+            policy=policy,
+            rules=rules,
+        )
+        if result.canonical["record_id"] != s1_row["record_id"]:
+            stats.order_preserved = False
+            raise S2NormaliseError("S2 altered record_id or row identity")
+        if result.canonical["native_id"] != s1_row["native_id"]:
+            raise S2NormaliseError("S2 altered native_id")
+        if result.canonical["sequence_raw"] != s1_row["sequence_raw"]:
+            stats.sequence_raw_unchanged = False
+            raise S2NormaliseError("S2 must not alter sequence_raw")
+        if result.canonical["target_name_raw"] != s1_row["target_name_raw"]:
+            stats.target_name_raw_unchanged = False
+            raise S2NormaliseError("S2 must not alter target_name_raw")
+        if result.canonical["notes"] != s1_row["notes"]:
+            stats.notes_unchanged = False
+            raise S2NormaliseError("S2 must not alter notes")
+        if result.canonical["pubmed_id"] != s1_row["pubmed_id"]:
+            stats.pubmed_id_unchanged = False
+            raise S2NormaliseError("S2 must not alter pubmed_id")
+        if result.canonical["publication"] != s1_row["publication"]:
+            raise S2NormaliseError("S2 must not alter publication")
+        if result.canonical["source_db"] != s1_row["source_db"]:
+            stats.provenance_preserved = False
+            raise S2NormaliseError("S2 must not alter source_db")
+        if result.canonical["source_dataset"] != s1_row["source_dataset"]:
+            stats.provenance_preserved = False
+            raise S2NormaliseError("S2 must not alter source_dataset")
+        if result.canonical["sequence_core"] != result.canonical["sequence_full"]:
+            raise S2NormaliseError(
+                "ncbi_nuc S2 must not apply trims; sequence_core must equal "
+                "sequence_full"
+            )
+        if result.canonical["molecule_type"] == "ssDNA":
+            raise S2NormaliseError(
+                "ncbi_nuc must not coerce DNA to ssDNA"
+            )
+        length_full = result.canonical["sequence_length_full"]
+        if length_full != "":
+            if int(length_full) != len(result.canonical["sequence_full"]):
+                raise S2NormaliseError(
+                    "sequence_length_full must equal len(sequence_full)"
+                )
+            if int(result.canonical["sequence_length_core"]) != len(
+                result.canonical["sequence_core"]
+            ):
+                raise S2NormaliseError(
+                    "sequence_length_core must equal len(sequence_core)"
+                )
+        normalised_rows.append(result.canonical)
+        qc_rows.append(result.qc)
+        row_results.append(result)
+        if ncbi_nuc_is_review_candidate(result.qc):
+            review_rows.append(result.qc)
+        update_ncbi_nuc_stats_from_row(stats, result)
+
+    stats.s2_rows = len(normalised_rows)
+    stats.unique_record_ids = len({row["record_id"] for row in normalised_rows})
+    stats.unique_native_ids = len({row["native_id"] for row in normalised_rows})
+    stats.records_dropped = 0
+    stats.records_parked = 0
+    finalise_ncbi_nuc_review_stats(stats, row_results)
+
+    if expected_rows == EXPECTED_NCBI_NUC_ROWS:
+        if stats.s2_rows != EXPECTED_NCBI_NUC_ROWS:
+            raise S2NormaliseError(
+                f"S2 must preserve {EXPECTED_NCBI_NUC_ROWS} rows; got {stats.s2_rows}"
+            )
+        if stats.unique_record_ids != EXPECTED_NCBI_NUC_ROWS:
+            raise S2NormaliseError("S2 record_id values are not unique")
+        if stats.s1_rows - stats.s2_rows != 0:
+            raise S2NormaliseError("S2 row disappearance must be 0")
+        for key, expected in EXPECTED_NCBI_NUC_MOLECULE.items():
+            got = stats.molecule_type_counts.get(key, 0)
+            if got != expected:
+                raise S2NormaliseError(
+                    f"molecule_type {key} expected {expected}; got {got}"
+                )
+        extra_molecules = [
+            key
+            for key, count in stats.molecule_type_counts.items()
+            if key not in EXPECTED_NCBI_NUC_MOLECULE and count
+        ]
+        if extra_molecules:
+            raise S2NormaliseError(
+                f"unexpected molecule_type values: {extra_molecules}"
+            )
+        for key, expected in EXPECTED_NCBI_NUC_CHEMISTRY.items():
+            got = stats.chemistry_counts.get(key, 0)
+            if got != expected:
+                raise S2NormaliseError(
+                    f"chemistry {key} expected {expected}; got {got}"
+                )
+        if stats.t_to_u_count != EXPECTED_NCBI_NUC_T_TO_U:
+            raise S2NormaliseError(
+                f"ncbi_nuc T→U count expected {EXPECTED_NCBI_NUC_T_TO_U}; "
+                f"got {stats.t_to_u_count}"
+            )
+        if stats.core_differs_from_full != 0:
+            raise S2NormaliseError(
+                "ncbi_nuc S2 applied a trim; sequence_core must equal sequence_full"
+            )
+        nonempty_target = sum(1 for row in normalised_rows if row["target_name_raw"])
+        if nonempty_target:
+            raise S2NormaliseError("ncbi_nuc S2 must not populate target_name_raw")
+
+    known_motif_proposals = build_ncbi_nuc_known_motif_proposals(row_results)
+    assert_ncbi_nuc_genuine_proposals(known_motif_proposals)
+
+    stats.constant_region_proposals = len(known_motif_proposals)
+    stats.groups_considered = 0
+    stats.groups_meeting_min_size = 0
+    stats.five_prime_proposals = sum(
+        1 for row in known_motif_proposals if row["side"] == "five_prime"
+    )
+    stats.three_prime_proposals = sum(
+        1 for row in known_motif_proposals if row["side"] == "three_prime"
+    )
+    stats.records_with_medium_confidence_proposal = 0
+    stats.high_confidence_trims_applied = 0
+    stats.applied_trims = 0
+    for row in known_motif_proposals:
+        source = row["proposal_source"]
+        stats.proposal_source_counts[source] = (
+            stats.proposal_source_counts.get(source, 0) + 1
+        )
+
+    for row in normalised_rows:
+        if row["sequence_core"] != row["sequence_full"]:
+            raise S2NormaliseError(
+                "known-motif detections must not mutate sequence_core"
+            )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_normalised = output_dir / "ncbi_nuc_normalised.csv"
+    out_qc = output_dir / "ncbi_nuc_s2_qc.csv"
+    out_review = output_dir / "ncbi_nuc_s2_review_candidates.csv"
+    out_proposals = output_dir / "detected_constants_ncbi_nuc.csv"
+    out_report = output_dir / "ncbi_nuc_s2_report.md"
+
+    write_corpus_csv_atomic(out_normalised, normalised_rows)
+    write_csv_atomic(out_qc, NCBI_NUC_S2_QC_COLUMNS, qc_rows)
+    write_csv_atomic(out_review, NCBI_NUC_S2_QC_COLUMNS, review_rows)
+    write_csv_atomic(
+        out_proposals, NCBI_NUC_CONSTANT_PROPOSAL_COLUMNS, known_motif_proposals
+    )
+
+    s1_hash_after = _sha256_file(canonical_path)
+    sidecar_hash_after = _sha256_file(sidecar_path)
+    inputs_unchanged = (
+        s1_hash_before == s1_hash_after
+        and sidecar_hash_before == sidecar_hash_after
+    )
+    if not inputs_unchanged:
+        raise S2NormaliseError("S1 inputs were modified during S2 execution")
+
+    raw_sha_after: str | None = None
+    raw_sha_unchanged: bool | None = None
+    if raw_sha_before is not None:
+        observed_after = _ncbi_nuc_raw_hashes(repo_root)
+        digest = "|".join(
+            f"{path}:{value}" for path, value in sorted(observed_after.items())
+        )
+        if digest != raw_sha_before:
+            raise S2NormaliseError("NCBI Nucleotide raw SHA-256 values changed during S2")
+        raw_sha_after = digest
+        raw_sha_unchanged = True
+
+    deterministic_ok: bool | None = None
+    if check_deterministic_rerun:
+        first_hashes = {
+            "normalised": _sha256_file(out_normalised),
+            "qc": _sha256_file(out_qc),
+            "review": _sha256_file(out_review),
+            "proposals": _sha256_file(out_proposals),
+        }
+        second = run_ncbi_nuc_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=policy_path,
+            expected_rows=expected_rows,
+            check_deterministic_rerun=False,
+        )
+        deterministic_ok = (
+            first_hashes["normalised"] == _sha256_file(second.output_normalised)
+            and first_hashes["qc"] == _sha256_file(second.output_qc)
+            and first_hashes["review"] == _sha256_file(second.output_review)
+            and first_hashes["proposals"] == _sha256_file(second.output_proposals)
+        )
+        if not deterministic_ok:
+            raise S2NormaliseError(
+                "S2 outputs were not byte-identical across deterministic rerun"
+            )
+
+    run_result = S2RunResult(
+        source_key="ncbi_nuc",
+        stats=stats,
+        output_normalised=out_normalised,
+        output_qc=out_qc,
+        output_review=out_review,
+        output_proposals=out_proposals,
+        output_report=out_report,
+        s1_hash_before=s1_hash_before,
+        s1_hash_after=s1_hash_after,
+        sidecar_hash_before=sidecar_hash_before,
+        sidecar_hash_after=sidecar_hash_after,
+        inputs_unchanged=inputs_unchanged,
+        deterministic_rerun_ok=deterministic_ok,
+        raw_sha256=raw_sha_after,
+        raw_sha_unchanged=raw_sha_unchanged,
+    )
+    report_text = build_ncbi_nuc_s2_report(
+        repo_root=repo_root,
+        result=run_result,
+        rules_path=rules_path,
+        policy_path=policy_path,
+    )
+    abs_root = str(repo_root.resolve())
+    if abs_root in report_text:
+        raise S2NormaliseError("S2 report must not contain absolute repository paths")
+    forbidden_tokens = (
+        canonical_rows[0]["sequence_raw"] if canonical_rows else ""
+    )
+    if forbidden_tokens and forbidden_tokens in report_text:
+        raise S2NormaliseError("S2 report must not contain sequence values")
+    _write_text_atomic(out_report, report_text)
+    return run_result
+
+
 def run_s2_normalisation(
     *,
     repo_root: Path,
@@ -5872,6 +6596,18 @@ def run_s2_normalisation(
             rules_path=rules_path,
             policy_path=source_policy,
             expected_rows=expected_rows,
+            check_deterministic_rerun=check_deterministic_rerun,
+        )
+    if source_key == "ncbi_nuc":
+        return run_ncbi_nuc_s2(
+            repo_root=repo_root,
+            input_dir=input_dir,
+            output_dir=output_dir,
+            rules_path=rules_path,
+            policy_path=source_policy,
+            expected_rows=(
+                EXPECTED_NCBI_NUC_ROWS if expected_rows is None else expected_rows
+            ),
             check_deterministic_rerun=check_deterministic_rerun,
         )
     raise S2NormaliseError(f"Unknown S2 source_key={source_key!r}")
@@ -5984,6 +6720,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy_path = Path("config/source_normalisation/aptadiff_a.json")
         elif args.source == "aptadiff_b":
             policy_path = Path("config/source_normalisation/aptadiff_b.json")
+        elif args.source == "ncbi_nuc":
+            policy_path = Path("config/source_normalisation/ncbi_nuc.json")
         else:
             raise S2NormaliseError(
                 "--source-policy is required for unrecognised sources"
@@ -6010,6 +6748,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         RiboAptamerS2Error,
         AptaIndexS2Error,
         EnaS2Error,
+        NcbiNucS2Error,
         CorpusSchemaError,
     ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -6096,6 +6835,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"\nt_to_u_count={stats.t_to_u_count}"
             f"\nambiguous_base_count={stats.ambiguous_base_count}"
             f"\nlength_36_count={stats.length_36_count}"
+            f"\ncore_differs_from_full={stats.core_differs_from_full}"
+            f"\napplied_trims={stats.applied_trims}"
+            f"\nreview_candidate_rows={stats.review_candidate_rows}"
+        )
+    elif isinstance(stats, NcbiNucS2Stats):
+        extra = (
+            f"\nmolecule_type_counts={dict(sorted(stats.molecule_type_counts.items()))}"
+            f"\nchemistry_counts={dict(sorted(stats.chemistry_counts.items()))}"
+            f"\nalphabet_counts={dict(sorted(stats.alphabet_counts.items()))}"
+            f"\nt_to_u_count={stats.t_to_u_count}"
+            f"\nambiguous_base_count={stats.ambiguous_base_count}"
+            f"\nconstruct_scope_counts="
+            f"{dict(sorted(stats.construct_scope_counts.items()))}"
+            f"\nknown_motif_detection_count={stats.known_motif_detection_count}"
             f"\ncore_differs_from_full={stats.core_differs_from_full}"
             f"\napplied_trims={stats.applied_trims}"
             f"\nreview_candidate_rows={stats.review_candidate_rows}"

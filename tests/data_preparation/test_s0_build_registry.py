@@ -21,6 +21,7 @@ from s0_build_registry import (  # noqa: E402
     RegistrySpecRow,
     build_registry,
     count_csv_data_rows,
+    count_genbank_records,
     count_ntriples_gzip_statements,
     detect_csv_text_encoding,
     load_registry_spec,
@@ -1310,3 +1311,150 @@ def test_tracked_source_dataset_still_belongs_to_one_source_key() -> None:
         keys_to_count[row.source_key] = keys_to_count.get(row.source_key, 0) + 1
     assert keys_to_count["aptabase"] == 1
     assert keys_to_count["ena"] == 1
+    assert keys_to_count["ncbi_nuc"] == 18
+
+
+def _write_genbank_record(
+    *,
+    locus: str,
+    accession: str,
+    sequence: str,
+    molecule: str = "DNA",
+    pubmed: str = "",
+) -> str:
+    """Synthetic non-biological GenBank record text."""
+    length = len(sequence)
+    pubmed_block = f"\n   PUBMED   {pubmed}" if pubmed else ""
+    origin_groups = [sequence[i : i + 10] for i in range(0, len(sequence), 10)]
+    origin_line = f"{1:>9} " + " ".join(origin_groups)
+    return (
+        f"LOCUS       {locus:<16}{length:>12} bp    {molecule:<7} linear   SYN 01-JAN-2026\n"
+        f"DEFINITION  Synthetic fixture record; not a biological aptamer.\n"
+        f"ACCESSION   {accession}\n"
+        f"VERSION     {accession}.1\n"
+        "KEYWORDS    .\n"
+        "SOURCE      synthetic construct\n"
+        "  ORGANISM  synthetic construct\n"
+        "            other sequences; artificial sequences.\n"
+        f"REFERENCE   1  (bases 1 to {length})\n"
+        "  AUTHORS   Fixture,A.\n"
+        "  TITLE     Synthetic title.\n"
+        "  JOURNAL   Synthetic J. 1, 1-2 (2026)"
+        f"{pubmed_block}\n"
+        "FEATURES             Location/Qualifiers\n"
+        f"     source          1..{length}\n"
+        '                     /organism="synthetic construct"\n'
+        '                     /mol_type="unassigned DNA"\n'
+        "ORIGIN\n"
+        f"{origin_line}\n"
+        "//\n"
+    )
+
+
+def test_gb_single_record_count(tmp_path: Path) -> None:
+    repo = _make_repo_tree(tmp_path)
+    path = repo / "data" / "raw" / "demo" / "one.gb"
+    path.write_text(
+        _write_genbank_record(
+            locus="SYNLOC01",
+            accession="SYNACC01",
+            sequence="acgtacgt",
+        ),
+        encoding="utf-8",
+    )
+    assert count_genbank_records(path) == 1
+    row = RegistrySpecRow(
+        source_key="ncbi_nuc",
+        source_dataset="ncbi_nuc_demo",
+        path="data/raw/demo/one.gb",
+        sha256=_hash_path(path),
+        n_rows_expected=1,
+        snapshot_date="2026-07-27",
+        tier="1",
+        redistribution_status="unknown",
+        notes="synthetic genbank",
+    )
+    validate_registered_file(repo, row)
+
+
+def test_gb_multi_record_count(tmp_path: Path) -> None:
+    text = _write_genbank_record(
+        locus="SYNLOC01",
+        accession="SYNACC01",
+        sequence="acgt",
+    ) + _write_genbank_record(
+        locus="SYNLOC02",
+        accession="SYNACC02",
+        sequence="tgcaacgt",
+    )
+    path = tmp_path / "multi.gb"
+    path.write_text(text, encoding="utf-8")
+    assert count_genbank_records(path) == 2
+
+
+def test_gb_malformed_fails_closed(tmp_path: Path) -> None:
+    repo = _make_repo_tree(tmp_path)
+    path = repo / "data" / "raw" / "demo" / "bad.gb"
+    path.write_text("this is not a GenBank record\n", encoding="utf-8")
+    row = RegistrySpecRow(
+        source_key="ncbi_nuc",
+        source_dataset="ncbi_nuc_demo",
+        path="data/raw/demo/bad.gb",
+        sha256=_hash_path(path),
+        n_rows_expected=1,
+        snapshot_date="2026-07-27",
+        tier="1",
+        redistribution_status="unknown",
+        notes="malformed",
+    )
+    with pytest.raises(RegistryError, match="could not be parsed"):
+        validate_registered_file(repo, row)
+
+
+def test_gb_expected_count_mismatch_fails(tmp_path: Path) -> None:
+    repo = _make_repo_tree(tmp_path)
+    path = repo / "data" / "raw" / "demo" / "one.gb"
+    path.write_text(
+        _write_genbank_record(
+            locus="SYNLOC01",
+            accession="SYNACC01",
+            sequence="acgtacgt",
+        ),
+        encoding="utf-8",
+    )
+    row = RegistrySpecRow(
+        source_key="ncbi_nuc",
+        source_dataset="ncbi_nuc_demo",
+        path="data/raw/demo/one.gb",
+        sha256=_hash_path(path),
+        n_rows_expected=99,
+        snapshot_date="2026-07-27",
+        tier="1",
+        redistribution_status="unknown",
+        notes="mismatch",
+    )
+    with pytest.raises(RegistryError, match="GenBank record-count mismatch"):
+        validate_registered_file(repo, row)
+
+
+def test_csv_xlsx_rdf_count_behaviour_unchanged_with_gb_support(
+    tmp_path: Path,
+) -> None:
+    """Existing CSV/XLSX/RDF counters still dispatch by file type."""
+    csv_path = tmp_path / "demo.csv"
+    _write_utf8_sig_csv(
+        csv_path,
+        ["record_id", "label", "payload"],
+        _synthetic_input_rows(3),
+    )
+    assert count_csv_data_rows(csv_path) == 3
+
+    from s0_build_registry import count_xlsx_physical_data_rows
+
+    xlsx = tmp_path / "demo.xlsx"
+    _write_minimal_xlsx(xlsx, [["h"], ["1"], ["2"], ["3"]])
+    assert count_xlsx_physical_data_rows(xlsx) == 3
+
+    nt_path = tmp_path / "demo.nt.gz"
+    _write_nt_gz(nt_path, SYNTHETIC_NT_STATEMENTS)
+    assert count_ntriples_gzip_statements(nt_path) == 3

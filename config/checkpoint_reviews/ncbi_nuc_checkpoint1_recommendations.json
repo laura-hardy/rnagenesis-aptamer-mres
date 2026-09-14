@@ -1,0 +1,37 @@
+{
+  "source_key": "ncbi_nuc",
+  "review_plan_version": "ncbi_nuc_checkpoint1_structured_review_v1",
+  "notes": "Recommendation/guidance only. Never copy these values into manual_* fields. Contains no sequences. Alphabet classification must not resolve molecule type.",
+  "records": {},
+  "groups": {},
+  "audit_only": {
+    "review_recommendation": "keep_current_route",
+    "recommended_manual_decision": "keep",
+    "requires_specific_human_decision": false,
+    "rationale": "Length-boundary or random-kept audit of an otherwise technically eligible RNA record. Confirm the current technical route; do not invent a trim or assign a target."
+  },
+  "primer_like": {
+    "review_recommendation": "review_proposed_primer_reject",
+    "recommended_manual_decision": "drop",
+    "requires_specific_human_decision": true,
+    "rationale": "Source COMMENT identifies a primer/reverse-primer object. Confirm the proposed primer_like rejection. Do not repair or trim the deposited sequence."
+  },
+  "non_aptamer_source_object": {
+    "review_recommendation": "review_proposed_non_aptamer_reject",
+    "recommended_manual_decision": "drop",
+    "requires_specific_human_decision": true,
+    "rationale": "Source annotation identifies a non-aptamer deposited object (poly-A fragment or method/construct DNA). Confirm the proposed rejection. Do not treat alphabet_as_reported=RNA as RNA evidence. Do not park a DNA method object as a validated DNA aptamer."
+  },
+  "molecule_type_unresolved": {
+    "review_recommendation": "remain_unresolved_park",
+    "recommended_manual_decision": "",
+    "requires_specific_human_decision": true,
+    "rationale": "S2 molecule_type remains unknown. Resolve molecule/chemistry from source evidence, not from alphabet, T-count, A-only composition, patent titles, or ENA overlap. Preserve secondary length/ambiguity/construct diagnostics. Do not transcribe or guess a core."
+  },
+  "construct_source_object": {
+    "review_recommendation": "review_construct_or_template",
+    "recommended_manual_decision": "",
+    "requires_specific_human_decision": true,
+    "rationale": "cDNA, transcription-template, or other construct/source-object concern without safe aptamer-core coordinates. Do not trim. Do not infer a core from T7 language without exact supported boundaries."
+  }
+}

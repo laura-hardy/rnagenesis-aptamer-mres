@@ -2887,7 +2887,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source",
         required=True,
-        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, ena, aptamerbase, aptadiff_a, or aptadiff_b)",
+        help="Source key (aptabase, utexas, aptadb, riboaptamer, aptaindex, ena, aptamerbase, aptadiff_a, aptadiff_b, or ncbi_nuc)",
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -2970,8 +2970,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--authorise-actual-apply",
         action="store_true",
         help=(
-            "Required for AptamerBase actual CHECKPOINT-1 apply. "
-            "Without this flag AptamerBase remains dry-run only."
+            "Required for AptamerBase and NCBI Nucleotide actual "
+            "CHECKPOINT-1 apply. Without this flag those sources still "
+            "permit --dry-run only."
         ),
     )
     return parser
@@ -7783,6 +7784,1086 @@ def run_aptadiff_checkpoint1_apply(
     )
 
 
+def _ncbi_nuc_paths(repo_root: Path, checkpoint_dir: Path) -> dict[str, Path]:
+    review_dir = checkpoint_dir / "manual_review"
+    return {
+        "queue": review_dir / "ncbi_nuc_checkpoint1_manual_review.csv",
+        "index": review_dir / "ncbi_nuc_checkpoint1_manual_review_index.csv",
+        "group": review_dir / "ncbi_nuc_checkpoint1_constant_group_review.csv",
+        "bulk": review_dir / "ncbi_nuc_checkpoint1_bulk_audit_confirmation.csv",
+        "canonical": checkpoint_dir / "ncbi_nuc_s3_canonical.csv",
+        "decisions": checkpoint_dir / "ncbi_nuc_s3_decisions.csv",
+        "rejection": checkpoint_dir / "rejected_ncbi_nuc.csv",
+        "parked": checkpoint_dir / "ncbi_nuc_s3_parked.csv",
+        "s3_review": checkpoint_dir / "ncbi_nuc_checkpoint1_review.csv",
+        "s3_local": checkpoint_dir / "ncbi_nuc_checkpoint1_local_detail.csv",
+        "s1": repo_root / "data" / "interim" / "extracted" / "ncbi_nuc_extracted.csv",
+        "sidecar": repo_root
+        / "data"
+        / "interim"
+        / "extracted"
+        / "ncbi_nuc_source_metadata.csv",
+        "s2": repo_root / "data" / "interim" / "normalised" / "ncbi_nuc_normalised.csv",
+        "qc": repo_root / "data" / "interim" / "normalised" / "ncbi_nuc_s2_qc.csv",
+        "rec_json": repo_root
+        / "config"
+        / "checkpoint_reviews"
+        / "ncbi_nuc_checkpoint1_recommendations.json",
+        "eligibility": repo_root / "config" / "source_eligibility" / "ncbi_nuc.json",
+        "ena_s1": repo_root / "data" / "interim" / "extracted" / "ena_extracted.csv",
+        "ena_s2": repo_root / "data" / "interim" / "normalised" / "ena_normalised.csv",
+        "raw_dir": repo_root / "data" / "raw" / "NCBI_nucleotide",
+    }
+
+
+def _write_ncbi_nuc_transform_csvs(
+    output_dir: Path,
+    simulation: object,
+    *,
+    prefix: str = "dry_run",
+) -> dict[str, Path]:
+    from adapters.ncbi_nuc_checkpoint1_apply import PREVIEW_COMPARISON_FILES
+    from adapters.ncbi_nuc_checkpoint1_dry_run import (
+        CHANGE_REPORT_COLUMNS,
+        DECISION_AUDIT_COLUMNS,
+        ELIGIBLE_COLUMNS,
+        NcbiNucDryRunSimulation,
+    )
+    from adapters.ncbi_nuc_s3 import DECISION_COLUMNS, PARK_COLUMNS, REJECTION_COLUMNS
+    from common.corpus_schema import CORPUS_COLUMNS, write_corpus_csv_atomic
+
+    if not isinstance(simulation, NcbiNucDryRunSimulation):  # type: ignore[name-defined]
+        raise Checkpoint1ApplyError("NCBI Nucleotide simulation has unexpected type")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if prefix.startswith("dry_run"):
+        paths = {
+            key: output_dir / preview_name
+            for key, preview_name, _applied in PREVIEW_COMPARISON_FILES
+        }
+    else:
+        paths = {
+            key: output_dir / applied_name
+            for key, _preview, applied_name in PREVIEW_COMPARISON_FILES
+        }
+    write_corpus_csv_atomic(
+        paths["canonical"], simulation.preview_canonical, columns=CORPUS_COLUMNS
+    )
+    write_csv_atomic(paths["routing"], DECISION_COLUMNS, simulation.preview_decisions)
+    write_csv_atomic(
+        paths["rejection"], REJECTION_COLUMNS, simulation.preview_rejections
+    )
+    write_csv_atomic(paths["parked"], PARK_COLUMNS, simulation.preview_parked)
+    write_csv_atomic(paths["eligible"], ELIGIBLE_COLUMNS, simulation.preview_eligible)
+    write_csv_atomic(
+        paths["change_report"], CHANGE_REPORT_COLUMNS, simulation.change_report
+    )
+    write_csv_atomic(
+        paths["decision_audit"], DECISION_AUDIT_COLUMNS, simulation.decision_audit
+    )
+    return paths
+
+
+def _simulate_ncbi_nuc(
+    *,
+    paths: Mapping[str, Path],
+    expected_source_rows: int | None,
+    expected_reviewed_rows: int | None,
+):
+    from adapters.aptadb_checkpoint1_review import read_csv_rows
+    from adapters.ncbi_nuc_checkpoint1_dry_run import (
+        simulate_ncbi_nuc_checkpoint1_application,
+    )
+
+    queue_rows = read_csv_rows(paths["queue"])
+    group_rows = read_csv_rows(paths["group"]) if paths["group"].is_file() else []
+    bulk_rows = read_csv_rows(paths["bulk"]) if paths["bulk"].is_file() else []
+    bulk = bulk_rows[0] if bulk_rows else None
+    return simulate_ncbi_nuc_checkpoint1_application(
+        queue_rows=queue_rows,
+        group_rows=group_rows,
+        canonical_rows=read_csv_rows(paths["canonical"]),
+        decision_rows=read_csv_rows(paths["decisions"]),
+        existing_rejection_rows=(
+            read_csv_rows(paths["rejection"]) if paths["rejection"].is_file() else []
+        ),
+        existing_parked_rows=(
+            read_csv_rows(paths["parked"]) if paths["parked"].is_file() else []
+        ),
+        bulk_confirmation=bulk,
+        expected_source_rows=expected_source_rows,
+        expected_reviewed_rows=expected_reviewed_rows,
+    )
+
+
+def run_ncbi_nuc_checkpoint1_dry_run(
+    *,
+    repo_root: Path,
+    checkpoint_dir: Path,
+    output_dir: Path,
+    check_deterministic_rerun: bool = True,
+    expected_source_rows: int | None = 18,
+    expected_reviewed_rows: int | None = 18,
+    verify_frozen_inputs: bool = True,
+    compare_to_pristine: bool = True,
+) -> dict[str, str]:
+    """Simulate NCBI Nucleotide CHECKPOINT-1 application without closing it."""
+    import shutil
+
+    from adapters.ncbi_nuc_checkpoint1_apply import (
+        NcbiNucCheckpoint1ApplyError,
+        PREVIEW_COMPARISON_FILES,
+        assert_no_ena_inputs,
+        check_production_expectations,
+        frozen_pipeline_hashes,
+        verify_registered_raw_hashes,
+    )
+    from adapters.ncbi_nuc_checkpoint1_dry_run import (
+        DRY_RUN_BANNER,
+        NcbiNucDryRunSimulation,
+        format_dry_run_markdown,
+        serialise_ncbi_nuc_simulation_sequence_free,
+    )
+    from adapters.ncbi_nuc_checkpoint1_review import (
+        NcbiNucCheckpoint1ReviewError,
+        compare_review_to_pristine,
+        read_csv_rows,
+        validate_ncbi_nuc_review_package,
+    )
+    from checkpoint1_prepare_review import (
+        Checkpoint1ReviewError,
+        prepare_ncbi_nuc_checkpoint1_review,
+    )
+
+    output_dir = _assert_aptadb_dry_run_output(output_dir)
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    paths = _ncbi_nuc_paths(repo_root, checkpoint_dir)
+    assert_no_ena_inputs(paths)
+    if not paths["queue"].is_file():
+        raise Checkpoint1ApplyError("Missing NCBI Nucleotide manual-review CSV")
+
+    queue_rows = read_csv_rows(paths["queue"])
+    group_rows = read_csv_rows(paths["group"]) if paths["group"].is_file() else []
+    bulk_rows = read_csv_rows(paths["bulk"]) if paths["bulk"].is_file() else []
+    bulk = bulk_rows[0] if bulk_rows else None
+    report = validate_ncbi_nuc_review_package(
+        queue_rows=queue_rows,
+        group_rows=group_rows,
+        bulk_confirmation=bulk,
+    )
+    if (
+        not report.ok
+        or report.unresolved_manual_decisions
+        or report.unresolved_judgement_required
+        or report.audit_only_unconfirmed
+        or report.ready_for_application != len(queue_rows)
+    ):
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 cannot be dry-run while required human decisions "
+            f"remain unresolved ({len(report.blocking_issues)} blocking issues)"
+        )
+
+    if compare_to_pristine:
+        pristine_dir = output_dir / "pristine_reconstruction"
+        pristine_dir = _assert_output_dir_allowed(repo_root, pristine_dir)
+        if pristine_dir.exists():
+            shutil.rmtree(pristine_dir)
+        try:
+            prepare_ncbi_nuc_checkpoint1_review(
+                repo_root=repo_root,
+                checkpoint_dir=checkpoint_dir,
+                output_dir=pristine_dir,
+                expected_active_rows=expected_reviewed_rows,
+                expected_total_rows=expected_source_rows,
+            )
+        except Checkpoint1ReviewError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+        pristine_rows = read_csv_rows(
+            pristine_dir / "ncbi_nuc_checkpoint1_manual_review.csv"
+        )
+        drift = compare_review_to_pristine(queue_rows, pristine_rows)
+        shutil.rmtree(pristine_dir)
+        if drift:
+            raise Checkpoint1ApplyError(
+                "Review file drifted from pristine baseline: " + ", ".join(drift[:10])
+            )
+
+    hashes_before = {
+        "queue": sha256_file(paths["queue"]),
+        "index": sha256_file(paths["index"]) if paths["index"].is_file() else "",
+        "bulk": sha256_file(paths["bulk"]) if paths["bulk"].is_file() else "",
+        "s1": sha256_file(paths["s1"]) if paths["s1"].is_file() else "",
+        "sidecar": sha256_file(paths["sidecar"]) if paths["sidecar"].is_file() else "",
+        "s2": sha256_file(paths["s2"]) if paths["s2"].is_file() else "",
+        "qc": sha256_file(paths["qc"]) if paths["qc"].is_file() else "",
+        "s3": sha256_file(paths["canonical"]),
+        "s3_decisions": sha256_file(paths["decisions"]),
+        "s3_review": (
+            sha256_file(paths["s3_review"]) if paths["s3_review"].is_file() else ""
+        ),
+        "s3_local": (
+            sha256_file(paths["s3_local"]) if paths["s3_local"].is_file() else ""
+        ),
+        "rec_json": sha256_file(paths["rec_json"]) if paths["rec_json"].is_file() else "",
+        "eligibility": (
+            sha256_file(paths["eligibility"]) if paths["eligibility"].is_file() else ""
+        ),
+        "ena_s1": sha256_file(paths["ena_s1"]) if paths["ena_s1"].is_file() else "",
+        "ena_s2": sha256_file(paths["ena_s2"]) if paths["ena_s2"].is_file() else "",
+    }
+    if verify_frozen_inputs:
+        frozen = frozen_pipeline_hashes()
+        for key in frozen:
+            if hashes_before.get(key, "") != frozen[key]:
+                raise Checkpoint1ApplyError(
+                    f"ncbi_nuc {key} hash does not match the frozen pre-dry-run snapshot"
+                )
+        if hashes_before["s2"] != hashes_before["s3"]:
+            raise Checkpoint1ApplyError(
+                "NCBI Nucleotide S3 canonical is not byte-identical to S2"
+            )
+        try:
+            verify_registered_raw_hashes(repo_root)
+        except NcbiNucCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    try:
+        simulation = _simulate_ncbi_nuc(
+            paths=paths,
+            expected_source_rows=expected_source_rows,
+            expected_reviewed_rows=expected_reviewed_rows,
+        )
+    except (NcbiNucCheckpoint1ReviewError, NcbiNucCheckpoint1ApplyError) as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+    if not isinstance(simulation, NcbiNucDryRunSimulation):
+        raise Checkpoint1ApplyError("NCBI Nucleotide simulation has unexpected type")
+    if simulation.nogo_reasons:
+        raise Checkpoint1ApplyError(
+            "Dry-run NO-GO: " + "; ".join(simulation.nogo_reasons)
+        )
+    if expected_source_rows == 18:
+        try:
+            check_production_expectations(simulation.stats)
+        except NcbiNucCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    first_serialised = serialise_ncbi_nuc_simulation_sequence_free(simulation)
+    if check_deterministic_rerun:
+        second = _simulate_ncbi_nuc(
+            paths=paths,
+            expected_source_rows=expected_source_rows,
+            expected_reviewed_rows=expected_reviewed_rows,
+        )
+        if first_serialised != serialise_ncbi_nuc_simulation_sequence_free(second):
+            raise Checkpoint1ApplyError(
+                "Repeated NCBI Nucleotide dry-run was not byte-identical"
+            )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    preview_paths = _write_ncbi_nuc_transform_csvs(output_dir, simulation)
+    payload_rows: list[dict[str, str]] = []
+    payload_lines = [
+        "",
+        "## Dry-run scientific payloads (byte-compared after future apply)",
+        "",
+    ]
+    for name, preview_name, applied_name in PREVIEW_COMPARISON_FILES:
+        path = preview_paths[name]
+        row_count = sum(1 for _ in csv.DictReader(path.open(encoding="utf-8", newline="")))
+        digest = sha256_file(path)
+        payload_rows.append(
+            {
+                "name": name,
+                "dry_run_file": preview_name,
+                "future_applied_file": applied_name,
+                "row_count": str(row_count),
+                "sha256": digest,
+            }
+        )
+        payload_lines.append(
+            f"- `{preview_name}`: rows=`{row_count}` "
+            f"sha256=`{digest}` (future `{applied_name}`)"
+        )
+    payload_lines.append("")
+    hashes_path = output_dir / "ncbi_nuc_checkpoint1_dry_run_payload_hashes.json"
+    hashes_path.write_text(
+        json.dumps(payload_rows, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    report_text = format_dry_run_markdown(
+        simulation,
+        review_hashes=hashes_before,
+        integrity=hashes_before,
+    )
+    report_text = report_text.rstrip() + "\n" + "\n".join(payload_lines)
+    if DRY_RUN_BANNER not in report_text:
+        raise Checkpoint1ApplyError("Dry-run report missing banner")
+    if "CHECKPOINT-1 is not closed" not in report_text:
+        raise Checkpoint1ApplyError("Dry-run report must not claim closure")
+    if "Sequences are not printed" not in report_text:
+        raise Checkpoint1ApplyError("Dry-run report must remain sequence-safe")
+    report_path = output_dir / "ncbi_nuc_checkpoint1_dry_run_report.md"
+    _write_text_atomic(report_path, report_text)
+
+    hashes_after = {
+        "queue": sha256_file(paths["queue"]),
+        "index": sha256_file(paths["index"]) if paths["index"].is_file() else "",
+        "bulk": sha256_file(paths["bulk"]) if paths["bulk"].is_file() else "",
+        "s1": sha256_file(paths["s1"]) if paths["s1"].is_file() else "",
+        "sidecar": sha256_file(paths["sidecar"]) if paths["sidecar"].is_file() else "",
+        "s2": sha256_file(paths["s2"]) if paths["s2"].is_file() else "",
+        "qc": sha256_file(paths["qc"]) if paths["qc"].is_file() else "",
+        "s3": sha256_file(paths["canonical"]),
+        "s3_decisions": sha256_file(paths["decisions"]),
+        "s3_review": (
+            sha256_file(paths["s3_review"]) if paths["s3_review"].is_file() else ""
+        ),
+        "s3_local": (
+            sha256_file(paths["s3_local"]) if paths["s3_local"].is_file() else ""
+        ),
+        "rec_json": sha256_file(paths["rec_json"]) if paths["rec_json"].is_file() else "",
+        "eligibility": (
+            sha256_file(paths["eligibility"]) if paths["eligibility"].is_file() else ""
+        ),
+        "ena_s1": sha256_file(paths["ena_s1"]) if paths["ena_s1"].is_file() else "",
+        "ena_s2": sha256_file(paths["ena_s2"]) if paths["ena_s2"].is_file() else "",
+    }
+    if hashes_after != hashes_before:
+        raise Checkpoint1ApplyError("Dry-run mutated an immutable input artefact")
+    if output_dir.resolve() == (checkpoint_dir / "resolved").resolve():
+        raise Checkpoint1ApplyError("Dry-run must not write resolved outputs")
+
+    output_hashes = {name: sha256_file(path) for name, path in preview_paths.items()}
+    output_hashes["report"] = sha256_file(report_path)
+    output_hashes["payload_hashes"] = sha256_file(hashes_path)
+    stats = simulation.stats
+    print(
+        f"source=ncbi_nuc\n"
+        "mode=dry_run\n"
+        "checkpoint_status=unapplied\n"
+        f"total_records={stats['total_records']}\n"
+        f"technically_eligible={stats['technically_eligible']}\n"
+        f"parked_molecule_unresolved={stats['parked_molecule_unresolved']}\n"
+        f"technical_rejects={stats['technical_rejects_after_review']}\n"
+        f"projected_authorised_for_s4={stats['projected_authorised_for_s4']}\n"
+        f"authorised_for_s4={stats['authorised_for_s4']}\n"
+        f"route_changed={stats['route_changed']}\n"
+        f"sequence_corrections={stats['sequence_corrections']}\n"
+        f"guard_rail_failures={stats['guard_rail_failures']}\n"
+        f"deterministic_rerun={'pass' if check_deterministic_rerun else 'skipped'}\n"
+        "CHECKPOINT-1 is not closed\n"
+        "S4 remains blocked"
+    )
+    return output_hashes
+
+
+@dataclass(frozen=True)
+class NcbiNucApplyResult:
+    """Authoritative NCBI Nucleotide CHECKPOINT-1 apply/closure result."""
+
+    output_dir: Path
+    metadata_out: Path
+    tracked_manifest: Path
+    summary_out: Path
+    output_hashes: dict[str, str]
+    stats: dict[str, int | str | bool]
+    preview_comparison_ok: bool
+    deterministic_rerun_ok: bool
+    semantic_mismatches: int
+    byte_mismatches: int
+    checkpoint_closed: bool
+
+
+def _assert_ncbi_nuc_resolved_output(path: Path, *, checkpoint_dir: Path) -> Path:
+    resolved = path.resolve()
+    checkpoint_resolved = checkpoint_dir.resolve()
+    if resolved == checkpoint_resolved:
+        raise Checkpoint1ApplyError(
+            "Refusing to overwrite the NCBI Nucleotide CHECKPOINT-1 snapshot "
+            "directory"
+        )
+    dry_run_dir = (checkpoint_resolved / "dry_run").resolve()
+    if resolved == dry_run_dir:
+        raise Checkpoint1ApplyError(
+            "Refusing to overwrite the validated dry-run preview directory"
+        )
+    lowered = [part.lower() for part in resolved.parts]
+    if any(name in APPLY_FORBIDDEN_DIR_NAMES for name in lowered):
+        raise Checkpoint1ApplyError(
+            f"Resolved output must not use a dry-run/S2/S3/S4 directory: {resolved}"
+        )
+    return resolved
+
+
+def _compare_ncbi_nuc_applied_to_preview(
+    *,
+    applied_paths: Mapping[str, Path],
+    preview_dir: Path,
+) -> tuple[dict[str, bool], int]:
+    from adapters.ncbi_nuc_checkpoint1_apply import PREVIEW_COMPARISON_FILES
+
+    missing = [
+        preview_name
+        for _key, preview_name, _applied in PREVIEW_COMPARISON_FILES
+        if not (preview_dir / preview_name).is_file()
+    ]
+    if missing:
+        raise Checkpoint1ApplyError(
+            "Validated dry-run preview is incomplete; refusing real apply: "
+            + ", ".join(missing)
+        )
+    byte_identical: dict[str, bool] = {}
+    for key, preview_name, _applied_name in PREVIEW_COMPARISON_FILES:
+        preview_path = preview_dir / preview_name
+        applied_path = applied_paths[key]
+        byte_identical[key] = preview_path.read_bytes() == applied_path.read_bytes()
+    semantic_mismatches = 0
+    if not all(byte_identical.values()):
+        mismatched = [key for key, ok in byte_identical.items() if not ok]
+        raise Checkpoint1ApplyError(
+            "Real application has scientific mismatches versus the "
+            "accepted dry-run preview for: " + ", ".join(mismatched)
+        )
+    return byte_identical, semantic_mismatches
+
+
+def _assert_ncbi_nuc_existing_resolved_identical(
+    output_dir: Path, new_paths: Mapping[str, Path]
+) -> None:
+    from adapters.ncbi_nuc_checkpoint1_apply import PREVIEW_COMPARISON_FILES
+
+    existing_names = [
+        applied_name
+        for _key, _preview, applied_name in PREVIEW_COMPARISON_FILES
+        if (output_dir / applied_name).is_file()
+    ]
+    if not existing_names:
+        return
+    mismatches: list[str] = []
+    for key, _preview, applied_name in PREVIEW_COMPARISON_FILES:
+        dest = output_dir / applied_name
+        src = new_paths[key]
+        if dest.is_file() and dest.read_bytes() != src.read_bytes():
+            mismatches.append(key)
+        elif not dest.is_file():
+            mismatches.append(key)
+    if mismatches:
+        raise Checkpoint1ApplyError(
+            "Existing authoritative NCBI Nucleotide resolved payload differs "
+            "from this apply; refusing to overwrite: " + ", ".join(mismatches)
+        )
+
+
+def run_ncbi_nuc_checkpoint1_apply(
+    *,
+    repo_root: Path | None = None,
+    checkpoint_dir: Path | None = None,
+    output_dir: Path | None = None,
+    tracked_manifest: Path | None = None,
+    metadata_out: Path | None = None,
+    preview_dir: Path | None = None,
+    check_deterministic_rerun: bool = True,
+    expected_source_rows: int | None = 18,
+    expected_reviewed_rows: int | None = 18,
+    verify_frozen_inputs: bool | None = None,
+    compare_to_pristine: bool | None = None,
+    compare_to_preview: bool | None = None,
+    authorise_actual_apply: bool = False,
+) -> NcbiNucApplyResult:
+    """Apply completed NCBI Nucleotide CHECKPOINT-1 review and close it.
+
+    Uses the same ``simulate_ncbi_nuc_checkpoint1_application`` transform as
+    dry-run. Does not prepare a global-S4 handoff or start S4.
+    """
+    from adapters.ncbi_nuc_checkpoint1_apply import (
+        ACCEPTED_DRY_RUN_PAYLOAD_SHA256,
+        AUTHORISED_FOR_S4_MEANING,
+        CLOSURE_ONLY_FIELDS,
+        FROZEN_NCBI_NUC_DRY_RUN_REPORT_SHA256,
+        NCBI_NUC_CHECKPOINT_CLOSED_STATEMENT,
+        NCBI_NUC_EXPECTED_TOTAL_ROWS,
+        NCBI_NUC_TRACKED_RESOLUTION_COLUMNS,
+        PREVIEW_COMPARISON_FILES,
+        SOURCE_DATASET,
+        NcbiNucCheckpoint1ApplyError,
+        assert_no_ena_inputs,
+        assert_s4_fields_empty,
+        build_tracked_resolutions,
+        check_applied_id_sets,
+        check_production_expectations,
+        count_manual_decisions,
+        format_closure_markdown,
+        frozen_pipeline_hashes,
+        refuse_unauthorised_apply,
+        tracked_payload_contains_sequence,
+        verify_registered_raw_hashes,
+    )
+    from adapters.ncbi_nuc_checkpoint1_dry_run import (
+        serialise_ncbi_nuc_simulation_sequence_free,
+    )
+    from adapters.ncbi_nuc_checkpoint1_review import (
+        NcbiNucCheckpoint1ReviewError,
+        compare_review_to_pristine,
+        read_csv_rows,
+        validate_ncbi_nuc_review_package,
+    )
+    from adapters.ncbi_nuc_s3 import PRIMARY_ROUTE_ELIGIBLE, PRIMARY_ROUTE_REJECT
+    from checkpoint1_prepare_review import (
+        Checkpoint1ReviewError,
+        prepare_ncbi_nuc_checkpoint1_review,
+    )
+
+    if not authorise_actual_apply:
+        try:
+            refuse_unauthorised_apply()
+        except NcbiNucCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+
+    if repo_root is None:
+        repo_root = find_repo_root(Path(__file__).resolve())
+    repo_root = Path(repo_root).resolve()
+    if checkpoint_dir is None:
+        checkpoint_dir = Path("data/interim/checkpoints/ncbi_nuc_cp1")
+    if not Path(checkpoint_dir).is_absolute():
+        checkpoint_dir = repo_root / checkpoint_dir
+    checkpoint_dir = Path(checkpoint_dir).resolve()
+    if output_dir is None:
+        output_dir = checkpoint_dir / "resolved"
+    if not Path(output_dir).is_absolute():
+        output_dir = repo_root / output_dir
+    output_dir = _assert_ncbi_nuc_resolved_output(
+        Path(output_dir), checkpoint_dir=checkpoint_dir
+    )
+    output_dir = _assert_output_dir_allowed(repo_root, output_dir)
+    if tracked_manifest is None:
+        tracked_manifest = Path(
+            "config/checkpoint_reviews/ncbi_nuc_checkpoint1_resolutions.csv"
+        )
+    if metadata_out is None:
+        metadata_out = Path(
+            "config/checkpoint_reviews/ncbi_nuc_checkpoint1_metadata.json"
+        )
+    tracked_manifest = _assert_tracked_path_allowed(repo_root, tracked_manifest)
+    metadata_out = _assert_tracked_path_allowed(repo_root, metadata_out)
+    if preview_dir is None:
+        preview_dir = checkpoint_dir / "dry_run"
+    if not Path(preview_dir).is_absolute():
+        preview_dir = repo_root / preview_dir
+    preview_dir = preview_dir.resolve()
+    production = expected_source_rows == NCBI_NUC_EXPECTED_TOTAL_ROWS
+    if verify_frozen_inputs is None:
+        verify_frozen_inputs = production
+    if compare_to_pristine is None:
+        compare_to_pristine = production
+    if compare_to_preview is None:
+        compare_to_preview = production
+
+    if metadata_out.is_file():
+        payload = json.loads(metadata_out.read_text(encoding="utf-8"))
+        if bool(payload.get("checkpoint_closed")):
+            canonical_out = output_dir / "ncbi_nuc_checkpoint1_applied_canonical.csv"
+            if not canonical_out.is_file():
+                raise Checkpoint1ApplyError(
+                    "CHECKPOINT-1 is already closed and no identical resolved "
+                    "payload is present for an idempotent rerun"
+                )
+
+    paths = _ncbi_nuc_paths(repo_root, checkpoint_dir)
+    assert_no_ena_inputs(paths)
+    if not paths["queue"].is_file():
+        raise Checkpoint1ApplyError("Missing NCBI Nucleotide manual-review CSV")
+
+    queue_rows = read_csv_rows(paths["queue"])
+    group_rows = read_csv_rows(paths["group"]) if paths["group"].is_file() else []
+    bulk_rows = read_csv_rows(paths["bulk"]) if paths["bulk"].is_file() else []
+    bulk = bulk_rows[0] if bulk_rows else None
+    report = validate_ncbi_nuc_review_package(
+        queue_rows=queue_rows,
+        group_rows=group_rows,
+        bulk_confirmation=bulk,
+    )
+    if (
+        not report.ok
+        or report.unresolved_manual_decisions
+        or report.unresolved_judgement_required
+        or report.audit_only_unconfirmed
+        or report.ready_for_application != len(queue_rows)
+    ):
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 cannot be applied while required human decisions "
+            f"remain unresolved ({len(report.blocking_issues)} blocking issues)"
+        )
+
+    if compare_to_pristine:
+        pristine_dir = checkpoint_dir / "manual_review" / "pristine_blank"
+        pristine_dir = _assert_output_dir_allowed(repo_root, pristine_dir)
+        try:
+            prepare_ncbi_nuc_checkpoint1_review(
+                repo_root=repo_root,
+                checkpoint_dir=checkpoint_dir,
+                output_dir=pristine_dir,
+                expected_active_rows=expected_reviewed_rows,
+                expected_total_rows=expected_source_rows,
+            )
+        except Checkpoint1ReviewError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+        pristine_rows = read_csv_rows(
+            pristine_dir / "ncbi_nuc_checkpoint1_manual_review.csv"
+        )
+        drift = compare_review_to_pristine(queue_rows, pristine_rows)
+        if drift:
+            raise Checkpoint1ApplyError(
+                "Review file drifted from pristine baseline: " + ", ".join(drift[:10])
+            )
+
+    hashes_before = {
+        "queue": sha256_file(paths["queue"]),
+        "index": sha256_file(paths["index"]) if paths["index"].is_file() else "",
+        "bulk": sha256_file(paths["bulk"]) if paths["bulk"].is_file() else "",
+        "s1": sha256_file(paths["s1"]) if paths["s1"].is_file() else "",
+        "sidecar": sha256_file(paths["sidecar"]) if paths["sidecar"].is_file() else "",
+        "s2": sha256_file(paths["s2"]) if paths["s2"].is_file() else "",
+        "qc": sha256_file(paths["qc"]) if paths["qc"].is_file() else "",
+        "s3": sha256_file(paths["canonical"]),
+        "s3_decisions": sha256_file(paths["decisions"]),
+        "s3_review": (
+            sha256_file(paths["s3_review"]) if paths["s3_review"].is_file() else ""
+        ),
+        "s3_local": (
+            sha256_file(paths["s3_local"]) if paths["s3_local"].is_file() else ""
+        ),
+        "rec_json": sha256_file(paths["rec_json"]) if paths["rec_json"].is_file() else "",
+        "eligibility": (
+            sha256_file(paths["eligibility"]) if paths["eligibility"].is_file() else ""
+        ),
+        "ena_s1": sha256_file(paths["ena_s1"]) if paths["ena_s1"].is_file() else "",
+        "ena_s2": sha256_file(paths["ena_s2"]) if paths["ena_s2"].is_file() else "",
+        "dry_run_report": (
+            sha256_file(preview_dir / "ncbi_nuc_checkpoint1_dry_run_report.md")
+            if (preview_dir / "ncbi_nuc_checkpoint1_dry_run_report.md").is_file()
+            else ""
+        ),
+    }
+    preview_hash_paths = {
+        key: preview_dir / preview_name
+        for key, preview_name, _applied in PREVIEW_COMPARISON_FILES
+    }
+    preview_hashes_before = (
+        _hash_paths(preview_hash_paths) if compare_to_preview else {}
+    )
+    if verify_frozen_inputs:
+        frozen = frozen_pipeline_hashes()
+        for key in frozen:
+            if hashes_before.get(key, "") != frozen[key]:
+                raise Checkpoint1ApplyError(
+                    f"ncbi_nuc {key} hash does not match the frozen pre-apply snapshot"
+                )
+        if hashes_before["s2"] != hashes_before["s3"]:
+            raise Checkpoint1ApplyError(
+                "NCBI Nucleotide S3 canonical is not byte-identical to S2"
+            )
+        try:
+            verify_registered_raw_hashes(repo_root)
+        except NcbiNucCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+        if (
+            hashes_before["dry_run_report"]
+            and hashes_before["dry_run_report"] != FROZEN_NCBI_NUC_DRY_RUN_REPORT_SHA256
+        ):
+            raise Checkpoint1ApplyError(
+                "Accepted dry-run report hash does not match the frozen snapshot"
+            )
+        if compare_to_preview:
+            for key, expected in ACCEPTED_DRY_RUN_PAYLOAD_SHA256.items():
+                got = preview_hashes_before.get(key, "")
+                if got != expected:
+                    raise Checkpoint1ApplyError(
+                        f"Accepted dry-run {key} hash differs unexpectedly"
+                    )
+
+    try:
+        simulation = _simulate_ncbi_nuc(
+            paths=paths,
+            expected_source_rows=expected_source_rows,
+            expected_reviewed_rows=expected_reviewed_rows,
+        )
+    except (NcbiNucCheckpoint1ReviewError, NcbiNucCheckpoint1ApplyError) as exc:
+        raise Checkpoint1ApplyError(str(exc)) from exc
+    if simulation.nogo_reasons:
+        raise Checkpoint1ApplyError(
+            "Apply NO-GO: " + "; ".join(simulation.nogo_reasons)
+        )
+    if production:
+        try:
+            check_production_expectations(simulation.stats)
+            check_applied_id_sets(
+                eligible_rows=simulation.preview_eligible,
+                parked_rows=simulation.preview_parked,
+                rejection_rows=simulation.preview_rejections,
+                canonical_rows=simulation.preview_canonical,
+            )
+            assert_s4_fields_empty(simulation.preview_canonical)
+        except NcbiNucCheckpoint1ApplyError as exc:
+            raise Checkpoint1ApplyError(str(exc)) from exc
+    else:
+        assert_s4_fields_empty(simulation.preview_canonical)
+
+    first_serialised = serialise_ncbi_nuc_simulation_sequence_free(simulation)
+    if check_deterministic_rerun:
+        second = _simulate_ncbi_nuc(
+            paths=paths,
+            expected_source_rows=expected_source_rows,
+            expected_reviewed_rows=expected_reviewed_rows,
+        )
+        if first_serialised != serialise_ncbi_nuc_simulation_sequence_free(second):
+            raise Checkpoint1ApplyError(
+                "Repeated NCBI Nucleotide apply transform was not byte-identical"
+            )
+
+    compare_dir = checkpoint_dir / "closure_validation" / "apply_vs_preview"
+    compare_dir = _assert_output_dir_allowed(repo_root, compare_dir)
+    compare_paths = _write_ncbi_nuc_transform_csvs(
+        compare_dir, simulation, prefix="applied"
+    )
+    byte_identical: dict[str, bool] = {}
+    semantic_mismatches = 0
+    if compare_to_preview:
+        byte_identical, semantic_mismatches = _compare_ncbi_nuc_applied_to_preview(
+            applied_paths=compare_paths, preview_dir=preview_dir
+        )
+        preview_hashes_after_compare = _hash_paths(preview_hash_paths)
+        if preview_hashes_after_compare != preview_hashes_before:
+            raise Checkpoint1ApplyError(
+                "Dry-run preview files changed during real application"
+            )
+
+    _assert_ncbi_nuc_existing_resolved_identical(output_dir, compare_paths)
+    applied_paths = _write_ncbi_nuc_transform_csvs(
+        output_dir, simulation, prefix="applied"
+    )
+    if compare_to_preview:
+        byte_identical, semantic_mismatches = _compare_ncbi_nuc_applied_to_preview(
+            applied_paths=applied_paths, preview_dir=preview_dir
+        )
+        if not all(byte_identical.values()):
+            raise Checkpoint1ApplyError(
+                "Byte mismatches versus accepted dry-run; refusing closure"
+            )
+
+    eligible_n = int(simulation.stats["technically_eligible"])
+    simulation.stats["authorised_for_s4"] = eligible_n
+    simulation.stats["checkpoint_closed"] = True
+
+    record_decisions = count_manual_decisions(queue_rows)
+    tracked_rows = build_tracked_resolutions(
+        decisions=simulation.preview_decisions,
+        canonical_rows=simulation.preview_canonical,
+        queue_rows=queue_rows,
+        change_report=simulation.change_report,
+        route_changed_ids=simulation.route_changed_ids,
+    )
+    authorised_n = sum(1 for row in tracked_rows if row["authorised_for_s4"] == "true")
+    if authorised_n != eligible_n:
+        raise Checkpoint1ApplyError(
+            "authorised_for_s4 was not derived from the technical eligible route"
+        )
+    for row in tracked_rows:
+        if row["primary_route"] == PRIMARY_ROUTE_ELIGIBLE:
+            if row["authorised_for_s4"] != "true":
+                raise Checkpoint1ApplyError(
+                    "Eligible technical route must be authorised_for_s4"
+                )
+        elif row["authorised_for_s4"] != "false":
+            raise Checkpoint1ApplyError(
+                "Non-eligible technical routes must remain unauthorised for S4"
+            )
+
+    s4_rows = [
+        {
+            "record_id": row["record_id"],
+            "resolved_decision": "accept",
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+        }
+        for row in tracked_rows
+        if row["authorised_for_s4"] == "true"
+    ]
+    parked_id_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["manual_decision"],
+        }
+        for row in tracked_rows
+        if row["primary_route"] != PRIMARY_ROUTE_ELIGIBLE
+        and row["primary_route"] != PRIMARY_ROUTE_REJECT
+    ]
+    rejected_id_rows = [
+        {
+            "record_id": row["record_id"],
+            "checkpoint1_resolution_status": row["checkpoint1_resolution_status"],
+            "review_action": row["manual_decision"],
+        }
+        for row in tracked_rows
+        if row["primary_route"] == PRIMARY_ROUTE_REJECT
+    ]
+    write_csv_atomic(
+        tracked_manifest, NCBI_NUC_TRACKED_RESOLUTION_COLUMNS, tracked_rows
+    )
+    if tracked_payload_contains_sequence(tracked_manifest.read_text(encoding="utf-8")):
+        raise Checkpoint1ApplyError(
+            "Tracked resolutions must not contain biological sequence fields"
+        )
+    write_csv_atomic(
+        output_dir / "ncbi_nuc_checkpoint1_s4_authorised_ids.csv",
+        S4_ID_COLUMNS,
+        s4_rows,
+    )
+    write_csv_atomic(
+        output_dir / "ncbi_nuc_checkpoint1_parked_ids.csv",
+        PARKED_ID_COLUMNS,
+        parked_id_rows,
+    )
+    write_csv_atomic(
+        output_dir / "ncbi_nuc_checkpoint1_rejected_ids.csv",
+        REJECTED_ID_COLUMNS,
+        rejected_id_rows,
+    )
+
+    transform_hashes = {name: sha256_file(path) for name, path in applied_paths.items()}
+    closure_paths = {
+        "s4_authorised_ids": output_dir / "ncbi_nuc_checkpoint1_s4_authorised_ids.csv",
+        "parked_ids": output_dir / "ncbi_nuc_checkpoint1_parked_ids.csv",
+        "rejected_ids": output_dir / "ncbi_nuc_checkpoint1_rejected_ids.csv",
+        "tracked_manifest": tracked_manifest,
+    }
+    output_hashes = {
+        **transform_hashes,
+        **{name: sha256_file(path) for name, path in closure_paths.items()},
+    }
+
+    if check_deterministic_rerun:
+        determinism_dir = checkpoint_dir / "closure_validation" / "determinism"
+        determinism_dir = _assert_output_dir_allowed(repo_root, determinism_dir)
+        third = _simulate_ncbi_nuc(
+            paths=paths,
+            expected_source_rows=expected_source_rows,
+            expected_reviewed_rows=expected_reviewed_rows,
+        )
+        if first_serialised != serialise_ncbi_nuc_simulation_sequence_free(third):
+            raise Checkpoint1ApplyError(
+                "Deterministic verification rerun diverged from the "
+                "authoritative in-memory payload"
+            )
+        verify_paths = _write_ncbi_nuc_transform_csvs(
+            determinism_dir, third, prefix="applied"
+        )
+        for key, path in applied_paths.items():
+            if sha256_file(path) != sha256_file(verify_paths[key]):
+                raise Checkpoint1ApplyError(
+                    f"Deterministic verification mismatch for applied {key}"
+                )
+
+    summary_text = format_closure_markdown(
+        simulation,
+        review_hashes=hashes_before,
+        integrity=hashes_before,
+        output_hashes=output_hashes,
+        record_decisions=record_decisions,
+        byte_identical=byte_identical,
+        semantic_mismatches=semantic_mismatches,
+        deterministic_ok=check_deterministic_rerun,
+        preview_comparison_ok=(
+            (not compare_to_preview)
+            or (bool(byte_identical) and all(byte_identical.values()))
+        ),
+    )
+    if NCBI_NUC_CHECKPOINT_CLOSED_STATEMENT.split("\n", 1)[0] not in summary_text:
+        raise Checkpoint1ApplyError("Closure summary missing closed statement")
+    if AUTHORISED_FOR_S4_MEANING not in summary_text:
+        raise Checkpoint1ApplyError(
+            "Resolution summary missing authorised_for_s4 meaning"
+        )
+    if str(repo_root.resolve()) in summary_text:
+        raise Checkpoint1ApplyError(
+            "Resolution summary must not contain absolute repository paths"
+        )
+    summary_path = output_dir / "ncbi_nuc_checkpoint1_resolution_summary.md"
+    _write_text_atomic(summary_path, summary_text)
+    _write_text_atomic(
+        output_dir / "README.md",
+        "CHECKPOINT-1 CLOSED.\n"
+        "These files are the authoritative NCBI Nucleotide post-review artefacts.\n"
+        "They must not overwrite S1, S2, pre-review S3, completed human review, "
+        "or dry-run previews.\n"
+        "authorised_for_s4 means technical sequence/molecule/source-object "
+        "eligibility only. It is not a final corpus inclusion.\n"
+        "Global S4 has not started. No global-S4 handoff was prepared.\n"
+        "NCBI was not deduplicated against ENA.\n",
+    )
+    output_hashes["summary"] = sha256_file(summary_path)
+
+    byte_mismatch_n = sum(1 for ok in byte_identical.values() if not ok)
+    metadata = {
+        "source": "ncbi_nuc",
+        "source_key": "ncbi_nuc",
+        "source_dataset": SOURCE_DATASET,
+        "checkpoint": "CHECKPOINT-1",
+        "review_model": "single_reviewer",
+        "checkpoint_status": "closed",
+        "checkpoint_closed": True,
+        "review_completion_status": "complete",
+        "application_status": "applied",
+        "s4_started": False,
+        "global_s4_handoff_prepared": False,
+        "global_s4_run": False,
+        "ncbi_ena_deduplication_performed": False,
+        "next_stage": "prepare_ncbi_nuc_global_s4_handoff",
+        "source_rows": int(simulation.stats["total_records"]),
+        "reviewed_records": int(simulation.stats["reviewed_records"]),
+        "human_review_resolved": (
+            f"{simulation.stats['reviewed_records']}/"
+            f"{simulation.stats['total_records']}"
+        ),
+        "record_decisions": record_decisions,
+        "technically_eligible": eligible_n,
+        "parked_molecule_unresolved": int(
+            simulation.stats["parked_molecule_unresolved"]
+        ),
+        "technical_rejects": int(simulation.stats["technical_rejects_after_review"]),
+        "authorised_for_s4": authorised_n,
+        "authorised_for_s4_meaning": AUTHORISED_FOR_S4_MEANING,
+        "sequence_corrections": int(simulation.stats["sequence_corrections"]),
+        "molecule_overrides": int(simulation.stats["molecule_overrides"]),
+        "chemistry_overrides": int(simulation.stats["chemistry_overrides"]),
+        "target_corrections": int(simulation.stats["target_corrections"]),
+        "applied_trims": int(simulation.stats["records_trimmed"]),
+        "review_file_sha256": hashes_before["queue"],
+        "review_index_sha256": hashes_before["index"],
+        "review_bulk_sha256": hashes_before["bulk"],
+        "s1_sha256": hashes_before["s1"],
+        "sidecar_sha256": hashes_before["sidecar"],
+        "s2_sha256": hashes_before["s2"],
+        "s3_sha256": hashes_before["s3"],
+        "s3_decisions_sha256": hashes_before["s3_decisions"],
+        "accepted_dry_run_hashes": ACCEPTED_DRY_RUN_PAYLOAD_SHA256,
+        "accepted_dry_run_parity": (
+            (not compare_to_preview)
+            or (bool(byte_identical) and all(byte_identical.values()))
+        ),
+        "output_hashes": output_hashes,
+        "preview_comparison_ok": (
+            (not compare_to_preview)
+            or (bool(byte_identical) and all(byte_identical.values()))
+        ),
+        "semantic_mismatches": semantic_mismatches,
+        "byte_mismatches": byte_mismatch_n,
+        "byte_identical": byte_identical,
+        "deterministic_rerun_ok": check_deterministic_rerun,
+        "code_identity": {
+            "apply_adapter": "adapters.ncbi_nuc_checkpoint1_apply",
+            "dispatcher": "scripts/data_preparation/checkpoint1_apply_review.py",
+            "eligibility_policy": "config/source_eligibility/ncbi_nuc.json",
+        },
+        "closure_only_fields": list(CLOSURE_ONLY_FIELDS),
+        "application_mode": "apply",
+    }
+    metadata_text = json.dumps(metadata, indent=2, sort_keys=False)
+    if tracked_payload_contains_sequence(metadata_text):
+        raise Checkpoint1ApplyError(
+            "Tracked metadata must not contain biological sequence fields"
+        )
+    _write_json_atomic(metadata_out, metadata)
+    output_hashes["metadata"] = sha256_file(metadata_out)
+
+    hashes_after = {
+        "queue": sha256_file(paths["queue"]),
+        "index": sha256_file(paths["index"]) if paths["index"].is_file() else "",
+        "bulk": sha256_file(paths["bulk"]) if paths["bulk"].is_file() else "",
+        "s1": sha256_file(paths["s1"]) if paths["s1"].is_file() else "",
+        "sidecar": sha256_file(paths["sidecar"]) if paths["sidecar"].is_file() else "",
+        "s2": sha256_file(paths["s2"]) if paths["s2"].is_file() else "",
+        "qc": sha256_file(paths["qc"]) if paths["qc"].is_file() else "",
+        "s3": sha256_file(paths["canonical"]),
+        "s3_decisions": sha256_file(paths["decisions"]),
+        "s3_review": (
+            sha256_file(paths["s3_review"]) if paths["s3_review"].is_file() else ""
+        ),
+        "s3_local": (
+            sha256_file(paths["s3_local"]) if paths["s3_local"].is_file() else ""
+        ),
+        "rec_json": sha256_file(paths["rec_json"]) if paths["rec_json"].is_file() else "",
+        "eligibility": (
+            sha256_file(paths["eligibility"]) if paths["eligibility"].is_file() else ""
+        ),
+        "ena_s1": sha256_file(paths["ena_s1"]) if paths["ena_s1"].is_file() else "",
+        "ena_s2": sha256_file(paths["ena_s2"]) if paths["ena_s2"].is_file() else "",
+        "dry_run_report": hashes_before["dry_run_report"],
+    }
+    immutable_before = {k: v for k, v in hashes_before.items() if k != "dry_run_report"}
+    immutable_after = {k: v for k, v in hashes_after.items() if k != "dry_run_report"}
+    if immutable_after != immutable_before:
+        raise Checkpoint1ApplyError(
+            "CHECKPOINT-1 apply mutated an immutable input artefact"
+        )
+    if compare_to_preview:
+        preview_hashes_final = _hash_paths(preview_hash_paths)
+        if preview_hashes_final != preview_hashes_before:
+            raise Checkpoint1ApplyError(
+                "Dry-run preview files changed after real application"
+            )
+    global_s4_cfg = repo_root / "config" / "global_s4_sources" / "ncbi_nuc.json"
+    global_s4_csv = (
+        repo_root / "data" / "interim" / "global_s4_ready" / "ncbi_nuc_global_s4_input.csv"
+    )
+    if global_s4_cfg.exists() or global_s4_csv.exists():
+        raise Checkpoint1ApplyError(
+            "Apply must not prepare a global-S4 handoff"
+        )
+
+    stats = dict(simulation.stats)
+    stats["checkpoint_closed"] = True
+    stats["preview_comparison_ok"] = (
+        (not compare_to_preview)
+        or (bool(byte_identical) and all(byte_identical.values()))
+    )
+    stats["deterministic_rerun_ok"] = check_deterministic_rerun
+    stats["semantic_mismatches"] = semantic_mismatches
+    stats["byte_mismatches"] = byte_mismatch_n
+    print(
+        f"source=ncbi_nuc\n"
+        "mode=apply\n"
+        "checkpoint_status=closed\n"
+        "checkpoint_closed=true\n"
+        f"total_records={stats['total_records']}\n"
+        f"technically_eligible={stats['technically_eligible']}\n"
+        f"parked_molecule_unresolved={stats['parked_molecule_unresolved']}\n"
+        f"technical_rejects={stats['technical_rejects_after_review']}\n"
+        f"authorised_for_s4={stats['authorised_for_s4']}\n"
+        f"sequence_corrections={stats['sequence_corrections']}\n"
+        f"semantic_mismatches={semantic_mismatches}\n"
+        f"byte_mismatches={byte_mismatch_n}\n"
+        f"deterministic_rerun={'pass' if check_deterministic_rerun else 'skipped'}\n"
+        "global_s4_handoff_prepared=false\n"
+        "global_s4_run=false\n"
+        "S4 remains blocked"
+    )
+    return NcbiNucApplyResult(
+        output_dir=output_dir,
+        metadata_out=metadata_out,
+        tracked_manifest=tracked_manifest,
+        summary_out=summary_path,
+        output_hashes=output_hashes,
+        stats=stats,
+        preview_comparison_ok=(
+            (not compare_to_preview)
+            or (bool(byte_identical) and all(byte_identical.values()))
+        ),
+        deterministic_rerun_ok=check_deterministic_rerun,
+        semantic_mismatches=semantic_mismatches,
+        byte_mismatches=byte_mismatch_n,
+        checkpoint_closed=True,
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -7798,11 +8879,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             "aptamerbase",
             "aptadiff_a",
             "aptadiff_b",
+            "ncbi_nuc",
         }:
             raise Checkpoint1ApplyError(
                 f"Unsupported source_key={args.source!r}; "
                 "supported: aptabase, utexas, aptadb, riboaptamer, "
-                "aptaindex, ena, aptamerbase, aptadiff_a, aptadiff_b"
+                "aptaindex, ena, aptamerbase, aptadiff_a, aptadiff_b, "
+                "ncbi_nuc"
             )
         repo_root = (
             args.repo_root.resolve()
@@ -7811,6 +8894,79 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if not repo_root.is_dir():
             raise Checkpoint1ApplyError(f"Repository root does not exist: {repo_root}")
+
+        if args.source == "ncbi_nuc":
+            checkpoint_dir = (
+                args.checkpoint_dir
+                if args.checkpoint_dir is not None
+                else Path("data/interim/checkpoints/ncbi_nuc_cp1")
+            )
+            if not Path(checkpoint_dir).is_absolute():
+                checkpoint_dir = repo_root / checkpoint_dir
+            expected_total = (
+                18 if args.expected_total_rows is None else args.expected_total_rows
+            )
+            expected_active = (
+                18 if args.expected_active_rows is None else args.expected_active_rows
+            )
+            if args.dry_run:
+                output_dir = (
+                    args.output_dir
+                    if args.output_dir is not None
+                    else Path(checkpoint_dir) / "dry_run"
+                )
+                if not Path(output_dir).is_absolute():
+                    output_dir = repo_root / output_dir
+                run_ncbi_nuc_checkpoint1_dry_run(
+                    repo_root=repo_root,
+                    checkpoint_dir=Path(checkpoint_dir),
+                    output_dir=Path(output_dir),
+                    check_deterministic_rerun=not args.skip_deterministic_rerun,
+                    expected_source_rows=expected_total,
+                    expected_reviewed_rows=expected_active,
+                    verify_frozen_inputs=not args.skip_pipeline_integrity,
+                    compare_to_pristine=not args.skip_pipeline_integrity,
+                )
+                return 0
+            if not args.authorise_actual_apply:
+                run_ncbi_nuc_checkpoint1_apply()
+                return 1
+            output_dir = (
+                args.output_dir
+                if args.output_dir is not None
+                else Path(checkpoint_dir) / "resolved"
+            )
+            if not Path(output_dir).is_absolute():
+                output_dir = repo_root / output_dir
+            tracked_manifest = (
+                args.tracked_manifest
+                if args.tracked_manifest is not None
+                else Path(
+                    "config/checkpoint_reviews/ncbi_nuc_checkpoint1_resolutions.csv"
+                )
+            )
+            metadata_out = (
+                args.metadata_out
+                if args.metadata_out is not None
+                else Path(
+                    "config/checkpoint_reviews/ncbi_nuc_checkpoint1_metadata.json"
+                )
+            )
+            run_ncbi_nuc_checkpoint1_apply(
+                repo_root=repo_root,
+                checkpoint_dir=Path(checkpoint_dir),
+                output_dir=Path(output_dir),
+                tracked_manifest=tracked_manifest,
+                metadata_out=metadata_out,
+                check_deterministic_rerun=not args.skip_deterministic_rerun,
+                expected_source_rows=expected_total,
+                expected_reviewed_rows=expected_active,
+                verify_frozen_inputs=not args.skip_pipeline_integrity,
+                compare_to_pristine=not args.skip_pipeline_integrity,
+                compare_to_preview=not args.skip_pipeline_integrity,
+                authorise_actual_apply=True,
+            )
+            return 0
 
         if args.source in {"aptadiff_a", "aptadiff_b"}:
             checkpoint_dir = (
