@@ -45,10 +45,21 @@ def _empty_corpus(**overrides: str) -> dict[str, str]:
     return row
 
 
-def _write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
+def _write_csv(
+    path: Path,
+    fieldnames: list[str],
+    rows: list[dict[str, str]],
+    *,
+    quoting: int = csv.QUOTE_MINIMAL,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=fieldnames,
+            lineterminator="\n",
+            quoting=quoting,
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow({col: row.get(col, "") for col in fieldnames})
@@ -2454,5 +2465,1094 @@ def test_ncbi_nuc_does_not_invoke_global_s4(tmp_path: Path) -> None:
 def test_ncbi_nuc_expected_count_mismatch_hard_fails(tmp_path: Path) -> None:
     repo, config_path = _ncbi_nuc_handoff_tree(tmp_path, expected=5)
     with pytest.raises(GlobalS4HandoffError, match="Expected 5"):
+        _run(repo, config_path)
+
+
+APTADB_RESOLUTION_COLUMNS = [
+    "record_id",
+    "native_id",
+    "primary_route",
+    "proposed_decision",
+    "primary_reason",
+    "checkpoint1_resolution_status",
+    "authorised_for_s4",
+    "manual_decision",
+    "route_changed",
+]
+
+APTADB_SIDECAR_COLUMNS = [
+    "record_id",
+    "aptadb_interaction_index",
+    "aptadb_apta_index",
+    "aptadb_target_id",
+    "aptadb_target_chemistry",
+    "aptadb_binding_conditions_buffer",
+    "aptadb_reference_pubmed_id",
+    "aptadb_interaction_sequence",
+    "aptadb_aptamer_sequence",
+    "aptadb_aptamer_description",
+    "aptadb_aptamer_chemistry",
+    "aptadb_aptamer_function",
+    "aptadb_aptamer_applications",
+    "aptadb_aptamer_assay",
+    "aptadb_uniprot_id",
+    "aptadb_entry_name",
+    "aptadb_protein_names",
+    "aptadb_gene_names",
+    "aptadb_status",
+    "aptadb_organism",
+    "aptadb_protein_length",
+    "aptadb_mass",
+    "aptadb_activity_regulation",
+    "aptadb_involvement_in_disease",
+    "aptadb_catalytic_activity",
+    "aptadb_pdb_cross_reference",
+    "aptadb_protein_function",
+    "aptadb_sequence_agreement",
+    "aptadb_aptamer_join_status",
+    "aptadb_protein_join_status",
+    "aptadb_target_name_source",
+]
+
+APTADB_EXTRA_FIELDS = [
+    "aptadb_interaction_index",
+    "aptadb_apta_index",
+    "aptadb_target_id",
+    "aptadb_target_chemistry",
+    "aptadb_binding_conditions_buffer",
+    "aptadb_reference_pubmed_id",
+    "aptadb_aptamer_description",
+    "aptadb_aptamer_chemistry",
+    "aptadb_aptamer_function",
+    "aptadb_aptamer_applications",
+    "aptadb_aptamer_assay",
+    "aptadb_uniprot_id",
+    "aptadb_entry_name",
+    "aptadb_protein_names",
+    "aptadb_gene_names",
+    "aptadb_status",
+    "aptadb_organism",
+    "aptadb_protein_length",
+    "aptadb_mass",
+    "aptadb_activity_regulation",
+    "aptadb_involvement_in_disease",
+    "aptadb_catalytic_activity",
+    "aptadb_pdb_cross_reference",
+    "aptadb_protein_function",
+    "aptadb_sequence_agreement",
+    "aptadb_aptamer_join_status",
+    "aptadb_protein_join_status",
+    "aptadb_target_name_source",
+]
+
+
+def _aptadb_specs() -> list[dict[str, str]]:
+    """Synthetic AptaDB CHECKPOINT rows. Sequences are <20 nt."""
+    return [
+        {
+            "record_id": "aptadb:1",
+            "native_id": "1",
+            "resolved": "accept",
+            "status": "approved_for_s4",
+            "auth": "true",
+            "route": "technically_eligible",
+            "reason": "technically_eligible_rna",
+            "seq": "ACGUACGU",
+            "core": "GUAC",
+            "molecule": "RNA",
+            "chemistry": "RNA",
+            "target_raw": "Demo protein A",
+            "uniprot": "P00001",
+            "apta_index": "A1",
+            "target_chem": "Protein",
+        },
+        {
+            "record_id": "aptadb:2",
+            "native_id": "2",
+            "resolved": "accept",
+            "status": "approved_for_s4",
+            "auth": "true",
+            "route": "technically_eligible",
+            "reason": "technically_eligible_rna",
+            "seq": "GGCCGGCC",
+            "core": "GGCCGGCC",
+            "molecule": "RNA",
+            "chemistry": "RNA",
+            "target_raw": "Demo protein A",
+            "uniprot": "P00001",
+            "apta_index": "A1",
+            "target_chem": "Protein",
+        },
+        {
+            "record_id": "aptadb:3",
+            "native_id": "3",
+            "resolved": "accept",
+            "status": "approved_for_s4",
+            "auth": "true",
+            "route": "technically_eligible",
+            "reason": "technically_eligible_rna",
+            "seq": "UUGGAACC",
+            "core": "UUGGAACC",
+            "molecule": "RNA",
+            "chemistry": "RNA",
+            "target_raw": "Demo protein B",
+            "uniprot": "P00002",
+            "apta_index": "A2",
+            "target_chem": "Protein",
+        },
+        {
+            "record_id": "aptadb:ss1",
+            "native_id": "4",
+            "resolved": "park",
+            "status": "parked_after_checkpoint1",
+            "auth": "false",
+            "route": "parked_ssdna",
+            "reason": "ssdna_parked",
+            "seq": "ACGTTGCA",
+            "core": "ACGTTGCA",
+            "molecule": "ssDNA",
+            "chemistry": "DNA",
+            "target_raw": "Demo protein C",
+            "uniprot": "P00003",
+            "apta_index": "A3",
+            "target_chem": "Protein",
+        },
+        {
+            "record_id": "aptadb:np1",
+            "native_id": "5",
+            "resolved": "park",
+            "status": "parked_after_checkpoint1",
+            "auth": "false",
+            "route": "parked_non_protein",
+            "reason": "non_protein_target_parked",
+            "seq": "AAUUGGCC",
+            "core": "AAUUGGCC",
+            "molecule": "RNA",
+            "chemistry": "RNA",
+            "target_raw": "",
+            "uniprot": "",
+            "apta_index": "A4",
+            "target_chem": "Molecule",
+        },
+        {
+            "record_id": "aptadb:rj1",
+            "native_id": "6",
+            "resolved": "reject",
+            "status": "rejected_after_checkpoint1",
+            "auth": "false",
+            "route": "technical_reject",
+            "reason": "length_out_of_range",
+            "seq": "CCGG",
+            "core": "CCGG",
+            "molecule": "RNA",
+            "chemistry": "RNA",
+            "target_raw": "Demo protein D",
+            "uniprot": "P00004",
+            "apta_index": "A5",
+            "target_chem": "Protein",
+        },
+    ]
+
+
+def _aptadb_sidecar_row(spec: dict[str, str]) -> dict[str, str]:
+    protein = spec["target_chem"] == "Protein"
+    return {
+        "record_id": spec["record_id"],
+        "aptadb_interaction_index": spec["native_id"],
+        "aptadb_apta_index": spec["apta_index"],
+        "aptadb_target_id": spec["uniprot"],
+        "aptadb_target_chemistry": spec["target_chem"],
+        "aptadb_binding_conditions_buffer": "PBS pH 7.4",
+        "aptadb_reference_pubmed_id": "12345678",
+        "aptadb_interaction_sequence": spec["seq"],
+        "aptadb_aptamer_sequence": spec["seq"],
+        "aptadb_aptamer_description": f"desc-{spec['native_id']}",
+        "aptadb_aptamer_chemistry": spec["chemistry"],
+        "aptadb_aptamer_function": "binding",
+        "aptadb_aptamer_applications": "assay",
+        "aptadb_aptamer_assay": "SPR",
+        "aptadb_uniprot_id": spec["uniprot"],
+        "aptadb_entry_name": f"DEMO{spec['native_id']}_HUMAN" if protein else "",
+        "aptadb_protein_names": spec["target_raw"],
+        "aptadb_gene_names": f"GENE{spec['native_id']}" if protein else "",
+        "aptadb_status": "reviewed" if protein else "",
+        "aptadb_organism": "Homo sapiens" if protein else "",
+        "aptadb_protein_length": "100" if protein else "",
+        "aptadb_mass": "11000" if protein else "",
+        "aptadb_activity_regulation": "",
+        "aptadb_involvement_in_disease": "",
+        "aptadb_catalytic_activity": "",
+        "aptadb_pdb_cross_reference": "1ABC;" if protein else "",
+        "aptadb_protein_function": "demo function" if protein else "",
+        "aptadb_sequence_agreement": "identical",
+        "aptadb_aptamer_join_status": "joined",
+        "aptadb_protein_join_status": "joined" if protein else "not_applicable",
+        "aptadb_target_name_source": "protein_names" if protein else (
+            "unresolved_missing_lookup_table"
+        ),
+    }
+
+
+def _aptadb_handoff_tree(
+    tmp_path: Path, *, expected: int | None = None
+) -> tuple[Path, Path]:
+    repo, config_path = _make_tree(tmp_path, source_key="aptadb", expected=expected)
+    specs = _aptadb_specs()
+    authorised = [spec for spec in specs if spec["auth"] == "true"]
+    if expected is None:
+        expected = len(authorised)
+
+    applied_dir = repo / "data/interim/checkpoints/aptadb_cp1/resolved"
+    applied_dir.mkdir(parents=True, exist_ok=True)
+    pre_review = repo / "data/interim/checkpoints/aptadb_cp1/aptadb_s3_canonical.csv"
+    pre_review.parent.mkdir(parents=True, exist_ok=True)
+    sidecar_dir = repo / "data/interim/extracted"
+    sidecar_dir.mkdir(parents=True, exist_ok=True)
+    unlinked_dir = sidecar_dir
+
+    applied: list[dict[str, str]] = []
+    mutated_prereview: list[dict[str, str]] = []
+    resolutions: list[dict[str, str]] = []
+    for spec in specs:
+        row = _empty_corpus(
+            record_id=spec["record_id"],
+            sequence_raw=spec["seq"],
+            sequence_full=spec["seq"],
+            sequence_core=spec["core"],
+            sequence_length_full=str(len(spec["seq"])),
+            sequence_length_core=str(len(spec["core"])),
+            molecule_type=spec["molecule"],
+            chemistry=spec["chemistry"],
+            alphabet_as_reported="RNA" if spec["molecule"] == "RNA" else "DNA_T",
+            t_to_u_applied="false",
+            trim_status=(
+                "primers_removed" if spec["record_id"] == "aptadb:1" else (
+                    "no_constants_detected"
+                )
+            ),
+            target_name_raw=spec["target_raw"],
+            target_name="",
+            target_uniprot="",
+            source_db="aptadb",
+            source_dataset="aptadb_official_export_2026-08",
+            contributing_sources="aptadb",
+            contributing_datasets="aptadb_official_export_2026-08",
+            corroboration_count="1",
+            redistribution_status="unknown",
+            independently_attested_by_permissive_source="false",
+            native_id=spec["native_id"],
+            pubmed_id="12345678",
+        )
+        pre = dict(row)
+        if spec["record_id"] == "aptadb:1":
+            pre["sequence_core"] = spec["seq"]
+            pre["sequence_length_core"] = str(len(spec["seq"]))
+            pre["trim_status"] = "no_constants_detected"
+        applied.append(row)
+        mutated_prereview.append(pre)
+        proposed = {
+            "accept": "proposed_accept",
+            "park": "proposed_park",
+            "reject": "proposed_reject",
+        }[spec["resolved"]]
+        resolutions.append(
+            {
+                "record_id": spec["record_id"],
+                "native_id": spec["native_id"],
+                "primary_route": spec["route"],
+                "proposed_decision": proposed,
+                "primary_reason": spec["reason"],
+                "checkpoint1_resolution_status": spec["status"],
+                "authorised_for_s4": spec["auth"],
+                "manual_decision": "",
+                "route_changed": "false",
+            }
+        )
+
+    applied_path = applied_dir / "aptadb_checkpoint1_applied_canonical.csv"
+    _write_csv(applied_path, list(CORPUS_COLUMNS), applied)
+    _write_csv(pre_review, list(CORPUS_COLUMNS), mutated_prereview)
+    res_path = repo / "config/checkpoint_reviews/aptadb_checkpoint1_resolutions.csv"
+    _write_csv(res_path, APTADB_RESOLUTION_COLUMNS, resolutions)
+    auth_path = applied_dir / "aptadb_checkpoint1_s4_authorised_ids.csv"
+    _write_csv(
+        auth_path,
+        AUTH_ID_COLUMNS,
+        [
+            {
+                "record_id": spec["record_id"],
+                "resolved_decision": "accept",
+                "checkpoint1_resolution_status": "approved_for_s4",
+            }
+            for spec in authorised
+        ],
+    )
+    _write_csv(
+        sidecar_dir / "aptadb_source_metadata.csv",
+        APTADB_SIDECAR_COLUMNS,
+        [_aptadb_sidecar_row(spec) for spec in specs],
+    )
+    _write_csv(
+        unlinked_dir / "aptadb_unlinked_aptamers.csv",
+        ["apta_index", "reconciliation_status", "planned_s3_reason"],
+        [
+            {
+                "apta_index": "U99",
+                "reconciliation_status": "unlinked_no_interaction_row",
+                "planned_s3_reason": "missing_target",
+            }
+        ],
+    )
+
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["source_key"] = "aptadb"
+    payload["source_dataset"] = "aptadb_official_export_2026-08"
+    payload["canonical_input"] = (
+        "data/interim/checkpoints/aptadb_cp1/resolved/"
+        "aptadb_checkpoint1_applied_canonical.csv"
+    )
+    payload["resolution_manifest"] = (
+        "config/checkpoint_reviews/aptadb_checkpoint1_resolutions.csv"
+    )
+    payload["authorised_ids_input"] = (
+        "data/interim/checkpoints/aptadb_cp1/resolved/"
+        "aptadb_checkpoint1_s4_authorised_ids.csv"
+    )
+    payload["expected_authorised_records"] = expected
+    payload["global_s4_run"] = False
+    payload["redistribution_status"] = "unknown"
+    payload["physical_row_join_key"] = "record_id"
+    payload["emit_target_evidence_boundary"] = True
+    payload["emit_source_metadata_only_disclaimer"] = True
+    payload["handoff_extra_fields"] = list(APTADB_EXTRA_FIELDS)
+    payload["required_nonempty_handoff_fields"] = [
+        "aptadb_interaction_index",
+        "aptadb_apta_index",
+        "aptadb_uniprot_id",
+        "aptadb_protein_names",
+        "aptadb_target_chemistry",
+    ]
+    payload["require_empty_canonical_fields"] = [
+        "target_name",
+        "target_uniprot",
+        "target_type",
+        "target_type_source",
+        "target_family",
+        "target_pfam",
+        "pdb_id",
+        "binding_evidence_type",
+        "binding_evidence_score",
+        "affinity_value",
+        "affinity_unit",
+        "affinity_type",
+        "cluster_id",
+        "is_cluster_representative",
+        "partition",
+    ]
+    payload["handoff_summary_provenance_counts"] = {
+        "unique_count_fields": ["aptadb_uniprot_id", "aptadb_apta_index"],
+        "duplicate_group_fields": ["aptadb_apta_index"],
+        "nonempty_count_fields": ["aptadb_uniprot_id", "aptadb_pdb_cross_reference"],
+        "value_count_fields": ["aptadb_target_chemistry", "redistribution_status"],
+    }
+    payload["handoff_summary_additional_notes"] = [
+        "authorised_for_s4=true means only technically eligible RNA-protein records.",
+        "The 37 unlinked missing_target aptamers remain outside this handoff.",
+        "Global S4 has not been run.",
+    ]
+    payload["handoff_ready_statement"] = (
+        "AptaDB CHECKPOINT-1 is closed and this source is prepared as one "
+        "input to the future corpus-wide global S4 stage. Global S4 has "
+        "not been run."
+    )
+    payload["target_metadata"]["source_metadata_path"] = (
+        "data/interim/extracted/aptadb_source_metadata.csv"
+    )
+    payload["target_metadata"]["source_specific_field"] = "aptadb_protein_names"
+    payload["target_metadata"]["source_general_field"] = "aptadb_target_chemistry"
+    payload["target_metadata"]["specific_target_present_in_authorised_records"] = (
+        expected
+    )
+    payload["target_metadata"]["specific_target_missing_in_authorised_records"] = 0
+    payload["global_s4_handoff_output"] = (
+        "data/interim/global_s4_ready/aptadb_global_s4_input.csv"
+    )
+    payload["global_s4_handoff_summary"] = (
+        "data/interim/global_s4_ready/aptadb_global_s4_handoff_summary.md"
+    )
+    payload["global_s4_rules"]["uniprot_resolution_performed_here"] = False
+    _write_json(config_path, payload)
+    return repo, config_path
+
+
+def test_aptadb_live_source_config_loads() -> None:
+    path = REPO_ROOT / "config" / "global_s4_sources" / "aptadb.json"
+    config = load_source_config(path)
+    assert config["source_key"] == "aptadb"
+    assert config["source_dataset"] == "aptadb_official_export_2026-08"
+    assert config["expected_authorised_records"] == 151
+    assert config["authorisation_field"] == "authorised_for_s4"
+    assert config["checkpoint_status"] == "closed"
+    assert config["global_s4_run"] is False
+    assert config["canonical_input"].endswith(
+        "aptadb_checkpoint1_applied_canonical.csv"
+    )
+    assert "resolved/" in config["canonical_input"]
+    assert "aptadb_s3_canonical.csv" not in config["canonical_input"]
+    extras = config["handoff_extra_fields"]
+    assert "aptadb_uniprot_id" in extras
+    assert "aptadb_protein_names" in extras
+    assert "aptadb_pdb_cross_reference" in extras
+    assert "aptadb_binding_conditions_buffer" in extras
+    assert "aptadb_reference_pubmed_id" in extras
+    assert "aptadb_aptamer_assay" in extras
+    assert "aptadb_interaction_sequence" not in extras
+    assert "aptadb_aptamer_sequence" not in extras
+    assert "aptadb_uniprot_id" in config["required_nonempty_handoff_fields"]
+    assert "target_uniprot" in config["require_empty_canonical_fields"]
+    assert "pdb_id" in config["require_empty_canonical_fields"]
+    assert "target_name_raw" not in config["require_empty_canonical_fields"]
+    rules = config["global_s4_rules"]
+    assert rules["final_target_normalisation_performed_here"] is False
+    assert rules["uniprot_resolution_performed_here"] is False
+    assert rules["evidence_threshold_performed_here"] is False
+    text = path.read_text(encoding="utf-8")
+    assert SEQ_LEAK_RE.search(text) is None
+
+
+def test_aptadb_live_resolutions_lack_resolved_decision_column() -> None:
+    path = (
+        REPO_ROOT / "config" / "checkpoint_reviews" / "aptadb_checkpoint1_resolutions.csv"
+    )
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        header = list(reader.fieldnames or [])
+        rows = list(reader)
+    assert "resolved_decision" not in header
+    assert "authorised_for_s4" in header
+    assert "checkpoint1_resolution_status" in header
+    authorised = [row for row in rows if row["authorised_for_s4"] == "true"]
+    assert len(authorised) == 151
+    assert all(
+        row["checkpoint1_resolution_status"] == "approved_for_s4" for row in authorised
+    )
+
+
+def test_aptadb_selects_only_authorised_and_excludes_parks_rejects_unlinked(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _aptadb_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    rows = list(csv.DictReader(result.output_csv.open(encoding="utf-8")))
+    ids = [row["record_id"] for row in rows]
+    assert ids == ["aptadb:1", "aptadb:2", "aptadb:3"]
+    assert "aptadb:ss1" not in ids
+    assert "aptadb:np1" not in ids
+    assert "aptadb:rj1" not in ids
+    assert "aptadb:U99" not in ids
+    assert result.stats.handoff_records == 3
+    assert len({row["record_id"] for row in rows}) == 3
+    assert all(row["source_db"] == "aptadb" for row in rows)
+    assert all(row["redistribution_status"] == "unknown" for row in rows)
+
+
+def test_aptadb_uses_applied_canonical_not_prereview_s3(tmp_path: Path) -> None:
+    repo, config_path = _aptadb_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    by_id = {
+        row["record_id"]: row
+        for row in csv.DictReader(result.output_csv.open(encoding="utf-8"))
+    }
+    assert by_id["aptadb:1"]["sequence_core"] == "GUAC"
+    assert by_id["aptadb:1"]["trim_status"] == "primers_removed"
+    pre = {
+        row["record_id"]: row
+        for row in csv.DictReader(
+            (
+                repo / "data/interim/checkpoints/aptadb_cp1/aptadb_s3_canonical.csv"
+            ).open(encoding="utf-8")
+        )
+    }
+    assert pre["aptadb:1"]["sequence_core"] == "ACGUACGU"
+    assert by_id["aptadb:1"]["sequence_core"] != pre["aptadb:1"]["sequence_core"]
+
+
+def test_aptadb_sidecar_join_is_one_to_one_and_preserves_uniprot_extra(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _aptadb_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    rows = list(csv.DictReader(result.output_csv.open(encoding="utf-8")))
+    by_id = {row["record_id"]: row for row in rows}
+    assert by_id["aptadb:1"]["aptadb_uniprot_id"] == "P00001"
+    assert by_id["aptadb:2"]["aptadb_uniprot_id"] == "P00001"
+    assert by_id["aptadb:3"]["aptadb_uniprot_id"] == "P00002"
+    assert by_id["aptadb:1"]["aptadb_protein_names"] == "Demo protein A"
+    assert by_id["aptadb:1"]["aptadb_target_chemistry"] == "Protein"
+    assert by_id["aptadb:1"]["aptadb_pdb_cross_reference"] == "1ABC;"
+    assert by_id["aptadb:1"]["aptadb_binding_conditions_buffer"] == "PBS pH 7.4"
+    assert by_id["aptadb:1"]["aptadb_aptamer_assay"] == "SPR"
+    assert by_id["aptadb:1"]["aptadb_protein_join_status"] == "joined"
+    assert "aptadb_interaction_sequence" not in by_id["aptadb:1"]
+    assert "aptadb_aptamer_sequence" not in by_id["aptadb:1"]
+    assert len(rows) == len({row["record_id"] for row in rows})
+    assert by_id["aptadb:1"]["aptadb_apta_index"] == by_id["aptadb:2"]["aptadb_apta_index"]
+    assert by_id["aptadb:1"]["record_id"] != by_id["aptadb:2"]["record_id"]
+
+
+def test_aptadb_duplicate_sidecar_join_fails(tmp_path: Path) -> None:
+    repo, config_path = _aptadb_handoff_tree(tmp_path)
+    sidecar = repo / "data/interim/extracted/aptadb_source_metadata.csv"
+    rows = list(csv.DictReader(sidecar.open(encoding="utf-8")))
+    rows.append(dict(rows[0]))
+    _write_csv(sidecar, APTADB_SIDECAR_COLUMNS, rows)
+    with pytest.raises(GlobalS4HandoffError, match="duplicate record_id"):
+        _run(repo, config_path)
+
+
+def test_aptadb_missing_sidecar_join_fails(tmp_path: Path) -> None:
+    repo, config_path = _aptadb_handoff_tree(tmp_path)
+    sidecar = repo / "data/interim/extracted/aptadb_source_metadata.csv"
+    rows = [
+        row
+        for row in csv.DictReader(sidecar.open(encoding="utf-8"))
+        if row["record_id"] != "aptadb:2"
+    ]
+    _write_csv(sidecar, APTADB_SIDECAR_COLUMNS, rows)
+    with pytest.raises(GlobalS4HandoffError, match="missing from source metadata"):
+        _run(repo, config_path)
+
+
+def test_aptadb_source_uniprot_does_not_populate_canonical_target_uniprot(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _aptadb_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    for row in csv.DictReader(result.output_csv.open(encoding="utf-8")):
+        assert row["aptadb_uniprot_id"]
+        assert row["target_uniprot"] == ""
+        assert row["pdb_id"] == ""
+        assert row["aptadb_pdb_cross_reference"]
+        assert row["target_name"] == ""
+        assert row["target_type"] == ""
+        assert row["binding_evidence_type"] == ""
+        assert row["binding_evidence_score"] == ""
+        assert row["affinity_value"] == ""
+        assert row["target_name_raw"]
+
+
+def test_aptadb_s4_canonical_fields_remain_empty(tmp_path: Path) -> None:
+    repo, config_path = _aptadb_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    for row in csv.DictReader(result.output_csv.open(encoding="utf-8")):
+        assert row["target_name"] == ""
+        assert row["target_uniprot"] == ""
+        assert row["target_type"] == ""
+        assert row["target_type_source"] == ""
+        assert row["target_family"] == ""
+        assert row["target_pfam"] == ""
+        assert row["pdb_id"] == ""
+        assert row["binding_evidence_type"] == ""
+        assert row["binding_evidence_score"] == ""
+        assert row["affinity_value"] == ""
+        assert row["affinity_unit"] == ""
+        assert row["affinity_type"] == ""
+        assert row["cluster_id"] == ""
+        assert row["is_cluster_representative"] == ""
+        assert row["partition"] == ""
+
+
+def test_aptadb_sequence_bearing_sidecar_fields_rejected(tmp_path: Path) -> None:
+    repo, config_path = _aptadb_handoff_tree(tmp_path)
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["handoff_extra_fields"] = list(payload["handoff_extra_fields"]) + [
+        "aptadb_interaction_sequence"
+    ]
+    _write_json(config_path, payload)
+    with pytest.raises(GlobalS4HandoffError, match="sequence-bearing"):
+        _run(repo, config_path)
+
+
+def test_aptadb_accepts_closed_manifest_without_resolved_decision(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _aptadb_handoff_tree(tmp_path)
+    res_path = repo / "config/checkpoint_reviews/aptadb_checkpoint1_resolutions.csv"
+    header = list(csv.DictReader(res_path.open(encoding="utf-8")).fieldnames or [])
+    assert "resolved_decision" not in header
+    result = _run(repo, config_path)
+    assert result.stats.handoff_records == 3
+
+
+def test_aptadb_handoff_deterministic(tmp_path: Path) -> None:
+    repo, config_path = _aptadb_handoff_tree(tmp_path)
+    first = _run(repo, config_path)
+    h1 = _sha256(first.output_csv)
+    h1s = _sha256(first.output_summary)
+    second = _run(repo, config_path)
+    assert _sha256(second.output_csv) == h1
+    assert _sha256(second.output_summary) == h1s
+
+
+def test_aptadb_does_not_invoke_global_s4(tmp_path: Path) -> None:
+    import prepare_global_s4_source as mod
+
+    assert not hasattr(mod, "run_global_s4")
+    assert not hasattr(mod, "normalise_targets")
+    assert not hasattr(mod, "score_evidence")
+    repo, config_path = _aptadb_handoff_tree(tmp_path)
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    assert payload["global_s4_run"] is False
+    result = _run(repo, config_path)
+    text = result.output_summary.read_text(encoding="utf-8")
+    assert "Global S4 has not been run." in text
+    assert "SOURCE METADATA ONLY" in text
+    assert "unlinked missing_target" in text
+    assert SEQ_LEAK_RE.search(text) is None
+    assert "ACGUACGU" not in text
+    assert "P00001" not in text
+    assert str(repo.resolve()) not in text
+
+
+def test_aptadb_expected_count_mismatch_hard_fails(tmp_path: Path) -> None:
+    repo, config_path = _aptadb_handoff_tree(tmp_path, expected=151)
+    with pytest.raises(GlobalS4HandoffError, match="Expected 151"):
+        _run(repo, config_path)
+
+
+APTAINDEX_SIDECAR_COLUMNS = [
+    "record_id",
+    "aptaindex_native_id",
+    "aptaindex_csv_data_row",
+    "aptaindex_title",
+    "aptaindex_type",
+    "aptaindex_target",
+    "aptaindex_affinity_type",
+    "aptaindex_affinity",
+    "aptaindex_affinity_units",
+    "aptaindex_refolding_protocol",
+    "aptaindex_binding_conditions",
+    "aptaindex_temp",
+    "aptaindex_sequence",
+    "aptaindex_molecular_weight",
+    "aptaindex_comments",
+    "aptaindex_reference",
+    "aptaindex_target_type",
+]
+
+APTAINDEX_EXTRA_FIELDS = [
+    "aptaindex_title",
+    "aptaindex_type",
+    "aptaindex_target",
+    "aptaindex_target_type",
+    "aptaindex_affinity_type",
+    "aptaindex_affinity",
+    "aptaindex_affinity_units",
+    "aptaindex_reference",
+    "aptaindex_comments",
+    "aptaindex_binding_conditions",
+    "aptaindex_refolding_protocol",
+    "aptaindex_temp",
+]
+
+
+def _aptaindex_specs() -> list[dict[str, str]]:
+    return [
+        {
+            "record_id": "aptaindex:0001",
+            "native_id": "0001",
+            "resolved": "accept",
+            "status": "approved_for_s4",
+            "auth": "true",
+            "route": "technically_eligible",
+            "reason": "technically_eligible_rna",
+            "seq": "ACGUACGU",
+            "molecule": "RNA",
+            "chemistry": "RNA",
+            "src_type": "RNA",
+            "target": "Demo target A",
+            "target_type": "Protein",
+        },
+        {
+            "record_id": "aptaindex:0002",
+            "native_id": "0002",
+            "resolved": "accept",
+            "status": "approved_for_s4",
+            "auth": "true",
+            "route": "technically_eligible",
+            "reason": "technically_eligible_rna",
+            "seq": "UUGGAACC",
+            "molecule": "RNA",
+            "chemistry": "2F-RNA",
+            "src_type": "2'-F-RNA",
+            "target": "Demo target B",
+            "target_type": "Small Organic",
+        },
+        {
+            "record_id": "aptaindex:ss01",
+            "native_id": "0003",
+            "resolved": "park",
+            "status": "parked_after_checkpoint1",
+            "auth": "false",
+            "route": "parked_ssdna",
+            "reason": "ssdna_parked",
+            "seq": "ACGTTGCA",
+            "molecule": "ssDNA",
+            "chemistry": "DNA",
+            "src_type": "DNA",
+            "target": "Demo DNA target",
+            "target_type": "Protein",
+        },
+        {
+            "record_id": "aptaindex:ch01",
+            "native_id": "0004",
+            "resolved": "park",
+            "status": "parked_after_checkpoint1",
+            "auth": "false",
+            "route": "parked_chemistry_review",
+            "reason": "molecule_type_unresolved",
+            "seq": "AAUUGGCC",
+            "molecule": "RNA",
+            "chemistry": "2NH2-RNA",
+            "src_type": "2'-NH2-RNA",
+            "target": "Demo chem target",
+            "target_type": "Protein",
+        },
+        {
+            "record_id": "aptaindex:rj01",
+            "native_id": "0005",
+            "resolved": "reject",
+            "status": "rejected_after_checkpoint1",
+            "auth": "false",
+            "route": "technical_reject",
+            "reason": "length_out_of_range",
+            "seq": "CCGG",
+            "molecule": "RNA",
+            "chemistry": "RNA",
+            "src_type": "RNA",
+            "target": "Demo reject target",
+            "target_type": "Other",
+        },
+    ]
+
+
+def _aptaindex_sidecar_row(spec: dict[str, str]) -> dict[str, str]:
+    return {
+        "record_id": spec["record_id"],
+        "aptaindex_native_id": spec["native_id"],
+        "aptaindex_csv_data_row": spec["native_id"].lstrip("0") or "0",
+        "aptaindex_title": f"title-{spec['native_id']}",
+        "aptaindex_type": spec["src_type"],
+        "aptaindex_target": spec["target"],
+        "aptaindex_affinity_type": "Kd",
+        "aptaindex_affinity": "1.2",
+        "aptaindex_affinity_units": "nM",
+        "aptaindex_refolding_protocol": "",
+        "aptaindex_binding_conditions": "PBS",
+        "aptaindex_temp": "25C",
+        "aptaindex_sequence": spec["seq"],
+        "aptaindex_molecular_weight": "8000",
+        "aptaindex_comments": (
+            "demo comment\rwith embedded CR" if spec["record_id"] == "aptaindex:0001"
+            else "demo comment"
+        ),
+        "aptaindex_reference": "Demo 2020",
+        "aptaindex_target_type": spec["target_type"],
+    }
+
+
+def _aptaindex_handoff_tree(
+    tmp_path: Path, *, expected: int | None = None
+) -> tuple[Path, Path]:
+    repo, config_path = _make_tree(tmp_path, source_key="aptaindex", expected=expected)
+    specs = _aptaindex_specs()
+    authorised = [spec for spec in specs if spec["auth"] == "true"]
+    if expected is None:
+        expected = len(authorised)
+
+    applied_dir = repo / "data/interim/checkpoints/aptaindex_cp1/resolved"
+    applied_dir.mkdir(parents=True, exist_ok=True)
+    pre_review = (
+        repo / "data/interim/checkpoints/aptaindex_cp1/aptaindex_s3_canonical.csv"
+    )
+    sidecar_dir = repo / "data/interim/extracted"
+    sidecar_dir.mkdir(parents=True, exist_ok=True)
+
+    applied: list[dict[str, str]] = []
+    mutated_prereview: list[dict[str, str]] = []
+    resolutions: list[dict[str, str]] = []
+    for spec in specs:
+        row = _empty_corpus(
+            record_id=spec["record_id"],
+            sequence_raw=spec["seq"],
+            sequence_full=spec["seq"],
+            sequence_core=spec["seq"],
+            sequence_length_full=str(len(spec["seq"])),
+            sequence_length_core=str(len(spec["seq"])),
+            molecule_type=spec["molecule"],
+            chemistry=spec["chemistry"],
+            alphabet_as_reported="RNA" if spec["molecule"] == "RNA" else "DNA_T",
+            t_to_u_applied="false",
+            target_name_raw=spec["target"],
+            target_name="",
+            target_uniprot="",
+            source_db="aptaindex",
+            source_dataset="aptaindex_export_2026-07-22",
+            contributing_sources="aptaindex",
+            contributing_datasets="aptaindex_export_2026-07-22",
+            corroboration_count="1",
+            redistribution_status="restricted",
+            independently_attested_by_permissive_source="false",
+            native_id=spec["native_id"],
+        )
+        pre = dict(row)
+        if spec["record_id"] == "aptaindex:0001":
+            pre["sequence_core"] = "ACGU"
+            pre["sequence_length_core"] = "4"
+        applied.append(row)
+        mutated_prereview.append(pre)
+        resolutions.append(
+            {
+                "record_id": spec["record_id"],
+                "proposed_decision": f"proposed_{spec['resolved']}",
+                "resolved_decision": spec["resolved"],
+                "checkpoint1_resolution_status": spec["status"],
+                "authorised_for_s4": spec["auth"],
+            }
+        )
+
+    applied_path = applied_dir / "aptaindex_checkpoint1_applied_canonical.csv"
+    _write_csv(applied_path, list(CORPUS_COLUMNS), applied)
+    _write_csv(pre_review, list(CORPUS_COLUMNS), mutated_prereview)
+    res_path = repo / "config/checkpoint_reviews/aptaindex_checkpoint1_resolutions.csv"
+    _write_csv(res_path, RESOLUTION_COLUMNS, resolutions)
+    auth_path = applied_dir / "aptaindex_checkpoint1_s4_authorised_ids.csv"
+    _write_csv(
+        auth_path,
+        AUTH_ID_COLUMNS,
+        [
+            {
+                "record_id": spec["record_id"],
+                "resolved_decision": "accept",
+                "checkpoint1_resolution_status": "approved_for_s4",
+            }
+            for spec in authorised
+        ],
+    )
+    _write_csv(
+        sidecar_dir / "aptaindex_source_metadata.csv",
+        APTAINDEX_SIDECAR_COLUMNS,
+        [_aptaindex_sidecar_row(spec) for spec in specs],
+        quoting=csv.QUOTE_ALL,
+    )
+
+    live = json.loads(
+        (REPO_ROOT / "config" / "global_s4_sources" / "aptaindex.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["source_key"] = "aptaindex"
+    payload["canonical_input"] = (
+        "data/interim/checkpoints/aptaindex_cp1/resolved/"
+        "aptaindex_checkpoint1_applied_canonical.csv"
+    )
+    payload["resolution_manifest"] = (
+        "config/checkpoint_reviews/aptaindex_checkpoint1_resolutions.csv"
+    )
+    payload["authorised_ids_input"] = (
+        "data/interim/checkpoints/aptaindex_cp1/resolved/"
+        "aptaindex_checkpoint1_s4_authorised_ids.csv"
+    )
+    payload["expected_authorised_records"] = expected
+    payload["handoff_extra_fields"] = list(live["handoff_extra_fields"])
+    payload["emit_target_evidence_boundary"] = live.get(
+        "emit_target_evidence_boundary", True
+    )
+    payload["handoff_ready_statement"] = live["handoff_ready_statement"]
+    payload["target_metadata"] = dict(live["target_metadata"])
+    payload["target_metadata"]["specific_target_present_in_authorised_records"] = (
+        expected
+    )
+    payload["target_metadata"]["specific_target_missing_in_authorised_records"] = 0
+    payload["target_metadata"]["source_metadata_path"] = (
+        "data/interim/extracted/aptaindex_source_metadata.csv"
+    )
+    payload["provisional_source_observations"] = {
+        "Protein": 1,
+        "Small Organic": 1,
+    }
+    payload["s4_semantics"] = dict(live["s4_semantics"])
+    payload["global_s4_rules"] = dict(live["global_s4_rules"])
+    payload["global_s4_handoff_output"] = (
+        "data/interim/global_s4_ready/aptaindex_global_s4_input.csv"
+    )
+    payload["global_s4_handoff_summary"] = (
+        "data/interim/global_s4_ready/aptaindex_global_s4_handoff_summary.md"
+    )
+    payload["require_empty_canonical_fields"] = [
+        "target_name",
+        "target_uniprot",
+        "target_type",
+        "binding_evidence_type",
+        "binding_evidence_score",
+        "affinity_value",
+        "affinity_unit",
+        "affinity_type",
+    ]
+    _write_json(config_path, payload)
+    return repo, config_path
+
+
+def test_aptaindex_live_source_config_loads() -> None:
+    path = REPO_ROOT / "config" / "global_s4_sources" / "aptaindex.json"
+    config = load_source_config(path)
+    assert config["source_key"] == "aptaindex"
+    assert config["expected_authorised_records"] == 221
+    assert config["authorisation_field"] == "authorised_for_s4"
+    assert config["checkpoint_status"] == "closed"
+    assert config["canonical_input"].endswith(
+        "aptaindex_checkpoint1_applied_canonical.csv"
+    )
+    assert "resolved/" in config["canonical_input"]
+    assert "aptaindex_s3_canonical.csv" not in config["canonical_input"]
+    extras = config["handoff_extra_fields"]
+    assert extras == APTAINDEX_EXTRA_FIELDS
+    assert "aptaindex_target" in extras
+    assert "aptaindex_target_type" in extras
+    assert "aptaindex_affinity" in extras
+    assert "aptaindex_reference" in extras
+    assert "aptaindex_binding_conditions" in extras
+    assert "aptaindex_sequence" not in extras
+    rules = config["global_s4_rules"]
+    assert rules["final_target_normalisation_performed_here"] is False
+    assert rules["evidence_threshold_performed_here"] is False
+    text = path.read_text(encoding="utf-8")
+    assert SEQ_LEAK_RE.search(text) is None
+
+
+def test_aptaindex_live_authorised_count_is_221() -> None:
+    path = (
+        REPO_ROOT
+        / "config"
+        / "checkpoint_reviews"
+        / "aptaindex_checkpoint1_resolutions.csv"
+    )
+    rows = list(csv.DictReader(path.open(encoding="utf-8")))
+    authorised = [row for row in rows if row["authorised_for_s4"] == "true"]
+    assert len(authorised) == 221
+    assert all(row["resolved_decision"] == "accept" for row in authorised)
+    assert all(
+        row["checkpoint1_resolution_status"] == "approved_for_s4" for row in authorised
+    )
+
+
+def test_aptaindex_selects_only_authorised_and_excludes_parks_rejects(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _aptaindex_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    rows = list(csv.DictReader(result.output_csv.open(encoding="utf-8")))
+    ids = [row["record_id"] for row in rows]
+    assert ids == ["aptaindex:0001", "aptaindex:0002"]
+    assert "aptaindex:ss01" not in ids
+    assert "aptaindex:ch01" not in ids
+    assert "aptaindex:rj01" not in ids
+    assert result.stats.handoff_records == 2
+    assert len({row["record_id"] for row in rows}) == 2
+    assert all(row["redistribution_status"] == "restricted" for row in rows)
+    assert all(row["target_name_raw"] for row in rows)
+
+
+def test_aptaindex_uses_applied_canonical_not_prereview_s3(tmp_path: Path) -> None:
+    repo, config_path = _aptaindex_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    by_id = {
+        row["record_id"]: row
+        for row in csv.DictReader(result.output_csv.open(encoding="utf-8"))
+    }
+    assert by_id["aptaindex:0001"]["sequence_core"] == "ACGUACGU"
+    pre = {
+        row["record_id"]: row
+        for row in csv.DictReader(
+            (
+                repo
+                / "data/interim/checkpoints/aptaindex_cp1/aptaindex_s3_canonical.csv"
+            ).open(encoding="utf-8")
+        )
+    }
+    assert pre["aptaindex:0001"]["sequence_core"] == "ACGU"
+    assert by_id["aptaindex:0001"]["sequence_core"] != pre["aptaindex:0001"][
+        "sequence_core"
+    ]
+
+
+def test_aptaindex_source_extras_survive_and_canonical_s4_fields_stay_blank(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _aptaindex_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    rows = list(csv.DictReader(result.output_csv.open(encoding="utf-8")))
+    by_id = {row["record_id"]: row for row in rows}
+    assert by_id["aptaindex:0001"]["aptaindex_target"] == "Demo target A"
+    assert by_id["aptaindex:0001"]["aptaindex_target_type"] == "Protein"
+    assert by_id["aptaindex:0001"]["aptaindex_affinity"] == "1.2"
+    assert by_id["aptaindex:0001"]["aptaindex_affinity_units"] == "nM"
+    assert by_id["aptaindex:0001"]["aptaindex_reference"] == "Demo 2020"
+    assert by_id["aptaindex:0001"]["aptaindex_type"] == "RNA"
+    assert by_id["aptaindex:0002"]["aptaindex_target_type"] == "Small Organic"
+    assert by_id["aptaindex:0002"]["aptaindex_type"] == "2'-F-RNA"
+    assert "aptaindex_sequence" not in by_id["aptaindex:0001"]
+    for row in rows:
+        assert row["target_name"] == ""
+        assert row["target_uniprot"] == ""
+        assert row["target_type"] == ""
+        assert row["binding_evidence_type"] == ""
+        assert row["binding_evidence_score"] == ""
+        assert row["affinity_value"] == ""
+        assert row["affinity_unit"] == ""
+        assert row["affinity_type"] == ""
+        assert row["pdb_id"] == ""
+
+
+def test_aptaindex_sequence_bearing_sidecar_field_rejected(tmp_path: Path) -> None:
+    repo, config_path = _aptaindex_handoff_tree(tmp_path)
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["handoff_extra_fields"] = list(payload["handoff_extra_fields"]) + [
+        "aptaindex_sequence"
+    ]
+    _write_json(config_path, payload)
+    with pytest.raises(GlobalS4HandoffError, match="sequence-bearing"):
+        _run(repo, config_path)
+
+
+def test_aptaindex_embedded_cr_round_trips_without_splitting_rows(
+    tmp_path: Path,
+) -> None:
+    repo, config_path = _aptaindex_handoff_tree(tmp_path)
+    result = _run(repo, config_path)
+    rows = list(csv.DictReader(result.output_csv.open(encoding="utf-8", newline="")))
+    assert [row["record_id"] for row in rows] == [
+        "aptaindex:0001",
+        "aptaindex:0002",
+    ]
+    assert "\r" in rows[0]["aptaindex_comments"]
+    raw = result.output_csv.read_bytes()
+    assert raw.count(b"\r") >= 1
+
+
+def test_aptaindex_handoff_deterministic(tmp_path: Path) -> None:
+    repo, config_path = _aptaindex_handoff_tree(tmp_path)
+    first = _run(repo, config_path)
+    h1 = _sha256(first.output_csv)
+    h1s = _sha256(first.output_summary)
+    second = _run(repo, config_path)
+    assert _sha256(second.output_csv) == h1
+    assert _sha256(second.output_summary) == h1s
+
+
+def test_aptaindex_expected_count_mismatch_hard_fails(tmp_path: Path) -> None:
+    repo, config_path = _aptaindex_handoff_tree(tmp_path, expected=221)
+    with pytest.raises(GlobalS4HandoffError, match="Expected 221"):
         _run(repo, config_path)
 

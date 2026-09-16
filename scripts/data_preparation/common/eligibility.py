@@ -283,6 +283,11 @@ class SequenceLeakageIndex:
                 for excl_label, excl_cmp in exclusion_forms:
                     if not excl_cmp:
                         continue
+                    denom = max(len(query_cmp), len(excl_cmp))
+                    if denom == 0:
+                        continue
+                    if abs(len(query_cmp) - len(excl_cmp)) / denom > (1.0 - threshold):
+                        continue
                     try:
                         identity = global_edit_identity(query_cmp, excl_cmp)
                     except LeakageMatchingError:

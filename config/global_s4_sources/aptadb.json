@@ -1,0 +1,222 @@
+{
+  "source_key": "aptadb",
+  "source_dataset": "aptadb_official_export_2026-08",
+  "handoff_status": "ready_for_global_s4",
+  "authoritative_stage": "CHECKPOINT-1",
+  "checkpoint_status": "closed",
+  "checkpoint_metadata": "config/checkpoint_reviews/aptadb_checkpoint1_metadata.json",
+  "canonical_input": "data/interim/checkpoints/aptadb_cp1/resolved/aptadb_checkpoint1_applied_canonical.csv",
+  "resolution_manifest": "config/checkpoint_reviews/aptadb_checkpoint1_resolutions.csv",
+  "authorised_ids_input": "data/interim/checkpoints/aptadb_cp1/resolved/aptadb_checkpoint1_s4_authorised_ids.csv",
+  "authorisation_field": "authorised_for_s4",
+  "expected_authorised_records": 151,
+  "global_s4_handoff_output": "data/interim/global_s4_ready/aptadb_global_s4_input.csv",
+  "global_s4_handoff_summary": "data/interim/global_s4_ready/aptadb_global_s4_handoff_summary.md",
+  "redistribution_status": "unknown",
+  "global_s4_run": false,
+  "physical_row_join_key": "record_id",
+  "physical_source_grain_preserved": true,
+  "do_not_collapse_by": [
+    "aptadb_apta_index",
+    "aptadb_uniprot_id",
+    "aptadb_target_id",
+    "sequence"
+  ],
+  "handoff_ready_statement": "AptaDB CHECKPOINT-1 is closed and this source is prepared as one input to the future corpus-wide global S4 stage. authorised_for_s4=true / inclusion in this handoff means only technically eligible RNA-protein interaction records after AptaDB sequence/molecule/target-chemistry review. Source UniProt, protein names, PDB cross-references, PubMed IDs, assay text, and binding-condition/buffer fields are SOURCE provenance only. They are not copied into canonical target_uniprot, pdb_id, evidence, or affinity fields. Binding Conditions/Buffer is not interpreted as E3. Unlinked missing_target aptamers remain outside this 1350-row interaction denominator and are not in the handoff. Global S4 has not been run.",
+  "emit_target_evidence_boundary": true,
+  "emit_source_metadata_only_disclaimer": true,
+  "authorised_for_s4_meaning": "Technically eligible RNA-protein interaction records after AptaDB sequence/molecule/target-chemistry CHECKPOINT-1 and prepared as an input to the future corpus-wide global S4 stage. Does not mean target canonicalised, UniProt resolved into canonical fields, evidence threshold passed, E3 inferred from buffer, affinity resolved, PDB resolved, leakage cleared, unlinked aptamers included, final corpus included, deduplicated, clustered, balanced, or partitioned.",
+  "handoff_summary_additional_notes": [
+    "authorised_for_s4=true / inclusion in this handoff means only technically eligible RNA-protein interaction records after AptaDB sequence/molecule/target-chemistry review and prepared as an input to the future corpus-wide global S4 stage.",
+    "It does not mean target canonicalised, UniProt copied into canonical target_uniprot, evidence scored, E3 inferred from Binding Conditions/Buffer, PDB assigned, leakage cleared, final corpus included, deduplicated, clustered, balanced, or partitioned.",
+    "Canonical target_name_raw retains the applied CHECKPOINT-1 protein-names value. Canonical target_name, target_uniprot, pdb_id, evidence, and affinity remain empty.",
+    "The 37 unlinked missing_target aptamers remain outside the 1350 interaction denominator and are not in this handoff.",
+    "Physical interaction grain is preserved: 151 authorised interaction records remain 151 handoff rows even when Apta_index or UniProt values repeat.",
+    "Global S4 has not been run."
+  ],
+  "handoff_extra_fields": [
+    "aptadb_interaction_index",
+    "aptadb_apta_index",
+    "aptadb_target_id",
+    "aptadb_target_chemistry",
+    "aptadb_binding_conditions_buffer",
+    "aptadb_reference_pubmed_id",
+    "aptadb_aptamer_description",
+    "aptadb_aptamer_chemistry",
+    "aptadb_aptamer_function",
+    "aptadb_aptamer_applications",
+    "aptadb_aptamer_assay",
+    "aptadb_uniprot_id",
+    "aptadb_entry_name",
+    "aptadb_protein_names",
+    "aptadb_gene_names",
+    "aptadb_status",
+    "aptadb_organism",
+    "aptadb_protein_length",
+    "aptadb_mass",
+    "aptadb_activity_regulation",
+    "aptadb_involvement_in_disease",
+    "aptadb_catalytic_activity",
+    "aptadb_pdb_cross_reference",
+    "aptadb_protein_function",
+    "aptadb_sequence_agreement",
+    "aptadb_aptamer_join_status",
+    "aptadb_protein_join_status",
+    "aptadb_target_name_source"
+  ],
+  "required_nonempty_handoff_fields": [
+    "aptadb_interaction_index",
+    "aptadb_apta_index",
+    "aptadb_uniprot_id",
+    "aptadb_protein_names",
+    "aptadb_target_chemistry"
+  ],
+  "require_empty_canonical_fields": [
+    "target_name",
+    "target_uniprot",
+    "target_type",
+    "target_type_source",
+    "target_family",
+    "target_pfam",
+    "pdb_id",
+    "binding_evidence_type",
+    "binding_evidence_score",
+    "affinity_value",
+    "affinity_unit",
+    "affinity_type",
+    "cluster_id",
+    "is_cluster_representative",
+    "partition"
+  ],
+  "handoff_summary_provenance_counts": {
+    "report_t_to_u_applied": true,
+    "report_duplicate_sequence_identities": true,
+    "unique_count_fields": [
+      "aptadb_interaction_index",
+      "aptadb_apta_index",
+      "aptadb_uniprot_id",
+      "native_id"
+    ],
+    "duplicate_group_fields": [
+      "aptadb_apta_index",
+      "aptadb_uniprot_id"
+    ],
+    "nonempty_count_fields": [
+      "aptadb_uniprot_id",
+      "aptadb_protein_names",
+      "aptadb_entry_name",
+      "aptadb_pdb_cross_reference",
+      "aptadb_reference_pubmed_id",
+      "aptadb_binding_conditions_buffer",
+      "aptadb_aptamer_assay",
+      "target_name_raw"
+    ],
+    "true_value_count_fields": [],
+    "value_count_fields": [
+      "molecule_type",
+      "chemistry",
+      "aptadb_target_chemistry",
+      "aptadb_protein_join_status",
+      "aptadb_aptamer_join_status",
+      "redistribution_status"
+    ]
+  },
+  "handoff_summary_count_labels": {
+    "unique_aptadb_interaction_index": "unique AptaDB interaction Index values",
+    "unique_aptadb_apta_index": "unique Apta_index values",
+    "unique_aptadb_uniprot_id": "unique source UniProt accessions",
+    "unique_native_id": "unique native IDs",
+    "duplicate_aptadb_apta_index_groups": "duplicated Apta_index groups",
+    "duplicate_aptadb_apta_index_rows": "rows in duplicated Apta_index groups",
+    "duplicate_aptadb_uniprot_id_groups": "duplicated source-UniProt groups",
+    "duplicate_aptadb_uniprot_id_rows": "rows in duplicated source-UniProt groups",
+    "nonempty_aptadb_uniprot_id": "nonempty source UniProt",
+    "nonempty_aptadb_protein_names": "nonempty source protein names",
+    "nonempty_aptadb_entry_name": "nonempty source UniProt entry names",
+    "nonempty_aptadb_pdb_cross_reference": "nonempty source PDB cross-references",
+    "nonempty_aptadb_reference_pubmed_id": "nonempty source PubMed IDs",
+    "nonempty_aptadb_binding_conditions_buffer": "nonempty source Binding Conditions/Buffer",
+    "nonempty_aptadb_aptamer_assay": "nonempty source assay text",
+    "nonempty_target_name_raw": "nonempty canonical target_name_raw"
+  },
+  "future_enrichment_join": {
+    "physical_row_key": "record_id",
+    "join_path": "record_id -> S1 sidecar interaction Index / Apta_index / UniProt (aptadb_uniprot_id) -> AptaDB protein and interaction provenance",
+    "aptadb_uniprot_id_is_not": [
+      "canonical target_uniprot",
+      "dedup key"
+    ],
+    "aptadb_pdb_cross_reference_is_not": [
+      "canonical pdb_id",
+      "E1"
+    ]
+  },
+  "future_global_s4_prerequisites": [
+    "Do not copy aptadb_uniprot_id into canonical target_uniprot at this boundary. Source UniProt remains provenance until global S4.",
+    "Do not copy aptadb_pdb_cross_reference into canonical pdb_id or interpret it as E1.",
+    "Do not infer E3 or any evidence score from Binding Conditions/Buffer.",
+    "Do not recanonicalise target_name_raw; it already carries the applied CHECKPOINT-1 protein-names value.",
+    "Unlinked missing_target aptamers remain outside the interaction denominator and must not be added here.",
+    "Deduplication of repeated Apta_index or UniProt values remains a later global stage. Physical interaction grain must be preserved until then."
+  ],
+  "closure_hashes": {
+    "applied_canonical": "434369fc768efe15c60aff4ffdc3fef97ba3c43917d2b403b60e206aa43075d0",
+    "applied_routing": "a6edd736b71fefcdc9523c5d889b6274f9a35a12014d6ab709b3c72478f999ae",
+    "applied_eligible": "5fb8816b65bb9995350796f98570b21bebd402e2b27736ac01e31f22348e60d6",
+    "s4_authorised_ids": "38d29492996662a2fb4dbd6c0612066c0df4136934e3be2249ba8a278485e2b3",
+    "sidecar": "12e817369c620625c6d9758d88de71b82ca387d7376ca21d4614c4c7343d5465",
+    "s2": "b4075b602a9e569e3e91a66f1437a8939d56432138b8e9fcd2063920b0028aa5",
+    "s3_prereview": "b4075b602a9e569e3e91a66f1437a8939d56432138b8e9fcd2063920b0028aa5",
+    "raw_interaction": "6dbd97f20fa6f98d359d697713c43032d5a6a3c1a400d80ef28a150d676dff86",
+    "raw_aptamer": "9d3ab029d1de4408d2406051a68bc0e6da347ee1be1838aee9c938ca3f3fb464",
+    "raw_protein": "4de0d8b105b3318c9704ff64819089f5e17b5c735f0730724052f3e808325f79"
+  },
+  "target_metadata": {
+    "canonical_raw_field": "target_name_raw",
+    "source_specific_field": "aptadb_protein_names",
+    "source_general_field": "aptadb_target_chemistry",
+    "source_general_is_categorical": true,
+    "source_type_prior_field": "aptadb_target_chemistry",
+    "specific_target_present_in_authorised_records": 151,
+    "specific_target_missing_in_authorised_records": 0,
+    "source_metadata_path": "data/interim/extracted/aptadb_source_metadata.csv",
+    "uniprot_source_field": "aptadb_uniprot_id",
+    "uniprot_is_not_canonical_target_uniprot": true,
+    "pdb_source_field": "aptadb_pdb_cross_reference",
+    "pdb_is_not_canonical_pdb_id": true,
+    "uniprot_source_columns_present": true,
+    "pdb_source_columns_present": true,
+    "pfam_source_columns_present": false,
+    "family_source_columns_present": false
+  },
+  "provisional_source_observations": {
+    "Protein": 151
+  },
+  "s4_semantics": {
+    "target_identity_from_descriptive_source_metadata": true,
+    "source_uniprot_is_provenance_only": true,
+    "source_pdb_is_not_canonical_pdb": true,
+    "source_buffer_is_not_e3": true,
+    "source_assay_is_not_evidence_score": true,
+    "category_is_prior_only": true,
+    "source_type_is_target_class_prior": true,
+    "protein_non_protein_routing_after_target_resolution": true,
+    "leakage_exclusion_global_at_s4": true,
+    "canonical_s4_fields_populated_here": false,
+    "target_evidence_processing_deferred": true,
+    "unlinked_missing_target_excluded": true
+  },
+  "global_s4_rules": {
+    "final_target_normalisation_performed_here": false,
+    "final_target_type_assignment_performed_here": false,
+    "uniprot_resolution_performed_here": false,
+    "target_family_assignment_performed_here": false,
+    "evidence_threshold_performed_here": false,
+    "global_leakage_application_performed_here": false,
+    "deduplication_performed_here": false,
+    "clustering_performed_here": false,
+    "balancing_performed_here": false,
+    "partitioning_performed_here": false,
+    "checkpoint2_emitted_here": false
+  }
+}

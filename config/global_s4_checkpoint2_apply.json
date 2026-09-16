@@ -1,0 +1,77 @@
+{
+  "contract_id": "global_s4_checkpoint2_application",
+  "milestone": "M5_apply_checkpoint2_complete_global_s4",
+  "expected_combined_records": 2960,
+  "expected_reviewed_resolved_targets": 164,
+  "expected_inactive_target_exclusions": 36,
+  "expected_target_scientific_parks": 5,
+  "expected_relationship_parks": 9,
+  "human_derived_cAMP": {
+    "target_dictionary_id": "TDHc92005d63414",
+    "canonical_target_name": "3',5'-cyclic adenosine monophosphate (cAMP)",
+    "target_type": "small_molecule",
+    "target_family": "other"
+  },
+  "combined_input_csv": "data/interim/global_s4/combined_global_s4_input.csv",
+  "proposal_config": "config/global_s4_scientific_proposals.json",
+  "checkpoint2_dir": "data/interim/global_s4/checkpoint2",
+  "expected_hashes": {
+    "combined_input": [
+      "data/interim/global_s4/combined_global_s4_input.csv",
+      "24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0"
+    ],
+    "target_review": [
+      "data/interim/global_s4/checkpoint2/checkpoint2_target_dictionary_review.csv",
+      "ce7c64137b0d0764c137d85b606a500db29139c78c2db753ad4efd250a7ed765"
+    ],
+    "relationship_review": [
+      "data/interim/global_s4/checkpoint2/checkpoint2_relationship_review.csv",
+      "a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9"
+    ],
+    "evidence_review": [
+      "data/interim/global_s4/checkpoint2/checkpoint2_evidence_review.csv",
+      "2116183dc4db64f1939149d68e9416f36db8e9b747b4b1d7fbffca1c3c840718"
+    ],
+    "affinity_review": [
+      "data/interim/global_s4/checkpoint2/checkpoint2_affinity_review.csv",
+      "08dc960c0c8626f89a4bfdc36c17b029ebbb48d830d12a040c19c6c45a4597f4"
+    ],
+    "evidence_consistency_review": [
+      "data/interim/global_s4/checkpoint2/checkpoint2_evidence_consistency_review.csv",
+      "5775cf8682f2423f61fd6c412a4406bb62f3e23164a56e92280ccfed91edd3db"
+    ],
+    "leakage_review": [
+      "data/interim/global_s4/checkpoint2/checkpoint2_leakage_review.csv",
+      "9adb73232c363ed440dc776c3c8669784e7232ec8e67f7b55bcf4c0627bfacf7"
+    ],
+    "relationship_scientific": [
+      "data/interim/global_s4/relationship_scientific_proposals.csv",
+      "be18f87a894691801e3beb625bbe5c5ddb23ecff69cd14a48fc21c081ff5b899"
+    ],
+    "target_dictionary": [
+      "data/interim/global_s4/target_dictionary_scientific_proposed.csv",
+      "de6cc7ee3164d4a16f91a83980ae4715f0f2e0836aed9db74c994c103045c829"
+    ],
+    "evidence_affinity": [
+      "data/interim/global_s4/evidence_affinity_proposals.csv",
+      "98753d5ea536e78a33bea0dea62f64db8e58fc25678d728f71b9e115498e413b"
+    ]
+  },
+  "outputs": {
+    "reviewed_relationships_csv": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
+    "reviewed_dictionary_csv": "data/interim/global_s4/global_s4_reviewed_target_dictionary.csv",
+    "record_map_csv": "data/interim/global_s4/global_s4_record_relationship_map.csv",
+    "parked_audit_csv": "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
+    "routing_summary_csv": "data/interim/global_s4/global_s4_routing_summary.csv",
+    "application_summary_json": "data/interim/global_s4/checkpoint2_application_summary.json",
+    "application_manifest_json": "data/interim/global_s4/checkpoint2_application_manifest.json"
+  },
+  "scientific_boundary": {
+    "overwrites_combined_input": false,
+    "s5_deduplication_performed": false,
+    "clustering_performed": false,
+    "target_balancing_performed": false,
+    "ft_ref_eval_assigned": false,
+    "train_validation_splits_made": false
+  }
+}

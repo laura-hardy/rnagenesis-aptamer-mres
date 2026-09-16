@@ -4975,7 +4975,7 @@ AptaIndex S1 complete
 AptaIndex S2 complete
 AptaIndex S3 complete
 AptaIndex CHECKPOINT-1 closed
-AptaIndex prepared for later global S4 (not run)
+AptaIndex global-S4 handoff config recorded; sequence-bearing input not yet materialised
 ```
 
 ## 2026-09-07 — ENA S0 registration and S1 extraction
@@ -7756,4 +7756,2141 @@ NCBI global-S4 handoff prepared for 5 records
 Global S4 NOT run
 ```
 
+## 2026-09-14 — AptaDB and AptaIndex global-S4 handoffs materialised
+
+AptaDB and AptaIndex CHECKPOINT-1 were already closed. The two missing
+positive-authorised source-local global-S4 handoffs were materialised
+from the authoritative applied checkpoint state. Global S4 was not
+run. Combined 2960-row input construction, target canonicalisation,
+UniProt/type/family/Pfam assignment, evidence scoring, affinity
+normalisation, leakage, CHECKPOINT-2, cross-source deduplication,
+NCBI↔ENA merge, clustering, balancing, and partitioning were not
+performed.
+
+`authorised_for_s4=true` / inclusion in these handoffs means only
+technical eligibility after each source's sequence/molecule
+CHECKPOINT-1. It does not mean protein target confirmed, target
+canonicalised, UniProt resolved into canonical fields, evidence scored,
+leakage cleared, final corpus included, clustered, balanced, or
+partitioned.
+
+### AptaDB
+
+Handoff denominator: 1350 interaction records → 151 authorised
+RNA-protein records → 151 handoff rows. Unique `record_id` = 151.
+Parked ssDNA (1037), parked RNA non-protein (115), interaction-stream
+rejects (47), and 37 unlinked `missing_target` aptamers are excluded.
+`redistribution_status` remains `unknown` 151/151.
+
+The applied 151-row subset was joined one-to-one by `record_id` to the
+frozen S1 interaction/protein sidecar. Source UniProt
+(`aptadb_uniprot_id`) is nonempty 151/151 (81 unique accessions) and
+was not copied into canonical `target_uniprot`. Source protein names,
+Target chemistry, PubMed ID, Binding Conditions/Buffer, assay text,
+and PDB cross-reference are SOURCE extras only. Canonical `pdb_id`,
+evidence, and affinity remain empty. Binding Conditions/Buffer was not
+interpreted as E3. Physical interaction grain is preserved (148 unique
+Apta_index values among 151 rows; no collapse). Canonical
+`target_name_raw` retains the applied CHECKPOINT-1 protein-names
+value.
+
+AptaDB's closed resolution manifest records `authorised_for_s4` and
+`checkpoint1_resolution_status` without a separate `resolved_decision`
+column. The shared handoff utility accepts that closed schema when
+status is already `approved_for_s4`.
+
+### AptaIndex
+
+The existing tracked config `config/global_s4_sources/aptaindex.json`
+was validated against the live handoff contract and left unchanged.
+Handoff denominator: 1050 source records → 221 authorised RNA/2F-RNA
+records → 221 handoff rows. Unique `record_id` = 221. Parked ssDNA
+(614), chemistry-review parks (33), and rejects (182) are excluded.
+`redistribution_status=restricted` 221/221. Canonical `target_name_raw`
+is populated 221/221 from the applied state.
+
+Source Target / Target Type / Affinity / Reference extras survive
+one-to-one from the frozen S1 sidecar. Canonical target/evidence/affinity
+fields remain empty. Bare CR characters in AptaIndex source extras
+are written with `QUOTE_ALL` so the 221-row file round-trips as 221
+records.
+
+### Aggregate (individual handoffs, not concatenated)
+
+Positive-authorised sources = 8. Individual-handoff rows = 2960.
+Unique `record_id` = 2960. Cross-source collisions = 0. AptaDiff A/B
+remain `ready_zero_authorised` with no sequence-bearing handoff.
+
+Tracked: `config/global_s4_sources/aptadb.json`,
+`docs/data_curation/aptadb_global_s4_handoff.md`, shared handoff
+utility/tests, and this log. AptaIndex config was not rewritten.
+Ignored: `aptadb_global_s4_input.csv` (151 rows) and
+`aptaindex_global_s4_input.csv` (221 rows) plus sequence-free summaries.
+Deterministic reruns were byte-identical. `git ls-files data` remains
+empty.
+
+### Pipeline status
+
+```text
+AptaDB CHECKPOINT-1 closed
+AptaDB global-S4 handoff prepared for 151 records
+AptaIndex CHECKPOINT-1 closed
+AptaIndex global-S4 handoff prepared for 221 records
+Eight positive-authorised handoffs = 2960 rows
+AptaDiff A/B ready_zero_authorised
+Global S4 NOT run
+```
+
+## 2026-09-14 — Deterministic combined global-S4 input
+
+The eight positive-count source-local handoffs were concatenated into one
+row-preserving pre-S4 input. This is not a merge. Records were not joined,
+collapsed, or provenance-merged. Global S4 was not run.
+
+Contributing sources and counts:
+
+```text
+aptabase       162
+utexas         468
+aptadb         151
+riboaptamer    397
+aptaindex      221
+ena            675
+aptamerbase    881
+ncbi_nuc         5
+TOTAL         2960
+```
+
+Unique `record_id` = 2960. Duplicate / cross-source collisions = 0.
+AptaDiff A/B remain `ready_zero_authorised` with no fabricated rows.
+
+Canonical `CORPUS_COLUMNS` occupy the first 47 columns and were copied
+exactly. 129 source-specific extras were unioned in configured source
+order; extras are empty on rows from other sources. No extra-name
+collision remained after the existing ENA aliases. Canonical S4/S5
+fields remain empty. `contributing_sources` / `corroboration_count`
+remain source-local. AptaIndex `redistribution_status=restricted`
+remains 221/221. No licensing filter was applied.
+
+Target extraction, target-dictionary construction, evidence assignment,
+affinity canonicalisation, leakage, CHECKPOINT-2, non-protein routing,
+cross-source deduplication, NCBI↔ENA merge, clustering, balancing, and
+partitioning were not performed.
+
+Tracked: `config/global_s4_combined_input.json`,
+`scripts/data_preparation/combine_global_s4_input.py`,
+`tests/data_preparation/test_combine_global_s4_input.py`,
+`docs/data_curation/global_s4_combined_input.md`, and this log.
+Ignored: `data/interim/global_s4/combined_global_s4_input.csv` (2960
+rows), the sequence-safe summary, and the sequence-safe manifest.
+Deterministic rerun was byte-identical. Source-handoff hashes were
+unchanged. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+AptaDiff A/B ready_zero_authorised
+Combined pre-S4 input prepared
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 2 raw target extraction and initial dictionary proposal
+
+Source-supported raw target relationships were extracted from the immutable
+2960-row combined pre-S4 input. Proposals were written beside that file, not
+into it. Canonical target identity, target type, UniProt, family/Pfam,
+evidence, affinity, leakage, CHECKPOINT-2 decisions, and S5 were not applied.
+
+Structured sources (`aptabase` 162, `utexas` 468, `aptadb` 151, `aptaindex`
+221, `ena` 675) preserved existing `target_name_raw` exactly (1677/1677).
+AptaBase `target_general`, AptaDB chemistry, AptaIndex Target Type, ENA
+source target type, and RiboAptamer Type remain priors only.
+
+RiboAptamer (397) used Sequence Name `{target}_{clone}` as the primary
+explicit encoding, with narrow Aptamer Name fallbacks. Category/Type were
+not substituted for target names. Result: 370 resolved_single, 19
+ambiguous, 8 unresolved, 0 resolved_multiple.
+
+AptamerBase (881) used the local RDF path `is_participant_in` →
+`has_participant` → English `rdfs:label` on `aptamer_target` nodes.
+`aptamerbase_label` was not treated as a target. Affinity/evidence triples
+were provenance only. Result: 777 resolved_single, 46 resolved_multiple
+(expansion proposed, not applied), 10 ambiguous, 48 unresolved.
+
+NCBI (5): U34759 / U37124 / U37123 / AF083271 resolved_single from
+DEFINITION or FEATURE binding phrases; BD161067 ambiguous dual targeting
+of IRES and NS3 protease.
+
+Record extraction rows = 2960 with exact `record_id` set match.
+Relationship proposals = 3008. Machine dictionary proposals = 818
+(`review_status=machine_proposed`). AptaDB source-UniProt seeds were not
+copied into canonical `target_uniprot`.
+
+Tracked: `config/global_s4_target_extraction.json`,
+`scripts/data_preparation/extract_global_s4_targets.py`, source extraction
+adapters, synthetic tests, `docs/data_curation/global_s4_target_extraction.md`,
+and this log. Ignored: record/relationship/dictionary CSVs plus sequence-safe
+summary and manifest. Deterministic rerun was byte-identical. Combined-input
+and eight source-handoff hashes were unchanged. `git ls-files data` remains
+empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 raw target extraction + initial dictionary proposal complete
+CHECKPOINT-2 NOT started
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 3 scientific proposals and CHECKPOINT-2 preparation
+
+Machine proposals for target type, UniProt, family/Pfam, evidence,
+affinity, leakage, and routing were written beside the immutable 2960-row
+combined input. Human CHECKPOINT-2 fields were left blank. Proposals were
+not applied. S5 was not run.
+
+### RiboAptamer entry-gate audit
+
+`RA_SEQ_FIRST_UNDERSCORE` was audited against Aptamer Name, Description, and
+publication text. Category and Type were not used as corroboration.
+Outside biological knowledge was not used to rescue labels.
+
+Convention: Sequence Name `{target}_{clone_or_variant}` encodes the ligand
+in the prefix. Aptamer Name is usually `{target} aptamer` or a clone
+label. The 364 single-prefix cohort classified as:
+
+- corroborated_target_label: 331
+- sequence_name_is_explicit_target_label: 3
+- conflicting_source_metadata: 29 → ambiguous (`RA_SEQ_FIRST_UNDERSCORE_CONFLICT`)
+- insufficient_support: 1 → unresolved
+- clone_or_construct_label_not_target: 0
+
+Unsupported prefixes are no longer deterministic targets. Combined
+input remained 2960 rows. Regenerated Milestone-2 counts:
+
+```text
+resolved_single   2796
+resolved_multiple =   46
+ambiguous         =   61
+unresolved        =   57
+relationships     = 3038
+dictionary        =  831
+```
+
+RiboAptamer: 338 resolved_single / 50 ambiguous / 9 unresolved.
+
+### Target type
+
+Closed vocabulary only. Source priors are evidence, not canonical truth.
+`enzyme` → canonical `protein` plus family clue `enzyme`. Conflicts and
+unmapped priors go to CHECKPOINT-2. Unknown is allowed to remain unknown
+(UTexas has no structured type).
+
+Dictionary proposals: protein 471, peptide 13, small_molecule 127,
+nucleic_acid 12, cell 24, other 4, unknown 180.
+
+### UniProt
+
+U1 AptaDB source seeds: 81. U2 local AptaDB protein table: 8. U3
+external lookup was not used (`allow_uniprot_network=false`); unresolved
+proteins remain unresolved rather than fuzzy-matched. AptaDB
+Prothrombin (`P00734` / `P00735`) and Hemagglutinin (`P03436` / `P03451`)
+were not merged. Region/fragment context is preserved; parent UniProt
+plus `target_region_or_fragment` requires CHECKPOINT-2.
+
+### Family / Pfam
+
+Family only after type is resolved. Non-protein → `other`. Assigned:
+enzyme 17, antibody_immunoglobulin 1, other 168, unknown 645. Pfam 0/831.
+Missing Pfam is not an exclusion and is not a CHECKPOINT-2 reason by itself.
+
+### Evidence and affinity
+
+Ladder E1–E5. E1 requires a verified aptamer–target complex; mmCIF URL and
+`has_experimentally_determined_structure=true` are not E1. Buffer is not
+E3. LOD is not E2. Counts: E1=0, E2=1917, E3=267, E4=404, E5=507.
+E4/E5 threshold ambiguities: AptaDB PMID-without-assay (62), ENA
+target-specific claim (438), NCBI publication-only (1).
+
+Affinity: 959 scalar values normalised to molar. Ranges, inequalities,
+approximate verbal values, missing units, and malformed text were not
+converted to invented scalars. Ka was not converted to Kd.
+
+### Leakage and routing
+
+Existing leakage matcher in proposal mode only. Exact / ≥90% / target-alias
+matches: 0. No exclusions applied.
+
+Routing preview only: primary_candidate 1394, park_non_protein 476,
+park_evidence_e5 17, hold_target_unresolved 573, hold_evidence_ambiguous 500,
+leakage 0, no-binding 0.
+
+### CHECKPOINT-2 package
+
+Grouped blank review: 204 target, 107 relationship, 3 evidence, 19
+affinity, 0 leakage (333 decisions; 1636 affected records). Validator:
+`ready_for_application=false`. CHECKPOINT-2 is prepared, not complete.
+
+Tracked: scientific proposal config/scripts/adapters, CHECKPOINT-2
+prepare/validate, synthetic tests, `docs/data_curation/global_s4_scientific_proposals.md`,
+and this log. Ignored: proposal CSVs, routing preview, CHECKPOINT-2 CSVs,
+summary, and manifest under `data/interim/global_s4/`. Deterministic
+rerun was byte-identical. Combined-input hash unchanged.
+`git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 human review NOT started
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4A.1 CHECKPOINT-2 target-dictionary Batch-1 recording
+
+Human decisions were recorded into the ignored CHECKPOINT-2 target
+dictionary review CSV only. Proposals were not applied. Combined input
+was not modified. Relationship, evidence, affinity, and leakage review
+files were not populated. S5 was not run.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- pre-edit target-review SHA-256:
+  `5a402d93903ce9bfe757d454dc29c6d4a0a169c658a576d38b238260f050a4cb`
+- pristine copy:
+  `data/interim/global_s4/checkpoint2/pristine/checkpoint2_target_dictionary_review.csv`
+  (same hash)
+- post-edit target-review SHA-256:
+  `93ced101f4bed9fa1d3e33a00d36f96c8bc4c341df5bf399aebe3ed722ace7fe`
+- only human-review fields changed on 15 authorised rows
+
+### Adopted policies (not bulk-applied)
+
+Recorded under ignored
+`data/interim/global_s4/checkpoint2/human_review/batch1_adopted_policies.md`:
+
+1. Equivalent type-prior vocabulary (`Protein`/`Proteins`;
+   `Small molecule`/`Small molecules`/`Small Organic`) only where all
+   mapped priors agree.
+2. Free amino acids are `small_molecule`, not `peptide`.
+3. `Enzyme` supports protein + family `enzyme` only when the resolved
+   target is an enzyme/protein.
+4. Region/fragment/cleaved-form wording is retained; source UniProt may
+   be parent-protein metadata; do not silently rename to the whole
+   protein.
+5. Strict orthographic aliases (case/whitespace/punctuation/hyphen)
+   may share a canonical target; abbreviations, gene symbols, and
+   distinct components remain individual review.
+
+### Recorded target-dictionary decisions (15)
+
+- `approve_proposal` (13): `C2T0001` Codeine; `C2T0002` bFGF;
+  `C2T0003` ALPPL2; `C2T0006` ATP; `C2T0007` L-arginine; `C2T0009` uPA
+  cleaved-form / P00749 with policy note; `C2T0010` Pepocin;
+  `C2T0011` Human Activated Protein C; `C2T0017` Adenine;
+  `C2T0018` L-selectin; `C2T0019` Lysozyme; `C2T0024` Bovine thrombin;
+  `C2T0026` Dopamine.
+- `override` (2): `C2T0004` hnRNP L → protein / family other;
+  `C2T0022` B. subtilis RNase P RNA P5.1 stem-loop → nucleic_acid /
+  family other.
+
+Live IDs: `C2T0006` is ATP and `C2T0007` is L-arginine. Both were
+authorised as `approve_proposal`.
+
+### Deferred Batch-1 rows (still blank)
+
+`C2T0005`, `C2T0008`, `C2T0012`, `C2T0013`, `C2T0014`, `C2T0015`,
+`C2T0016`, `C2T0020`, `C2T0021`, `C2T0023`. These depend on relationship
+review.
+
+Remaining 189 target-dictionary rows are blank.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+318 (was 333). Errors: none. Fail-closed blank-package flag is now false
+because 15 human fields are populated, as expected.
+
+Tracked: this log and a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited target-review CSV, pristine copy, policy note, and recording
+manifest. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4B.1 CHECKPOINT-2 relationship Batch-1 recording
+
+Human decisions were recorded into the ignored CHECKPOINT-2
+relationship review CSV only. Proposals were not applied. Combined
+input was not modified. Target-dictionary, evidence, affinity, and
+leakage review files were not populated. S5 was not run.
+
+Decisions were supplied by Laura/ChatGPT on 2026-09-14.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- pre-edit relationship-review SHA-256:
+  `5c4d8fbd9c2a924d17c2038b28337767e3485dba4e0cbd9e2e95e6c8a2f88297`
+- pristine copy:
+  `data/interim/global_s4/checkpoint2/pristine/checkpoint2_relationship_review.csv`
+  (same hash)
+- post-edit relationship-review SHA-256:
+  `be587b255156e14d994e9d25217cd421617794cdffa96457fc6c5cacb6a10dc1`
+- target-review SHA-256 unchanged:
+  `93ced101f4bed9fa1d3e33a00d36f96c8bc4c341df5bf399aebe3ed722ace7fe`
+- only `manual_decision` and `manual_notes` changed on 34 authorised rows
+- `manual_relationship_action` left blank
+
+### Recorded relationship decisions (34)
+
+- `confirm_multi_target_expansion` (17): NF-kappaB p50/p65
+  (`C2R0001`–`C2R0007`); seven-aminoglycoside panel (`C2R0015`–`C2R0018`);
+  Pyr-tobramycin/Tobramycin (`C2R0022`, `C2R0023`); Neu5Ac/Neu5Gc
+  (`C2R0027`–`C2R0030`).
+- `reject_proposed_relationship` (16): PAI-1/PAI1 (`C2R0044`–`C2R0052`);
+  Mitochondria/Mitochondrion (`C2R0071`–`C2R0074`);
+  Theophyline/Theophylline (`C2R0058`–`C2R0060`).
+- `park_unresolved` (1): NCBI BD161067 (`C2R0057`).
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/batch1_relationship_recording_manifest.json`.
+
+Unlocked target-dictionary rows remain blank for a later milestone.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+284 (was 318). Errors: none.
+
+Tracked: this log and a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited relationship-review CSV, pristine copy, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4B.2 relationship-unlocked target-dictionary recording
+
+Human decisions were recorded into the ignored CHECKPOINT-2 target
+dictionary review CSV only. Proposals were not applied. Combined
+input was not modified. Relationship, evidence, affinity, and
+leakage review files were not populated. Dictionary rows were not
+collapsed. S5 was not run.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- pre-edit target-review SHA-256:
+  `93ced101f4bed9fa1d3e33a00d36f96c8bc4c341df5bf399aebe3ed722ace7fe`
+- pristine copy unchanged:
+  `data/interim/global_s4/checkpoint2/pristine/checkpoint2_target_dictionary_review.csv`
+  (`5a402d93903ce9bfe757d454dc29c6d4a0a169c658a576d38b238260f050a4cb`)
+- post-edit target-review SHA-256:
+  `77a8d355121da3cd264c5ffc704443953fd73d9d24acec5d0d5566f9f91b412f`
+- relationship-review SHA-256 unchanged:
+  `be587b255156e14d994e9d25217cd421617794cdffa96457fc6c5cacb6a10dc1`
+- only human-review fields changed on 18 authorised rows, all `override`
+
+### Recorded target-dictionary decisions (18 override)
+
+- PAI-1 aliases (`C2T0005`, `C2T0016`) → protein / family other /
+  Plasminogen activator inhibitor-1.
+- NF-kappaB p65 / p50 (`C2T0008`, `C2T0020`) remain distinct
+  transcription-factor proteins.
+- Seven aminoglycosides (`C2T0014`, `C2T0015`, `C2T0021`, `C2T0035`,
+  `C2T0037`, `C2T0042`, `C2T0051`) remain distinct small molecules.
+- Pyr tobramycin (`C2T0117`) remains distinct from Tobramycin.
+- Neu5Ac / Neu5Gc (`C2T0013`, `C2T0049`) remain distinct sialic acids.
+- Mitochondria / Mitochondrion (`C2T0012`, `C2T0048`) → organelle
+  type `other`, canonical name Mitochondrion.
+- Theophylline / Theophyline (`C2T0023`, `C2T0078`) →
+  Theophylline / small_molecule.
+
+IRES (`C2T0174`) and NS3 protease (`C2T0182`) remain blank. Each has
+`n_records=1` from `ncbi_nuc` only; BD161067 was parked.
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/batch1_relationship_unlocked_target_recording_manifest.json`.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+266 (was 284). Errors: none. Fail-closed blank-package flag remains
+false.
+
+Tracked: this log and a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited target-review CSV, pristine copy, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4B.4 CHECKPOINT-2 relationship Batch-2 recording
+
+Human decisions were recorded into the ignored CHECKPOINT-2
+relationship review CSV only. Proposals were not applied. Combined
+input was not modified. Target-dictionary, evidence, affinity, and
+leakage review files were not populated. Batch 3 and S5 were not
+started.
+
+Decisions were supplied by Laura/ChatGPT on 2026-09-14.
+
+### Reject-semantics safeguard
+
+No `checkpoint2_apply` script exists. Live collapse of
+`reject_proposed_relationship` with blank `manual_target_name` /
+`manual_relationship_action` keeps `relationship_index=1`. Ten
+authorised rows were withheld because that would retain the wrong
+relationship: `C2R0107` (Spinach, not DMHBI); `C2R0065`–`C2R0066`
+(`3'`, not complete `3',5'-cAMP`); `C2R0067`–`C2R0070` (generic
+NS5B, not NS5BΔC55); `C2R0012`–`C2R0014` (L Tyrosine-agarose, not
+free Tyrosine). The Tyrosine/agarose corpus-grain policy is documented
+in the recording note but was not entered.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- pre-edit relationship-review SHA-256:
+  `be587b255156e14d994e9d25217cd421617794cdffa96457fc6c5cacb6a10dc1`
+- pristine copy:
+  `data/interim/global_s4/checkpoint2/pristine/checkpoint2_relationship_review.csv`
+  (`5c4d8fbd9c2a924d17c2038b28337767e3485dba4e0cbd9e2e95e6c8a2f88297`)
+- post-edit relationship-review SHA-256:
+  `c8b3da755abbf541debfd399f6176b0b82787ee07aaa5a715e35d58177ccfa39`
+- target-review SHA-256 unchanged:
+  `77a8d355121da3cd264c5ffc704443953fd73d9d24acec5d0d5566f9f91b412f`
+- evidence/affinity/leakage hashes unchanged
+- only `manual_decision` and `manual_notes` changed on 30 recorded rows
+- previous 34 relationship decisions unchanged
+- `manual_relationship_action` left blank
+
+### Recorded relationship decisions (30 of 40 authorised)
+
+- `confirm_multi_target_expansion` (11): EF-Tu GDP/GTP
+  (`C2R0008`–`C2R0011`); Prothrombin/Thrombin (`C2R0024`, `C2R0025`);
+  KRAS v12/WT (`C2R0040`, `C2R0041`); BACE1 CT phospho states
+  (`C2R0037`–`C2R0039`).
+- `reject_proposed_relationship` (19): IgG (`C2R0085`–`C2R0087`);
+  GlnRS (`C2R0061`); AML1 Runt domain (`C2R0090`, `C2R0091`);
+  fluorogen ligands except Spinach/DMHBI (`C2R0089`, `C2R0092`–
+  `C2R0094`, `C2R0096`, `C2R0099`, `C2R0102`–`C2R0104`);
+  organism/context (`C2R0062`, `C2R0075`–`C2R0077`).
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/batch2_relationship_recording_manifest.json`.
+
+Unlocked target-dictionary rows remain blank.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+236 (was 266). Errors: none. Target 33/171; relationship 64/43;
+evidence 3; affinity 19; leakage 0.
+
+Tracked: this log and a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited relationship-review CSV, pristine copy, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107; 10 Batch-2 IDs withheld)
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4B.4A withheld Batch-2 relationship overrides
+
+Human decisions were recorded into the ignored CHECKPOINT-2
+relationship review CSV only. Proposals were not applied. Combined
+input was not modified. Target-dictionary, evidence, affinity, and
+leakage review files were not populated. Batch 3 and S5 were not
+started.
+
+### Override-semantics gate
+
+No `checkpoint2_apply` CLI exists. A narrow helper
+`apply_relationship_override` now replaces a record's machine
+relationship set with one human-specified target via
+`apply_relationships` on a single replacement relationship. It does
+not retain the original `relationship_index=1` candidate. Synthetic
+tests lock that contract. The full CHECKPOINT-2 apply stage was not
+created.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- pre-edit relationship-review SHA-256:
+  `c8b3da755abbf541debfd399f6176b0b82787ee07aaa5a715e35d58177ccfa39`
+- post-edit relationship-review SHA-256:
+  `b60dac9e99a6245f3e3682334c67980b528200232c95659ac6356a0096be9d79`
+- target-review SHA-256 unchanged:
+  `77a8d355121da3cd264c5ffc704443953fd73d9d24acec5d0d5566f9f91b412f`
+- evidence/affinity/leakage hashes unchanged
+- only `manual_decision`, `manual_target_name`, `manual_target_type`,
+  and `manual_notes` changed on the 10 withheld rows
+- previous 64 relationship decisions unchanged
+- 33 resolved target-dictionary decisions unchanged
+- `manual_relationship_action`, UniProt, family, and Pfam left blank
+
+### Recorded relationship overrides (10)
+
+- `C2R0107`: DMHBI / small_molecule (not Spinach)
+- `C2R0065`, `C2R0066`: 3',5'-cyclic adenosine monophosphate (cAMP)
+- `C2R0067`–`C2R0070`: hepatitis C virus (HCV) NS5BΔC55 protein
+- `C2R0012`–`C2R0014`: Tyrosine (agarose remains evidence provenance)
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/batch2_withheld_relationship_override_recording_manifest.json`.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+226 (was 236). Errors: none. Target 33/171; relationship 74/33;
+evidence 3; affinity 19; leakage 0.
+
+Tracked: relationship-override helper, synthetic tests, this log, and
+a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited relationship-review CSV, pristine copy, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4B.6 CHECKPOINT-2 relationship Batch-3 recording
+
+Human decisions were recorded into the ignored CHECKPOINT-2
+relationship review CSV only. Proposals were not applied. Combined
+input was not modified. Target-dictionary, evidence, affinity, and
+leakage review files were not populated. S5 was not started.
+
+This closes the CHECKPOINT-2 relationship-review component
+(107/107). Eight `park_unresolved` rows are completed human review
+outcomes, not missing decisions. Unlocked target-dictionary rows
+remain blank.
+
+Decisions were supplied by Laura/ChatGPT on 2026-09-14.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- pre-edit relationship-review SHA-256:
+  `b60dac9e99a6245f3e3682334c67980b528200232c95659ac6356a0096be9d79`
+- pristine copy unchanged:
+  `data/interim/global_s4/checkpoint2/pristine/checkpoint2_relationship_review.csv`
+  (`5c4d8fbd9c2a924d17c2038b28337767e3485dba4e0cbd9e2e95e6c8a2f88297`)
+- post-edit relationship-review SHA-256:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- target-review SHA-256 unchanged:
+  `77a8d355121da3cd264c5ffc704443953fd73d9d24acec5d0d5566f9f91b412f`
+- evidence/affinity/leakage hashes unchanged
+- machine proposal hashes unchanged
+- only `manual_decision` and `manual_notes` changed on 32 rows;
+  `C2R0034` also received `manual_target_name` and `manual_target_type`
+- previous 74 relationship decisions unchanged
+- 33 resolved target-dictionary decisions unchanged
+- `manual_relationship_action`, UniProt, family, and Pfam left blank
+
+### Recorded relationship decisions (33 of 33 remaining)
+
+- `confirm_multi_target_expansion` (15): trypanosome stage/strain
+  panel (`C2R0019`, `C2R0020`); human/mouse CCL1 (`C2R0021`);
+  A549/EGFR (`C2R0026`); zinc-finger p1-8/TFIIIA (`C2R0031`–
+  `C2R0033`); PrP ARR/VRQ (`C2R0035`); CPEB3/CPEB4 domains
+  (`C2R0036`); GluA2 open/closed (`C2R0042`, `C2R0043`); HIV
+  LTR-325/LTR-408 (`C2R0053`); human/mouse IL-17A (`C2R0054`);
+  IL-17 A/A, A/F, F/F (`C2R0055`, `C2R0056`).
+- `reject_proposed_relationship` (9): Guanine (`C2R0063`);
+  Malachite green (`C2R0064`); engineered FKBP (`C2R0078`,
+  `C2R0079`); calsenilin (`C2R0083`, `C2R0084`); DFHBI not Fab
+  (`C2R0088`); Chili DMHBO+ (`C2R0098`); FAD (`C2R0101`).
+- `override` (1): `C2R0034` RVV-X / protein (not VEGF165).
+- `park_unresolved` (8): polκ versus polβ (`C2R0080`–`C2R0082`);
+  AMPA/kainate (`C2R0095`); OTB-SO3/Fab (`C2R0097`); Beetroot
+  ThT/DFHO/DFAME (`C2R0100`); TMR versus pAF (`C2R0105`,
+  `C2R0106`).
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/batch3_relationship_recording_manifest.json`.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+193 (was 226). Errors: none. Target 33/171; relationship 107/0;
+evidence 3; affinity 19; leakage 0.
+
+Tracked: this log and a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited relationship-review CSV, pristine copy, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4C.2 CHECKPOINT-2 active target-dictionary Batch-2 recording
+
+Human decisions were recorded into the ignored CHECKPOINT-2 target
+dictionary review CSV only. Proposals were not applied. Combined
+input was not modified. Relationship, evidence, affinity, and
+leakage review files were not populated. Inactive/superseded and
+parked-relationship-only target rows were not reviewed. No cAMP
+dictionary row was created. S5 was not run.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- pre-edit target-review SHA-256:
+  `77a8d355121da3cd264c5ffc704443953fd73d9d24acec5d0d5566f9f91b412f`
+- pristine copy unchanged:
+  `data/interim/global_s4/checkpoint2/pristine/checkpoint2_target_dictionary_review.csv`
+  (`5a402d93903ce9bfe757d454dc29c6d4a0a169c658a576d38b238260f050a4cb`)
+- post-edit target-review SHA-256:
+  `66f9cff59c667b6c96dddad92bb75cd359e6edc9d748175d145b6efbd42a257a`
+- relationship-review SHA-256 unchanged:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence/affinity/leakage hashes unchanged
+- machine proposal hashes unchanged
+- only human-review fields changed on 40 authorised active rows
+- previous 33 target-dictionary decisions unchanged
+
+### Recorded target-dictionary decisions (40)
+
+- `approve_proposal` (31): TFKBP*3R-2G; DFHBI-1T; sheep PrP VRQ/ARR;
+  GlnRS; L-Citrulline; prothrombin; p1-8; DFHBI; Guanine; RF1;
+  calsenilin; DFHO; Xanthine; ACE; CsrA; CPEB3/CPEB4 domains; DMHBI;
+  DMHBO+; FAD; HBC; Malachite green; NBSI; YO3; RVV-X; BACE1 CT
+  phospho states; EFTuGDP/GTP; Tyrosine.
+- `override` (9 family only): HIV-1 Tat `viral_protein`; HEWL
+  `enzyme`; HCV NS5BΔC55 `enzyme`; SARS-CoV N `viral_protein`;
+  polκ `enzyme`; TFIIIA `transcription_factor`; Thrombin `enzyme`;
+  Human IgG `antibody_immunoglobulin`; Pol II `enzyme`.
+
+PrP ARR/VRQ, prothrombin/thrombin, p1-8/TFIIIA, CPEB3/CPEB4, BACE1
+phospho states, and EF-Tu GDP/GTP remain separate identities. polκ,
+DFHO, Xanthine, and DMHBI were not globally removed.
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/batch2_target_recording_manifest.json`.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+153 (was 193). Errors: none. Target 73/131; relationship 107/0;
+evidence 3; affinity 19; leakage 0.
+
+Tracked: this log and a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited target-review CSV, pristine copy, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4C.3 target-dictionary review/application semantics
+
+Architecture/semantics only. No additional target identities were
+reviewed. The 131 blank target-review rows were not populated.
+Evidence, affinity, and CHECKPOINT-2 application were not started.
+S5 was not run.
+
+Current target actions could not represent relationship-conditioned
+inactivity. Using `park_unresolved` for superseded or parked-only
+candidates would treat them as unresolved science. The smallest
+correction is one explicit target action,
+`exclude_no_active_relationship`, valid only when the reviewed
+relationship projection shows zero effective resolved relationships
+for that dictionary identity. Machine-derived provenance
+distinguishes `superseded_by_relationship_review` from
+`parked_relationship_only`. Both are excluded from the resolved
+effective dictionary; parked-only provenance remains linked to the
+parked relationship records.
+
+Relationship overrides reuse a dictionary identity only on exact
+name match. Non-matching names, including
+`3',5'-cyclic adenosine monophosphate (cAMP)`, create a deterministic
+human-derived identity (`TDH…`) that still requires a target-level
+review row. Nearby `cAMP` / `Cyclic adenosine monophosphate` rows are
+not reused. Machine proposal tables and live review CSVs were not
+mutated.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- target-review SHA-256 unchanged:
+  `66f9cff59c667b6c96dddad92bb75cd359e6edc9d748175d145b6efbd42a257a`
+- relationship-review SHA-256 unchanged:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence/affinity/leakage hashes unchanged
+- machine proposal tables unchanged
+- `git ls-files data` remains empty
+
+### Dry-run against accepted live state
+
+- superseded candidates passing the inactivity invariant: 26/26
+- parked-only candidates passing: 10/10
+- inactive action rejected for active-elsewhere `C2T0025` polκ,
+  `C2T0094` DFHO, `C2T0132` Xanthine, `C2T0150` DMHBI
+- projected cAMP identity `TDHc92005d63414` with blank proposed
+  review row `C2THc92005d63414`; not written
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+153. Errors: none. Target 73/131; relationship 107/0; evidence 3;
+affinity 19; leakage 0. The new action is not recorded on any live
+row. When later recorded, inactive rows will count as resolved
+decisions without entering the effective dictionary.
+
+Tracked: vocabulary, relationship projection, dictionary transform
+helper, validator invariant, synthetic tests, scientific docs, this
+log. Ignored review CSVs were not edited.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added;
+  36 non-active target rows still blank; cAMP review row not added
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4C.4 relationship-inactive target-dictionary recording
+
+Human decisions were recorded into the ignored CHECKPOINT-2 target
+dictionary review CSV only. Proposals were not applied. Combined
+input was not modified. Relationship, evidence, affinity, and
+leakage review files were not populated. The 95 remaining active
+blank target rows were not reviewed. No cAMP dictionary or review
+row was created. S5 was not run.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- pre-edit target-review SHA-256:
+  `66f9cff59c667b6c96dddad92bb75cd359e6edc9d748175d145b6efbd42a257a`
+- post-edit target-review SHA-256:
+  `2dfc68237ae0a7ac8eb41fa04dd17d89c4195823b350ff9cc00f7a35850df4e1`
+- relationship-review SHA-256 unchanged:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence SHA-256 unchanged:
+  `dc42db78661d2b68723eb9380093435f6285ad2833556339a366496b67517dc0`
+- affinity SHA-256 unchanged:
+  `ec7da21e3d7fbe2ba17715b477bf3e6c000a92b04ea8ea303a8020f3e5e732c8`
+- leakage SHA-256 unchanged:
+  `9adb73232c363ed440dc776c3c8669784e7232ec8e67f7b55bcf4c0627bfacf7`
+- machine proposal hashes unchanged
+- only `manual_decision` changed on the 36 authorised inactive rows
+- previous 73 target-dictionary decisions unchanged
+
+### Recorded target-dictionary decisions (36)
+
+All 36: `exclude_no_active_relationship`. Override fields blank.
+
+- `superseded_by_relationship_review` (26): IgG; GlnRs; AML1
+  (RUNX1); Ca2+ binding protein; Engineered FKBP protein_s23; TMR;
+  FMN; Riboflavin; VEGF165; Spinach; Broccoli; Clivias; Corn;
+  Mango-III; Okra; Pepper; Squash; T. thermophilus; E. coli;
+  S. cerevisiae; `3'`; `5'-cyclic adenosine monophosphate (cAMP)`;
+  generic NS5B parent; L Tyrosine-agarose; long DMHBI source label;
+  Fab.
+- `parked_relationship_only` (10): polβ; pAF; TMR; AMPA; kainate
+  receptors; DFAME; ThT; IRES; NS3 protease of hepatitis C virus;
+  OTB-SO3.
+
+Active-elsewhere controls polκ, DFHO, Xanthine, and DMHBI still
+reject the inactive action. Projected cAMP identity
+`TDHc92005d63414` remains unwritten.
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/inactive_target_recording_manifest.json`.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+117 (was 153). Errors: none. Target 109/95; relationship 107/0;
+evidence 3; affinity 19; leakage 0.
+
+Tracked: this log and a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited target-review CSV, package README, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4C.5 human-derived cAMP target identity
+
+The reviewed relationship overrides `C2R0065` and `C2R0066` were
+projected into one deterministic human-derived target-dictionary
+identity and reviewed at target grain. Combined input was not
+modified. Relationship, evidence, affinity, and leakage review files
+were not populated. The 95 remaining active blank target rows were
+not reviewed. The 36 inactive decisions were not modified. No
+CHECKPOINT-2 apply was performed. S5 was not run.
+
+Exact dictionary mapping found no existing machine/reviewed identity
+for `3',5'-cyclic adenosine monophosphate (cAMP)`. Nearby `cAMP` and
+`Cyclic adenosine monophosphate` identities were not reused. Old
+parse fragments `C2T0083` and `C2T0085` remain
+`exclude_no_active_relationship`.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- pre-edit target-review SHA-256:
+  `2dfc68237ae0a7ac8eb41fa04dd17d89c4195823b350ff9cc00f7a35850df4e1`
+- post-edit target-review SHA-256:
+  `ee11da4205381e5e757e3e1d121fc5606523b5bc4d94357c870a374daa466a48`
+- relationship-review SHA-256 unchanged:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence SHA-256 unchanged:
+  `dc42db78661d2b68723eb9380093435f6285ad2833556339a366496b67517dc0`
+- affinity SHA-256 unchanged:
+  `ec7da21e3d7fbe2ba17715b477bf3e6c000a92b04ea8ea303a8020f3e5e732c8`
+- leakage SHA-256 unchanged:
+  `9adb73232c363ed440dc776c3c8669784e7232ec8e67f7b55bcf4c0627bfacf7`
+- machine proposal hashes unchanged
+- previous 109 target-dictionary decisions unchanged
+- one new row only: `C2THc92005d63414` / `TDHc92005d63414`
+
+### Recorded target-dictionary decision (1)
+
+`C2THc92005d63414`: `approve_proposal` for
+`3',5'-cyclic adenosine monophosphate (cAMP)` (`small_molecule`,
+family `other`). Override fields blank. Provenance
+`checkpoint2_relationship_override:C2R0065|C2R0066`.
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/human_derived_camp_target_recording_manifest.json`.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+117. Errors: none. Target 110/95/205; relationship 107/0; evidence 3;
+affinity 19; leakage 0.
+
+Tracked: human-derived materialisation helper, synthetic
+idempotency test, this log, and a one-line CHECKPOINT-2 status note
+in `docs/data_curation/global_s4_scientific_proposals.md`. Ignored:
+the edited target-review CSV, package README, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 human-derived cAMP target identity materialised and approved (110/205)
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4C.7 CHECKPOINT-2 active target-dictionary Batch-3 recording
+
+Human decisions were recorded into the ignored CHECKPOINT-2 target
+dictionary review CSV only. Proposals were not applied. Combined
+input was not modified. Relationship, evidence, affinity, and
+leakage review files were not populated. The previous 110
+target-dictionary decisions, including the 36 inactive exclusions
+and the approved human-derived cAMP row, were not modified. S5 was
+not run. Batch 4 was not started.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- pre-edit target-review SHA-256:
+  `ee11da4205381e5e757e3e1d121fc5606523b5bc4d94357c870a374daa466a48`
+- post-edit target-review SHA-256:
+  `b34ea79952d26c2f1d0d29a243cf97bc11ab3273eb754f687d04238468c8869d`
+- relationship-review SHA-256 unchanged:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence SHA-256 unchanged:
+  `dc42db78661d2b68723eb9380093435f6285ad2833556339a366496b67517dc0`
+- affinity SHA-256 unchanged:
+  `ec7da21e3d7fbe2ba17715b477bf3e6c000a92b04ea8ea303a8020f3e5e732c8`
+- leakage SHA-256 unchanged:
+  `9adb73232c363ed440dc776c3c8669784e7232ec8e67f7b55bcf4c0627bfacf7`
+- machine proposal hashes unchanged
+- only human-review fields changed on the 40 authorised active rows
+- previous 110 target-dictionary decisions unchanged
+- 36 `exclude_no_active_relationship` rows unchanged
+
+### Recorded target-dictionary decisions (40)
+
+- `override` (32): AML1 Runt domain; closed/open GluA2Qflip; IL-2RA;
+  IL-6RA; H2N2/H3N2 hemagglutinin seed splits; bovine/human
+  prothrombin; human/mouse CCL1; human/mouse IL-17A; IL-17 A/A, A/F
+  (two IDs), F/F dimers; mutant/WT KRAS; Human Thrombin; Nogo-66
+  Receptor; Apramycin; Kanamycin A; N-terminal histone H3 peptide;
+  *E. coli* O157:H7; HIV-1 Rev peptide; Neuropeptide Y; Lys-Arg-
+  azobenzene-Arg; A549 cells; EGFR; HIV-1 reverse transcriptase
+  spelling pair.
+- `approve_proposal` (7): HIV-1 LTR-325/LTR-408; four *T. brucei*
+  stage/strain cell identities; Thyroxine.
+- `park_unresolved` (1): CypB pancreatic cell line (`C2T0092`).
+
+Apramycin `C2T0038` is exactly `Apramycin` (`small_molecule`), not
+an aminoglycoside group. It may share that canonical name with
+`C2T0037` / `TD0059` while remaining `TD0060`. Machine UniProt
+accessions P03451, P03436, P00735, P00734, P01589, and P08887 were
+retained; `manual_uniprot` was left blank.
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/batch3_target_recording_manifest.json`.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+77 (was 117). Errors: none. Target 150/55/205; relationship 107/0;
+evidence 3; affinity 19; leakage 0.
+
+Tracked: this log and a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited target-review CSV, package README, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 human-derived cAMP target identity materialised and approved (110/205)
+CHECKPOINT-2 Batch-3 active target-dictionary decisions recorded (150/205; 1 scientific park)
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-14 — Milestone 4C.9 final active target-dictionary recording
+
+Human decisions were recorded into the ignored CHECKPOINT-2 target
+dictionary review CSV only. Proposals were not applied. Combined
+input was not modified. Relationship, evidence, affinity, and
+leakage review files were not populated. The previous 150
+target-dictionary decisions, including the 36 inactive exclusions,
+the approved human-derived cAMP row, and the CypB park, were not
+modified. S5 was not run. Evidence and affinity review were not
+started.
+
+This closes the CHECKPOINT-2 target-dictionary review component
+(205/205).
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- pre-edit target-review SHA-256:
+  `b34ea79952d26c2f1d0d29a243cf97bc11ab3273eb754f687d04238468c8869d`
+- post-edit target-review SHA-256:
+  `ce7c64137b0d0764c137d85b606a500db29139c78c2db753ad4efd250a7ed765`
+- relationship-review SHA-256 unchanged:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence SHA-256 unchanged:
+  `dc42db78661d2b68723eb9380093435f6285ad2833556339a366496b67517dc0`
+- affinity SHA-256 unchanged:
+  `ec7da21e3d7fbe2ba17715b477bf3e6c000a92b04ea8ea303a8020f3e5e732c8`
+- leakage SHA-256 unchanged:
+  `9adb73232c363ed440dc776c3c8669784e7232ec8e67f7b55bcf4c0627bfacf7`
+- machine proposal hashes unchanged
+- only human-review fields changed on the 55 authorised active rows
+- previous 150 target-dictionary decisions unchanged
+- 36 `exclude_no_active_relationship` rows unchanged
+- CypB `C2T0092` remains `park_unresolved`
+
+### Recorded target-dictionary decisions (55)
+
+- `approve_proposal` (15): FMN; Cyanocobalamin; Tetracycline;
+  4,4′-Methylenedianiline; moenomycin A; DFHBI chemical name;
+  Cyanine dye cy3; Factor VII; Sulforhodamine B; BHDP; African
+  Trypanosomes (`cell`); Brain capillary endothelia and parenchyma
+  (`other`); Factor IX; FADH; S-Adenosyl-L-homocysteine.
+- `override` (36): Angiopoietin-2 pair; PSMA trio; TO1-biotin pair;
+  ATP; NF-kappaB p50; ALPPL2; M3 HIV-1 RT pair; whole VEEV and
+  influenza A/Panama virions (`organism`); MS2 coat protein; mAb198;
+  Rabbit IgG; aniline-substituted sulforhodamine analogue; BoNT/A
+  pair; HEF; NF-kappaB p65; hemoglobin beta; CD23; MMP-9; CRP;
+  complement C5; HIV-1 gp160; integrin alpha-IIb / alpha-V; IL-8;
+  Ebola sGP; Pro-neuropeptide Y; Progonadoliberin-1; LAMTOR5; RACK1.
+- `park_unresolved` (4): HCV H77 genome polyprotein; HIV-1 HXB2
+  Gag-Pol; MoMLV Gag-Pol; FIV Pol polyprotein.
+
+Canonical-name convergence does not collapse dictionary IDs.
+Machine UniProt accessions were retained with `manual_uniprot`
+blank. No accession was invented for `C2T0059`.
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/final_target_recording_manifest.json`.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+22 (was 77). Errors: none. Target 205/0/205; relationship 107/0;
+evidence 3; affinity 19; leakage 0.
+
+Effective-dictionary dry-run (not applied): 164 resolved entries,
+36 inactive exclusions, 5 target scientific parks.
+
+Tracked: this log and a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited target-review CSV, package README, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 human-derived cAMP target identity materialised and approved (110/205)
+CHECKPOINT-2 Batch-3 active target-dictionary decisions recorded (150/205; 1 scientific park)
+CHECKPOINT-2 final active target-dictionary decisions recorded (205/205; 5 scientific parks)
+CHECKPOINT-2 target-dictionary review CLOSED
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-15 — Milestone 4D.2 CHECKPOINT-2 evidence recording
+
+Human evidence decisions were recorded into the ignored CHECKPOINT-2
+evidence review CSV only. Proposals were not applied. Combined input
+was not modified. Target, relationship, affinity, and leakage review
+files were not populated. Machine evidence/affinity proposal tables
+were not bulk-updated. S5 was not run. Affinity review was not
+started.
+
+This closes the CHECKPOINT-2 evidence-review component (3/3).
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- target-review SHA-256 unchanged:
+  `ce7c64137b0d0764c137d85b606a500db29139c78c2db753ad4efd250a7ed765`
+- relationship-review SHA-256 unchanged:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- pre-edit evidence SHA-256:
+  `dc42db78661d2b68723eb9380093435f6285ad2833556339a366496b67517dc0`
+- post-edit evidence SHA-256:
+  `2116183dc4db64f1939149d68e9416f36db8e9b747b4b1d7fbffca1c3c840718`
+- affinity SHA-256 unchanged:
+  `ec7da21e3d7fbe2ba17715b477bf3e6c000a92b04ea8ea303a8020f3e5e732c8`
+- leakage SHA-256 unchanged:
+  `9adb73232c363ed440dc776c3c8669784e7232ec8e67f7b55bcf4c0627bfacf7`
+- machine proposal hashes unchanged
+- only human-review fields changed on the three evidence rows
+
+### Recorded evidence decisions (3)
+
+- `C2E0001` AptaDB `override_evidence` E4 → E5 (score 1): PMID
+  without Assay, binding assay, or selection provenance.
+- `C2E0002` ENA `confirm_evidence` E5 (score 1): patent-level
+  target-specific aptamer claims; not upgraded to E4.
+- `C2E0003` NCBI `confirm_evidence` E5 (score 1): BD161067
+  patent/DEFINITION association only. Relationship park `C2R0057`
+  remains authoritative.
+
+No review-row split. Nearby non-reviewed ENA E4 assignments were
+not reopened.
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/evidence_recording_manifest.json`.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+19 (was 22). Errors: none. Target 205/0; relationship 107/0;
+evidence 3/0; affinity 0/19; leakage 0.
+
+Evidence-projection dry-run (not applied): E1=0, E2=1917, E3=267,
+E4=342, E5=569. Only AptaDB moved 62 rows E4→E5.
+
+Routing dry-run (not applied): AptaDB 59 `park_evidence_e5` plus 3
+already target-parked; ENA 438 `park_evidence_e5`; NCBI relationship
+park unchanged.
+
+Tracked: this log and a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited evidence-review CSV, package README, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 human-derived cAMP target identity materialised and approved (110/205)
+CHECKPOINT-2 Batch-3 active target-dictionary decisions recorded (150/205; 1 scientific park)
+CHECKPOINT-2 final active target-dictionary decisions recorded (205/205; 5 scientific parks)
+CHECKPOINT-2 target-dictionary review CLOSED
+CHECKPOINT-2 evidence decisions recorded (3/3; all E5)
+CHECKPOINT-2 evidence review CLOSED
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-15 — Milestone 4D.2 CHECKPOINT-2 evidence recording
+
+Human evidence decisions were recorded into the ignored CHECKPOINT-2
+evidence review CSV only. Proposals were not applied. Combined input
+was not modified. Target, relationship, affinity, and leakage review
+files were not populated. Machine evidence/affinity proposal tables
+were not bulk-updated. S5 was not run. Affinity review was not
+started.
+
+This closes the CHECKPOINT-2 evidence-review component (3/3).
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- target-review SHA-256 unchanged:
+  `ce7c64137b0d0764c137d85b606a500db29139c78c2db753ad4efd250a7ed765`
+- relationship-review SHA-256 unchanged:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- pre-edit evidence SHA-256:
+  `dc42db78661d2b68723eb9380093435f6285ad2833556339a366496b67517dc0`
+- post-edit evidence SHA-256:
+  `2116183dc4db64f1939149d68e9416f36db8e9b747b4b1d7fbffca1c3c840718`
+- affinity SHA-256 unchanged:
+  `ec7da21e3d7fbe2ba17715b477bf3e6c000a92b04ea8ea303a8020f3e5e732c8`
+- leakage SHA-256 unchanged:
+  `9adb73232c363ed440dc776c3c8669784e7232ec8e67f7b55bcf4c0627bfacf7`
+- machine proposal hashes unchanged
+- only human-review fields changed on the three evidence rows
+
+### Recorded evidence decisions (3)
+
+- `C2E0001` AptaDB `override_evidence` E4 → E5 (score 1): PMID
+  without Assay, binding assay, or selection provenance.
+- `C2E0002` ENA `confirm_evidence` E5 (score 1): patent-level
+  target-specific aptamer claims; not upgraded to E4.
+- `C2E0003` NCBI `confirm_evidence` E5 (score 1): BD161067
+  patent/DEFINITION association only. Relationship park `C2R0057`
+  remains authoritative.
+
+No review-row split. Nearby non-reviewed ENA E4 assignments were
+not reopened.
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/evidence_recording_manifest.json`.
+
+### Validator
+
+`ready_for_application=false`. Unresolved CHECKPOINT-2 decisions:
+19 (was 22). Errors: none. Target 205/0; relationship 107/0;
+evidence 3/0; affinity 0/19; leakage 0.
+
+Evidence-projection dry-run (not applied): E1=0, E2=1917, E3=267,
+E4=342, E5=569. Only AptaDB moved 62 rows E4→E5.
+
+Routing dry-run (not applied): AptaDB 59 `park_evidence_e5` plus 3
+already target-parked; ENA 438 `park_evidence_e5`; NCBI relationship
+park unchanged.
+
+Tracked: this log and a one-line CHECKPOINT-2 status note in
+`docs/data_curation/global_s4_scientific_proposals.md`. Ignored: the
+edited evidence-review CSV, package README, and recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 human-derived cAMP target identity materialised and approved (110/205)
+CHECKPOINT-2 Batch-3 active target-dictionary decisions recorded (150/205; 1 scientific park)
+CHECKPOINT-2 final active target-dictionary decisions recorded (205/205; 5 scientific parks)
+CHECKPOINT-2 target-dictionary review CLOSED
+CHECKPOINT-2 evidence decisions recorded (3/3; all E5)
+CHECKPOINT-2 evidence review CLOSED
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+
+
+## 2026-09-15 — Milestone 4E.2 affinity review semantics
+
+Affinity review gained first-class outcomes, per-record transforms,
+qualifier/raw/non-affinity representation, a projection helper, and
+an evidence-affinity consistency check. The 19 live affinity decisions
+were not recorded. Combined input, target/relationship/evidence review,
+and machine proposal tables were not modified. CHECKPOINT-2 was not
+applied. S5 was not run.
+
+The previous shared vocabulary could not express retain-raw-without
+scalar, non-affinity, qualifier/range, or per-record scalars under one
+grouped row. Target `override` is not used for affinity.
+
+### Integrity (unchanged)
+
+- combined SHA-256:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- target-review SHA-256:
+  `ce7c64137b0d0764c137d85b606a500db29139c78c2db753ad4efd250a7ed765`
+- relationship-review SHA-256:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence-review SHA-256:
+  `2116183dc4db64f1939149d68e9416f36db8e9b747b4b1d7fbffca1c3c840718`
+- affinity-review SHA-256:
+  `ec7da21e3d7fbe2ba17715b477bf3e6c000a92b04ea8ea303a8020f3e5e732c8`
+
+Affinity remains 0 resolved / 19 blank; all affinity human fields
+blank.
+
+### Semantics (not recorded)
+
+Affinity-only completed outcomes: `confirm_affinity_scalar`,
+`retain_affinity_raw`, `exclude_non_affinity`, plus existing
+`park_unresolved`. Canonical scalar columns stay blank unless a
+per-record exact molar value is safe. No invented midpoint/nM.
+
+Deterministic parser repairs (not re-proposed): scientific-notation
+hyphen, glued units, uncertainty after unit, `Kd: NA`.
+
+Live dry-run split: 19 rows → 31 proposed subgroups. Unsplit 13
+rows. Split: C2A0004, C2A0009, C2A0013, C2A0014, C2A0016, C2A0018.
+Projected record classes: exact scalar 11; retain-raw 741;
+non-affinity 114; park 0. Evidence-affinity inconsistency flags: 49
+records. These block application until reconciled and do not mutate
+evidence.
+
+Validator: `ready_for_application=false`. Unresolved 19. Errors: none.
+
+Tracked: affinity helper/validator/parser tests, this log, and
+`docs/data_curation/checkpoint2_affinity_review_semantics.md`.
+Ignored live review CSVs were not edited. `git ls-files data`
+remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 human-derived cAMP target identity materialised and approved (110/205)
+CHECKPOINT-2 Batch-3 active target-dictionary decisions recorded (150/205; 1 scientific park)
+CHECKPOINT-2 final active target-dictionary decisions recorded (205/205; 5 scientific parks)
+CHECKPOINT-2 target-dictionary review CLOSED
+CHECKPOINT-2 evidence decisions recorded (3/3; all E5)
+CHECKPOINT-2 evidence review CLOSED
+CHECKPOINT-2 affinity semantics added; 19 affinity rows still blank
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-16 — Milestone 4E.3 controlled affinity review split
+
+The 19-row affinity review was materialised into 31 scientifically
+coherent rows. Human affinity fields remain blank. Combined input,
+target/relationship/evidence review, and machine proposal tables were
+not modified. CHECKPOINT-2 was not applied. S5 was not run.
+
+The 19→31 increase is corrected review grain, not regression: six
+heterogeneous groups cannot share one human rule.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- target-review SHA-256 unchanged:
+  `ce7c64137b0d0764c137d85b606a500db29139c78c2db753ad4efd250a7ed765`
+- relationship-review SHA-256 unchanged:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence-review SHA-256 unchanged:
+  `2116183dc4db64f1939149d68e9416f36db8e9b747b4b1d7fbffca1c3c840718`
+- pre-split affinity SHA-256:
+  `ec7da21e3d7fbe2ba17715b477bf3e6c000a92b04ea8ea303a8020f3e5e732c8`
+- pristine copy:
+  `data/interim/global_s4/checkpoint2/pristine/checkpoint2_affinity_review_pre_split.csv`
+  (same hash)
+- post-split affinity SHA-256:
+  `518f8f262b0133cc5938c0b3ce0166ba200102abd9b59790e6e9122fb39cec25`
+- leakage and machine proposal hashes unchanged
+
+### Split map
+
+Unsplit (13): C2A0001, C2A0002, C2A0003, C2A0005, C2A0006, C2A0007,
+C2A0008, C2A0010, C2A0011, C2A0012, C2A0015, C2A0017, C2A0019.
+
+Split parents are not reused as children:
+
+- C2A0004 → C2A0004A assay caption (60) / C2A0004B mentioned foreign Kd (25)
+- C2A0009 → C2A0009A list (2) / C2A0009B true range (2)
+- C2A0013 → C2A0013A inequality (4) / C2A0013B multiple (1) / C2A0013C uncertainty (9)
+- C2A0014 → C2A0014A approximate (5) / C2A0014B binding % (2) / C2A0014C range (1)
+- C2A0016 → C2A0016A central±unc (2) / C2A0016B glued nM (3) / C2A0016C NA (2) / C2A0016D multiple (35) / C2A0016E rate (2)
+- C2A0018 → C2A0018A multiple (6) / C2A0018B `2e-5 M` (2) / C2A0018C true range (10)
+
+Seven C2A0004 records on parked targets remain in A/B. `riboaptamer:481`
+remains in C2A0016D; relationship park is authoritative.
+
+### Projected outcome classes (machine metadata only)
+
+Review rows: exact-scalar 4; retain-raw 15; non-affinity 12; park 0.
+Records: exact-scalar 11; retain-raw 741; non-affinity 114; park 0.
+No `manual_decision` was written.
+
+Evidence-affinity inconsistency flags remain 49 unique records and
+block application: 40 machine-E2 / projected non-affinity; 9 machine-E4
+but projected exact scalar. Evidence review was not reopened.
+
+### Validator
+
+`ready_for_application=false`. Unresolved 31 (was 19). Errors: none.
+Target 205/0; relationship 107/0; evidence 3/0; affinity 0/31.
+
+Tracked: affinity split/materialisation helper and tests, this log,
+semantics note, scientific-proposals status line. Ignored: 31-row
+affinity CSV, pristine 19-row copy, package README, materialisation
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 human-derived cAMP target identity materialised and approved (110/205)
+CHECKPOINT-2 Batch-3 active target-dictionary decisions recorded (150/205; 1 scientific park)
+CHECKPOINT-2 final active target-dictionary decisions recorded (205/205; 5 scientific parks)
+CHECKPOINT-2 target-dictionary review CLOSED
+CHECKPOINT-2 evidence decisions recorded (3/3; all E5)
+CHECKPOINT-2 evidence review CLOSED
+CHECKPOINT-2 affinity review split 19 -> 31; all affinity human fields blank
+CHECKPOINT-2 not applied; not ready for application
+Global S4 NOT run
+```
+
+## 2026-09-16 — Milestone 4E.4 affinity decisions recorded
+
+Recorded exactly 31 authorised affinity-review decisions into the
+ignored 31-row package. Target, relationship, and evidence review were
+not modified. Machine proposal tables and combined input were not
+modified. CHECKPOINT-2 was not applied. S5 was not run.
+
+### Integrity
+
+- combined SHA-256 unchanged:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- target-review SHA-256 unchanged:
+  `ce7c64137b0d0764c137d85b606a500db29139c78c2db753ad4efd250a7ed765`
+- relationship-review SHA-256 unchanged:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence-review SHA-256 unchanged:
+  `2116183dc4db64f1939149d68e9416f36db8e9b747b4b1d7fbffca1c3c840718`
+- pre-recording affinity SHA-256:
+  `518f8f262b0133cc5938c0b3ce0166ba200102abd9b59790e6e9122fb39cec25`
+- pristine copy:
+  `data/interim/global_s4/checkpoint2/pristine/checkpoint2_affinity_review_pre_recording.csv`
+  (same hash)
+- post-recording affinity SHA-256:
+  `08dc960c0c8626f89a4bfdc36c17b029ebbb48d830d12a040c19c6c45a4597f4`
+
+Changed affinity columns are human fields only:
+`manual_decision`, `manual_affinity_type`,
+`manual_affinity_transform_rule`, `manual_affinity_qualifier`,
+`manual_affinity_range_status`, `manual_affinity_non_affinity_reason`,
+`manual_notes`.
+
+### Decision counts
+
+```text
+confirm_affinity_scalar =  4
+retain_affinity_raw     = 15
+exclude_non_affinity    = 12
+park_unresolved         =  0
+--------------------------------
+total                   = 31
+```
+
+Record grain: exact scalar 11; retain-raw 741; non-affinity 114;
+affinity parks 0. No group-level numeric scalar was stored.
+
+Evidence-affinity inconsistency flags remain 49 unique records and
+continue to block application: 40 machine-E2 / reviewed non-affinity
+(C2A0004A 9, C2A0004B 25, C2A0010 3, C2A0014B 2, C2A0019 1);
+9 machine-E4 / reviewed exact quantitative affinity
+(C2A0002 4, C2A0016A 2, C2A0016B 3). C2A0018B is exact + machine E2
+and is consistent.
+
+### Validator
+
+`ready_for_application=false`. Unresolved 0. Errors: none.
+Target 205/0; relationship 107/0; evidence 3/0; affinity 31/0.
+Application blocked by the 49 evidence-affinity inconsistencies.
+
+Tracked: affinity recording helper and tests, this log, semantics
+note, scientific-proposals status line. Ignored: recorded 31-row
+affinity CSV, pristine blank 31-row copy, package README, recording
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 human-derived cAMP target identity materialised and approved (110/205)
+CHECKPOINT-2 Batch-3 active target-dictionary decisions recorded (150/205; 1 scientific park)
+CHECKPOINT-2 final active target-dictionary decisions recorded (205/205; 5 scientific parks)
+CHECKPOINT-2 target-dictionary review CLOSED
+CHECKPOINT-2 evidence decisions recorded (3/3; all E5)
+CHECKPOINT-2 evidence review CLOSED
+CHECKPOINT-2 affinity review split 19 -> 31; all affinity human fields blank
+CHECKPOINT-2 affinity decisions recorded (31/31; 0 parks)
+CHECKPOINT-2 not applied; not ready for application (49 evidence-affinity flags)
+Global S4 NOT run
+```
+
+## 2026-09-16 — Milestone 4F.1 evidence–affinity consistency review support
+
+Read-only reconciliation of the 49 evidence-affinity inconsistency
+records. No review CSV, proposal table, or combined input was modified.
+Supplemental evidence rows were not materialised. CHECKPOINT-2 was not
+applied. S5 was not run.
+
+### Integrity (unchanged except affinity already recorded in 4E.4)
+
+- combined SHA-256:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- target-review SHA-256:
+  `ce7c64137b0d0764c137d85b606a500db29139c78c2db753ad4efd250a7ed765`
+- relationship-review SHA-256:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence-review SHA-256:
+  `2116183dc4db64f1939149d68e9416f36db8e9b747b4b1d7fbffca1c3c840718`
+- affinity-review SHA-256:
+  `08dc960c0c8626f89a4bfdc36c17b029ebbb48d830d12a040c19c6c45a4597f4`
+
+Target 205/205; relationship 107/107; evidence 3/3; affinity 31/31.
+Unresolved human decisions: 0. Unique evidence-affinity flags: 49.
+`ready_for_application=false`. Closed E5 rows C2E0001–C2E0003 do not
+overlap these 49 records.
+
+### Recommended corrected evidence (not recorded)
+
+False-positive machine E2 (40): 30 remain E3 after removing the invalid
+quantitative signal; 10 fall to E5 (6 AptaDB non-binding remainder,
+3 AptamerBase no-binding without SELEX, 1 UTexas TBD/patent-only).
+False-negative machine E4 (9): all recommended E2 (4 AptaBase recovered
+µM Kd; 5 RiboAptamer recovered exact Kd). Projected 49-only distribution:
+9 E2, 30 E3, 0 E4, 10 E5.
+
+Design (not materialised): nine supplemental consistency-review rows
+`C2EC0001`–`C2EC0009` in a new package file, leaving the closed 3-row
+evidence CSV untouched. Projection precedence: supplemental correction,
+then C2E0001–C2E0003, then machine evidence.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 human-derived cAMP target identity materialised and approved (110/205)
+CHECKPOINT-2 Batch-3 active target-dictionary decisions recorded (150/205; 1 scientific park)
+CHECKPOINT-2 final active target-dictionary decisions recorded (205/205; 5 scientific parks)
+CHECKPOINT-2 target-dictionary review CLOSED
+CHECKPOINT-2 evidence decisions recorded (3/3; all E5)
+CHECKPOINT-2 evidence review CLOSED
+CHECKPOINT-2 affinity review split 19 -> 31; all affinity human fields blank
+CHECKPOINT-2 affinity decisions recorded (31/31; 0 parks)
+CHECKPOINT-2 evidence-affinity consistency analysed (49 flags; not recorded)
+CHECKPOINT-2 not applied; not ready for application (49 evidence-affinity flags)
+Global S4 NOT run
+```
+
+## 2026-09-16 — Milestone 4F.2 blank supplemental evidence-consistency review
+
+Materialised a blank 9-row supplemental evidence-consistency package
+`C2EC0001`–`C2EC0009` in a new ignored file. Human C2EC fields were
+not recorded. The frozen 3-row evidence review was not modified.
+Affinity review, target/relationship review, combined input, and
+machine proposal tables were unchanged. CHECKPOINT-2 was not
+applied. S5 was not run.
+
+### Integrity (unchanged)
+
+- combined SHA-256:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- target-review SHA-256:
+  `ce7c64137b0d0764c137d85b606a500db29139c78c2db753ad4efd250a7ed765`
+- relationship-review SHA-256:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence-review SHA-256:
+  `2116183dc4db64f1939149d68e9416f36db8e9b747b4b1d7fbffca1c3c840718`
+- affinity-review SHA-256:
+  `08dc960c0c8626f89a4bfdc36c17b029ebbb48d830d12a040c19c6c45a4597f4`
+
+Target 205/205; relationship 107/107; evidence 3/3; affinity 31/31.
+Supplemental evidence consistency: resolved 0 / blank 9.
+Unresolved human decisions: 9. Unique evidence-affinity flags: 49.
+`ready_for_application=false`. Closed E5 rows C2E0001–C2E0003 do not
+overlap these 49 records.
+
+### Ordering
+
+Independent of CSV row order: AptaBase C2A0002, AptaDB C2A0004A,
+AptaDB C2A0004B E3 then E5, AptamerBase C2A0010, RiboAptamer C2A0014B,
+C2A0016A, C2A0016B, UTexas C2A0019.
+
+Supplemental SHA-256:
+`0b16b918c6963068ee8334e5d72dc64f82cb0663c1bd091d61afe18a94fdb3d9`
+
+Tracked: evidence-consistency adapter/CLI/tests, validator/flag
+precedence, this log, scientific-proposals status, semantics note.
+Ignored: 9-row supplemental CSV, package README update, materialisation
+manifest/note. `git ls-files data` remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 human-derived cAMP target identity materialised and approved (110/205)
+CHECKPOINT-2 Batch-3 active target-dictionary decisions recorded (150/205; 1 scientific park)
+CHECKPOINT-2 final active target-dictionary decisions recorded (205/205; 5 scientific parks)
+CHECKPOINT-2 target-dictionary review CLOSED
+CHECKPOINT-2 evidence decisions recorded (3/3; all E5)
+CHECKPOINT-2 evidence review CLOSED
+CHECKPOINT-2 affinity review split 19 -> 31; all affinity human fields blank
+CHECKPOINT-2 affinity decisions recorded (31/31; 0 parks)
+CHECKPOINT-2 evidence-affinity consistency analysed (49 flags; not recorded)
+CHECKPOINT-2 blank supplemental evidence-consistency review materialised (0/9)
+CHECKPOINT-2 not applied; not ready for application (49 evidence-affinity flags)
+Global S4 NOT run
+```
+
+## 2026-09-16 — Milestone 4F.3 recorded supplemental evidence-consistency decisions
+
+Recorded all nine authorised C2EC decisions as `override_evidence`
+into the ignored supplemental review CSV. Human fields on the
+original 3-row evidence review, affinity review, target review, and
+relationship review were not modified. Combined input and machine
+proposal tables were unchanged. CHECKPOINT-2 was not applied.
+S5 was not run.
+
+The blank 9-row package was copied to
+`pristine/checkpoint2_evidence_consistency_review_pre_recording.csv`
+before recording.
+
+### Integrity
+
+- combined SHA-256:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- target-review SHA-256:
+  `ce7c64137b0d0764c137d85b606a500db29139c78c2db753ad4efd250a7ed765`
+- relationship-review SHA-256:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence-review SHA-256:
+  `2116183dc4db64f1939149d68e9416f36db8e9b747b4b1d7fbffca1c3c840718`
+- affinity-review SHA-256:
+  `08dc960c0c8626f89a4bfdc36c17b029ebbb48d830d12a040c19c6c45a4597f4`
+- leakage-review SHA-256:
+  `9adb73232c363ed440dc776c3c8669784e7232ec8e67f7b55bcf4c0627bfacf7`
+- machine proposal hashes unchanged
+- only human fields changed on the nine supplemental rows
+
+Pre-recording / pristine supplemental SHA-256:
+`0b16b918c6963068ee8334e5d72dc64f82cb0663c1bd091d61afe18a94fdb3d9`
+
+Post-recording supplemental SHA-256:
+`5775cf8682f2423f61fd6c412a4406bb62f3e23164a56e92280ccfed91edd3db`
+
+Target 205/205; relationship 107/107; evidence 3/3; affinity 31/31;
+evidence consistency 9/9. Unresolved human decisions: 0.
+Evidence-affinity flags: 49 → 0. Errors: none.
+`ready_for_application=true`. CHECKPOINT-2 was not applied.
+
+### Recorded decisions (9)
+
+```text
+C2EC0001 |  4 | E2 | 4
+C2EC0002 |  9 | E3 | 3
+C2EC0003 | 19 | E3 | 3
+C2EC0004 |  6 | E5 | 1
+C2EC0005 |  3 | E5 | 1
+C2EC0006 |  2 | E3 | 3
+C2EC0007 |  2 | E2 | 4
+C2EC0008 |  3 | E2 | 4
+C2EC0009 |  1 | E5 | 1
+```
+
+Record outcomes: 9 E2, 30 E3, 0 E4, 10 E5.
+Transitions: E4→E2 = 9; E2→E3 = 30; E2→E5 = 10.
+C2EC0005 does not encode no-binding as zero Kd.
+
+### Routing dry-run (not applied)
+
+9 E2 and 30 E3 records pass the evidence threshold. 10 E5 records
+fail unless already parked. New evidence parks from otherwise
+protein-primary context: `aptadb:132`–`136`, `aptadb:1068`.
+Independent parks remain authoritative (AptaBase peptides,
+`aptadb:383`–`386` target-parked, AptamerBase target-held,
+RiboAptamer cell, UTexas target-unresolved).
+
+Recording manifest:
+`data/interim/global_s4/checkpoint2/human_review/evidence_consistency_recording_manifest.json`.
+
+Tracked: evidence-consistency recording CLI/helpers/tests, this
+log, scientific-proposals status, architecture/semantics notes.
+Ignored: recorded 9-row supplemental CSV, pristine copy, package
+README update, recording manifest/note. `git ls-files data`
+remains empty.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 Batch-1 target-dictionary decisions recorded (15/204)
+CHECKPOINT-2 Batch-1 relationship decisions recorded (34/107)
+CHECKPOINT-2 relationship-unlocked target-dictionary decisions recorded (33/204)
+CHECKPOINT-2 Batch-2 relationship decisions recorded (64/107)
+CHECKPOINT-2 Batch-2 withheld relationship overrides recorded (74/107)
+CHECKPOINT-2 Batch-3 relationship decisions recorded (107/107; 8 parked)
+CHECKPOINT-2 Batch-2 active target-dictionary decisions recorded (73/204)
+CHECKPOINT-2 inactive-target and override-identity semantics added
+CHECKPOINT-2 relationship-inactive target-dictionary decisions recorded (109/204; 36 inactive)
+CHECKPOINT-2 human-derived cAMP target identity materialised and approved (110/205)
+CHECKPOINT-2 Batch-3 active target-dictionary decisions recorded (150/205; 1 scientific park)
+CHECKPOINT-2 final active target-dictionary decisions recorded (205/205; 5 scientific parks)
+CHECKPOINT-2 target-dictionary review CLOSED
+CHECKPOINT-2 evidence decisions recorded (3/3; all E5)
+CHECKPOINT-2 evidence review CLOSED
+CHECKPOINT-2 affinity review split 19 -> 31; all affinity human fields blank
+CHECKPOINT-2 affinity decisions recorded (31/31; 0 parks)
+CHECKPOINT-2 evidence-affinity consistency analysed (49 flags; not recorded)
+CHECKPOINT-2 blank supplemental evidence-consistency review materialised (0/9)
+CHECKPOINT-2 supplemental evidence-consistency decisions recorded (9/9)
+CHECKPOINT-2 not applied; ready for application (0 evidence-affinity flags)
+Global S4 NOT run
+```
+
+## 2026-09-16 — Milestone 5 CHECKPOINT-2 applied; global S4 complete
+
+Applied the completed CHECKPOINT-2 package to the 2960-row combined
+input and wrote the reviewed global-S4 relationship corpus. Combined
+input and all review CSVs were not modified. S5 was not started: no
+dedup, clustering, balancing, FT/REF/EVAL, or splits.
+
+### Integrity (unchanged)
+
+- branch `main` HEAD / origin/main:
+  `08e37ce6cacdb93e3c0de2dbc4a15389cb720b19`
+- combined SHA-256:
+  `24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0`
+- target-review SHA-256:
+  `ce7c64137b0d0764c137d85b606a500db29139c78c2db753ad4efd250a7ed765`
+- relationship-review SHA-256:
+  `a65bfb1eadee660a83cd51ea8d162ba1c1290706a3b720797211a7a0b4d776b9`
+- evidence-review SHA-256:
+  `2116183dc4db64f1939149d68e9416f36db8e9b747b4b1d7fbffca1c3c840718`
+- affinity-review SHA-256:
+  `08dc960c0c8626f89a4bfdc36c17b029ebbb48d830d12a040c19c6c45a4597f4`
+- evidence-consistency SHA-256:
+  `5775cf8682f2423f61fd6c412a4406bb62f3e23164a56e92280ccfed91edd3db`
+- leakage-review SHA-256:
+  `9adb73232c363ed440dc776c3c8669784e7232ec8e67f7b55bcf4c0627bfacf7`
+- `git ls-files data` remains empty
+
+Validator before application: target 205/205; relationship 107/107;
+evidence 3/3; affinity 31/31; evidence consistency 9/9. Unresolved 0.
+Evidence-affinity flags 0. Errors none. `ready_for_application=true`.
+
+### Application
+
+Existing projection helpers were composed; science was not
+reimplemented. Output grain is one reviewed `(sequence,target)`
+relationship. Combined extras remain on the immutable combined file
+and are joined by `record_id`.
+
+Relationship projection: 2960 source records → 2963 effective
+relationship rows including 12 target-park rows, plus 19
+relationship-parked rows from 9 records, 44 reject-survivors, 11
+overrides, 43 confirmed expansions (112 expanded rows). Target-park
+and relationship-park rows are excluded from the active corpus file.
+
+Target dictionary: 205 decisions; 36 inactive exclusions; 5 scientific
+parks; **164 reviewed resolved identities** including
+`TDHc92005d63414` once (`3',5'-cyclic adenosine monophosphate (cAMP)`,
+`small_molecule`, `other`). 627 unreviewed deterministic identities
+are carried forward so every active relationship has metadata. Equal
+canonical names were not merged. Documented extra versus 164-only: the
+active dictionary has 791 entries (164 reviewed + 627 unreviewed).
+
+Evidence record grain after precedence
+(supplemental → original C2E → machine):
+
+```text
+E1 =    0
+E2 = 1762
+E3 =  296
+E4 =  324
+E5 =  578
+--------------
+     2960
+```
+
+Supplemental 49-record corrections: 9 E2, 30 E3, 10 E5. Original C2E
+membership 501 records, all E5. Evidence-affinity flags after
+application: 0.
+
+Affinity record grain: exact scalar 11; retain-raw 741; non-affinity
+114; affinity park 0. Canonical molar also kept for 920 unreviewed
+already-normalised machine scalars. Representative reviewed scalars:
+AptaBase µM Kd `1.9e-06` / `1.8e-05` / `2.5e-06`; glued nM `5e-08` /
+`2e-08` / `5.27e-08`; `2 x 10^-5 M` → `2e-05`; central±unc
+`7.82e-08` / `1.012e-07`. LOD / binding % / no-binding / rates /
+captions / TBD / N/A did not enter canonical affinity.
+
+Leakage recomputed on reviewed relationships: 0 exclusions.
+
+### Routing
+
+Source-record grain (2960):
+
+```text
+primary_candidate            = 1428
+park_non_protein             =  541
+park_evidence_e5             =  521
+hold_target_unresolved       =  389
+unresolved_no_relationship   =   57
+target_parked                =   12
+relationship_parked          =    9
+reject_no_binding_evidence   =    3
+leakage_excluded             =    0
+--------------------------------
+                             2960
+```
+
+Reviewed relationship grain (2951 active rows):
+
+```text
+primary_candidate            = 1460
+park_non_protein             =  578
+park_evidence_e5             =  521
+hold_target_unresolved       =  389
+reject_no_binding_evidence   =    3
+leakage_exclusion_proposed   =    0
+```
+
+Holds are unknown target type. Five target parks (CypB pancreatic cell
+line; HCV H77 genome polyprotein; HIV-1 HXB2 Gag-Pol; MoMLV Gag-Pol;
+FIV Pol) cover 12 records. Nine relationship parks remain
+authoritative, including `ncbi_nuc:BD161067`. Three AptamerBase no-
+binding records were rejected, not primary.
+
+### Validation
+
+Every original record has a map outcome. No active relationship
+references an inactive or scientifically parked target. E5 is never
+primary. Application rerun hashes identical. Input/review hashes
+unchanged.
+
+S5 diagnostic only (not resolved): 461 duplicate `sequence_core`
+values (1199 rows); 259 exact `(sequence_core, canonical_target_name)`
+duplicate groups (570 rows); 386 cross-source duplicate cores; 0
+NCBI/ENA overlapping cores.
+
+### Outputs (ignored `data/`)
+
+- `global_s4_reviewed_relationships.csv`
+  `dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502`
+- `global_s4_reviewed_target_dictionary.csv`
+  `e7234d9a9308dd899cbb3f801ff20ba05b2960071ede98812c6109db0f21b5ec`
+- `global_s4_record_relationship_map.csv`
+  `632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b`
+- `global_s4_parked_excluded_audit.csv`
+  `98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7`
+- `global_s4_routing_summary.csv`
+  `46bc0c91a121f1737f3816ec4b16fef4630b388310c9599171cf054b17e74635`
+
+Tracked: apply adapter/CLI/config/tests, routing kwargs, this log,
+`docs/data_curation/global_s4_checkpoint2_application.md`. Not
+committed in this milestone.
+
+### Pipeline status
+
+```text
+Eight positive-authorised handoffs concatenated = 2960 rows
+Milestone 2 regenerated after RiboAptamer entry-gate audit
+Milestone 3 scientific proposals + blank CHECKPOINT-2 package complete
+CHECKPOINT-2 target-dictionary review CLOSED (205/205; 5 scientific parks)
+CHECKPOINT-2 relationship review CLOSED (107/107; 9 parked)
+CHECKPOINT-2 evidence review CLOSED (3/3; all E5)
+CHECKPOINT-2 affinity review CLOSED (31/31; 0 parks)
+CHECKPOINT-2 supplemental evidence-consistency CLOSED (9/9)
+CHECKPOINT-2 applied; ready_for_application was true
+Global S4 COMPLETE at reviewed relationship grain
+S5 NOT started
+```
+
+## 2026-09-16 — Global S4 version-control closure
+
+Global S4 is scientifically complete and CHECKPOINT-2 is applied.
+This entry records version-control closure of the tracked
+implementation. Scientific review decisions were not changed. S5
+was not started: no dedup, NCBI/ENA resolution, clustering,
+balancing, FT/REF/EVAL, or splits.
+
+Reviewed grain remains one `(sequence, target)` relationship.
+Combined input is 2960 source records. Leakage exclusions = 0.
+Unresolved human decisions = 0. Evidence-affinity flags = 0.
+
+Reviewed relationship routing:
+
+```text
+primary_candidate          = 1460
+park_non_protein           =  578
+park_evidence_e5           =  521
+hold_target_unresolved     =  389
+reject_no_binding_evidence =    3
+leakage                    =    0
+```
+
+Source-record routing:
+
+```text
+primary_candidate          = 1428
+park_non_protein           =  541
+park_evidence_e5           =  521
+hold_target_unresolved     =  389
+unresolved_no_relationship =   57
+target_parked              =   12
+relationship_parked        =    9
+reject_no_binding_evidence =    3
+leakage_excluded           =    0
+```
+
+S5 diagnostics remain unresolved (461 duplicate sequence_core
+groups / 1199 rows; 259 exact pair groups / 570 rows; 386
+cross-source cores; 0 NCBI/ENA overlapping cores).
+
+Input/review hashes unchanged. Application rerun hashes identical.
+`git ls-files data` empty. Ignored `data/` outputs were not staged.
+
+### Pipeline status
+
+```text
+CHECKPOINT-2 applied = yes
+Global S4 COMPLETE at reviewed relationship grain
+S5 NOT started
+```
 

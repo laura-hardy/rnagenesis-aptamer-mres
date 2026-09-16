@@ -88,6 +88,9 @@ SEQUENCE_BEARING_HANDOFF_EXTRAS: frozenset[str] = frozenset(
         "riboaptamer_sequence",
         "aptamerbase_sequence",
         "ncbi_nuc_origin_residues",
+        "aptadb_interaction_sequence",
+        "aptadb_aptamer_sequence",
+        "aptaindex_sequence",
         "sequence",
     }
 )
@@ -292,7 +295,10 @@ def _select_authorised_resolutions(
             continue
         resolved = (row.get("resolved_decision") or "").strip()
         status = (row.get("checkpoint1_resolution_status") or "").strip()
-        if resolved != "accept":
+        # AptaDB's closed CHECKPOINT-1 manifest records status/authorisation
+        # without a separate resolved_decision column. Blank is accepted
+        # only when checkpoint1_resolution_status is already approved_for_s4.
+        if resolved not in {"", "accept"}:
             raise GlobalS4HandoffError(
                 f"Authorised record {row.get('record_id')!r} has "
                 f"resolved_decision={resolved!r}; expected accept"
@@ -1183,17 +1189,31 @@ def prepare_global_s4_source(
         category_observations=category_observations,
     )
 
+    quoting = csv.QUOTE_MINIMAL
+    if any("\r" in (value or "") for row in handoff_rows for value in row.values()):
+        # AptaIndex (and any other CR-bearing extras) must match S1/S2/S3
+        # QUOTE_ALL so bare CR cannot split physical rows on disk.
+        quoting = csv.QUOTE_ALL
     try:
         if extra_columns:
             write_corpus_csv_atomic(
                 output_csv,
                 handoff_rows,
                 columns=list(CORPUS_COLUMNS) + extra_columns,
+                quoting=quoting,
             )
         else:
-            write_corpus_csv_atomic(output_csv, handoff_rows)
+            write_corpus_csv_atomic(output_csv, handoff_rows, quoting=quoting)
     except CorpusSchemaError as exc:
         raise GlobalS4HandoffError(str(exc)) from exc
+    written_ids = _unique_ids(
+        _read_csv(output_csv, label="handoff output"),
+        label="handoff output",
+    )
+    if written_ids != unique_ids:
+        raise GlobalS4HandoffError(
+            "Handoff CSV did not round-trip the authorised record_id order"
+        )
 
     result = HandoffResult(
         source_key=stats.source_key,

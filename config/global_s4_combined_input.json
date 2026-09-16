@@ -1,0 +1,204 @@
+{
+  "contract_id": "global_s4_combined_input",
+  "combination_mode": "row_preserving_concatenation",
+  "canonical_schema_module": "scripts/data_preparation/common/corpus_schema.py",
+  "canonical_columns_symbol": "CORPUS_COLUMNS",
+  "expected_combined_records": 2960,
+  "output_csv": "data/interim/global_s4/combined_global_s4_input.csv",
+  "output_summary": "data/interim/global_s4/combined_global_s4_input_summary.md",
+  "output_manifest": "data/interim/global_s4/combined_global_s4_input_manifest.json",
+  "row_order": {
+    "sources": "configured_order",
+    "within_source": "preserve_handoff_order"
+  },
+  "extra_column_policy": {
+    "canonical_columns_first": true,
+    "group_extras_by_configured_source_order": true,
+    "preserve_within_source_extra_order": true,
+    "empty_for_other_sources": true,
+    "do_not_alphabetically_reorder_canonical": true,
+    "duplicate_extra_name_fails_closed": true,
+    "canonical_name_collision_fails_closed": true
+  },
+  "completeness_fields": [
+    "target_name_raw",
+    "target_name",
+    "target_type",
+    "target_type_source",
+    "target_uniprot",
+    "target_family",
+    "target_pfam",
+    "pdb_id",
+    "binding_evidence_type",
+    "binding_evidence_score",
+    "affinity_value",
+    "affinity_unit",
+    "affinity_type",
+    "publication",
+    "doi",
+    "pubmed_id",
+    "accession",
+    "redistribution_status"
+  ],
+  "must_remain_empty_canonical_fields": [
+    "target_name",
+    "target_uniprot",
+    "target_type",
+    "target_type_source",
+    "target_family",
+    "target_pfam",
+    "pdb_id",
+    "binding_evidence_type",
+    "binding_evidence_score",
+    "affinity_value",
+    "affinity_unit",
+    "affinity_type",
+    "cluster_id",
+    "is_cluster_representative",
+    "partition"
+  ],
+  "unaltered_provenance_fields": [
+    "contributing_sources",
+    "contributing_datasets",
+    "corroboration_count"
+  ],
+  "contributing_sources": [
+    {
+      "source_key": "aptabase",
+      "source_config": "config/global_s4_sources/aptabase.json",
+      "expected_records": 162,
+      "record_id_prefix": "aptabase:",
+      "principal_extra_fields": []
+    },
+    {
+      "source_key": "utexas",
+      "source_config": "config/global_s4_sources/utexas.json",
+      "expected_records": 468,
+      "record_id_prefix": "utexas:",
+      "principal_extra_fields": [
+        "utexas_kd_nm",
+        "utexas_affinity",
+        "utexas_type_of_nucleic_acid",
+        "utexas_post_selex_modifications"
+      ]
+    },
+    {
+      "source_key": "aptadb",
+      "source_config": "config/global_s4_sources/aptadb.json",
+      "expected_records": 151,
+      "record_id_prefix": "aptadb:",
+      "principal_extra_fields": [
+        "aptadb_uniprot_id",
+        "aptadb_protein_names",
+        "aptadb_entry_name",
+        "aptadb_pdb_cross_reference",
+        "aptadb_reference_pubmed_id",
+        "aptadb_binding_conditions_buffer",
+        "aptadb_aptamer_assay",
+        "aptadb_target_chemistry"
+      ]
+    },
+    {
+      "source_key": "riboaptamer",
+      "source_config": "config/global_s4_sources/riboaptamer.json",
+      "expected_records": 397,
+      "record_id_prefix": "riboaptamer:",
+      "principal_extra_fields": [
+        "riboaptamer_aptamer_name",
+        "riboaptamer_description",
+        "riboaptamer_category",
+        "riboaptamer_type",
+        "riboaptamer_affinity_kd",
+        "riboaptamer_mmcif_download_url",
+        "riboaptamer_article_name",
+        "riboaptamer_pubmed_link"
+      ]
+    },
+    {
+      "source_key": "aptaindex",
+      "source_config": "config/global_s4_sources/aptaindex.json",
+      "expected_records": 221,
+      "record_id_prefix": "aptaindex:",
+      "require_redistribution_status": "restricted",
+      "principal_extra_fields": [
+        "aptaindex_target",
+        "aptaindex_target_type",
+        "aptaindex_affinity_type",
+        "aptaindex_affinity",
+        "aptaindex_reference"
+      ]
+    },
+    {
+      "source_key": "ena",
+      "source_config": "config/global_s4_sources/ena.json",
+      "expected_records": 675,
+      "record_id_prefix": "ena:",
+      "principal_extra_fields": [
+        "target",
+        "ena_source_target_type",
+        "ena_source_binding_evidence_type",
+        "binding_evidence_strength",
+        "ena_source_experiment_group_id",
+        "ena_source_near_duplicate_family_id",
+        "ena_effective_near_duplicate_family_id"
+      ]
+    },
+    {
+      "source_key": "aptamerbase",
+      "source_config": "config/global_s4_sources/aptamerbase.json",
+      "expected_records": 881,
+      "record_id_prefix": "aptamerbase:",
+      "principal_extra_fields": [
+        "aptamerbase_id",
+        "aptamerbase_label",
+        "source_object_type",
+        "rdf_has_rna",
+        "rdf_has_dna",
+        "rdf_has_modified_nucleic_acid"
+      ]
+    },
+    {
+      "source_key": "ncbi_nuc",
+      "source_config": "config/global_s4_sources/ncbi_nuc.json",
+      "expected_records": 5,
+      "record_id_prefix": "ncbi_nuc:",
+      "principal_extra_fields": [
+        "ncbi_nuc_accession",
+        "ncbi_nuc_version",
+        "ncbi_nuc_locus",
+        "ncbi_nuc_definition",
+        "ncbi_nuc_comment",
+        "ncbi_nuc_features_json",
+        "ncbi_nuc_references_json"
+      ]
+    }
+  ],
+  "zero_authorised_sources": [
+    {
+      "source_key": "aptadiff_a",
+      "expected_records": 0,
+      "status": "ready_zero_authorised",
+      "contribute_rows": false
+    },
+    {
+      "source_key": "aptadiff_b",
+      "expected_records": 0,
+      "status": "ready_zero_authorised",
+      "contribute_rows": false
+    }
+  ],
+  "scientific_boundary": {
+    "target_extraction_performed_here": false,
+    "target_dictionary_built_here": false,
+    "evidence_assigned_here": false,
+    "affinity_canonicalised_here": false,
+    "leakage_applied_here": false,
+    "checkpoint2_started_here": false,
+    "non_protein_evidence_routing_applied_here": false,
+    "cross_source_deduplication_performed_here": false,
+    "ncbi_ena_merged_here": false,
+    "clustering_balancing_partitioning_performed_here": false,
+    "source_uniprot_copied_into_canonical_here": false,
+    "global_contributing_sources_merged_here": false
+  }
+}

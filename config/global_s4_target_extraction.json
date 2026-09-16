@@ -1,0 +1,77 @@
+{
+  "contract_id": "global_s4_target_extraction",
+  "milestone": "M2_raw_target_extraction_and_initial_dictionary_proposal",
+  "expected_combined_records": 2960,
+  "expected_combined_sha256": "24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0",
+  "combined_input_csv": "data/interim/global_s4/combined_global_s4_input.csv",
+  "combined_input_config": "config/global_s4_combined_input.json",
+  "output_record_csv": "data/interim/global_s4/target_extraction_by_record.csv",
+  "output_relationship_csv": "data/interim/global_s4/target_relationship_proposals.csv",
+  "output_dictionary_csv": "data/interim/global_s4/target_dictionary_proposed.csv",
+  "output_summary": "data/interim/global_s4/target_extraction_summary.md",
+  "output_manifest": "data/interim/global_s4/target_extraction_manifest.json",
+  "aptabase_source_metadata": "data/interim/extracted/aptabase_source_metadata.csv",
+  "aptamerbase_rdf": "data/raw/aptamerbase/aptamerbase.freebase.extract.nt.gz",
+  "expected_aptamerbase_rdf_sha256": "3ab9340ee1fcb6a0910532a6e8d4cf5cc62579c3b21d85355c48d473e372006c",
+  "row_order": "preserve_combined_input_order",
+  "relationship_status_vocabulary": [
+    "resolved_single",
+    "resolved_multiple",
+    "ambiguous",
+    "unresolved"
+  ],
+  "extraction_confidence_vocabulary": [
+    "high",
+    "medium",
+    "low",
+    "unresolved"
+  ],
+  "structured_target_sources": [
+    "aptabase",
+    "utexas",
+    "aptadb",
+    "aptaindex",
+    "ena"
+  ],
+  "deferred_target_sources": [
+    "riboaptamer",
+    "aptamerbase",
+    "ncbi_nuc"
+  ],
+  "expected_source_counts": {
+    "aptabase": 162,
+    "utexas": 468,
+    "aptadb": 151,
+    "riboaptamer": 397,
+    "aptaindex": 221,
+    "ena": 675,
+    "aptamerbase": 881,
+    "ncbi_nuc": 5
+  },
+  "expected_existing_target_name_raw": {
+    "aptabase": 162,
+    "utexas": 468,
+    "aptadb": 151,
+    "aptaindex": 221,
+    "ena": 675,
+    "riboaptamer": 0,
+    "aptamerbase": 0,
+    "ncbi_nuc": 0
+  },
+  "scientific_boundary": {
+    "writes_into_combined_input": false,
+    "expands_combined_input": false,
+    "final_canonical_target_name_applied": false,
+    "canonical_target_uniprot_assigned": false,
+    "canonical_target_type_assigned": false,
+    "canonical_family_pfam_assigned": false,
+    "evidence_assigned": false,
+    "affinity_canonicalised": false,
+    "leakage_applied": false,
+    "checkpoint2_human_review_started": false,
+    "non_protein_evidence_routing_applied": false,
+    "cross_source_deduplication_performed": false,
+    "clustering_balancing_partitioning_performed": false,
+    "external_uniprot_lookup_performed": false
+  }
+}
