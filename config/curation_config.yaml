@@ -2,6 +2,10 @@
 # config/source_eligibility/*.json; this file holds shared seeds and later-stage
 # defaults referenced by the curation plan.
 seed: 42
-MAX_TARGET_FRACTION: 0.05
+# Active S7 target-cap scalar after CHECKPOINT-3 (C3-01).
+# Historical pre-decision placeholder was 0.05; that value is no longer active.
+# Cap unit: final S5 cluster_id (whole cluster; never split).
+# Cap denominator: current/post-removal scientific-identity count.
+MAX_TARGET_FRACTION: 0.03
 TRAINING_SEQUENCE_COLUMN: sequence_core
 checkpoint1_random_sample_size: 30

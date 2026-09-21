@@ -10603,3 +10603,110 @@ and reconstruction procedures); and complete a pre-publication GitHub leakage
 audit. Ian requested an E5 population/inclusion-impact diagnostic; E5 remains
 excluded. No scientific data or S4/S5/S6 output changed. S7/final capping and
 splitting have not yet run. Not committed.
+
+## 2026-09-21 — S7A 3% target-cap preparation and dry-run
+
+**Stage:** Aim 2 / data curation / S7A target-cap preview
+**What was done:** Incorporated closed CHECKPOINT-3 decisions into the
+governing curation plan (v1.5 — 2026-09-21) and active configuration.
+Implemented Amin's deterministic whole-cluster 3% cap as a pure selection
+function and ran it in preview mode against the frozen final S5 corpus.
+No authoritative post-cap corpus was written.
+
+**Decisions encoded:** C3-01 active cap 3% of the current/post-removal
+identity denominator (previous 5% placeholder retired); C3-02
+multi-objective FT/REF/EVAL comparability with `target_family` secondary
+only; C3-03 retain E2–E4, keep E5 parked; C3-04 protein-only primary
+corpus; C3-05 never split clusters, target-pure first, least-collateral
+mixed fallback, stable `cluster_id` tie-break, recompute after every
+removal, fail closed if two targets are simultaneously overrepresented.
+REF/EVAL freeze, FT-only cluster-level train/validation split, two
+sequence-length regimes, and pre-publication leakage audit recorded in
+the plan. Not applied beyond this preview.
+
+**Inputs used:** frozen `corpus_clustered_final.csv`
+SHA-256 `615677d51aa81337a3660b8c67e9db9fae2a5c8abc7128e7668617a342689d30`.
+Counts independently verified: 1281 identities, 1144 cores, 796 clusters,
+411 canonical protein targets, partition blank, E5 = 0.
+
+**Outputs produced (preview only, gitignored):**
+`data/interim/s7a_target_cap_preview/` sequence-free trace, removed-cluster
+table, post-cap target distribution, mixed-collateral sidecar, markdown
+report, and manifest.
+
+**Numbers:** Synthetic pytest 17 S7A + 19 S5E + 33 S6 = 69 passed.
+Dry-run: 2 target-pure NGF clusters proposed removed (89 then 19
+identities); 0 mixed clusters; 0 collateral identities. 1281 → 1173
+identities; 1144 → 1036 cores; 796 → 794 clusters; 411 → 411 targets.
+Final independent max share 34/1173 = 0.0289855072 (HIV-1 Rev protein),
+cap gate PASS. No non-initial-dominant target exceeded 3% after
+denominator reduction. Remaining NGF 23/1173 = 0.0196078431.
+
+**Open questions carried forward:** human review of this dry-run before
+scientific cap application. No partitioning. Not committed. Not pushed.
+
+## 2026-09-21 — S7A 3% target-cap preview approved and applied
+
+**Stage:** Aim 2 / data curation / S7A target-cap application
+**What was done:** Recorded human approval of the reviewed S7A dry-run
+and applied the same tested `select_target_cap` function to the frozen
+final S5 corpus. Wrote the authoritative post-cap/pre-partition corpus
+under ignored `data/interim/s7a_target_cap/`. Did not begin S7B.
+
+```text
+S7A preview approved            = yes
+S7A authoritative cap applied   = yes
+S7A validation complete         = yes
+S7B not started                 = yes
+FT/REF/EVAL not assigned        = yes
+```
+
+**Approval:** `config/checkpoint_reviews/s7a_target_cap_approval.json`
+(`review_status = approved_for_application`, decision_date 2026-09-21,
+max_target_fraction 0.03). Approval metadata was used only as a
+post-derivation parity check and was not used to select clusters.
+
+**Reviewed preview hashes (frozen, not overwritten):**
+- `s7a_target_cap_removal_trace.csv` `da3cd922e53c1388f25d2e1e9fcd714cdc22119fdecc11057e7a2205e1df1048`
+- `s7a_removed_clusters.csv` `46defa4e1b460a4b9fec91106f2cf2c432146348a23888399c3fae6c0072c40b`
+- `s7a_post_cap_target_distribution.csv` `f2be67a8c117335157577464362dc5eb1e89c28feeb9689f2b342453532ac2c7`
+- `s7a_mixed_cluster_collateral.csv` `91eb65f42d4469e48ba3b1c3d915c14a4d34145645169c918cd0eed3e6aacc5e`
+- `s7a_target_cap_preview_report.md` `e08ccab6f0cf3d9f22c9f9e516d780a4cab0c6820720cdc6b10f14db8e896f14`
+- `s7a_target_cap_preview_manifest.json` `f230d70db5cff5b445e730a0ee6664600584a1d5dde1e12ca8c174d044dce65a`
+
+**Inputs used:** frozen `corpus_clustered_final.csv`
+SHA-256 `615677d51aa81337a3660b8c67e9db9fae2a5c8abc7128e7668617a342689d30`.
+All frozen final-S5 hashes matched. Independently verified: 1281
+identities, 1144 cores, 796 clusters, 411 canonical protein targets,
+partition blank, E5 = 0, non-protein = 0.
+
+**Application result:** 1281 → 1173 identities; 1144 → 1036 cores;
+796 → 794 clusters; 411 → 411 targets. Two NGF target-pure clusters
+removed (89 then 19 identities); 108 identities removed; 108 cores
+removed; 0 mixed clusters; 0 collateral identities; 0 targets lost.
+Post-cap NGF 23/1173 = 0.0196078431. Final maximum target = HIV-1 Rev
+protein 34/1173 = 0.0289855072. All 411 targets independently
+`exceeds_cap = false`. All-target 3% hard gate PASS.
+preview/application semantic mismatches = 0.
+
+**Authoritative output hashes:**
+- `corpus_post_cap.csv` `6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd`
+- `s7a_target_cap_removal_trace.csv` `da3cd922e53c1388f25d2e1e9fcd714cdc22119fdecc11057e7a2205e1df1048`
+- `s7a_removed_clusters.csv` `46defa4e1b460a4b9fec91106f2cf2c432146348a23888399c3fae6c0072c40b`
+- `s7a_post_cap_target_distribution.csv` `f2be67a8c117335157577464362dc5eb1e89c28feeb9689f2b342453532ac2c7`
+- `s7a_target_cap_report.md` `12a1b1207826995a31c5229f39d6c5654783bd7bf24d8593d55ff1e04df3d08b`
+- `s7a_target_cap_manifest.json` `c6f7d5846761bbc3e66eaea275c4eaa6ad835062ecdaf6d483d0e0277eb5d01c`
+
+**Determinism:** two temporary application writes produced byte-identical
+scientific payloads. In-process reversed-row re-selection matched.
+Deterministic rerun PASS.
+
+**Numbers:** Synthetic pytest 22 S7A + 19 S5E + 33 S6 = 74 passed.
+The extra 5 S7A tests cover the application path (approval is audit-only,
+preview directory is not overwritten, retained fields/partition are
+preserved). No relevant failure.
+
+**Boundary:** S7B not started. FT/REF/EVAL not assigned. REF/EVAL not
+frozen. FT train/validation not created. S4/S5/S6 not mutated. No
+commit. No push.
+

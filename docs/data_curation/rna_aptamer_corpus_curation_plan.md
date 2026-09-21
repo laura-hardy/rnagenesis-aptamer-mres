@@ -2,14 +2,19 @@
 
 **Project:** RNAGenesis aptamer MRes (`rnagenesis-aptamer-mres`)
 **Owner:** Laura
-**Version:** 1.4 — 2026-09-17
-**Status:** Ready for implementation. All blocking questions resolved. AptaDiff A/B
+**Version:** 1.5 — 2026-09-21
+**Status:** Ready for S7. CHECKPOINT-3 supervisor decisions are closed. AptaDiff A/B
 canonical molecule identity is ssDNA (see §2.1). S5 clustering interpretation
-was corrected in v1.4: ENA families are positive must-links, not global
-90%-identity ground truth.
+remains as in v1.4: ENA families are positive must-links, not global
+90%-identity ground truth. S7A has applied the approved 3% whole-cluster
+target cap to the frozen S5 corpus. The authoritative post-cap/pre-partition
+corpus exists under ignored `data/interim/s7a_target_cap/`. S7B has not
+started: FT/REF/EVAL are not assigned.
 
 **Companion documents (authoritative inputs):**
 
+- `docs/data_curation/checkpoint3_supervisor_decisions_2026-09-21.md` — closed CHECKPOINT-3 decisions (authority for S7)
+- `docs/data_curation/corpus_profile_report_supervisor.md` — frozen S6 supervisor briefing
 - `docs/data_curation/raw_data_inventory.csv` — refreshed 2026-08-04, 203 files / 29 directories
 - `docs/data_curation/raw_data_inventory_summary.json`
 - `docs/data_curation/raw_data_state_assessment.md`
@@ -65,9 +70,28 @@ families cannot straddle a boundary):
 | `REF` | ~10% | Fitting Tier 1 reference distributions **only** |
 | `EVAL` | ~10% | Positive controls / held-out real aptamers |
 
-Deterministic (fixed seed), stratified by `target_family`, recorded in `partition`. Assigned at S7,
-**after** target normalisation, and distinct from the later RNA-aware splitting plan, which operates
-*within* `FT` using the same `cluster_id` hooks.
+Assigned at S7 **after** target normalisation and the approved target cap, at cluster
+level so near-duplicate families cannot straddle a boundary. Recorded in `partition`.
+
+CHECKPOINT-3 (C3-02) replaces the earlier plan to stratify primarily by `target_family`.
+FT/REF/EVAL assignment must keep canonical-target representation, evidence level,
+sequence-length regime, and source broadly comparable. Known `target_family` labels
+are a secondary diagnostic only — S6 found 1,097/1,281 identities (85.64%) labelled
+`unknown`, so family cannot be the primary stratifier.
+
+Freeze REF and EVAL before any fine-tuning, model-selection, or hyperparameter use.
+Create the train/validation split only within `FT`, at cluster level, after the
+top-level FT/REF/EVAL assignment. Do not move clusters between partitions later to
+benefit fine-tuning or hyperparameter results; any legitimate correction is a new
+documented split revision.
+
+Preserve the two S6-observed sequence-length regimes (centred near 39 and 77 nt) both
+when assigning splits and when constructing null/reference distributions. Do not
+approximate the corpus by one unimodal length distribution. Source-associated length
+structure must be recorded in the relevant split/reference-distribution documentation.
+
+The later RNA-aware splitting plan operates *within* `FT` using the same `cluster_id`
+hooks.
 
 ### 1.2 NDM-1 framing — **RESOLVED, affects the thesis text**
 
@@ -150,10 +174,13 @@ RNAGenesis replication and comparability:
 Never merge these. Do not reduce Dataset A to the 13,802-row `x_z`
 derivative.
 
-Per-target capping (`MAX_TARGET_FRACTION`, default 0.05, finalised at
-CHECKPOINT-3) remains the balancing tool for sources that **do** enter
-the primary RNA corpus. It is not an AptaDiff A/B RNA-corpus
-downsampling instruction.
+Per-target capping (`MAX_TARGET_FRACTION`) remains the balancing tool for sources that
+**do** enter the primary RNA corpus. CHECKPOINT-3 (C3-01) set the active value to
+**0.03** of the current/post-removal identity denominator, replacing the previous 5%
+placeholder. Historical S6 candidate-cap diagnostics still report 0.02 / 0.03 / 0.05 /
+0.10 as decision-support simulations; those figures are not executable S7 output and
+must not be re-read as an active 5% instruction. It is not an AptaDiff A/B RNA-corpus
+downsampling instruction. Operational whole-cluster removal is §2.9 / S7.
 
 ### 2.2 Sequence columns — original, full construct, and random region — **DECIDED**
 
@@ -225,6 +252,9 @@ practical generation window and matches the reviewed ENA set (max 100).
 - Records where `sequence_length_full` passes but `sequence_length_core` fails go to **review**, not
   straight to rejection — that usually means the trim was too aggressive.
 - Note riboaptamer spans 10–179 nt (median 75), so both ends of this filter will bite there.
+- CHECKPOINT-3 additionally requires S7 split construction and later null/reference
+  distributions to preserve the two observed sequence-length regimes rather than collapsing
+  them to one typical length. This does not change the 20–100 nt inclusion window.
 
 ### 2.4 Alphabet, chemistry, and transcription provenance — **DECIDED**
 
@@ -270,7 +300,9 @@ Parking rather than dropping matters because a large share of well-characterised
 target small molecules — riboaptamer alone contributes ~120 clearly non-protein records
 (Fluorophores 42, Pharmaceuticals 32, Nucleosides & Nucleotides 25, RNA 17, Toxin 4, Synthetic 3).
 If the protein-only corpus proves too small, relaxing this filter is the fastest recovery, and it is
-cheap only if those records were cleaned alongside everything else.
+cheap only if those records were cleaned alongside everything else. CHECKPOINT-3 (C3-04)
+retained the protein-only primary corpus and kept non-protein records parked. Do not promote
+non-protein records during S7.
 
 ### 2.6 Evidence ladder — **DECIDED**
 
@@ -285,6 +317,10 @@ cheap only if those records were cleaned alongside everything else.
 Unplaceable → reject `no_binding_evidence`. **Inclusion threshold: E4 (score ≥ 2).** E5 records are
 cleaned and retained in `parked_evidence_e5.csv`, so the database lane can be added back as an
 ablation. This is also the mechanism by which "remove ENA records if necessary" becomes cheap.
+CHECKPOINT-3 (C3-03) retains E2–E4 for finalisation and keeps E5 parked. Do not promote E5
+during S7. The S7 report must still quantify the parked E5 population and the consequences of
+inclusion; that diagnostic is not authorisation to include E5. The frozen S5 primary corpus
+contains zero E5 identities.
 
 Two sources now supply high-evidence records that were not available in v1.1:
 
@@ -343,6 +379,42 @@ Three consequences:
 
 The master file is only ever produced by re-running the merge with a source-exclusion list. Never
 hand-edit `corpus_final.csv`.
+
+### 2.9 Target cap — **DECIDED at CHECKPOINT-3 (C3-01, C3-05)**
+
+Active configuration:
+
+```text
+MAX_TARGET_FRACTION = 0.03
+training_sequence_column = sequence_core
+cap unit = final cluster
+cap denominator = current / post-removal scientific-identity count
+```
+
+A target is overrepresented only if `count(t) / N > 0.03`. Equality to exactly 0.03 passes.
+`N` is the number of currently retained scientific identities and is recomputed after every
+cluster removal. Do not precompute a fixed number of identities to remove from the original
+denominator.
+
+Whole-cluster removal (never split a cluster):
+
+1. Consider **target-pure** clusters first (every retained identity in the cluster has canonical
+   target `t`). Rank by number of retained identities for `t` descending, then stable
+   `cluster_id` ascending.
+2. Use **mixed-target** clusters only if no remaining target-pure cluster exists for `t`.
+   Rank mixed candidates by least collateral identities (identities whose target is not `t`),
+   then stable `cluster_id`.
+3. Remove one cluster at a time. After every removal, recompute `N` and every target share.
+4. Stop when every retained target satisfies `count(t) / N <= 0.03`.
+
+CHECKPOINT-3 does not specify an ordering rule among multiple simultaneously overrepresented
+targets. If more than one target is overrepresented at a decision step, S7 must **fail closed**
+and request a new recorded decision. Do not invent alphabetical, largest-share, or RNG order.
+
+The removal trace must be auditable at every step (denominator, target counts and shares,
+selected cluster, purity/collateral rationale, updated values). Do not use a record-wise
+removal shortcut. S7A has applied this rule to the frozen S5 corpus after human
+approval of the dry-run. The authoritative post-cap corpus remains pre-partition.
 
 ---
 
@@ -637,9 +709,9 @@ data/raw/  ──S0──▶  interim/registry/     ──S1──▶  interim/e
                                                         ▼
                                              interim/deduplicated/
                                                         │
-                                                       S6  ◀── CHECKPOINT-3 (SUPERVISOR REVIEW)
+                                                       S6  ◀── CHECKPOINT-3 (SUPERVISOR REVIEW; closed 2026-09-21)
                                                         ▼        corpus_profile_report.md
-                                                       S7  (balance + partition)
+                                                       S7  (3% whole-cluster cap, then partition)
                                                         ▼
                              processed/corpus_final.csv + corpus_report.md
                                         + parked_*.csv + corpus_final.txt
@@ -756,18 +828,36 @@ target-normalised corpus **before any balancing or partitioning**, so supervisor
 distribution and their input shapes the balancing decision rather than rationalising it. Contents in
 §9.1. Produces no corpus file — it exists to stop and ask.
 
-Decisions taken here: final `MAX_TARGET_FRACTION`, whether further balancing beyond the cap is
-wanted now, and whether the E4 threshold or protein-only policy should be relaxed given actual size.
+Decisions taken here were recorded on 2026-09-21 in
+`docs/data_curation/checkpoint3_supervisor_decisions_2026-09-21.md`: active
+`MAX_TARGET_FRACTION = 0.03` against the current/post-removal identity denominator;
+no additional target-family balancing; retain E2–E4 and keep E5 parked; retain the
+protein-only primary corpus; apply Amin's deterministic whole-cluster C3-05 rule.
+S6 itself remains a read-only profile of the frozen S5 corpus. Historical S6
+candidate-cap simulations (0.02 / 0.03 / 0.05 / 0.10) are diagnostic only and are
+not rewritten.
 
 ### S7 — Balancing, partition, and final outputs
 
-**Out:** `data/processed/`.
+**Out:** `data/processed/` after S7B/S7C. S7A now writes the authoritative
+post-cap/pre-partition corpus under `data/interim/s7a_target_cap/` in addition
+to the frozen reviewed preview under `data/interim/s7a_target_cap_preview/`.
+S7A does **not** write `corpus_final.csv` or populate `partition`. S7B has
+not started.
 
-1. Apply the per-target cap at cluster level for sources that enter the primary RNA corpus
-   (§2.1). AptaDiff A/B do not participate in that RNA-corpus cap. The unique S5 scientific-row
-   identifier `scientific_identity_id` must be retained in the final schema; donor `record_id`
-   remains provenance and is not unique.
-2. Assign `FT`/`REF`/`EVAL` at cluster level, stratified by `target_family` (§1.1).
+1. Apply the per-target cap at **final-cluster** level for sources that enter the
+   primary RNA corpus (§2.1, §2.9). Active `MAX_TARGET_FRACTION = 0.03`. AptaDiff A/B
+   do not participate. Training sequences remain `sequence_core`. Never split a
+   cluster. Target-pure clusters first, then least-collateral mixed clusters, stable
+   `cluster_id` tie-break, recompute all shares after every removal. Fail closed if
+   two or more targets are simultaneously overrepresented. The unique S5 scientific-row
+   identifier `scientific_identity_id` must be retained in the final schema; donor
+   `record_id` remains provenance and is not unique.
+2. Assign `FT`/`REF`/`EVAL` at cluster level under C3-02 multi-objective comparability
+   across canonical target, evidence, sequence-length regime, and source (§1.1).
+   `target_family` is a secondary diagnostic, not the primary stratifier. Freeze REF
+   and EVAL before fine-tuning / model-selection / hyperparameter use. Then create the
+   FT-only train/validation split at cluster level.
 3. Write:
 
 | File | Contents |
@@ -847,8 +937,9 @@ section for riboaptamer Category-versus-resolved-type disagreements.
 - **`target_family`** — functional class from a closed vocabulary: `enzyme`, `receptor`, `cytokine`,
   `growth_factor`, `antibody_immunoglobulin`, `transcription_factor`, `structural_protein`,
   `viral_protein`, `bacterial_surface_protein`, `transport_protein`, `other`, `unknown`. Manually
-  assignable, guaranteed coverage, legible in a thesis figure. **Used for stratification and
-  balancing.**
+  assignable, guaranteed coverage, legible in a thesis figure. CHECKPOINT-3 (C3-02) retains this
+  field as a **secondary diagnostic only**. It is not the primary FT/REF/EVAL stratification
+  variable.
 - **`target_pfam`** — Pfam/InterPro family via UniProt cross-reference. Better granularity for the
   "does aptamer grammar transfer across protein families" argument, but coverage depends on UniProt
   resolution. **Reported as a secondary diversity statistic**, not used for stratification.
@@ -871,9 +962,10 @@ decisions Laura wants input on.
 - Records and clusters per `target_family`; per `target_pfam` where resolved.
 - Gini coefficient and Shannon entropy of the target distribution, as-is.
 - Targets with only one record, and only one cluster.
-- The same recomputed under candidate `MAX_TARGET_FRACTION` values (0.02, 0.03, 0.05, 0.10) with the
-  resulting corpus size for each — this turns an abstract balancing question into a concrete
-  size-versus-diversity tradeoff.
+- The same recomputed under historical S6 candidate `MAX_TARGET_FRACTION` values
+  (0.02, 0.03, 0.05, 0.10) with the resulting corpus size for each — diagnostic
+  decision support only. The active S7 cap is **0.03** (§2.9); the 0.05 figure is
+  not an S7 instruction.
 - UniProt resolution rate; count of unresolved targets.
 - Sequences appearing against multiple targets (§2.0) — polyspecificity or conflict.
 
@@ -903,7 +995,8 @@ Everything in §9.1 recomputed post-balancing, plus:
 
 - Source-by-source funnel: rows in → extracted → normalised → kept / rejected (by reason) → parked →
   deduplicated → capped → final. Must reconcile exactly at every stage.
-- Partition sizes and the per-family stratification check.
+- Partition sizes and the C3-02 comparability checks (canonical target, evidence,
+  sequence-length regime, source), with `target_family` as a secondary diagnostic only.
 - Every CHECKPOINT decision Laura made, with counts.
 - Parameter values, seeds, input hashes and `source_dataset` names, tool versions.
 - Before/after comparison of the target distribution, showing what the cap did.
@@ -979,7 +1072,8 @@ Implement as assertions in the pipeline, not manual checks.
 - [ ] No cluster spans two partitions.
 
 **Corpus properties**
-- [ ] No single `target_name` exceeds `MAX_TARGET_FRACTION` of records.
+- [ ] No single `target_name` exceeds the active `MAX_TARGET_FRACTION` (0.03) of
+      currently retained scientific identities, using the post-cap identity denominator.
 - [ ] Every record has exactly one `cluster_id`; every cluster exactly one representative.
 - [ ] `contributing_sources` of every deduplicated record contains its `source_db`, and
       `corroboration_count == len(contributing_sources)`.
@@ -1035,6 +1129,7 @@ scripts/data_preparation/
 ├── s4_normalise_targets.py + s4_apply_target_review.py
 ├── s5_deduplicate.py
 ├── s6_profile_report.py
+├── s7_target_cap.py
 ├── s7_finalise.py
 ├── common/sequence_normalisation.py     # ONE implementation, shared by all sources
 ├── common/constant_region_detection.py
@@ -1107,7 +1202,7 @@ All Stage-S0 blockers are resolved. What is left:
 
 | Item | Status |
 |---|---|
-| `MAX_TARGET_FRACTION` final value | **Deferred by design** to CHECKPOINT-3, once the profile report shows real cluster counts and the size-versus-diversity tradeoff at 0.02 / 0.03 / 0.05 / 0.10. Default 0.05 until then |
+| `MAX_TARGET_FRACTION` final value | **DECIDED at CHECKPOINT-3 (C3-01):** active value **0.03** of the current/post-removal identity denominator. The previous 0.05 figure was a pre-decision placeholder. Historical S6 diagnostics still show 0.02 / 0.03 / 0.05 / 0.10 as candidate simulations only. |
 | ENA 679 vs 676 reconciliation | **Required at CHECKPOINT-1** (§5.2). Not a blocker for starting |
 | riboaptamer Category → target-type mapping | **Resolved as an approach** (§5.1): Category is a prior, per-record resolution happens at S4, disagreements surface at CHECKPOINT-2 |
 | AptaDB molecule/cell/other lookup tables | Not local. Only needed if the non-protein lane is promoted. Records park correctly without them |
@@ -1217,6 +1312,14 @@ Three cautions:
 The inventory CSV and this plan contain schemas, column names, counts, and file paths but no
 sequences, so both are safe to track under `docs/`.
 
+**Pre-publication GitHub leakage audit — CHECKPOINT-3.** Do not publish sequence data from the
+corpus on GitHub or elsewhere publicly. This includes curated sequences, raw source sequences,
+sequence derivatives, and sequence-containing split artefacts. Public materials may contain
+aggregate statistics, provenance information, and reconstruction procedures only, subject to this
+data-handling policy. Before the repository is made public, audit tracked history and current
+tracked files for sequence data and other restricted data; document the result and remediation
+before publication.
+
 ---
 
 ## 19. Change log
@@ -1228,3 +1331,4 @@ sequences, so both are safe to track under `docs/`.
 | 1.2 | 2026-08-04 | Q1–Q6 resolved against the refreshed 203-file inventory. Record grain defined as (sequence, target) and dedup keyed accordingly. ENA input registered as the 679-row review_v2 file with a required 679-vs-676 reconciliation and an explicit singleton policy. riboaptamer resolved to `all_sequences_509_rows.csv` with Category treated as a prior rather than a rule. AptaDB resolved to interaction-grain via `interaction.csv`, upgrading it from E5-by-default and seeding the target dictionary with 194 UniProt entries. Precision-SELEX layout resolved (column B primary, even rows from row 4). Selektion D9 confirmed RNA, with the resulting thesis reframing recorded. `li_et_al` removed. Added `alphabet_as_reported` / `t_to_u_applied` transcription provenance and `target_type_source`. `TRAINING_SEQUENCE_COLUMN` fixed to `sequence_core`. Added §17 project log and §18 version-control and data-handling policy. |
 | 1.3 | 2026-09-10 | AptaDiff A/B source identity corrected from primary-paper review: experimental molecule is ssDNA, canonical S2 retains DNA with no T→U, P6 sequences are random-region-only, and ordinary valid rows later park as ssDNA. They do not enter ordinary primary-RNA target capping. Dataset A remains uncapped for a separate replication/comparability file; any future RNA-alphabet Dataset-A representation is derived and replication-specific. The previous instruction to computationally transcribe A/B to RNA for the canonical corpus is superseded. |
 | 1.4 | 2026-09-17 | S5 clustering interpretation corrected after S5D showed that ENA `near_duplicate_family_id` is not complete global 90%-identity ground truth. MMseqs remains the primary 90% sequence-clustering method. Retained real multi-member ENA families are positive must-links unioned into leakage-safe final `cluster_id` components. Materialised singleton IDs are not cannot-link constraints. CD-HIT was tested and is not selected. S1–S4 scientific decisions are unchanged. |
+| 1.5 | 2026-09-21 | Records completed CHECKPOINT-3 supervisor decisions. Active `MAX_TARGET_FRACTION` changes from the previous 5% placeholder to **3%** of the current/post-removal identity denominator. Partition strategy changes from target-family-primary to multi-objective comparability across canonical target, evidence, sequence-length regime, and source; `target_family` is a secondary diagnostic only. Retains E2–E4 with E5 parked, and the protein-only primary corpus. Records the deterministic whole-cluster C3-05 removal policy, REF/EVAL freezing before fine-tuning/model-selection/hyperparameter use, cluster-level FT-only train/validation splitting after the top-level split, preservation of the two S6 sequence-length regimes, and the pre-publication repository leakage-audit requirement. Historical S6 observations and candidate-cap simulations are not rewritten. |

@@ -1,0 +1,62 @@
+{
+  "contract_id": "global_s7a_target_cap",
+  "milestone": "S7A_target_cap_application",
+  "mode": "apply",
+  "s5e_config": "config/global_s5e_final_clustering.json",
+  "s6_config": "config/global_s6_profile.json",
+  "curation_config": "config/curation_config.yaml",
+  "authoritative_corpus": "data/interim/deduplicated/corpus_clustered_final.csv",
+  "expected_input_sha256_from": "config/global_s6_profile.json#expected_s5_final_hashes.corpus_clustered_final_csv",
+  "expected_input_sha256": "615677d51aa81337a3660b8c67e9db9fae2a5c8abc7128e7668617a342689d30",
+  "expected_input_counts": {
+    "n_scientific_identities": 1281,
+    "n_distinct_sequence_core": 1144,
+    "n_final_clusters": 796,
+    "n_canonical_targets": 411
+  },
+  "max_target_fraction": 0.03,
+  "max_target_fraction_source": "config/curation_config.yaml",
+  "training_sequence_column": "sequence_core",
+  "cap_unit": "final_cluster",
+  "denominator_semantics": "current_post_removal_identity_count",
+  "cluster_integrity": "never_split_cluster",
+  "target_pure_first": true,
+  "pure_cluster_ordering": [
+    "trigger_target_identities_descending",
+    "stable_cluster_id_ascending"
+  ],
+  "mixed_cluster_collateral_policy": "least_collateral_identities_then_stable_cluster_id",
+  "stable_cluster_id_tie_break": "ascending",
+  "recompute_after_every_removal": true,
+  "simultaneous_overrepresented_target_ordering": "fail_closed_unspecified",
+  "no_e5_promotion": true,
+  "no_non_protein_promotion": true,
+  "no_partitioning": true,
+  "write_authoritative_capped_corpus": true,
+  "deterministic": true,
+  "preview_output_dir": "data/interim/s7a_target_cap_preview",
+  "output_dir": "data/interim/s7a_target_cap",
+  "approval_record": "config/checkpoint_reviews/s7a_target_cap_approval.json",
+  "does_not": [
+    "write_corpus_final",
+    "populate_partition",
+    "assign_ft_ref_eval",
+    "create_train_validation_split",
+    "promote_e5",
+    "promote_non_protein",
+    "rewrite_s4",
+    "rewrite_s5",
+    "rewrite_s6",
+    "start_s7b"
+  ],
+  "sequence_safety_scan_paths": [
+    "scripts/data_preparation/s7_target_cap.py",
+    "scripts/data_preparation/adapters/s7_target_cap.py",
+    "config/global_s7a_target_cap.json",
+    "config/checkpoint_reviews/s7a_target_cap_approval.json",
+    "config/curation_config.yaml",
+    "tests/data_preparation/test_s7_target_cap.py",
+    "docs/data_curation/global_s7a_target_cap.md",
+    "docs/data_curation/rna_aptamer_corpus_curation_plan.md"
+  ]
+}
