@@ -1,0 +1,171 @@
+{
+  "contract_id": "s7c_ft_split_approval",
+  "checkpoint": "CHECKPOINT-3",
+  "milestone": "S7C_ft_train_validation_preview_approved",
+  "decision_date": "2026-09-21",
+  "reviewers": [
+    "Laura",
+    "ChatGPT"
+  ],
+  "frozen_ft_sha256": "b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff",
+  "v1": {
+    "preview_dir": "data/interim/s7c_ft_split_preview",
+    "historical_copy": "data/interim/s7c_ft_split_preview_jsd_v1",
+    "review_status": "not_approved",
+    "mechanically_valid": true,
+    "approved": false,
+    "objective": "raw-JSD minimax",
+    "reason": "raw-JSD cross-criterion minimax caused target-support cardinality to dominate and yielded inadequate source comparability",
+    "assignment_preview_sha256": "2ff2ec397decf2da7dd0ebb4007428ebea2a3c6fbca15d524d41b49105888bda",
+    "preview_manifest_sha256": "07775ebf418b80371db9bab96f8f5c58733a8d75d641b728bf6d5077c3d7f62b",
+    "reviewed_preview_hashes": {
+      "cluster_ft_split_preview.csv": "2ff2ec397decf2da7dd0ebb4007428ebea2a3c6fbca15d524d41b49105888bda",
+      "divergence_metrics.csv": "eace17359c1d77275699f1988560c4ecc64a39f59af93a951250df8c482af8de",
+      "evidence_distribution.csv": "de09a44920659ceaaa9337ea058376fbb4e6163ec4b43809a17ed43b02a7e39a",
+      "length_regime_distribution.csv": "931650ccb4d9b7315a0f91e0a8b108ba9bfe96face11af5e7acc923e222341d2",
+      "s7c_ft_split_preview_manifest.json": "07775ebf418b80371db9bab96f8f5c58733a8d75d641b728bf6d5077c3d7f62b",
+      "s7c_ft_split_preview_report.md": "a7a1d77ddc72d5ed8085c3316c4fa9a08142f64babcd212cf6469a371b1d3dc3",
+      "source_distribution.csv": "6296c45f25e771f88abe2011f0a7c87872fac9948297bf9fce34a211bbc4072c",
+      "target_distribution.csv": "9a318c4482eed3e683848a3aff7e32b0b89cdc3c74427f49205ae03557e8fe6d",
+      "target_family_diagnostic.csv": "9bf67a6c7e09c6178bf3ce075abe4a86af1975b53a9f9313c173ea6567d4ea76",
+      "train_core_summary.csv": "3635994263cface13826b50904ceebb8e0e4eaa8f124cab5ba89ad59b58d2992",
+      "train_identity_summary.csv": "ada68fe8b89b4102bd5e2051d214e0e645256ff6b0dcfa4b425a29a53f560eed",
+      "validation_core_summary.csv": "a44053cb63387c527d7e27fc09a1ed2e14547dda83d82e4c283aa1b5dbcd32a3",
+      "validation_identity_summary.csv": "00833e877acaa72542ac17179f36c49cc16583df53904a7bde91485a97c2007e"
+    }
+  },
+  "v2": {
+    "preview_dir": "data/interim/s7c_ft_split_preview_v2",
+    "review_status": "approved_for_application_and_freeze",
+    "reviewed": true,
+    "approved": true,
+    "objective": "maximum absolute category-proportion deviation primary hierarchy, JSD diagnostic/tie-break",
+    "frozen_ft_sha256": "b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff",
+    "assignment_preview_sha256": "2f11a2b129f025965a428d0f6344e98fd9f615d519c68ba49a49c7d0386951ee",
+    "preview_manifest_sha256": "5bb05e2d73651221e8a553b453c807114427da950968b7bafe6b769900e20838",
+    "approved_cluster_quotas": {
+      "TRAIN": 571,
+      "VALIDATION": 64
+    },
+    "approved_identities": {
+      "TRAIN": 746,
+      "VALIDATION": 149
+    },
+    "approved_cores": {
+      "TRAIN": 678,
+      "VALIDATION": 117
+    },
+    "reviewed_preview": {
+      "clusters": {
+        "TRAIN": 571,
+        "VALIDATION": 64
+      },
+      "identities": {
+        "TRAIN": 746,
+        "VALIDATION": 149
+      },
+      "cores": {
+        "TRAIN": 678,
+        "VALIDATION": 117
+      },
+      "targets_represented": {
+        "TRAIN": 333,
+        "VALIDATION": 102
+      },
+      "targets_shared": 45,
+      "targets_train_only": 288,
+      "targets_validation_only": 57,
+      "singleton_target_identities": {
+        "TRAIN": 181,
+        "VALIDATION": 39
+      }
+    },
+    "approved_objective": {
+      "profile": "max_abs_proportion_deviation",
+      "M_target": 0.016782272880656892,
+      "M_evidence": 0.0034719358104308012,
+      "M_length": 0.0005805515239477588,
+      "M_source": 0.0032919650556784558,
+      "R1": 0.016782272880656892,
+      "R3": 0.024126725270713908,
+      "lexicographic_descending_M_vector": [
+        0.016782272880656892,
+        0.0034719358104308012,
+        0.0032919650556784558,
+        0.0005805515239477588
+      ],
+      "A_target": {
+        "TRAIN": 0.0033519553072625698,
+        "VALIDATION": 0.016782272880656892
+      },
+      "A_evidence": {
+        "TRAIN": 0.0006934563481959671,
+        "VALIDATION": 0.0034719358104308012
+      },
+      "A_length": {
+        "TRAIN": 0.00010018367006181528,
+        "VALIDATION": 0.0005805515239477588
+      },
+      "A_source": {
+        "TRAIN": 0.0006575104467775941,
+        "VALIDATION": 0.0032919650556784558
+      },
+      "J_target": {
+        "TRAIN": 0.052039505540865325,
+        "VALIDATION": 0.43146710309576275
+      },
+      "J_evidence": {
+        "TRAIN": 9.3435973199372e-07,
+        "VALIDATION": 2.301452558293158e-05
+      },
+      "J_length": {
+        "TRAIN": 7.358579051964533e-09,
+        "VALIDATION": 2.471485994031135e-07
+      },
+      "J_source": {
+        "TRAIN": 2.2978735808370176e-06,
+        "VALIDATION": 5.848076141135722e-05
+      },
+      "D_target": 0.43146710309576275,
+      "D_evidence": 2.301452558293158e-05,
+      "D_length": 2.471485994031135e-07,
+      "D_source": 5.848076141135722e-05,
+      "O1": 0.43146710309576275,
+      "O3": 0.4315488455313565,
+      "lexicographic_descending_D_vector": [
+        0.43146710309576275,
+        5.848076141135722e-05,
+        2.301452558293158e-05,
+        2.471485994031135e-07
+      ]
+    },
+    "reviewed_preview_hashes": {
+      "absolute_deviation_metrics.csv": "15c1943b346d771157c9f9ffec53f2b96f444530581df4e6506492514682f8d3",
+      "cluster_ft_split_preview.csv": "2f11a2b129f025965a428d0f6344e98fd9f615d519c68ba49a49c7d0386951ee",
+      "divergence_metrics.csv": "c6653c29ce3adb4727f78e939814c02fa43410d0d9249005bf50cbe4f84d9184",
+      "evidence_distribution.csv": "0ef4b6bc13352466e133ef36c2c91cc92686aefd8b202322358a35e3cc167e50",
+      "length_regime_distribution.csv": "37696ab4db0c89b4f694433ba94b2ff4584f337b042cea3ce4787bd01e49fa2b",
+      "s7c_ft_split_preview_manifest.json": "5bb05e2d73651221e8a553b453c807114427da950968b7bafe6b769900e20838",
+      "s7c_ft_split_preview_report.md": "abae260f7b15c037dd8d1790526d9efb8fb00ebd70a1c8b06081fbc32dc9f153",
+      "source_distribution.csv": "e3ac5ed1c99210e1963dc39f0f2e24bd5d22d5fa73720296a4106a88f61def9e",
+      "target_distribution.csv": "4eca882895ede279cd6523c6c68f4c444a276ab1d655c42713039a1b5b78a027",
+      "target_family_diagnostic.csv": "04d3d00417268ad9a8e47ad4693a3da5091f0c0a0ace992bedda4dd833e60e45",
+      "train_core_summary.csv": "db1ed32a7052155a36ba21447894069e66c5c0bb8d1be9a4413aedfb1ea9a190",
+      "train_identity_summary.csv": "d5af23a9f220ba6bfcaaacb55ccbf7951a2924692d5cc12457f0296c9a39e312",
+      "validation_core_summary.csv": "558182334913ce24ef762e3e4ffcd26e2f4e7304783f40937cc213a766de9d44",
+      "validation_identity_summary.csv": "1e6e1112f4b82f4a27d2e03b86954f3437a7b5d69510993d9a01e38379e43a95"
+    },
+    "usage": {
+      "audit_record_only": true,
+      "used_for_scientific_assignment": false,
+      "used_for_cluster_selection": false,
+      "may_be_used_for_post_derivation_parity": true
+    }
+  },
+  "usage": {
+    "audit_record_only": true,
+    "used_for_scientific_assignment": false,
+    "used_for_cluster_selection": false,
+    "may_be_used_for_post_derivation_parity": true
+  }
+}

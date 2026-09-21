@@ -10875,3 +10875,225 @@ than `partition` are preserved). No relevant failure.
 fine-tuning not started. REF calibration not started. EVAL model
 evaluation not started. No commit. No push.
 
+## 2026-09-21 — S7C FT train/validation preview dry-run
+
+**Stage:** Aim 2 / data curation / S7C FT-only train/validation preview
+**What was done:** Designed, implemented, tested, and dry-ran a
+deterministic approximately 90/10 whole-cluster split of frozen FT into
+TRAIN/VALIDATION. Reused the S7B feature-vector, JSD, greedy, and
+local-search implementation with TRAIN/VALIDATION labels. Did not write
+authoritative `ft_train.csv` / `ft_validation.csv`. Did not start
+fine-tuning. Did not use validation results for any model decision.
+
+```text
+S7C implementation built                 = yes
+S7C dry-run/preview                      = yes
+authoritative FT train/validation files  = no
+FT train frozen                          = no
+FT validation frozen                     = no
+```
+
+**Inputs used:** frozen `ft.csv` SHA-256
+`b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff`.
+Independently verified: 895 identities, 795 cores, 635 clusters, 390
+canonical protein targets, all `partition=FT`, E2/E3/E4 = 615/187/93,
+E5 = 0, short/long cores = 448/347.
+
+**REF/EVAL guards (automated, before and after):** file SHA-256 and
+identity/cluster-set hashes identical to the S7B freeze. REF 80
+clusters, EVAL 79 clusters, overlap 0. REF/EVAL files byte-identical
+after the preview.
+
+**Tied-optimal cluster quotas:** (571, 64) and (572, 63). Scientific
+objective selected 571 TRAIN / 64 VALIDATION.
+
+**Preview sizes:** TRAIN 571 clusters / 826 identities / 727 cores /
+390 targets; VALIDATION 64 / 69 / 68 / 59. Cluster fractions 89.92% /
+10.08%. Identity fractions 92.29% / 7.71% because quotas are by cluster
+count.
+
+**Objective (JSD log2 vs complete frozen FT):** O1 = D_target =
+0.350017921105; D_source = 0.085263227565; D_length = 0.000073625782;
+D_evidence = 0.000061441657; O3 = 0.435416216109. Local search
+converged after 585 accepted swaps / 32 passes (greedy O1 0.50081).
+`target_family` not in the primary objective. No manual criterion
+weights.
+
+**Target coverage:** TRAIN has all 390 FT targets. VALIDATION has 59,
+all shared with TRAIN; 331 targets train-only; 0 validation-only.
+Singleton-target identities 220 TRAIN / 0 VALIDATION. Validation is not
+required to contain every target.
+
+**Random diagnostic (21 seeds, 571/64 quotas):** O1 min/mean/max =
+0.4887 / 0.5194 / 0.5489. Optimised O1 0.3500. Some random splits beat
+optimised D_length and D_source while remaining worse under minimax.
+Not used as the assignment.
+
+**Integrity:** FT clusters assigned exactly once; identities assigned
+exactly once; cores cross train/validation = 0; cluster crossings = 0;
+REF/EVAL leakage = 0; E5 = 0; non-protein = 0; `ft.csv` unmutated;
+top-level `partition` still FT; tracked S7C sequence leaks = 0;
+`git ls-files data` empty.
+
+**Tests:** pytest 39 S7C + 38 S7B + 22 S7A + 19 S5E + 33 S6 = 151
+passed. The extra S7B test is a synthetic assignment fingerprint
+proving the shared-optimiser refactor did not change S7B semantics.
+
+**Open questions carried forward:** human review of this dry-run before
+authoritative FT train/validation freeze. No fine-tuning. Not
+committed. Not pushed.
+
+## 2026-09-21 — S7C v2 FT train/validation preview (revised objective)
+
+**Stage:** Aim 2 / data curation / S7C FT-only train/validation preview
+**What was done:** Did not freeze or apply the first S7C preview. Preserved
+the v1 raw-JSD artefacts under `data/interim/s7c_ft_split_preview/` and a
+byte-identical copy at `data/interim/s7c_ft_split_preview_jsd_v1/`.
+Revised the S7C primary metric from raw JSD minimax to maximum absolute
+category-proportion deviation on complete frozen FT support, so target,
+evidence, length regime, and source are measured on a common
+percentage-point scale. Regenerated a v2 dry-run under
+`data/interim/s7c_ft_split_preview_v2/`. Did not write authoritative
+`ft_train.csv` / `ft_validation.csv`. Did not start fine-tuning. Did not
+commit or push.
+
+```text
+S7C v1 preview preserved                 = yes
+S7C v1 approved                          = no
+S7C v2 preview generated                 = yes
+S7C v2 approved                          = no
+authoritative FT train/validation files  = no
+```
+
+**Why v1 was not approved:** mechanically valid, but raw JSD across
+criteria of radically different support size (390 targets vs 7/3/2)
+effectively prioritised target matching and yielded poor validation
+source coverage (AptaDB 0/54, AptaIndex 0/51, AptamerBase 38/368).
+
+**Inputs used:** frozen `ft.csv` SHA-256
+`b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff`.
+Independently verified: 895 identities, 795 cores, 635 clusters, 390
+canonical protein targets, all `partition=FT`.
+
+**REF/EVAL guards (automated, before and after):** file SHA-256 and
+identity/cluster-set hashes identical to the S7B freeze. REF 80
+clusters, EVAL 79 clusters, overlap 0. REF/EVAL files byte-identical
+after the preview.
+
+**Tied-optimal cluster quotas:** (571, 64) and (572, 63). Revised
+objective selected 571 TRAIN / 64 VALIDATION.
+
+**v2 preview sizes:** TRAIN 571 clusters / 746 identities / 678 cores /
+333 targets; VALIDATION 64 / 149 / 117 / 102. Cluster fractions 89.92%
+/ 10.08%. Identity fractions 83.35% / 16.65% because quotas are by
+cluster count.
+
+**Revised objective (max abs proportion deviation vs complete FT):**
+R1 = M_target = 0.016782272881 (1.68 pp); M_evidence = 0.003471935810
+(0.35 pp); M_length = 0.000580551524 (0.06 pp); M_source =
+0.003291965056 (0.33 pp); R3 = 0.024126725271. JSD is diagnostic /
+tie-break only. `target_family` not in the primary objective. No
+manual criterion weights. No hard source-coverage constraint. Local
+search converged after 526 accepted swaps / 33 passes (greedy R1
+0.12762). Frozen S7B JSD semantics unchanged (synthetic assignment
+fingerprint reproduced).
+
+**Source:** all 7 sources present in validation. Worst validation
+deviation 0.33 pp (aptaindex). VALIDATION count = 0 sources: none.
+
+**Target coverage:** TRAIN 333 / VALIDATION 102 / shared 45 /
+validation-only 57 / train-only 288. Singleton-target identities 181
+TRAIN / 39 VALIDATION. Maximum target-share deviation 1.68 pp
+(HIV-1 aspartyl protease (PR) in VALIDATION). No target-coverage hard
+constraint.
+
+**v1 vs v2 trade-off:** same 571/64 quotas. v2 improves R1 0.140 →
+0.017 and M_source 0.140 → 0.003, with all sources represented;
+validation identities rise 69 → 149; target JSD worsens 0.350 → 0.431
+because JSD is no longer the first scale. v2 is not declared superior
+solely because it is newer; it is the intended scientific correction
+pending review.
+
+**Random diagnostic (21 seeds, 571/64 quotas):** R1 min/mean/max =
+0.0459 / 0.0886 / 0.1808. Optimised R1 0.0168, better than every
+random split on R1 and on each reported M_c minimum. Not used as the
+assignment.
+
+**Integrity:** FT clusters assigned exactly once; identities assigned
+exactly once; cores cross train/validation = 0; cluster crossings = 0;
+REF/EVAL leakage = 0; E5 = 0; non-protein = 0; `ft.csv` unmutated;
+top-level `partition` still FT; tracked S7C sequence leaks = 0;
+`git ls-files data` empty.
+
+**Tests:** pytest 49 S7C + 38 S7B + 22 S7A + 19 S5E + 33 S6 = 161
+passed. S7B synthetic assignment fingerprint unchanged after the
+shared objective-profile refactor.
+
+**Open questions carried forward:** human review of the v2 dry-run
+before authoritative FT train/validation freeze. No fine-tuning. Not
+committed. Not pushed.
+
+## 2026-09-21 — S7C v2 authoritative application and TRAIN/VALIDATION freeze
+
+**Stage:** Aim 2 / data curation / S7C FT train/validation application
+and freeze
+**What was done:** Recorded explicit approval of the v2
+maximum-absolute-proportion-deviation preview and non-approval of v1.
+Preserved both preview trees unchanged. Rederived the v2 assignment
+from frozen `ft.csv` with the same tested optimiser, required exact
+preview/application parity, wrote authoritative `ft_train.csv` /
+`ft_validation.csv` / `ft_split_assignment.csv` under ignored
+`data/interim/s7c_ft_split/`, and froze TRAIN and VALIDATION with file
+and semantic hashes. Did not begin S7D. Did not start model
+fine-tuning. Did not construct `corpus_final`. Did not commit or push.
+
+```text
+S7C v1 preview preserved / not approved  = yes
+S7C v2 preview approved                  = yes
+authoritative assignment reproduced      = yes (635/635, mismatches 0)
+FT TRAIN frozen                          = yes
+FT VALIDATION frozen                     = yes
+REF/EVAL hash guards                     = passed
+```
+
+**Approval:** `config/checkpoint_reviews/s7c_ft_split_approval.json`.
+Audit-only. Not used for cluster selection.
+
+**Freeze:** `config/checkpoint_reviews/s7c_ft_split_freeze.json`,
+date 2026-09-21.
+
+**TRAIN:** 571 clusters / 746 identities / 678 cores / 333 targets.
+`ft_train.csv` SHA-256
+`941fe8783ee8c99a2ce7598dea00ed123e62750026b7f157f28e7bbcc5d14a8f`.
+Identity-set
+`75e5cb8471d2fb3ee30529617aaf80ff584d5bf79e9976dc338434057a6aac6a`.
+Cluster-set
+`18c6df63ac4935557bad9c5fcc12610dd280b207652208faf04f0ba39d9c3349`.
+
+**VALIDATION:** 64 / 149 / 117 / 102.
+`ft_validation.csv` SHA-256
+`03be477e12f7b9ca20f8911e2ac88fde2949af2b6131c2d2aa43eef2ae6d9abc`.
+Identity-set
+`19121149b9e0e02dd9cda5eb5619c64df86940331603139b702d436e6bde67ac`.
+Cluster-set
+`088d6b4db826be5c970b410e74cfa2d52fc402fa4818c692f8be30e42f79c4f9`.
+
+**Objective (exact v2 parity):** R1 = M_target = 0.016782272880656892;
+M_evidence = 0.0034719358104308012; M_length = 0.0005805515239477588;
+M_source = 0.0032919650556784558; R3 = 0.024126725270713908.
+
+**Integrity:** TRAIN∩VALIDATION identities/clusters/cores = 0; no
+REF/EVAL leakage; every FT identity/cluster/core appears exactly once;
+E5 = 0; non-protein = 0; top-level `partition` remains FT; `ft.csv`
+unmutated; REF/EVAL six freeze hashes unchanged; tracked sequence leaks
+= 0; `git ls-files data` empty. Deterministic rerun of scientific
+payloads was byte-identical.
+
+**Tests:** specified S7C/S7B/S7A/S5E/S6 command: 166 passed
+(was 161 at the accepted v2 preview baseline). Increase is the five
+new application/freeze tests.
+
+**Boundary:** No model training. No REF calibration. No EVAL
+evaluation. No S7D. Not committed. Not pushed.
+
+

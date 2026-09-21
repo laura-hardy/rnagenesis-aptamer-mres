@@ -94,10 +94,21 @@ FREEZE_REASON = (
     "fine-tuning, hyperparameter or REF-calibration use"
 )
 VALID_PARTITION_LABELS: frozenset[str] = frozenset(REPORT_PARTITION_ORDER)
+OBJECTIVE_PROFILE_JSD = "jsd_minimax"
+OBJECTIVE_PROFILE_ABSDEV = "max_abs_proportion_deviation"
+DEFAULT_OBJECTIVE_PROFILE = OBJECTIVE_PROFILE_JSD
 COMPARISON_TUPLE_FIELDS: tuple[str, ...] = (
     "O1_max_primary_D",
     "lexicographic_descending_D_vector",
     "O3_sum_primary_D",
+    "assignment_signature",
+)
+ABSDEV_COMPARISON_TUPLE_FIELDS: tuple[str, ...] = (
+    "R1_max_primary_M",
+    "lexicographic_descending_M_vector",
+    "R3_sum_primary_M",
+    "lexicographic_descending_D_vector",
+    "sum_primary_D",
     "assignment_signature",
 )
 CLUSTER_ORDERING: tuple[str, ...] = (
@@ -282,6 +293,24 @@ def assignment_signature(assignment: Mapping[str, str]) -> str:
     )
 
 
+def resolve_partition_labels(partition_labels: Sequence[str] | None) -> tuple[str, ...]:
+    """Report-order labels. Default is the frozen S7B FT/REF/EVAL order."""
+    if partition_labels is None:
+        return REPORT_PARTITION_ORDER
+    if not partition_labels:
+        raise S7PartitionError("partition_labels must be non-empty")
+    return tuple(partition_labels)
+
+
+def resolve_placement_labels(placement_labels: Sequence[str] | None) -> tuple[str, ...]:
+    """Greedy/local-search label order. Default is alphabetical S7B labels."""
+    if placement_labels is None:
+        return PARTITION_LABELS
+    if not placement_labels:
+        raise S7PartitionError("placement_labels must be non-empty")
+    return tuple(placement_labels)
+
+
 def _log(value: float, base: float) -> float:
     if value <= 0.0:
         raise S7PartitionError("logarithm requires a positive argument")
@@ -345,6 +374,82 @@ def counts_to_probs(
     if total <= 0:
         return None
     return [int(counts.get(category, 0)) / total for category in support]
+
+
+def resolve_objective_profile(profile: str | None) -> str:
+    if profile is None:
+        return DEFAULT_OBJECTIVE_PROFILE
+    if profile not in {OBJECTIVE_PROFILE_JSD, OBJECTIVE_PROFILE_ABSDEV}:
+        raise S7PartitionError(f"unknown objective profile {profile!r}")
+    return profile
+
+
+def max_abs_proportion_deviation(
+    counts: Mapping[str, int],
+    support: Sequence[str],
+    global_probs: Sequence[float],
+) -> float:
+    """Maximum absolute category-proportion deviation on complete support.
+
+    An absent category contributes its full global proportion. Relative
+    percentage error is not used. Empty mass yields ``max(global_probs)``.
+    """
+    if len(global_probs) != len(support):
+        raise S7PartitionError("absolute-deviation support length mismatch")
+    probs = counts_to_probs(counts, support)
+    if probs is None:
+        return max(global_probs) if global_probs else 0.0
+    return max(abs(p_i - q_i) for p_i, q_i in zip(probs, global_probs))
+
+
+def max_abs_dev_from_vec(counts_vec: Any, global_p: Any) -> float:
+    total = float(np.sum(counts_vec))
+    if total <= 0.0:
+        return float(np.max(global_p)) if getattr(global_p, "size", 0) else 0.0
+    return float(np.max(np.abs(counts_vec / total - global_p)))
+
+
+def worst_abs_deviation_category(
+    counts: Mapping[str, int],
+    support: Sequence[str],
+    global_probs: Sequence[float],
+) -> tuple[str, float]:
+    """Return the first support category attaining the maximum |P-P_FT|."""
+    if not support:
+        return "", 0.0
+    if len(global_probs) != len(support):
+        raise S7PartitionError("absolute-deviation support length mismatch")
+    probs = counts_to_probs(counts, support)
+    if probs is None:
+        idx = max(range(len(support)), key=lambda i: global_probs[i])
+        return support[idx], float(global_probs[idx])
+    idx = max(range(len(support)), key=lambda i: abs(probs[i] - global_probs[i]))
+    return support[idx], abs(probs[idx] - global_probs[idx])
+
+
+def scientific_prefix_from_components(
+    *,
+    d_target: float,
+    d_evidence: float,
+    d_length: float,
+    d_source: float,
+    m_target: float = 0.0,
+    m_evidence: float = 0.0,
+    m_length: float = 0.0,
+    m_source: float = 0.0,
+    profile: str | None = None,
+) -> tuple[Any, ...]:
+    """Build the scientific comparison prefix for the selected profile."""
+    resolved = resolve_objective_profile(profile)
+    d_values = (d_target, d_evidence, d_length, d_source)
+    d_lex = tuple(sorted(d_values, reverse=True))
+    o3 = d_target + d_evidence + d_length + d_source
+    if resolved == OBJECTIVE_PROFILE_ABSDEV:
+        m_values = (m_target, m_evidence, m_length, m_source)
+        m_lex = tuple(sorted(m_values, reverse=True))
+        r3 = m_target + m_evidence + m_length + m_source
+        return (max(m_lex), m_lex, r3, d_lex, o3)
+    return (max(d_lex), d_lex, o3)
 
 
 def js_against_global(
@@ -582,6 +687,15 @@ class ObjectiveScore:
     j_length: dict[str, float]
     j_source: dict[str, float]
     log_base: float = JSD_LOG_BASE
+    a_target: dict[str, float] = field(default_factory=dict)
+    a_evidence: dict[str, float] = field(default_factory=dict)
+    a_length: dict[str, float] = field(default_factory=dict)
+    a_source: dict[str, float] = field(default_factory=dict)
+    m_target: float = 0.0
+    m_evidence: float = 0.0
+    m_length: float = 0.0
+    m_source: float = 0.0
+    profile: str = DEFAULT_OBJECTIVE_PROFILE
 
     @property
     def o1(self) -> float:
@@ -600,23 +714,73 @@ class ObjectiveScore:
     def o3(self) -> float:
         return self.d_target + self.d_evidence + self.d_length + self.d_source
 
+    @property
+    def r1(self) -> float:
+        return max(self.m_target, self.m_evidence, self.m_length, self.m_source)
+
+    @property
+    def m_lex_vector(self) -> tuple[float, float, float, float]:
+        return tuple(
+            sorted(
+                (self.m_target, self.m_evidence, self.m_length, self.m_source),
+                reverse=True,
+            )
+        )
+
+    @property
+    def r3(self) -> float:
+        return self.m_target + self.m_evidence + self.m_length + self.m_source
+
+    @property
+    def comparison_tuple_fields(self) -> tuple[str, ...]:
+        if self.profile == OBJECTIVE_PROFILE_ABSDEV:
+            return ABSDEV_COMPARISON_TUPLE_FIELDS
+        return COMPARISON_TUPLE_FIELDS
+
     def scientific_prefix(self) -> tuple[Any, ...]:
-        """O1, descending D vector, O3 — everything except the assignment signature."""
-        return (self.o1, self.lex_vector, self.o3)
+        """Scientific comparison prefix for the selected profile.
+
+        Frozen S7B default (``jsd_minimax``): O1, descending D vector, O3.
+        S7C absolute-deviation profile: R1, descending M vector, R3,
+        then JSD descending D vector and D-sum as later tie-breaks.
+        """
+        return scientific_prefix_from_components(
+            d_target=self.d_target,
+            d_evidence=self.d_evidence,
+            d_length=self.d_length,
+            d_source=self.d_source,
+            m_target=self.m_target,
+            m_evidence=self.m_evidence,
+            m_length=self.m_length,
+            m_source=self.m_source,
+            profile=self.profile,
+        )
 
     def comparison_tuple(self, assignment: Mapping[str, str]) -> tuple[Any, ...]:
         """Exact optimisation key, in documented order.
 
+        Frozen S7B ``jsd_minimax``:
+
         1. O1 = max of the four worst-partition primary divergences.
         2. The four D values sorted descending (lexicographic).
-        3. O3 = sum of the four D values (redundant with 2 when the
-           sorted vectors tie, retained for explicit completeness).
+        3. O3 = sum of the four D values.
         4. Stable assignment signature of sorted ``cluster_id:label``.
+
+        S7C ``max_abs_proportion_deviation``:
+
+        1. R1 = max of the four worst-subset maximum absolute proportion
+           deviations M_c.
+        2. The four M values sorted descending (lexicographic).
+        3. R3 = sum of the four M values.
+        4. The four D (JSD) values sorted descending.
+        5. Sum of the four D values.
+        6. Stable assignment signature.
         """
         return (*self.scientific_prefix(), assignment_signature(assignment))
 
     def as_dict(self) -> dict[str, Any]:
         return {
+            "profile": self.profile,
             "log_base": self.log_base,
             "J_target": dict(self.j_target),
             "J_evidence": dict(self.j_evidence),
@@ -629,9 +793,20 @@ class ObjectiveScore:
             "O1": self.o1,
             "lexicographic_descending_D_vector": list(self.lex_vector),
             "O3": self.o3,
+            "A_target": dict(self.a_target),
+            "A_evidence": dict(self.a_evidence),
+            "A_length": dict(self.a_length),
+            "A_source": dict(self.a_source),
+            "M_target": self.m_target,
+            "M_evidence": self.m_evidence,
+            "M_length": self.m_length,
+            "M_source": self.m_source,
+            "R1": self.r1,
+            "lexicographic_descending_M_vector": list(self.m_lex_vector),
+            "R3": self.r3,
             "arbitrary_manually_chosen_criterion_weights": None,
             "target_family_in_primary_objective": False,
-            "comparison_tuple_fields": list(COMPARISON_TUPLE_FIELDS),
+            "comparison_tuple_fields": list(self.comparison_tuple_fields),
         }
 
 
@@ -680,23 +855,38 @@ def score_partition_states(
     space: FeatureSpace,
     *,
     include_family: bool = False,
+    partition_labels: Sequence[str] | None = None,
+    objective_profile: str | None = None,
 ) -> ObjectiveScore:
     """Score a partial or complete assignment against the global corpus.
 
-    Each partition is compared to the **full post-cap global** distribution
+    Each partition is compared to the **full stored global** distribution
     for that criterion, not to the mixture of currently assigned clusters.
     A partition with zero mass on the criterion grain receives JSD equal
-    to the supremum at the configured log base (1 bit when log2). The
-    four primary criteria are target, evidence, length regime, and source.
-    ``target_family`` is ignored unless ``include_family`` is requested for
-    a secondary diagnostic, and even then it is not folded into O1/O2/O3.
+    to the supremum at the configured log base (1 bit when log2), and
+    maximum absolute proportion deviation equal to the largest global
+    category share. The four primary criteria are target, evidence, length
+    regime, and source. ``target_family`` is ignored unless
+    ``include_family`` is requested for a secondary diagnostic, and even
+    then it is not folded into O1/O2/O3 or R1/R3.
+
+    Default ``partition_labels`` is the frozen S7B FT/REF/EVAL report
+    order. Default ``objective_profile`` is frozen S7B ``jsd_minimax``.
+    Absolute-deviation diagnostics are always computed; they enter the
+    comparison tuple only under ``max_abs_proportion_deviation``.
     """
     del include_family  # family is never part of the primary score object
+    labels = resolve_partition_labels(partition_labels)
+    profile = resolve_objective_profile(objective_profile)
     j_target = {}
     j_evidence = {}
     j_length = {}
     j_source = {}
-    for label in REPORT_PARTITION_ORDER:
+    a_target = {}
+    a_evidence = {}
+    a_length = {}
+    a_source = {}
+    for label in labels:
         state = states[label]
         if state.target_vec is not None:
             j_target[label] = js_from_vec(state.target_vec, space.target_p, log_base=space.log_base)
@@ -705,6 +895,10 @@ def score_partition_states(
             )
             j_length[label] = js_from_vec(state.length_vec, space.length_p, log_base=space.log_base)
             j_source[label] = js_from_vec(state.source_vec, space.source_p, log_base=space.log_base)
+            a_target[label] = max_abs_dev_from_vec(state.target_vec, space.target_p)
+            a_evidence[label] = max_abs_dev_from_vec(state.evidence_vec, space.evidence_p)
+            a_length[label] = max_abs_dev_from_vec(state.length_vec, space.length_p)
+            a_source[label] = max_abs_dev_from_vec(state.source_vec, space.source_p)
         else:
             j_target[label] = js_against_global(
                 state.target, space.target_probs, space.targets, log_base=space.log_base
@@ -718,6 +912,18 @@ def score_partition_states(
             j_source[label] = js_against_global(
                 state.source, space.source_probs, space.sources, log_base=space.log_base
             )
+            a_target[label] = max_abs_proportion_deviation(
+                state.target, space.targets, space.target_probs
+            )
+            a_evidence[label] = max_abs_proportion_deviation(
+                state.evidence, space.evidence, space.evidence_probs
+            )
+            a_length[label] = max_abs_proportion_deviation(
+                state.length, space.length_regimes, space.length_probs
+            )
+            a_source[label] = max_abs_proportion_deviation(
+                state.source, space.sources, space.source_probs
+            )
     return ObjectiveScore(
         d_target=max(j_target.values()),
         d_evidence=max(j_evidence.values()),
@@ -728,19 +934,31 @@ def score_partition_states(
         j_length=j_length,
         j_source=j_source,
         log_base=space.log_base,
+        a_target=a_target,
+        a_evidence=a_evidence,
+        a_length=a_length,
+        a_source=a_source,
+        m_target=max(a_target.values()),
+        m_evidence=max(a_evidence.values()),
+        m_length=max(a_length.values()),
+        m_source=max(a_source.values()),
+        profile=profile,
     )
 
 
 def family_jsd_by_partition(
     states: Mapping[str, PartitionCounts],
     space: FeatureSpace,
+    *,
+    partition_labels: Sequence[str] | None = None,
 ) -> dict[str, float]:
     """Secondary diagnostic only — not used by the optimiser."""
+    labels = resolve_partition_labels(partition_labels)
     return {
         label: js_against_global(
             states[label].family, space.family_probs, space.families, log_base=space.log_base
         )
-        for label in REPORT_PARTITION_ORDER
+        for label in labels
     }
 
 
@@ -949,8 +1167,12 @@ def cluster_processing_order(features: Mapping[str, ClusterFeature]) -> list[str
     )
 
 
-def _empty_states(space: FeatureSpace | None = None) -> dict[str, PartitionCounts]:
-    states = {label: PartitionCounts() for label in REPORT_PARTITION_ORDER}
+def _empty_states(
+    space: FeatureSpace | None = None,
+    labels: Sequence[str] | None = None,
+) -> dict[str, PartitionCounts]:
+    order = resolve_partition_labels(labels)
+    states = {label: PartitionCounts() for label in order}
     if space is not None:
         for state in states.values():
             state.target_vec = np.zeros(len(space.targets), dtype=float)
@@ -965,8 +1187,10 @@ def states_from_assignment(
     assignment: Mapping[str, str],
     features: Mapping[str, ClusterFeature],
     space: FeatureSpace | None = None,
+    *,
+    partition_labels: Sequence[str] | None = None,
 ) -> dict[str, PartitionCounts]:
-    states = _empty_states(space)
+    states = _empty_states(space, labels=partition_labels)
     for cluster_id, label in assignment.items():
         if label not in states:
             raise S7PartitionError(f"unknown partition label {label!r}")
@@ -977,29 +1201,43 @@ def states_from_assignment(
 def greedy_assign(
     features: Mapping[str, ClusterFeature],
     space: FeatureSpace,
-    quotas: QuotaTriple,
+    quotas: Any,
+    *,
+    partition_labels: Sequence[str] | None = None,
+    placement_labels: Sequence[str] | None = None,
+    objective_profile: str | None = None,
 ) -> dict[str, str]:
     """Deterministic greedy placement with the same primary objective.
 
     Partial-state scoring uses currently assigned clusters only (including
     the tentative placement) compared with the fixed global corpus
-    distributions. Empty partitions receive supremum JSD. Final exact
-    scientific ties use alphabetical partition-label order
-    (EVAL < FT < REF).
+    distributions. Empty partitions receive supremum JSD (and maximum
+    global category share under the absolute-deviation profile). Final
+    exact scientific ties use alphabetical partition-label order
+    (EVAL < FT < REF for the default S7B labels). Default
+    ``objective_profile`` is frozen S7B ``jsd_minimax``.
     """
     remaining = quotas.remaining()
-    states = _empty_states(space)
+    report_labels = resolve_partition_labels(partition_labels)
+    place_labels = resolve_placement_labels(placement_labels)
+    profile = resolve_objective_profile(objective_profile)
+    states = _empty_states(space, labels=report_labels)
     assignment: dict[str, str] = {}
     for cluster_id in cluster_processing_order(features):
         feature = features[cluster_id]
-        feasible = [label for label in PARTITION_LABELS if remaining[label] > 0]
+        feasible = [label for label in place_labels if remaining.get(label, 0) > 0]
         if not feasible:
             raise S7PartitionError("greedy placement exhausted partition capacity early")
         best_label: str | None = None
         best_key: tuple[Any, ...] | None = None
         for label in feasible:
             states[label].add(feature)
-            score = score_partition_states(states, space)
+            score = score_partition_states(
+                states,
+                space,
+                partition_labels=report_labels,
+                objective_profile=profile,
+            )
             key = (*score.scientific_prefix(), label)
             states[label].remove(feature)
             if best_key is None or key < best_key:
@@ -1037,6 +1275,10 @@ def pairwise_local_search(
     max_accepted_swaps: int = 1_000_000,
     max_evals: int | None = None,
     max_passes: int = 10_000,
+    partition_labels: Sequence[str] | None = None,
+    placement_labels: Sequence[str] | None = None,
+    log_prefix: str = "S7B",
+    objective_profile: str | None = None,
 ) -> tuple[dict[str, str], int, int, bool]:
     """Deterministic first-improvement pairwise swap search.
 
@@ -1050,16 +1292,21 @@ def pairwise_local_search(
     the intended scientific termination.
 
     The hot path keeps Python lists of category counts and only updates
-    membership after an accepted swap.
+    membership after an accepted swap. Default labels are the frozen S7B
+    FT/REF/EVAL set; ``log_prefix`` defaults to ``S7B``. Default
+    ``objective_profile`` is frozen S7B ``jsd_minimax``.
     """
+    report_labels = resolve_partition_labels(partition_labels)
+    place_labels = resolve_placement_labels(placement_labels)
+    profile = resolve_objective_profile(objective_profile)
     current = dict(assignment)
-    members: dict[str, set[str]] = {label: set() for label in REPORT_PARTITION_ORDER}
-    target = {label: np.zeros(len(space.targets), dtype=float) for label in REPORT_PARTITION_ORDER}
-    evidence = {label: np.zeros(len(space.evidence), dtype=float) for label in REPORT_PARTITION_ORDER}
-    source = {label: np.zeros(len(space.sources), dtype=float) for label in REPORT_PARTITION_ORDER}
-    length = {label: np.zeros(len(space.length_regimes), dtype=float) for label in REPORT_PARTITION_ORDER}
-    n_id = {label: 0 for label in REPORT_PARTITION_ORDER}
-    n_core = {label: 0 for label in REPORT_PARTITION_ORDER}
+    members: dict[str, set[str]] = {label: set() for label in report_labels}
+    target = {label: np.zeros(len(space.targets), dtype=float) for label in report_labels}
+    evidence = {label: np.zeros(len(space.evidence), dtype=float) for label in report_labels}
+    source = {label: np.zeros(len(space.sources), dtype=float) for label in report_labels}
+    length = {label: np.zeros(len(space.length_regimes), dtype=float) for label in report_labels}
+    n_id = {label: 0 for label in report_labels}
+    n_core = {label: 0 for label in report_labels}
     for cluster_id, label in current.items():
         feature = features[cluster_id]
         members[label].add(cluster_id)
@@ -1114,10 +1361,10 @@ def pairwise_local_search(
             l_src[index] -= value
             l_dst[index] += value
 
-    j_target = {label: _js(target[label], global_target, n_id[label]) for label in REPORT_PARTITION_ORDER}
-    j_evidence = {label: _js(evidence[label], global_evidence, n_id[label]) for label in REPORT_PARTITION_ORDER}
-    j_length = {label: _js(length[label], global_length, n_core[label]) for label in REPORT_PARTITION_ORDER}
-    j_source = {label: _js(source[label], global_source, n_id[label]) for label in REPORT_PARTITION_ORDER}
+    j_target = {label: _js(target[label], global_target, n_id[label]) for label in report_labels}
+    j_evidence = {label: _js(evidence[label], global_evidence, n_id[label]) for label in report_labels}
+    j_length = {label: _js(length[label], global_length, n_core[label]) for label in report_labels}
+    j_source = {label: _js(source[label], global_source, n_id[label]) for label in report_labels}
 
     def _rescore(label: str) -> None:
         j_target[label] = _js(target[label], global_target, n_id[label])
@@ -1130,6 +1377,31 @@ def pairwise_local_search(
         d_evidence = max(j_evidence.values())
         d_length = max(j_length.values())
         d_source = max(j_source.values())
+        if profile == OBJECTIVE_PROFILE_ABSDEV:
+            m_target = max(
+                max_abs_dev_from_vec(target[label], global_target) for label in report_labels
+            )
+            m_evidence = max(
+                max_abs_dev_from_vec(evidence[label], global_evidence)
+                for label in report_labels
+            )
+            m_length = max(
+                max_abs_dev_from_vec(length[label], global_length) for label in report_labels
+            )
+            m_source = max(
+                max_abs_dev_from_vec(source[label], global_source) for label in report_labels
+            )
+            return scientific_prefix_from_components(
+                d_target=d_target,
+                d_evidence=d_evidence,
+                d_length=d_length,
+                d_source=d_source,
+                m_target=m_target,
+                m_evidence=m_evidence,
+                m_length=m_length,
+                m_source=m_source,
+                profile=profile,
+            )
         lex = tuple(sorted((d_target, d_evidence, d_length, d_source), reverse=True))
         return (max(lex), lex, d_target + d_evidence + d_length + d_source)
 
@@ -1141,7 +1413,7 @@ def pairwise_local_search(
         improved = False
         current_prefix = _prefix()
         current_sig: str | None = None
-        labels = list(PARTITION_LABELS)
+        labels = list(place_labels)
         for i, label_a in enumerate(labels):
             for label_b in labels[i + 1 :]:
                 clusters_a = sorted(members[label_a])
@@ -1211,10 +1483,11 @@ def pairwise_local_search(
                             j_source[label_b],
                         ) = cached
         if len(current) >= 50:
+            metric_name = "R1" if profile == OBJECTIVE_PROFILE_ABSDEV else "O1"
             sys.stderr.write(
-                "S7B local-search pass="
+                f"{log_prefix} local-search pass="
                 f"{n_passes} accepted={accepted} "
-                f"O1={current_prefix[0]:.9f} improved={improved}\n"
+                f"{metric_name}={current_prefix[0]:.9f} improved={improved}\n"
             )
             sys.stderr.flush()
         if not improved:
@@ -1226,8 +1499,10 @@ def pairwise_local_search(
 
 def random_whole_cluster_assignment(
     cluster_ids: Sequence[str],
-    quotas: QuotaTriple,
+    quotas: Any,
     seed: int,
+    *,
+    partition_labels: Sequence[str] | None = None,
 ) -> dict[str, str]:
     """Diagnostic only. Not eligible as the scientific assignment."""
     rng = random.Random(seed)
@@ -1235,8 +1510,10 @@ def random_whole_cluster_assignment(
     rng.shuffle(ordered)
     assignment: dict[str, str] = {}
     start = 0
-    for label in REPORT_PARTITION_ORDER:
-        n = quotas.as_dict()[label]
+    labels = resolve_partition_labels(partition_labels)
+    counts = quotas.as_dict()
+    for label in labels:
+        n = counts[label]
         for cluster_id in ordered[start : start + n]:
             assignment[cluster_id] = label
         start += n
@@ -1249,23 +1526,64 @@ def score_assignment(
     assignment: Mapping[str, str],
     features: Mapping[str, ClusterFeature],
     space: FeatureSpace,
+    *,
+    partition_labels: Sequence[str] | None = None,
+    objective_profile: str | None = None,
 ) -> ObjectiveScore:
-    return score_partition_states(states_from_assignment(assignment, features, space), space)
+    return score_partition_states(
+        states_from_assignment(
+            assignment, features, space, partition_labels=partition_labels
+        ),
+        space,
+        partition_labels=partition_labels,
+        objective_profile=objective_profile,
+    )
 
 
 def optimise_partition(
     features: Mapping[str, ClusterFeature],
     space: FeatureSpace,
-    quotas: QuotaTriple,
+    quotas: Any,
     *,
     max_passes: int = 10_000,
+    partition_labels: Sequence[str] | None = None,
+    placement_labels: Sequence[str] | None = None,
+    log_prefix: str = "S7B",
+    objective_profile: str | None = None,
 ) -> dict[str, Any]:
-    greedy = greedy_assign(features, space, quotas)
-    improved, n_accepted, n_passes, converged = pairwise_local_search(
-        greedy, features, space, max_passes=max_passes
+    profile = resolve_objective_profile(objective_profile)
+    greedy = greedy_assign(
+        features,
+        space,
+        quotas,
+        partition_labels=partition_labels,
+        placement_labels=placement_labels,
+        objective_profile=profile,
     )
-    score = score_assignment(improved, features, space)
-    greedy_score = score_assignment(greedy, features, space)
+    improved, n_accepted, n_passes, converged = pairwise_local_search(
+        greedy,
+        features,
+        space,
+        max_passes=max_passes,
+        partition_labels=partition_labels,
+        placement_labels=placement_labels,
+        log_prefix=log_prefix,
+        objective_profile=profile,
+    )
+    score = score_assignment(
+        improved,
+        features,
+        space,
+        partition_labels=partition_labels,
+        objective_profile=profile,
+    )
+    greedy_score = score_assignment(
+        greedy,
+        features,
+        space,
+        partition_labels=partition_labels,
+        objective_profile=profile,
+    )
     return {
         "quotas": quotas,
         "greedy_assignment": greedy,
@@ -1276,23 +1594,36 @@ def optimise_partition(
         "n_local_search_passes": n_passes,
         "local_search_converged": converged,
         "comparison_tuple": score.comparison_tuple(improved),
+        "objective_profile": profile,
     }
 
 
 def select_preview_assignment(
     features: Mapping[str, ClusterFeature],
     space: FeatureSpace,
-    quota_candidates: Sequence[QuotaTriple],
+    quota_candidates: Sequence[Any],
     *,
     max_passes: int = 10_000,
+    partition_labels: Sequence[str] | None = None,
+    placement_labels: Sequence[str] | None = None,
+    log_prefix: str = "S7B",
+    objective_profile: str | None = None,
 ) -> dict[str, Any]:
     if not quota_candidates:
         raise S7PartitionError("no quota candidates")
+    profile = resolve_objective_profile(objective_profile)
     best: dict[str, Any] | None = None
     all_results: list[dict[str, Any]] = []
     for quotas in quota_candidates:
         result = optimise_partition(
-            features, space, quotas, max_passes=max_passes
+            features,
+            space,
+            quotas,
+            max_passes=max_passes,
+            partition_labels=partition_labels,
+            placement_labels=placement_labels,
+            log_prefix=log_prefix,
+            objective_profile=profile,
         )
         all_results.append(result)
         key = result["comparison_tuple"]
@@ -1307,13 +1638,25 @@ def select_preview_assignment(
 def evaluate_random_baselines(
     features: Mapping[str, ClusterFeature],
     space: FeatureSpace,
-    quotas: QuotaTriple,
+    quotas: Any,
     seeds: Sequence[int],
+    *,
+    partition_labels: Sequence[str] | None = None,
+    objective_profile: str | None = None,
 ) -> dict[str, Any]:
+    profile = resolve_objective_profile(objective_profile)
     scores: list[dict[str, Any]] = []
     for seed in seeds:
-        assignment = random_whole_cluster_assignment(list(features), quotas, int(seed))
-        score = score_assignment(assignment, features, space)
+        assignment = random_whole_cluster_assignment(
+            list(features), quotas, int(seed), partition_labels=partition_labels
+        )
+        score = score_assignment(
+            assignment,
+            features,
+            space,
+            partition_labels=partition_labels,
+            objective_profile=profile,
+        )
         scores.append(
             {
                 "seed": int(seed),
@@ -1323,12 +1666,20 @@ def evaluate_random_baselines(
                 "D_length": score.d_length,
                 "D_source": score.d_source,
                 "O3": score.o3,
+                "R1": score.r1,
+                "M_target": score.m_target,
+                "M_evidence": score.m_evidence,
+                "M_length": score.m_length,
+                "M_source": score.m_source,
+                "R3": score.r3,
             }
         )
     o1_values = [item["O1"] for item in scores]
+    r1_values = [item["R1"] for item in scores]
     return {
         "n_seeds": len(seeds),
         "seeds": [int(seed) for seed in seeds],
+        "objective_profile": profile,
         "scores": scores,
         "O1_min": min(o1_values) if o1_values else None,
         "O1_max": max(o1_values) if o1_values else None,
@@ -1337,6 +1688,13 @@ def evaluate_random_baselines(
         "D_evidence_min": min(item["D_evidence"] for item in scores) if scores else None,
         "D_length_min": min(item["D_length"] for item in scores) if scores else None,
         "D_source_min": min(item["D_source"] for item in scores) if scores else None,
+        "R1_min": min(r1_values) if r1_values else None,
+        "R1_max": max(r1_values) if r1_values else None,
+        "R1_mean": (sum(r1_values) / len(r1_values)) if r1_values else None,
+        "M_target_min": min(item["M_target"] for item in scores) if scores else None,
+        "M_evidence_min": min(item["M_evidence"] for item in scores) if scores else None,
+        "M_length_min": min(item["M_length"] for item in scores) if scores else None,
+        "M_source_min": min(item["M_source"] for item in scores) if scores else None,
     }
 
 
@@ -1367,12 +1725,13 @@ def apply_assignment_to_identities(
     return mapped
 
 
-def integrity_gates(
+def assignment_integrity_gates(
     corpus_rows: Sequence[Mapping[str, str]],
     assignment: Mapping[str, str],
     features: Mapping[str, ClusterFeature],
-    quotas: QuotaTriple,
+    quotas: Any,
 ) -> dict[str, Any]:
+    """Label-agnostic cluster/identity/core integrity checks."""
     cluster_ids = set(features)
     assigned = set(assignment)
     if assigned != cluster_ids:
@@ -1411,13 +1770,41 @@ def integrity_gates(
         "n_identities": len(identity_partitions),
         "n_cores": len(core_partitions),
         "n_clusters": len(assignment),
-        "n_FT": counts["FT"],
-        "n_REF": counts["REF"],
-        "n_EVAL": counts["EVAL"],
+        "label_counts": dict(counts),
         "E5": int(evidence.get("E5", 0)),
         "non_protein": 0 if types == {"protein"} else 1,
         "identity_sum": len(identity_partitions),
         "core_sum": len(core_partitions),
+        "cluster_sum": sum(counts.values()),
+        "identity_partitions": identity_partitions,
+        "core_partitions": core_partitions,
+    }
+
+
+def integrity_gates(
+    corpus_rows: Sequence[Mapping[str, str]],
+    assignment: Mapping[str, str],
+    features: Mapping[str, ClusterFeature],
+    quotas: QuotaTriple,
+) -> dict[str, Any]:
+    base = assignment_integrity_gates(corpus_rows, assignment, features, quotas)
+    counts = Counter(assignment.values())
+    types = {_blank(row.get("target_type")) for row in corpus_rows}
+    return {
+        "clusters_assigned_exactly_once": True,
+        "identities_assigned_exactly_once": True,
+        "cores_cross_partitions": 0,
+        "cluster_crossings": 0,
+        "n_identities": base["n_identities"],
+        "n_cores": base["n_cores"],
+        "n_clusters": base["n_clusters"],
+        "n_FT": counts["FT"],
+        "n_REF": counts["REF"],
+        "n_EVAL": counts["EVAL"],
+        "E5": base["E5"],
+        "non_protein": 0 if types == {"protein"} else 1,
+        "identity_sum": base["identity_sum"],
+        "core_sum": base["core_sum"],
         "cluster_sum": counts["FT"] + counts["REF"] + counts["EVAL"],
     }
 
@@ -1446,7 +1833,10 @@ def max_abs_share_deviation(
 def target_representation_diagnostics(
     corpus_rows: Sequence[Mapping[str, str]],
     assignment: Mapping[str, str],
+    *,
+    partition_labels: Sequence[str] | None = None,
 ) -> dict[str, Any]:
+    labels = resolve_partition_labels(partition_labels)
     by_target: dict[str, dict[str, Any]] = {}
     for row in corpus_rows:
         target = _blank(row.get("canonical_target_name"))
@@ -1460,24 +1850,28 @@ def target_representation_diagnostics(
         bucket["clusters"].add(cluster_id)
         bucket["partitions"].add(label)
 
-    represented = {label: 0 for label in REPORT_PARTITION_ORDER}
-    exclusive = {label: 0 for label in REPORT_PARTITION_ORDER}
-    singleton_identities = {label: 0 for label in REPORT_PARTITION_ORDER}
-    singleton_clusters = {label: 0 for label in REPORT_PARTITION_ORDER}
+    represented = {label: 0 for label in labels}
+    exclusive = {label: 0 for label in labels}
+    singleton_identities = {label: 0 for label in labels}
+    singleton_clusters = {label: 0 for label in labels}
     n_two = 0
     n_three = 0
     singleton_targets = 0
     for target, bucket in by_target.items():
         parts = bucket["partitions"]
         for label in parts:
-            represented[label] += 1
+            if label in represented:
+                represented[label] += 1
         if bucket["identities"] == 1:
             singleton_targets += 1
             label = next(iter(parts))
-            singleton_identities[label] += 1
-            singleton_clusters[label] += 1
+            if label in singleton_identities:
+                singleton_identities[label] += 1
+                singleton_clusters[label] += 1
         if len(parts) == 1:
-            exclusive[next(iter(parts))] += 1
+            only = next(iter(parts))
+            if only in exclusive:
+                exclusive[only] += 1
         elif len(parts) == 2:
             n_two += 1
         elif len(parts) == 3:
@@ -1492,7 +1886,7 @@ def target_representation_diagnostics(
         assignment[_blank(row.get("cluster_id"))] for row in corpus_rows
     )
     for target, bucket in top:
-        counts = {label: 0 for label in REPORT_PARTITION_ORDER}
+        counts = {label: 0 for label in labels}
         for row in corpus_rows:
             if _blank(row.get("canonical_target_name")) != target:
                 continue
@@ -1502,14 +1896,14 @@ def target_representation_diagnostics(
                 "canonical_target_name": target,
                 "n_global": bucket["identities"],
                 "share_global": bucket["identities"] / n_identities,
-                **{f"n_{label}": counts[label] for label in REPORT_PARTITION_ORDER},
+                **{f"n_{label}": counts[label] for label in labels},
                 **{
                     f"share_{label}": (
                         counts[label] / partition_identity_n[label]
                         if partition_identity_n[label]
                         else 0.0
                     )
-                    for label in REPORT_PARTITION_ORDER
+                    for label in labels
                 },
             }
         )
@@ -1534,7 +1928,9 @@ def category_distribution_rows(
     attr: str,
     name_field: str,
     grain: str,
+    partition_labels: Sequence[str] | None = None,
 ) -> list[dict[str, str]]:
+    labels = resolve_partition_labels(partition_labels)
     rows: list[dict[str, str]] = []
     n_global = sum(int(value) for value in global_counts.values())
     count_suffix = "_cores" if grain == "length" else ""
@@ -1546,7 +1942,7 @@ def category_distribution_rows(
             "share_global": format_fraction(int(global_counts.get(category, 0)), n_global),
         }
         n_parts = 0
-        for label in REPORT_PARTITION_ORDER:
+        for label in labels:
             counts = getattr(states[label], attr)
             n_part = states[label].n_cores if grain == "length" else states[label].n_identities
             value = int(counts.get(category, 0))
@@ -2904,15 +3300,19 @@ def jsonable(value: Any) -> Any:
 
 
 __all__ = [
+    "ABSDEV_COMPARISON_TUPLE_FIELDS",
     "APPLY_MODE",
     "CLUSTER_ASSIGNMENT_COLUMNS",
     "COMPARISON_TUPLE_FIELDS",
     "ClusterFeature",
     "DEFAULT_FRACTIONS",
+    "DEFAULT_OBJECTIVE_PROFILE",
     "FREEZE_DATE",
     "FREEZE_REASON",
     "FeatureSpace",
     "JSD_LOG_BASE",
+    "OBJECTIVE_PROFILE_ABSDEV",
+    "OBJECTIVE_PROFILE_JSD",
     "ObjectiveScore",
     "PREVIEW_MODE",
     "PRIMARY_CRITERIA",
@@ -2942,12 +3342,14 @@ __all__ = [
     "integrity_gates",
     "js_divergence",
     "load_frozen_s6_gmm",
+    "max_abs_proportion_deviation",
     "optimise_partition",
     "pairwise_local_search",
     "partition_subset_rows",
     "populate_partition_on_corpus",
     "preview_application_parity_mismatches",
     "random_whole_cluster_assignment",
+    "resolve_objective_profile",
     "score_assignment",
     "score_partition_states",
     "select_preview_assignment",
@@ -2956,4 +3358,5 @@ __all__ = [
     "states_from_assignment",
     "target_representation_diagnostics",
     "verify_frozen_identities",
+    "worst_abs_deviation_category",
 ]

@@ -27,6 +27,8 @@ from adapters.s5_final_clustering import enforce_authorised_parameters  # noqa: 
 from adapters.s6_profile import fit_univariate_gmm  # noqa: E402
 from adapters.s7_partition import (  # noqa: E402
     COMPARISON_TUPLE_FIELDS,
+    OBJECTIVE_PROFILE_ABSDEV,
+    OBJECTIVE_PROFILE_JSD,
     PRIMARY_CRITERIA,
     ObjectiveScore,
     QuotaTriple,
@@ -1027,3 +1029,41 @@ def test_application_preserves_non_partition_fields(tmp_path: Path) -> None:
             assert row[key] == value
         assert row["partition"] in {"FT", "REF", "EVAL"}
     assert input_unmutated(rows, snapshot)
+
+
+S7B_SYNTHETIC_ASSIGNMENT_FINGERPRINT = (
+    "c00:EVAL|c01:FT|c02:FT|c03:FT|c04:FT|c05:FT|c06:FT|c07:REF"
+)
+
+
+def test_shared_optimiser_preserves_frozen_s7b_synthetic_assignment() -> None:
+    """Regression: generic label kwargs must not change the S7B assignment."""
+    rows = [_row(index=i, target=f"T{i}", cluster_id=f"c{i:02d}") for i in range(8)]
+    features, space = _features(rows)
+    result = optimise_partition(features, space, _quotas(6, 1, 1))
+    assert assignment_signature(result["assignment"]) == S7B_SYNTHETIC_ASSIGNMENT_FINGERPRINT
+    assert result["assignment"] == {
+        "c00": "EVAL",
+        "c01": "FT",
+        "c02": "FT",
+        "c03": "FT",
+        "c04": "FT",
+        "c05": "FT",
+        "c06": "FT",
+        "c07": "REF",
+    }
+    default = optimise_partition(features, space, _quotas(6, 1, 1))
+    explicit_jsd = optimise_partition(
+        features, space, _quotas(6, 1, 1), objective_profile=OBJECTIVE_PROFILE_JSD
+    )
+    assert default["assignment"] == explicit_jsd["assignment"] == result["assignment"]
+    assert default["score"].profile == OBJECTIVE_PROFILE_JSD
+    assert len(default["score"].scientific_prefix()) == 3
+    assert list(default["score"].comparison_tuple_fields) == list(COMPARISON_TUPLE_FIELDS)
+    absdev = optimise_partition(
+        features, space, _quotas(6, 1, 1), objective_profile=OBJECTIVE_PROFILE_ABSDEV
+    )
+    assert absdev["score"].profile == OBJECTIVE_PROFILE_ABSDEV
+    assert len(absdev["score"].scientific_prefix()) == 5
+    assert assignment_signature(result["assignment"]) == S7B_SYNTHETIC_ASSIGNMENT_FINGERPRINT
+

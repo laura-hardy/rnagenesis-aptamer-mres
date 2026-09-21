@@ -1,0 +1,125 @@
+{
+  "contract_id": "global_s7c_ft_train_validation",
+  "milestone": "S7C_ft_train_validation_application_and_freeze",
+  "mode": "apply",
+  "s7b_config": "config/global_s7b_partition.json",
+  "s7b_freeze_record": "config/checkpoint_reviews/s7b_partition_freeze.json",
+  "s6_config": "config/global_s6_profile.json",
+  "ft_csv": "data/interim/s7b_partition/ft.csv",
+  "ref_csv": "data/interim/s7b_partition/ref.csv",
+  "eval_csv": "data/interim/s7b_partition/eval.csv",
+  "expected_ft_sha256": "b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff",
+  "expected_ref_sha256": "6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d",
+  "expected_eval_sha256": "88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d",
+  "expected_ref_identity_set_hash": "54a74c8bb8ef67f36dd4b054d6ed43f201bd38d41d75244d9b69eb1583951abc",
+  "expected_ref_cluster_set_hash": "84afc5a5bb030db9cbdddb7246ceaab3457ef8eb02f1192575433d5f77f6cd82",
+  "expected_eval_identity_set_hash": "47ef50345fae50f14e99547426dbf3a3c34ed0caf49574005fb3f1da94315406",
+  "expected_eval_cluster_set_hash": "c923af78ef7b191b569c5ead859982eb7711460a6537d0a70612a1101ffa8138",
+  "expected_ref_clusters": 80,
+  "expected_eval_clusters": 79,
+  "expected_input_counts": {
+    "n_scientific_identities": 895,
+    "n_distinct_sequence_core": 795,
+    "n_final_clusters": 635,
+    "n_canonical_targets": 390
+  },
+  "expected_evidence": {
+    "E2": 615,
+    "E3": 187,
+    "E4": 93,
+    "E5": 0
+  },
+  "expected_length_regime_cores": {
+    "short": 448,
+    "long": 347
+  },
+  "expected_source_identities": {
+    "aptabase": 90,
+    "aptadb": 54,
+    "aptaindex": 51,
+    "aptamerbase": 368,
+    "ena": 94,
+    "riboaptamer": 168,
+    "utexas": 70
+  },
+  "split_fractions": {
+    "TRAIN": 0.90,
+    "VALIDATION": 0.10
+  },
+  "quota_rounding": "minimise_sum_squared_fraction_error",
+  "jsd_log_base": 2,
+  "length_regime": {
+    "source": "frozen_s6_two_component_gmm",
+    "s6_bimodality_json": "data/interim/deduplicated/s6_profile/bimodality.json",
+    "assignment_method": "gmm_k2_maximum_posterior",
+    "grain": "distinct_sequence_core",
+    "labels": {
+      "0": "short",
+      "1": "long"
+    },
+    "refit_on_post_cap": false
+  },
+  "expected_s6_gmm2": {
+    "means": [38.887311544692416, 77.35623497594804],
+    "variances": [63.42923673279216, 168.91459023894495],
+    "weights": [0.5805142816481399, 0.41948571835186194]
+  },
+  "primary_criteria": ["target", "evidence", "length_regime", "source"],
+  "target_family_role": "secondary_diagnostic_only",
+  "objective_profile": "max_abs_proportion_deviation",
+  "v1_preview_dir": "data/interim/s7c_ft_split_preview",
+  "v1_preview_historical_copy": "data/interim/s7c_ft_split_preview_jsd_v1",
+  "v1_approved": false,
+  "cluster_processing_order": [
+    "n_identities_descending",
+    "n_distinct_canonical_targets_descending",
+    "n_distinct_sequence_core_descending",
+    "cluster_id_ascending"
+  ],
+  "comparison_tuple": [
+    "R1_max_primary_M",
+    "lexicographic_descending_M_vector",
+    "R3_sum_primary_M",
+    "lexicographic_descending_D_vector",
+    "sum_primary_D",
+    "assignment_signature"
+  ],
+  "local_search": "deterministic_first_improvement_pairwise_swaps",
+  "local_search_max_passes": 200,
+  "random_baseline_seeds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 42],
+  "write_authoritative_train_validation": true,
+  "freeze_ft_train": true,
+  "freeze_ft_validation": true,
+  "alter_top_level_partition": false,
+  "write_corpus_final": false,
+  "deterministic": true,
+  "preview_output_dir": "data/interim/s7c_ft_split_preview_v2",
+  "output_dir": "data/interim/s7c_ft_split",
+  "approval_record": "config/checkpoint_reviews/s7c_ft_split_approval.json",
+  "freeze_record": "config/checkpoint_reviews/s7c_ft_split_freeze.json",
+  "freeze_date": "2026-09-21",
+  "freeze_reason": "approved v2 FT train/validation assignment frozen before any model training, checkpoint selection, hyperparameter comparison, REF calibration or EVAL evaluation",
+  "does_not": [
+    "write_corpus_final",
+    "alter_ft_csv",
+    "alter_ref_csv",
+    "alter_eval_csv",
+    "alter_top_level_partition",
+    "start_fine_tuning",
+    "start_s7d",
+    "use_validation_for_model_decision",
+    "promote_e5",
+    "promote_non_protein"
+  ],
+  "sequence_safety_scan_paths": [
+    "scripts/data_preparation/s7_ft_train_validation.py",
+    "scripts/data_preparation/adapters/s7_ft_train_validation.py",
+    "config/global_s7c_ft_train_validation.json",
+    "config/checkpoint_reviews/s7c_ft_split_approval.json",
+    "config/checkpoint_reviews/s7c_ft_split_freeze.json",
+    "tests/data_preparation/test_s7_ft_train_validation.py",
+    "docs/data_curation/global_s7c_ft_train_validation.md",
+    "scripts/data_preparation/adapters/s7_partition.py",
+    "tests/data_preparation/test_s7_partition.py"
+  ]
+}
