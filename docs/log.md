@@ -10710,3 +10710,168 @@ preserved). No relevant failure.
 frozen. FT train/validation not created. S4/S5/S6 not mutated. No
 commit. No push.
 
+## 2026-09-21 — S7B whole-cluster FT/REF/EVAL assignment preview (dry-run)
+
+**Stage:** Aim 2 / data curation / S7B partition preview
+**What was done:** Implemented a deterministic whole-cluster assignment
+of the frozen S7A post-cap corpus into FT/REF/EVAL under closed
+CHECKPOINT-3 C3-02. Feature grains: identity-level target, evidence and
+`source_db`; distinct-core frozen S6 short/long GMM. Integer quotas
+minimise squared fraction error vs 80/10/10 cluster count and keep tied
+REF/EVAL triples as candidates. Weight-free objective: JSD log2;
+O1 = max worst-partition D; O2 = lexicographic descending D vector;
+O3 = sum D; assignment-signature tie-break. Heuristic: harder-clusters-
+first greedy placement then pairwise first-improvement swaps until a
+no-improve pass. Wrote sequence-free preview artefacts under ignored
+`data/interim/s7b_partition_preview/`. Did not write corpus_final, freeze
+REF/EVAL, populate `partition` on the S7A input, or create FT train/val.
+
+```text
+S7B deterministic assignment implementation = yes
+S7B dry-run completed                       = yes
+authoritative partitioned corpus written    = no
+REF frozen                                  = no
+EVAL frozen                                 = no
+REF/EVAL hashes created                     = no
+FT train/validation split                   = no
+commit performed                            = no
+push performed                              = no
+```
+
+**Frozen input:** `corpus_post_cap.csv` SHA-256
+`6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd`.
+Independently verified: 1173 identities, 1036 cores, 794 clusters, 411
+canonical protein targets, partition blank, E5 = 0, non-protein = 0.
+Every identity has one frozen S5 `cluster_id`; each core maps to one
+cluster.
+
+**Length regimes:** reused frozen S6 `bimodality.json` `gmm_2` with
+`gmm_k2_maximum_posterior` (means ≈ 38.89 / 77.36 nt). Not refit.
+Post-cap distinct cores: short = 595, long = 441.
+
+**Quotas:** tied-optimal (635, 79, 80) and (635, 80, 79). Scientific
+objective selected FT=635, REF=80, EVAL=79.
+
+**Preview sizes:** FT 635 clusters / 895 identities / 795 cores;
+REF 80 / 114 / 103; EVAL 79 / 164 / 138.
+
+**Objective:** O1 = 0.269453695698 (D_target); D_source = 0.019546237985;
+D_length = 0.001660102797; D_evidence = 0.000086296904; O3 =
+0.290746333384. Local search converged after 4222 accepted swaps / 76
+passes (greedy O1 0.46395). Random diagnostic (21 seeds) O1
+min/mean/max = 0.4185 / 0.4694 / 0.5017; not used as the assignment.
+
+**Integrity:** clusters assigned exactly once; identities assigned
+exactly once; cores cross partitions = 0; cluster crossings = 0;
+E5 = 0; non-protein = 0; S7A input unmutated; tracked S7B sequence
+leaks = 0.
+
+**Tests:** pytest 32 S7B + 22 S7A + 19 S5E + 33 S6 = 106 passed.
+
+**Open questions carried forward:** human review of this dry-run before
+authoritative assignment and REF/EVAL freeze. No corpus_final. Not
+committed. Not pushed.
+
+## 2026-09-21 — S7B preview approved; authoritative FT/REF/EVAL applied; REF/EVAL frozen
+
+**Stage:** Aim 2 / data curation / S7B partition application and freeze
+**What was done:** Recorded human approval of the reviewed S7B dry-run
+and rederived the assignment from frozen S7A `corpus_post_cap.csv` with
+the same tested `build_cluster_features` / `select_preview_assignment`
+implementation. Wrote the authoritative partitioned corpus under ignored
+`data/interim/s7b_partition/`. Formally froze REF and EVAL. Did not begin
+S7C or create an FT train/validation split.
+
+```text
+S7B preview                         = yes (preserved)
+S7B preview approved                = yes
+S7B authoritative assignment applied = yes
+REF frozen                          = yes
+EVAL frozen                         = yes
+S7C not started                     = yes
+FT train/validation not created     = yes
+```
+
+**Approval:** `config/checkpoint_reviews/s7b_partition_approval.json`
+(`review_status = approved_for_application_and_freeze`, decision_date
+2026-09-21). Approval metadata was used only as a post-derivation parity
+check and was not used to assign clusters.
+
+**Reviewed preview hashes (frozen, not overwritten):**
+- `cluster_partition_preview.csv` `5e74ec91469fd33309d0bd1034866a6d752316b10e89a2dafecaab7c5f4402b1`
+- `partition_identity_summary.csv` `03a2bba35855ca126f28b05c63641b527aedb48844d55abc880a65e4b75fa0bf`
+- `partition_core_summary.csv` `34ec67488c3242f6887d55d642d0d80a61d8bc5fb89c7c0958f9b2b8f3c68ce3`
+- `partition_target_distribution.csv` `94e14ee0350c42030283bc7f6a16371fbd24601863d41d8cb10d285a197b1120`
+- `partition_evidence_distribution.csv` `067e0cecfc89040d7aeab82aa5cccbba636026c73039f22a65235c0b33d5d67b`
+- `partition_length_regime_distribution.csv` `83a80b04f39b3a0146aabd4dd5f7c354b8197f52df27d764444b043b912f472b`
+- `partition_source_distribution.csv` `2c4468abd1e38fa3782bc75ae0b6dd7e44e28da7d94a14bbcd5f123ffb43a7ee`
+- `partition_target_family_diagnostic.csv` `a314cf3fa530c591e979449faf67ea146276a449b46b126e172638174beca366`
+- `partition_divergence_metrics.csv` `efff4974e1acd055dd433e1672a1ee68be32f06b698fca7ab2d486e311fa687a`
+- `s7b_partition_preview_report.md` `cabe07de51628ea9329e48b802fe555268bddb77319828cfac3937b8e8363ec6`
+- `s7b_partition_preview_manifest.json` `e07e7674f53b46733c8bfe3eca8213ac81a9fd0153ac6dc0ff283c5665dc6a17`
+
+**Inputs used:** frozen `corpus_post_cap.csv` SHA-256
+`6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd`.
+All frozen S7A artefact hashes matched. Independently verified: 1173
+identities, 1036 cores, 794 clusters, 411 canonical protein targets,
+partition blank, E5 = 0, non-protein = 0.
+
+**Application result:** FT 635 clusters / 895 identities / 795 cores /
+390 targets; REF 80 / 114 / 103 / 88; EVAL 79 / 164 / 138 / 111.
+794 / 794 cluster assignments identical to the reviewed preview.
+preview/application semantic mismatches = 0. Objective unchanged:
+O1 = D_target = 0.2694536956975229; D_source = 0.01954623798492084;
+D_length = 0.001660102797405985; D_evidence = 8.629690438492248e-05;
+O3 = 0.29074633338423467.
+
+Quotas are by cluster count, not identity count. EVAL therefore contains
+13.98% of identities despite 9.95% of clusters. REF contains zero
+globally singleton-target identities but still represents 88 canonical
+targets across 114 identities. This follows the approved
+identity-weighted target objective and whole-cluster constraints, not
+leakage. No additional singleton-target balancing constraint was
+introduced. Target JSD dominates because the 411-target long tail is
+harder to reproduce than evidence or two-regime length. Source, evidence
+and length diagnostics were reviewed and accepted before freeze. This is
+the approved deterministic operationalisation, not a claim of unique
+global optimality.
+
+**Authoritative output hashes:**
+- `corpus_partitioned.csv` `755e6afaf6a522be390073d3651311f8afc0ca9486322ac3bbfe348cd2a3fb1a`
+- `cluster_partition_assignment.csv` `6278d42a067e741b0f057169a862112351f8f183da49103952074f6f65376072`
+- `ft.csv` `b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff`
+- `ref.csv` `6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d`
+- `eval.csv` `88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d`
+- `partition_divergence_metrics.csv` `efff4974e1acd055dd433e1672a1ee68be32f06b698fca7ab2d486e311fa687a`
+
+**REF freeze:** identity-set
+`54a74c8bb8ef67f36dd4b054d6ed43f201bd38d41d75244d9b69eb1583951abc`;
+cluster-set
+`84afc5a5bb030db9cbdddb7246ceaab3457ef8eb02f1192575433d5f77f6cd82`.
+**EVAL freeze:** identity-set
+`47ef50345fae50f14e99547426dbf3a3c34ed0caf49574005fb3f1da94315406`;
+cluster-set
+`c923af78ef7b191b569c5ead859982eb7711460a6537d0a70612a1101ffa8138`.
+Freeze record:
+`config/checkpoint_reviews/s7b_partition_freeze.json`. Freeze date
+2026-09-21. Future movement of REF/EVAL is prohibited without a
+documented split revision.
+
+**Integrity:** identities assigned exactly once; clusters assigned
+exactly once; cores cross partitions = 0; cluster crossings = 0;
+partition blank = 0; invalid labels = 0; E5 = 0; non-protein = 0;
+S7A/S5/S6 unmutated.
+
+**Determinism:** two temporary application writes produced byte-identical
+scientific payloads. In-process reversed-row re-optimisation matched.
+Deterministic rerun PASS.
+
+**Tests:** pytest 37 S7B + 22 S7A + 19 S5E + 33 S6 = 111 passed.
+The extra 5 S7B tests cover the application/freeze path (approval is
+audit-only, preview directory is not overwritten, retained fields other
+than `partition` are preserved). No relevant failure.
+
+**Boundary:** S7C not started. FT train/validation not created. Model
+fine-tuning not started. REF calibration not started. EVAL model
+evaluation not started. No commit. No push.
+

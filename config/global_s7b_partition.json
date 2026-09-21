@@ -1,0 +1,97 @@
+{
+  "contract_id": "global_s7b_partition",
+  "milestone": "S7B_partition_application_and_freeze",
+  "mode": "apply",
+  "s7a_config": "config/global_s7a_target_cap.json",
+  "s6_config": "config/global_s6_profile.json",
+  "s5e_config": "config/global_s5e_final_clustering.json",
+  "curation_config": "config/curation_config.yaml",
+  "authoritative_corpus": "data/interim/s7a_target_cap/corpus_post_cap.csv",
+  "expected_input_sha256": "6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd",
+  "expected_s7a_artefact_hashes": {
+    "data/interim/s7a_target_cap/corpus_post_cap.csv": "6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd",
+    "data/interim/s7a_target_cap/s7a_target_cap_removal_trace.csv": "da3cd922e53c1388f25d2e1e9fcd714cdc22119fdecc11057e7a2205e1df1048",
+    "data/interim/s7a_target_cap/s7a_removed_clusters.csv": "46defa4e1b460a4b9fec91106f2cf2c432146348a23888399c3fae6c0072c40b",
+    "data/interim/s7a_target_cap/s7a_post_cap_target_distribution.csv": "f2be67a8c117335157577464362dc5eb1e89c28feeb9689f2b342453532ac2c7",
+    "data/interim/s7a_target_cap/s7a_mixed_cluster_collateral.csv": "91eb65f42d4469e48ba3b1c3d915c14a4d34145645169c918cd0eed3e6aacc5e",
+    "data/interim/s7a_target_cap/s7a_target_cap_report.md": "12a1b1207826995a31c5229f39d6c5654783bd7bf24d8593d55ff1e04df3d08b",
+    "data/interim/s7a_target_cap/s7a_target_cap_manifest.json": "c6f7d5846761bbc3e66eaea275c4eaa6ad835062ecdaf6d483d0e0277eb5d01c"
+  },
+  "expected_input_counts": {
+    "n_scientific_identities": 1173,
+    "n_distinct_sequence_core": 1036,
+    "n_final_clusters": 794,
+    "n_canonical_targets": 411
+  },
+  "partition_fractions": {
+    "FT": 0.80,
+    "REF": 0.10,
+    "EVAL": 0.10
+  },
+  "quota_rounding": "minimise_sum_squared_fraction_error",
+  "jsd_log_base": 2,
+  "length_regime": {
+    "source": "frozen_s6_two_component_gmm",
+    "s6_bimodality_json": "data/interim/deduplicated/s6_profile/bimodality.json",
+    "assignment_method": "gmm_k2_maximum_posterior",
+    "grain": "distinct_sequence_core",
+    "labels": {
+      "0": "short",
+      "1": "long"
+    },
+    "refit_on_post_cap": false
+  },
+  "expected_s6_gmm2": {
+    "means": [38.887311544692416, 77.35623497594804],
+    "variances": [63.42923673279216, 168.91459023894495],
+    "weights": [0.5805142816481399, 0.41948571835186194]
+  },
+  "primary_criteria": ["target", "evidence", "length_regime", "source"],
+  "target_family_role": "secondary_diagnostic_only",
+  "cluster_processing_order": [
+    "n_identities_descending",
+    "n_distinct_canonical_targets_descending",
+    "n_distinct_sequence_core_descending",
+    "cluster_id_ascending"
+  ],
+  "comparison_tuple": [
+    "O1_max_primary_D",
+    "lexicographic_descending_D_vector",
+    "O3_sum_primary_D",
+    "assignment_signature"
+  ],
+  "local_search": "deterministic_first_improvement_pairwise_swaps",
+  "local_search_max_passes": 200,
+  "random_baseline_seeds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 42],
+  "write_authoritative_partitioned_corpus": true,
+  "freeze_ref": true,
+  "freeze_eval": true,
+  "create_train_validation_split": false,
+  "write_corpus_final": false,
+  "deterministic": true,
+  "preview_output_dir": "data/interim/s7b_partition_preview",
+  "output_dir": "data/interim/s7b_partition",
+  "approval_record": "config/checkpoint_reviews/s7b_partition_approval.json",
+  "freeze_record": "config/checkpoint_reviews/s7b_partition_freeze.json",
+  "freeze_date": "2026-09-21",
+  "freeze_reason": "top-level FT/REF/EVAL assignment approved before any model-selection, fine-tuning, hyperparameter or REF-calibration use",
+  "does_not": [
+    "write_corpus_final",
+    "create_train_validation_split",
+    "promote_e5",
+    "promote_non_protein",
+    "rewrite_s5",
+    "rewrite_s6",
+    "rewrite_s7a",
+    "start_s7c"
+  ],
+  "sequence_safety_scan_paths": [
+    "scripts/data_preparation/s7_partition.py",
+    "scripts/data_preparation/adapters/s7_partition.py",
+    "config/global_s7b_partition.json",
+    "config/checkpoint_reviews/s7b_partition_approval.json",
+    "config/checkpoint_reviews/s7b_partition_freeze.json",
+    "tests/data_preparation/test_s7_partition.py",
+    "docs/data_curation/global_s7b_partition.md"
+  ]
+}

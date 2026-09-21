@@ -1,0 +1,79 @@
+{
+  "contract_id": "s7b_partition_approval",
+  "checkpoint": "CHECKPOINT-3",
+  "milestone": "S7B_partition_preview_approved",
+  "decision_date": "2026-09-21",
+  "review_status": "approved_for_application_and_freeze",
+  "reviewers": [
+    "Laura",
+    "ChatGPT"
+  ],
+  "frozen_input_sha256": "6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd",
+  "preview_dir": "data/interim/s7b_partition_preview",
+  "approved_assignment_fingerprint_sha256": "5e74ec91469fd33309d0bd1034866a6d752316b10e89a2dafecaab7c5f4402b1",
+  "approved_cluster_quotas": {
+    "FT": 635,
+    "REF": 80,
+    "EVAL": 79
+  },
+  "approved_identities": {
+    "FT": 895,
+    "REF": 114,
+    "EVAL": 164
+  },
+  "approved_cores": {
+    "FT": 795,
+    "REF": 103,
+    "EVAL": 138
+  },
+  "approved_objective": {
+    "O1": 0.2694536956975229,
+    "D_target": 0.2694536956975229,
+    "D_evidence": 8.629690438492248e-05,
+    "D_length": 0.001660102797405985,
+    "D_source": 0.01954623798492084,
+    "O3": 0.29074633338423467,
+    "lexicographic_descending_D_vector": [
+      0.2694536956975229,
+      0.01954623798492084,
+      0.001660102797405985,
+      8.629690438492248e-05
+    ]
+  },
+  "reviewed_preview": {
+    "clusters": {
+      "FT": 635,
+      "REF": 80,
+      "EVAL": 79
+    },
+    "identities": {
+      "FT": 895,
+      "REF": 114,
+      "EVAL": 164
+    },
+    "cores": {
+      "FT": 795,
+      "REF": 103,
+      "EVAL": 138
+    }
+  },
+  "reviewed_preview_hashes": {
+    "cluster_partition_preview.csv": "5e74ec91469fd33309d0bd1034866a6d752316b10e89a2dafecaab7c5f4402b1",
+    "partition_core_summary.csv": "34ec67488c3242f6887d55d642d0d80a61d8bc5fb89c7c0958f9b2b8f3c68ce3",
+    "partition_divergence_metrics.csv": "efff4974e1acd055dd433e1672a1ee68be32f06b698fca7ab2d486e311fa687a",
+    "partition_evidence_distribution.csv": "067e0cecfc89040d7aeab82aa5cccbba636026c73039f22a65235c0b33d5d67b",
+    "partition_identity_summary.csv": "03a2bba35855ca126f28b05c63641b527aedb48844d55abc880a65e4b75fa0bf",
+    "partition_length_regime_distribution.csv": "83a80b04f39b3a0146aabd4dd5f7c354b8197f52df27d764444b043b912f472b",
+    "partition_source_distribution.csv": "2c4468abd1e38fa3782bc75ae0b6dd7e44e28da7d94a14bbcd5f123ffb43a7ee",
+    "partition_target_distribution.csv": "94e14ee0350c42030283bc7f6a16371fbd24601863d41d8cb10d285a197b1120",
+    "partition_target_family_diagnostic.csv": "a314cf3fa530c591e979449faf67ea146276a449b46b126e172638174beca366",
+    "s7b_partition_preview_manifest.json": "e07e7674f53b46733c8bfe3eca8213ac81a9fd0153ac6dc0ff283c5665dc6a17",
+    "s7b_partition_preview_report.md": "cabe07de51628ea9329e48b802fe555268bddb77319828cfac3937b8e8363ec6"
+  },
+  "usage": {
+    "audit_record_only": true,
+    "used_for_scientific_assignment": false,
+    "used_for_cluster_selection": false,
+    "may_be_used_for_post_derivation_parity": true
+  }
+}

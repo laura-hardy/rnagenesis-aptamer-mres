@@ -1,0 +1,104 @@
+{
+  "contract_id": "s7b_partition_freeze",
+  "checkpoint": "CHECKPOINT-3",
+  "milestone": "S7B_partition_application_and_freeze",
+  "decision_date": "2026-09-21",
+  "freeze_date": "2026-09-21",
+  "freeze_reason": "top-level FT/REF/EVAL assignment approved before any model-selection, fine-tuning, hyperparameter or REF-calibration use",
+  "input_s7a_sha256": "6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd",
+  "assignment_preview_sha256": "5e74ec91469fd33309d0bd1034866a6d752316b10e89a2dafecaab7c5f4402b1",
+  "authoritative_assignment_sha256": "6278d42a067e741b0f057169a862112351f8f183da49103952074f6f65376072",
+  "preview_application_mismatch_count": 0,
+  "partition_quotas": {
+    "FT": 635,
+    "REF": 80,
+    "EVAL": 79
+  },
+  "FT": {
+    "clusters": 635,
+    "identities": 895,
+    "cores": 795,
+    "targets_represented": 390,
+    "file_sha256": "b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff",
+    "assigned": true,
+    "train_validation_split": false,
+    "frozen": false
+  },
+  "REF": {
+    "clusters": 80,
+    "identities": 114,
+    "cores": 103,
+    "targets_represented": 88,
+    "file_sha256": "6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d",
+    "semantic_identity_set_hash": "54a74c8bb8ef67f36dd4b054d6ed43f201bd38d41d75244d9b69eb1583951abc",
+    "semantic_cluster_set_hash": "84afc5a5bb030db9cbdddb7246ceaab3457ef8eb02f1192575433d5f77f6cd82",
+    "frozen": true
+  },
+  "EVAL": {
+    "clusters": 79,
+    "identities": 164,
+    "cores": 138,
+    "targets_represented": 111,
+    "file_sha256": "88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d",
+    "semantic_identity_set_hash": "47ef50345fae50f14e99547426dbf3a3c34ed0caf49574005fb3f1da94315406",
+    "semantic_cluster_set_hash": "c923af78ef7b191b569c5ead859982eb7711460a6537d0a70612a1101ffa8138",
+    "frozen": true
+  },
+  "corpus_partitioned_sha256": "755e6afaf6a522be390073d3651311f8afc0ca9486322ac3bbfe348cd2a3fb1a",
+  "objective": {
+    "log_base": 2.0,
+    "J_target": {
+      "FT": 0.02489064238794677,
+      "REF": 0.2694536956975229,
+      "EVAL": 0.26944246122261317
+    },
+    "J_evidence": {
+      "FT": 5.598701874995565e-06,
+      "REF": 8.629690438492248e-05,
+      "EVAL": 6.305052920693201e-05
+    },
+    "J_length": {
+      "FT": 8.580625352666224e-05,
+      "REF": 0.001660102797405985,
+      "EVAL": 0.0005477397065489012
+    },
+    "J_source": {
+      "FT": 0.0006983576103930154,
+      "REF": 0.01954623798492084,
+      "EVAL": 0.006128067137458337
+    },
+    "D_target": 0.2694536956975229,
+    "D_evidence": 8.629690438492248e-05,
+    "D_length": 0.001660102797405985,
+    "D_source": 0.01954623798492084,
+    "O1": 0.2694536956975229,
+    "lexicographic_descending_D_vector": [
+      0.2694536956975229,
+      0.01954623798492084,
+      0.001660102797405985,
+      8.629690438492248e-05
+    ],
+    "O3": 0.29074633338423467,
+    "arbitrary_manually_chosen_criterion_weights": null,
+    "target_family_in_primary_objective": false,
+    "comparison_tuple_fields": [
+      "O1_max_primary_D",
+      "lexicographic_descending_D_vector",
+      "O3_sum_primary_D",
+      "assignment_signature"
+    ]
+  },
+  "independence_rule": {
+    "no_cluster_may_move_between_ft_ref_eval_to_improve_model_results": true,
+    "no_ref_or_eval_identity_may_be_added_or_removed_because_of_fine_tuning": true,
+    "no_hyperparameter_or_model_selection_result_may_alter_ref_eval": true,
+    "later_scientific_correction_requires_documented_split_revision_new_hashes_and_human_approval": true,
+    "s7c_operates_only_inside_ft": true
+  },
+  "s7c_started": false,
+  "ft_train_validation_split": false,
+  "model_fine_tuning_started": false,
+  "ref_calibration_started": false,
+  "eval_model_evaluation_started": false,
+  "sequences_included": false
+}
