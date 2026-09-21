@@ -1,0 +1,107 @@
+{
+  "contract_id": "global_s5a_exact_dedup",
+  "milestone": "S5A_exact_scientific_dedup",
+  "scientific_key": ["sequence_core", "canonical_target_name"],
+  "scientific_identity_id_format": "S5I_<sha256(sequence_core + \"\\x1f\" + canonical_target_name)>",
+  "input_population": "global_s4_reviewed_relationships.csv WHERE s4_route == primary_candidate",
+  "does_not": [
+    "sequence_similarity_clustering",
+    "mmseqs2",
+    "cdhit",
+    "global_target_dictionary_id_merge",
+    "ncbi_ena_duplicate_resolution",
+    "balancing",
+    "ft_ref_eval_assignment",
+    "train_validation_test_split"
+  ],
+  "reviewed_relationships_csv": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
+  "combined_input_csv": "data/interim/global_s4/combined_global_s4_input.csv",
+  "output_dir": "data/interim/deduplicated",
+  "overlap_source_keys": [
+    "aptabase",
+    "aptadb",
+    "aptaindex",
+    "aptamerbase",
+    "ena",
+    "ncbi_nuc",
+    "riboaptamer",
+    "utexas"
+  ],
+  "metadata_completeness_fields": [
+    "canonical_affinity",
+    "affinity_type",
+    "doi",
+    "pubmed_id",
+    "accession",
+    "target_uniprot",
+    "target_pfam",
+    "target_family",
+    "pdb_id",
+    "chemistry",
+    "molecule_type",
+    "construct_scope",
+    "trim_status",
+    "publication"
+  ],
+  "donor_hierarchy": [
+    "highest evidence_score",
+    "highest pre-S5 corroboration_count",
+    "highest metadata completeness",
+    "alphabetical source_db",
+    "alphabetical reviewed_relationship_id"
+  ],
+  "expected_hashes": {
+    "reviewed_relationships": [
+      "data/interim/global_s4/global_s4_reviewed_relationships.csv",
+      "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502"
+    ],
+    "reviewed_dictionary": [
+      "data/interim/global_s4/global_s4_reviewed_target_dictionary.csv",
+      "e7234d9a9308dd899cbb3f801ff20ba05b2960071ede98812c6109db0f21b5ec"
+    ],
+    "record_map": [
+      "data/interim/global_s4/global_s4_record_relationship_map.csv",
+      "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b"
+    ],
+    "parked_audit": [
+      "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
+      "98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7"
+    ],
+    "routing_summary": [
+      "data/interim/global_s4/global_s4_routing_summary.csv",
+      "46bc0c91a121f1737f3816ec4b16fef4630b388310c9599171cf054b17e74635"
+    ],
+    "combined_input": [
+      "data/interim/global_s4/combined_global_s4_input.csv",
+      "24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0"
+    ]
+  },
+  "expected_counts": {
+    "n_input_relationships": 1460,
+    "n_distinct_source_record_ids": 1429,
+    "n_distinct_sequence_core": 1144,
+    "n_scientific_identities": 1281,
+    "n_exact_duplicate_groups": 157,
+    "n_rows_in_duplicate_groups": 336,
+    "n_duplicate_excess": 179,
+    "n_membership_rows": 1460,
+    "n_target_dictionary_id_conflict_groups": 9,
+    "source_input_distribution": {
+      "aptamerbase": 526,
+      "riboaptamer": 279,
+      "ena": 237,
+      "aptaindex": 126,
+      "aptabase": 112,
+      "utexas": 104,
+      "aptadb": 76,
+      "ncbi_nuc": 0
+    },
+    "evidence_input_distribution": {
+      "E1": 0,
+      "E2": 931,
+      "E3": 258,
+      "E4": 271,
+      "E5": 0
+    }
+  }
+}

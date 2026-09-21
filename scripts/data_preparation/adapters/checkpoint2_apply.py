@@ -2,7 +2,9 @@
 
 Does not reimplement target, evidence, affinity, leakage, or routing science.
 Does not collapse duplicate ``(sequence, target)`` rows, cluster, balance,
-or assign FT/REF/EVAL. Those are S5.
+or assign FT/REF/EVAL. Exact scientific deduplication is S5A. Clustering,
+balancing, and splits are later milestones. NCBI/ENA duplicate resolution
+is not an S5A operation.
 """
 
 from __future__ import annotations
@@ -47,6 +49,10 @@ CAMP_CANONICAL_NAME = "3',5'-cyclic adenosine monophosphate (cAMP)"
 CAMP_TARGET_TYPE = "small_molecule"
 CAMP_TARGET_FAMILY = "other"
 
+# Historical S4 boundary tokens. S4 must not mark these as run.
+# S5A implements exact_cross_source_deduplication / merge_duplicate_sequence_target
+# only. ncbi_ena_duplicate_resolution is not required on the true S5 input
+# (NCBI rows = 0; exact/near overlap with ENA = 0) and is not implemented.
 S5_OPERATIONS = (
     "exact_cross_source_deduplication",
     "merge_duplicate_sequence_target",

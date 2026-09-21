@@ -1,0 +1,165 @@
+{
+  "contract_id": "global_s6_profile",
+  "milestone": "S6_pre_balancing_corpus_profile_checkpoint3_preparation",
+  "principal_grain": "one S5 scientific identity = one exact (sequence_core, canonical_target_name) relationship",
+  "authoritative_corpus": "data/interim/deduplicated/corpus_clustered_final.csv",
+  "s5e_config": "config/global_s5e_final_clustering.json",
+  "s5a_config": "config/global_s5a_exact_dedup.json",
+  "curation_config": "config/curation_config.yaml",
+  "plan_default_max_target_fraction": 0.05,
+  "candidate_max_target_fractions": [0.02, 0.03, 0.05, 0.10],
+  "length_outlier_threshold_nt": 100,
+  "emergency_cluster_trigger": 500,
+  "s7_cluster_selection": {
+    "status": "unspecified",
+    "plan_specifies": [
+      "apply_per_target_cap_at_cluster_level",
+      "primary_rna_corpus_only",
+      "aptadiff_a_b_do_not_participate"
+    ],
+    "unspecified": [
+      "denominator_definition",
+      "floor_or_ceiling_rule",
+      "which_whole_clusters_are_retained_or_removed",
+      "treatment_of_clusters_containing_multiple_targets",
+      "ordering_and_tie_breaking",
+      "whether_removing_a_cluster_for_one_dominant_target_may_remove_identities_belonging_to_other_targets"
+    ]
+  },
+  "does_not": [
+    "balancing",
+    "apply_target_cap",
+    "select_final_max_target_fraction",
+    "remove_rows",
+    "remove_clusters",
+    "downsample_targets",
+    "change_target_metadata",
+    "change_evidence",
+    "change_chemistry",
+    "change_sequence",
+    "change_cluster_assignment",
+    "populate_partition",
+    "assign_ft_ref_eval",
+    "create_train_validation_split",
+    "create_corpus_final",
+    "start_s7",
+    "rewrite_s4",
+    "rewrite_s5"
+  ],
+  "cluster_summary_final_csv": "data/interim/deduplicated/cluster_summary_final.csv",
+  "cluster_union_provenance_csv": "data/interim/deduplicated/cluster_union_provenance.csv",
+  "clusters_final_tsv": "data/interim/deduplicated/clusters_final.tsv",
+  "membership_csv": "data/interim/deduplicated/exact_duplicate_membership.csv",
+  "overlap_matrix_csv": "data/interim/deduplicated/exact_overlap_matrix.csv",
+  "output_report_md": "data/interim/deduplicated/corpus_profile_report.md",
+  "output_figure_pack_md": "data/interim/deduplicated/figure_pack_supervisor.md",
+  "output_supervisor_briefing_md": "docs/data_curation/corpus_profile_report_supervisor.md",
+  "profile_dir": "data/interim/deduplicated/s6_profile",
+  "figures_dir": "data/interim/deduplicated/figures",
+  "checkpoint3_dir": "data/interim/deduplicated/checkpoint3",
+  "manifest_json": "data/interim/deduplicated/s6_profile_manifest.json",
+  "expected_s4_hashes": {
+    "reviewed_relationships": [
+      "data/interim/global_s4/global_s4_reviewed_relationships.csv",
+      "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502"
+    ],
+    "reviewed_dictionary": [
+      "data/interim/global_s4/global_s4_reviewed_target_dictionary.csv",
+      "e7234d9a9308dd899cbb3f801ff20ba05b2960071ede98812c6109db0f21b5ec"
+    ],
+    "record_map": [
+      "data/interim/global_s4/global_s4_record_relationship_map.csv",
+      "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b"
+    ],
+    "parked_audit": [
+      "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
+      "98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7"
+    ],
+    "routing_summary": [
+      "data/interim/global_s4/global_s4_routing_summary.csv",
+      "46bc0c91a121f1737f3816ec4b16fef4630b388310c9599171cf054b17e74635"
+    ],
+    "combined_input": [
+      "data/interim/global_s4/combined_global_s4_input.csv",
+      "24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0"
+    ]
+  },
+  "expected_s5a_hashes": {
+    "corpus_dedup_csv": [
+      "data/interim/deduplicated/corpus_dedup.csv",
+      "9dae7d8f59f36590945fa71baf473a8bfbbad95e9794355b5acab91ccc3cd2c2"
+    ],
+    "membership_csv": [
+      "data/interim/deduplicated/exact_duplicate_membership.csv",
+      "802c9d8dfed036639307e8456dbb330541dec2c519b5f06600c7cb82d113c618"
+    ],
+    "groups_csv": [
+      "data/interim/deduplicated/exact_duplicate_groups.csv",
+      "2eb63537abb5121bc79dc2a41cb26bbbc935008eb1015103d5a1e9f89ab3d903"
+    ],
+    "dictionary_conflicts_csv": [
+      "data/interim/deduplicated/target_dictionary_id_conflicts.csv",
+      "5b44c9a59b86be1350d43eaf0ca8812d7130399832ba7c46f7ecceea7fb8be8f"
+    ],
+    "multi_target_csv": [
+      "data/interim/deduplicated/multi_target_sequence_report.csv",
+      "f1634ccc81ae857425aaf93bd939dbea756486112a9aa45fe02e200913d2dc80"
+    ],
+    "overlap_matrix_csv": [
+      "data/interim/deduplicated/exact_overlap_matrix.csv",
+      "7b89d674c6a94eb7b36d920a185ec4a726793a1ca86cdc1ff47706416cc9211c"
+    ],
+    "report_md": [
+      "data/interim/deduplicated/s5a_exact_dedup_report.md",
+      "685f7a98c77e79af7cb9985b74f7759475e782bf9f32e40115f822214ecb0136"
+    ]
+  },
+  "expected_s5_final_hashes": {
+    "clusters_final_tsv": [
+      "data/interim/deduplicated/clusters_final.tsv",
+      "9b1b3c671cd1cd603e56ab23f0b2a9adac4ad85d47b019679ccb602605f971d9"
+    ],
+    "corpus_clustered_final_csv": [
+      "data/interim/deduplicated/corpus_clustered_final.csv",
+      "615677d51aa81337a3660b8c67e9db9fae2a5c8abc7128e7668617a342689d30"
+    ],
+    "cluster_summary_final_csv": [
+      "data/interim/deduplicated/cluster_summary_final.csv",
+      "7d06793fbf56be2e4e52c21d83faccef822feb2234118e4ef4b36dc307b6d078"
+    ],
+    "cluster_union_provenance_csv": [
+      "data/interim/deduplicated/cluster_union_provenance.csv",
+      "83023ba556d0a3e486ef7205001d9ae46f9ba9ef2e56210fa4f7a7e892c5f2dc"
+    ],
+    "overlap_report_md": [
+      "data/interim/deduplicated/overlap_report.md",
+      "41e52f80ec632e6dbc7a912f244d4df302b78b79d1cbab8e7141432a89d8e33b"
+    ],
+    "manifest_json": [
+      "data/interim/deduplicated/s5_final_clustering_manifest.json",
+      "aa5bab02a78481f32b4bab82c157d3f8aa975ebf4a77350fec9d9dd88623c5b0"
+    ]
+  },
+  "expected_counts": {
+    "n_scientific_identities": 1281,
+    "n_distinct_sequence_core": 1144,
+    "n_final_clusters": 796,
+    "n_shared_sequence_cores": 118,
+    "n_shared_core_identities": 255,
+    "n_length_outliers_gt_100nt": 13,
+    "n_missing_scientific_identity_id": 0,
+    "n_duplicate_scientific_identity_id": 0,
+    "n_missing_cluster_id": 0,
+    "n_clusters_without_representative": 0,
+    "n_clusters_with_gt1_representative": 0
+  },
+  "sequence_safety_scan_paths": [
+    "scripts/data_preparation/s6_profile_report.py",
+    "scripts/data_preparation/adapters/s6_profile.py",
+    "scripts/data_preparation/adapters/s6_profile_render.py",
+    "config/global_s6_profile.json",
+    "tests/data_preparation/test_s6_profile.py",
+    "docs/data_curation/global_s6_profile.md",
+    "docs/data_curation/corpus_profile_report_supervisor.md"
+  ]
+}

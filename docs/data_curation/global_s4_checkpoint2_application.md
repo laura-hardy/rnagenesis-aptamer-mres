@@ -58,8 +58,10 @@ Unreviewed machine dictionary identities that were never flagged for
 CHECKPOINT-2 remain as deterministic carry-forward. They are required
 so every active relationship has canonical metadata. Dictionary IDs
 are not merged merely because canonical names are equal (Apramycin,
-PSMA, ATP, NF-kappaB spelling variants, and similar). ID merging is
-S5.
+PSMA, ATP, NF-kappaB spelling variants, and similar). S5A may collapse
+exact `(sequence_core, canonical_target_name)` observations that span
+more than one dictionary ID, but that is a grouping and provenance
+decision: it does not globally merge S4 dictionary identities.
 
 ## Evidence
 
@@ -120,6 +122,11 @@ S4 application does **not**:
 * balance or cap targets
 * assign FT / REF / EVAL
 * split train/validation/test
+
+S5A later exact-deduplicates primary relationships and merges provenance.
+It does not globally merge dictionary IDs, resolve NCBI/ENA duplicates, or
+cluster sequences. The leftover token `ncbi_ena_duplicate_resolution` is not
+an S5A operation.
 
 Duplicate `(sequence_core, canonical_target_name)` observations may be
 counted only, labelled `S5 diagnostic only`.

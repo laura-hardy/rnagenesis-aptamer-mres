@@ -9894,3 +9894,712 @@ Global S4 COMPLETE at reviewed relationship grain
 S5 NOT started
 ```
 
+## 2026-09-17 — Global S5A exact scientific deduplication
+
+Implemented exact `(sequence_core, canonical_target_name)`
+deduplication with provenance merge. Clustering, MMseqs2/CD-HIT,
+balancing, partitions, global dictionary-ID merge, and NCBI/ENA
+duplicate resolution were not started. S4 outputs were not rewritten.
+
+Starting state: `main` HEAD / origin/main
+`bdc1df1b170eaac37a909a701e07c62377acfffd`
+(`Complete global S4 and CHECKPOINT-2 review`). Working tree was
+clean. `git ls-files data` empty. Frozen S4 hashes matched.
+
+### Input
+
+`global_s4_reviewed_relationships.csv` where
+`s4_route == primary_candidate` only. Record-level
+`s4_record_outcome` was not used. `aptamerbase:1110` retains its
+EGFR primary relationship (`aptamerbase:1110|2`).
+
+```text
+relationships                         = 1460
+distinct source record_id             = 1429
+distinct sequence_core                = 1144
+ncbi_nuc                              = 0
+ena                                   = 237
+
+aptamerbase = 526
+riboaptamer = 279
+ena         = 237
+aptaindex   = 126
+aptabase    = 112
+utexas      = 104
+aptadb      = 76
+
+E2 = 931
+E3 = 258
+E4 = 271
+E1 = 0
+E5 = 0
+```
+
+29 source `record_id` values contribute >1 primary relationship
+(60 rows; max 3). Combined extras were joined by `record_id` for
+construct/trim/redistribution/ENA family/modification provenance.
+
+### Exact dedup
+
+Scientific identity ID:
+`S5I_<sha256(sequence_core + "\x1f" + canonical_target_name)>`
+full SHA-256 hex. Independent of row order and donor selection.
+
+```text
+scientific identities                 = 1281
+exact duplicate groups                = 157
+rows in those groups                  = 336
+excess duplicate observations         = 179
+membership rows                       = 1460
+groups with >1 target_dictionary_id   = 9
+```
+
+Duplicate-group source combinations match the accepted preflight
+(138 cross-source, 19 within-source; AptaBase–AptaIndex 65,
+RiboAptamer–UTexas 57). Membership contains every input primary
+relationship exactly once.
+
+### Donor hierarchy
+
+1. highest `evidence_score`
+2. highest pre-S5 `corroboration_count` (not duplicate-row count)
+3. highest metadata completeness
+4. alphabetical `source_db`
+5. alphabetical `reviewed_relationship_id`
+
+Completeness fields: canonical affinity, affinity type, DOI, PMID,
+accession (relationship or ENA extras), UniProt, Pfam, resolved
+family, PDB, resolved chemistry, resolved molecule type, resolved
+construct scope, trim status, publication as a presence bit.
+Unresolved `unknown` does not count. Text length is ignored.
+
+Donor source distribution (1281 identities):
+
+```text
+aptamerbase = 491
+ena         = 235
+riboaptamer = 217
+utexas      = 104
+aptabase    = 102
+aptadb      = 70
+aptaindex   = 62
+```
+
+### Provenance
+
+`corroboration_count` = distinct `source_db` values, not rows.
+
+```text
+1 = 1143
+2 =  131
+3 =    6
+4 =    1
+```
+
+`independently_attested_by_permissive_source` is false on all 1281
+identities (no permissive contributing sources). Redistribution is
+the most permissive of `{permissive, unknown, restricted}`:
+unknown 1334 / restricted 126 on membership rows. Reversibility of
+restricted+other-source pairs was tested on synthetic fixtures only.
+
+### Dictionary-ID conflicts
+
+Nine exact groups collapse on the name key while spanning two S4
+IDs. Both IDs remain in membership. Scalar ID is the donor's. S4
+dictionary table was not modified (hash unchanged). Groups:
+
+HIV-1 reverse transcriptase `TD0365|TD0366` (2);
+NF-kappaB p65 `TD0532|TD0771` (3);
+Botulinum neurotoxin type A (BoNT/A) `TD0087|TD0088` (3);
+Interleukin-17 A/F heterodimer `TD0413|TD0418` (1).
+
+### Evidence / affinity / chemistry
+
+Duplicate groups: differing evidence levels 38; multiple nonempty
+canonical affinity observations 91 (88 same-value pairs plus 3
+conflicting scalars); conflicting canonical molar values 3;
+multiple chemistries 3 (RNA vs 2F-RNA); >1 `sequence_full` 0;
+>1 construct_scope 71; >1 trim_status 107. Donor supplies scalars.
+Member observations remain in the membership table. Affinities were
+not averaged.
+
+The 91 multiple-affinity count is canonical-value occupancy, not
+the preflight complementary blank-vs-value count (32). Conflicting
+nonblank canonical molars remain 3.
+
+### Multi-target sequences
+
+118 `sequence_core` values have >1 canonical name (326 rows);
+122 have >1 name or dictionary ID (334 rows). They remain distinct
+scientific identities. Sequence-only collapse was not performed.
+
+### Outputs (ignored `data/interim/deduplicated/`)
+
+```text
+corpus_dedup.csv
+  9dae7d8f59f36590945fa71baf473a8bfbbad95e9794355b5acab91ccc3cd2c2
+exact_duplicate_membership.csv
+  802c9d8dfed036639307e8456dbb330541dec2c519b5f06600c7cb82d113c618
+exact_duplicate_groups.csv
+  2eb63537abb5121bc79dc2a41cb26bbbc935008eb1015103d5a1e9f89ab3d903
+target_dictionary_id_conflicts.csv
+  5b44c9a59b86be1350d43eaf0ca8812d7130399832ba7c46f7ecceea7fb8be8f
+multi_target_sequence_report.csv
+  f1634ccc81ae857425aaf93bd939dbea756486112a9aa45fe02e200913d2dc80
+exact_overlap_matrix.csv
+  7b89d674c6a94eb7b36d920a185ec4a726793a1ca86cdc1ff47706416cc9211c
+s5a_exact_dedup_report.md
+  685f7a98c77e79af7cb9985b74f7759475e782bf9f32e40115f822214ecb0136
+```
+
+Tracked: `scripts/data_preparation/s5_deduplicate.py`,
+`scripts/data_preparation/adapters/s5_exact_dedup.py`,
+`config/global_s5a_exact_dedup.json`,
+`tests/data_preparation/test_s5_exact_dedup.py`,
+`docs/data_curation/global_s5a_exact_dedup.md`,
+narrow S4-boundary notes, this log. Not committed.
+
+S4 hashes unchanged. Combined input hash unchanged.
+`git ls-files data` empty. Two S5A runs byte-identical.
+Synthetic pytest: 21 passed. No clustering.
+
+### Pipeline status
+
+```text
+CHECKPOINT-2 applied = yes
+Global S4 COMPLETE at reviewed relationship grain
+S5A exact scientific dedup COMPLETE
+S5B/S5C clustering NOT started
+S6 NOT started
+S7 NOT started
+```
+
+## 2026-09-17 — Global S5B exact-dedup validation and scientific freeze
+
+Validated frozen S5A exact scientific identities against the original
+1460 primary S4 relationships. Schema/row-identity was reconciled for
+downstream S5. Clustering, MMseqs2/CD-HIT, S4 rewrite, S5A scientific
+rewrite, and final-schema migration were not started.
+
+Starting state: `main` HEAD / origin/main
+`bdc1df1b170eaac37a909a701e07c62377acfffd`. Working tree contained
+the accepted uncommitted S5A workstream only. `git ls-files data`
+empty. Frozen S4 hashes matched. Existing S5A output hashes matched;
+rerunning S5A from frozen S4 was byte-identical.
+
+### Population
+
+```text
+primary relationships     = 1460
+membership rows           = 1460
+scientific identities     = 1281
+duplicate groups          = 157
+duplicate excess          = 179
+1460 - 179                = 1281
+distinct scientific keys  = 1281
+distinct sequence_core    = 1144
+```
+
+1:1 membership coverage. No excluded S4 routes in membership.
+`aptamerbase:1110|2` remains the primary Epidermal growth factor
+receptor relationship. 118 multi-target cores (326 rows) stay
+separate identities.
+
+### Donor
+
+Independent recomputation matched all 1281 donors.
+
+```text
+evidence_score                         = 35
+metadata_completeness                  = 46
+alphabetical source_db                 = 54
+alphabetical reviewed_relationship_id  = 22
+pre-S5 corroboration_count             =  0
+sole member                            = 1124
+```
+
+### Provenance / conflicts
+
+Corroboration 1=1143, 2=131, 3=6, 4=1. Permissive-attestation flag
+false on all 1281 identities. Restricted AptaIndex membership rows
+126. Dictionary-ID conflicts 9; differing evidence 38; conflicting
+canonical affinity 3; multiple affinity observations 91; multiple
+chemistries 3; >1 sequence_full 0; >1 construct_scope 71; >1
+trim_status 107. Donor sequence_full mismatches 0; missing cores 0.
+
+### Row identity
+
+Donor `record_id` is not unique (26 duplicated values / 53 rows).
+`scientific_identity_id` is 1281/1281 unique, regenerates from the
+key, zero collisions. S5C must use `scientific_identity_id`. Later
+final-schema recommendation: Option B (keep source `record_id` as
+provenance; do not overwrite it). Not implemented in S5B.
+
+### Clustering readiness
+
+1144 sequence-level clustering-input rows recommended (one per
+distinct `sequence_core`), then broadcast cluster assignment back to
+the 1281 identities. Length min/median/max 20/50/123. 13 AptaBase
+rows already accepted by S4 sit above 100 nt (104–123); reported,
+not re-filtered. Alphabet: RNA 1274, DNA_T 4, mixed_T_U 3. No
+cluster IDs assigned.
+
+### ENA
+
+237 ENA membership rows; 235 identities; 234 distinct cores; 112
+family IDs; 16 multi-member families with ≥2 S5 members (the later
+ground truth); 0 within-family exact collapses; sidecar
+reconstructable. Cluster recall not evaluated.
+
+### Tests / safety
+
+Synthetic pytest: 17 S5B + 21 S5A + 11 CHECKPOINT-2 apply = 49
+passed. Tracked S5 implementation/docs/config/tests: no contiguous
+A/C/G/T/U strings of length ≥20. Historical `docs/log.md` Phase-2
+generation examples were not deleted.
+
+### S5A/S5B freeze (S5C input)
+
+```text
+corpus_dedup.csv
+  9dae7d8f59f36590945fa71baf473a8bfbbad95e9794355b5acab91ccc3cd2c2
+exact_duplicate_membership.csv
+  802c9d8dfed036639307e8456dbb330541dec2c519b5f06600c7cb82d113c618
+exact_duplicate_groups.csv
+  2eb63537abb5121bc79dc2a41cb26bbbc935008eb1015103d5a1e9f89ab3d903
+target_dictionary_id_conflicts.csv
+  5b44c9a59b86be1350d43eaf0ca8812d7130399832ba7c46f7ecceea7fb8be8f
+multi_target_sequence_report.csv
+  f1634ccc81ae857425aaf93bd939dbea756486112a9aa45fe02e200913d2dc80
+exact_overlap_matrix.csv
+  7b89d674c6a94eb7b36d920a185ec4a726793a1ca86cdc1ff47706416cc9211c
+s5a_exact_dedup_report.md
+  685f7a98c77e79af7cb9985b74f7759475e782bf9f32e40115f822214ecb0136
+```
+
+S4 hashes unchanged. Combined input hash unchanged.
+`git ls-files data` empty. S5A scientific outputs not rewritten.
+Not committed.
+
+### Pipeline status
+
+```text
+CHECKPOINT-2 applied = yes
+Global S4 COMPLETE at reviewed relationship grain
+S5A exact scientific dedup COMPLETE
+S5B exact-dedup validation COMPLETE and frozen
+S5C clustering NOT started
+S6 NOT started
+S7 NOT started
+```
+
+## 2026-09-17 — Global S5C 90% sequence-identity clustering
+
+Clustered the frozen S5A exact-deduplicated primary corpus on
+`sequence_core` at 90% identity with MMseqs2. CD-HIT, ENA-family
+adjudication, S4/S5A rewrite, balancing, and FT/REF/EVAL were not
+started.
+
+Starting state: `main` HEAD / origin/main
+`bdc1df1b170eaac37a909a701e07c62377acfffd`. Working tree contained
+the accepted uncommitted S5A/S5B workstream only. `git ls-files data`
+empty. Frozen S4 hashes matched. Frozen S5A hashes matched.
+
+### Tool environment
+
+MMseqs2 was absent, then installed with Homebrew
+`brew install mmseqs2`.
+
+```text
+path    = /opt/homebrew/bin/mmseqs
+version = 18-8cc5c
+CD-HIT  = not installed; fallback not run
+```
+
+Synthetic RNA/U preflight: A/C/G/U FASTA accepted as nucleotide;
+identical and near-identical U sequences clustered; U treated as a
+valid nucleotide and internally equivalent to T. Authoritative
+`sequence_core` was not transcoded U→T. Preflight GO.
+
+### Sequence-level input
+
+```text
+scientific identities              = 1281
+distinct sequence_core             = 1144
+unique S5SEQ IDs                   = 1144
+shared cores                       = 118
+identities on shared cores         = 255
+S4/S5A membership rows on those cores = 326
+extra identities from shared cores = 137
+missing sequence_core              = 0
+length min / median / max          = 20 / 50 / 123 (identity)
+cores >100 nt                      = 13 (reported, not filtered)
+alphabet identities RNA/DNA_T/mixed_T_U = 1274 / 4 / 3
+```
+
+The S5A/S5B 326 figure is membership rows on the 118 shared cores,
+not 326 scientific identities. All 255 identities and all 326
+relationships were retained. FASTA ordered by
+`sequence_core_sha256`, then `sequence_id`. No target labels in
+MMseqs headers.
+
+### MMseqs execution
+
+```text
+mmseqs easy-cluster \
+  sequence_clustering_input.fasta \
+  s5c_mmseqs_work/run1/clusters \
+  s5c_mmseqs_work/run1/tmp \
+  --min-seq-id 0.9 -c 0.8 --cov-mode 1 -s 7.5 --threads 1
+```
+
+`--threads 1` is a determinism control only. The four governing
+scientific parameters were not changed.
+
+### Cluster results
+
+```text
+clusters              = 813
+singletons            = 651
+multi-sequence        = 162
+singleton fraction    = 0.801
+largest size          = 36
+1144 → 813; reduction = 331
+```
+
+Sizes: 1=651, 2=106, 3=35, 4=6, 5=5, 6=5, 7=1, 9=1, 11=1, 34=1,
+36=1. Two 30+ sequence clusters are single-target. Scientific
+identities retained 1281/1281. Missing cluster IDs 0. Exactly 813
+scientific representatives. Shared cores have one cluster ID each.
+
+Independent global-Levenshtein diagnostic (not the MMseqs
+definition): 198 non-representative members in non-singleton
+clusters fall below 0.90. MMseqs clusters were not rejected.
+
+### ENA family diagnostics for S5D
+
+16 multi-member S5 families: 8 contained in one cluster, 8 split.
+Largest split: `ndfam_e51f65c5e5` (46 cores, 7 clusters). Largest
+contained: `ndfam_fa8cf96e7e` (31 cores, 1 cluster). Not adjudicated.
+CD-HIT not run.
+
+### Tests / safety
+
+Synthetic pytest: 24 S5C passed. Tracked S5C implementation/docs/
+config/tests: no contiguous A/C/G/T/U strings of length ≥20. Two
+MMseqs runs: identical membership, stable cluster IDs, and
+representatives.
+
+### Integrity
+
+S4 hashes unchanged. Combined input hash unchanged. Seven S5A freeze
+hashes unchanged. `git ls-files data` empty. `corpus_dedup.csv` not
+overwritten. Not committed.
+
+### Pipeline status
+
+```text
+CHECKPOINT-2 applied = yes
+Global S4 COMPLETE at reviewed relationship grain
+S5A exact scientific dedup COMPLETE
+S5B exact-dedup validation COMPLETE and frozen
+S5C 90% sequence-identity clustering COMPLETE
+S5D ENA-family adjudication COMPLETE
+S5 final clustering NOT accepted
+S6 NOT started
+S7 NOT started
+```
+
+---
+
+## Global S5D — ENA cluster validation + CD-HIT fallback
+
+Date: 2026-09-17.
+
+### GO / NO-GO
+
+S5D **execution succeeded**. A **final clustering method is not
+accepted**.
+
+```text
+decision = NO-GO — GROUND-TRUTH / 90%-RULE CONTRADICTION
+```
+
+CD-HIT was run as the authorised fallback. It is not promoted.
+No `*_final` artefacts.
+
+### Integrity
+
+Branch `main`. HEAD = origin/main =
+`bdc1df1b170eaac37a909a701e07c62377acfffd`. Recalculated S4 hashes,
+combined S4 input hash, seven S5A freeze hashes, and S5C candidate
+hashes were unchanged. `corpus_dedup.csv` unchanged. 1281 scientific
+identities retained. `git ls-files data` empty.
+
+### ENA methodology
+
+Tracked ENA review code builds `ndfam_*` IDs as connected components
+**within** experiment group + target. Edges are reverse complement,
+equal-length Hamming ≤ max(2, ceil(0.05×L)), substring/truncation at
+≥50% length ratio, or edit/max-length ≤ 0.08. That is not a 90%
+global-identity family. Blank source IDs were materialised as
+`ena_singleton_{review_unit_id}` with size 1. Families were not
+regenerated.
+
+### MMseqs characterisation
+
+16 families, 8 contained (0.50), 59/141 cores contained, 82 split.
+Largest split still `ndfam_e51f65c5e5` (46 cores, 7 clusters). Six
+families are disconnected at 0.90 global Levenshtein (three reverse
+complements, truncation/substring series). 96 materialised
+singletons: 83 isolated from other ENA cores, 10 with another
+singleton, 2 with a real family, 1 only with non-ENA. 8 clusters
+combine distinct ENA families.
+
+### CD-HIT
+
+Installed via Homebrew `brewsci/bio/cd-hit` 4.8.1 at
+`/opt/homebrew/bin/cd-hit-est`. Native U preflight passed; no U→T
+comparison FASTA. Command:
+
+```text
+cd-hit-est -c 0.9 -n 8 -T 1 -d 0
+```
+
+Identity documented as identical bases / shorter-sequence length.
+Default +/- strand search was left as installed.
+
+```text
+1144 cores → 791 clusters (612 singleton, 179 multi, largest 44)
+1281 identities retained; missing cluster_id = 0
+ENA containment 11/16 (0.6875); cores 60/141 contained
+still split: 5 families, including 46 → 44+1+1
+```
+
+Two identical runs matched.
+
+### Adjudication
+
+The plan's 90% clustering rule and ENA-family acceptance criterion
+conflict. CD-HIT improved recall but cannot make truncation and
+reverse-complement families into 90% global-identity clusters
+without retuning, which is forbidden. STOP for human review of the
+clustering policy.
+
+### Tests
+
+83 passed (21 S5D, 24 S5C, 21 S5A, 17 S5B). Not committed.
+
+---
+
+## Global S5E — leakage-safe final clustering + S5 closure
+
+Date: 2026-09-17.
+
+### GO / NO-GO
+
+**GO.** S5 can close. Final `cluster_id` is the connected component of
+frozen MMseqs 90% clusters union trusted real multi-member ENA family
+must-links. CD-HIT is not selected.
+
+```text
+decision = GO — S5 CLOSED
+MMseqs clusters 813 → final clusters 796
+16/16 retained multi-member ENA families contained
+```
+
+### Integrity
+
+Branch `main`. HEAD = origin/main =
+`bdc1df1b170eaac37a909a701e07c62377acfffd`. Recalculated S4 hashes,
+combined S4 input hash, seven S5A freeze hashes, and S5C candidate
+hashes were unchanged. `corpus_dedup.csv` and frozen S5C files were
+not overwritten. `git ls-files data` empty.
+
+### Policy resolution
+
+ENA families are positive must-links, not complete global 90%
+ground truth. Materialised singleton IDs are not cannot-links.
+Different family IDs may share a cluster. This supersedes the S5D
+validation interpretation without changing MMseqs parameters.
+
+### Union construction
+
+```text
+MMseqs base                         = 813
+real multi-member family IDs      = 17
+must-link families (≥2 S5 cores) = 16
+families that created a union edge = 8
+MMseqs clusters in unioned finals  = 23
+finals affected by must-links      = 6
+reduction from family constraints   = 17
+final clusters                      = 796
+```
+
+### Final statistics
+
+```text
+singletons 637 / multi-sequence 159 / largest 89
+identities 1281 / cores 1144 / representatives 796
+16/16 family containment; 0 splits
+descriptive: 6 clusters with multiple ENA family IDs;
+3 combining distinct real families (not a failure)
+```
+
+### Freeze hashes
+
+```text
+clusters_final.tsv
+  9b1b3c671cd1cd603e56ab23f0b2a9adac4ad85d47b019679ccb602605f971d9
+corpus_clustered_final.csv
+  615677d51aa81337a3660b8c67e9db9fae2a5c8abc7128e7668617a342689d30
+cluster_summary_final.csv
+  7d06793fbf56be2e4e52c21d83faccef822feb2234118e4ef4b36dc307b6d078
+cluster_union_provenance.csv
+  83023ba556d0a3e486ef7205001d9ae46f9ba9ef2e56210fa4f7a7e892c5f2dc
+overlap_report.md
+  41e52f80ec632e6dbc7a912f244d4df302b78b79d1cbab8e7141432a89d8e33b
+s5_final_clustering_manifest.json
+  aa5bab02a78481f32b4bab82c157d3f8aa975ebf4a77350fec9d9dd88623c5b0
+```
+
+Two live runs were byte-identical. 102 synthetic tests passed
+(19 S5E, 21 S5D, 24 S5C, 21 S5A, 17 S5B). Plan v1.4. Not committed.
+
+### Pipeline status
+
+```text
+CHECKPOINT-2 applied = yes
+Global S4 COMPLETE at reviewed relationship grain
+S5A exact scientific dedup COMPLETE
+S5B exact-dedup validation COMPLETE and frozen
+S5C 90% sequence-identity clustering COMPLETE (MMseqs candidate frozen)
+S5D ENA-family audit + CD-HIT fallback COMPLETE (diagnostic; not selected)
+S5E leakage-safe final clustering COMPLETE
+S5 COMPLETE
+S6 NOT started
+S7 NOT started
+```
+
+## 2026-09-17 — Global S6 pre-balancing corpus profile + CHECKPOINT-3 preparation
+
+S6 profiled the frozen final S5 clustered corpus and stopped for
+supervisor review. It did not balance, apply a target cap, assign
+FT/REF/EVAL, populate `partition`, drop rows, rewrite S4/S5, or start
+S7.
+
+Starting state: `main` HEAD / origin/main
+`bdc1df1b170eaac37a909a701e07c62377acfffd`. Recalculated S4 hashes,
+combined S4 input hash, S5A freeze hashes, and six final S5 freeze
+hashes matched. `git ls-files data` empty.
+
+### Grain
+
+```text
+scientific identities = 1281
+distinct sequence_core = 1144
+final clusters         = 796
+canonical targets      = 411
+```
+
+Records in this profile are the 1281 exact scientific identities, not
+1460 pre-dedup relationships, 1429 source records, 1144 cores, or 796
+clusters.
+
+### Headline
+
+```text
+donor sources: aptamerbase 491, ena 235, riboaptamer 217,
+  utexas 104, aptabase 102, aptadb 70, aptaindex 62
+evidence: E2 803 (62.69%), E3 247 (19.28%), E4 231 (18.03%), E5 0
+largest target: NGF 131 identities (10.23%)
+enzyme identities: 78 (6.09%); unknown family 1097 (85.64%)
+singleton clusters: 637 / 796 (80.0%)
+UniProt: 53/411 targets; 105/1281 identities
+<500-cluster trigger: not met
+```
+
+Exact duplicates were already provenance-merged. Final cluster IDs
+combine frozen 90% MMseqs grouping with trusted ENA family must-links.
+No balancing or partitioning has occurred.
+
+### Candidate cap (diagnostic only)
+
+v1.4 requires a cluster-level cap but does not specify denominator,
+floor/ceiling, which whole clusters are retained, multi-target
+treatment, ordering, or collateral removal. S6 did not invent an S7
+algorithm. C3-05 records that gap.
+
+Nominal threshold = floor(fraction × 1281). Idealised record-wise size
+is not executable S7 output.
+
+```text
+0.02: threshold 25; 5 targets above; excess 123; idealised 1158
+0.03: threshold 38; 1 target (NGF); excess 93; idealised 1188
+0.05: threshold 64; 1 target (NGF); excess 67; idealised 1214
+0.10: threshold 128; 1 target (NGF); excess 3; idealised 1278
+```
+
+NGF occupies 14 exclusive clusters, including an 89-core family-union
+cluster. Exclusive clusters can absorb the identity excess at every
+candidate fraction, but choosing which clusters to drop remains C3-05.
+
+### Sequence / clusters
+
+Distinct-core length median 49 nt, mean 55.0, max 123. Thirteen
+>100-nt identities/cores are retained. Distinct-core GMM/BIC prefers
+two components (means ~39 and ~77 nt; ΔBIC 437). This is a mixture
+comparison, not proof of bimodality, and is not caused by parked
+AptaDiff 36-mers. Distinct-core GC mean 0.531.
+
+```text
+clusters 796; multi-sequence 159; multi-target 143
+ENA provenance 98; ENA must-link union 6
+largest cluster 89 cores, NGF, mmseqs_plus_ena_family_must_link
+```
+
+118 cores / 255 identities are multi-target by identical core. 143
+clusters have >1 target (104 include a shared identical core; 39 are
+near-sequence co-membership only). Neutral wording retained.
+
+### CHECKPOINT-3
+
+Five decision rows, all human fields blank: C3-01 cap fraction;
+C3-02 further balancing; C3-03 E4 vs E5; C3-04 protein-only;
+C3-05 S7 cluster-selection semantics.
+
+Two live S6 runs from frozen S5 inputs produced byte-identical
+markdown, tables, CHECKPOINT-3 files, and plot-data CSVs. Synthetic
+pytest: 23 passed. Sequence-safety scan of tracked S6 files: 0 leaks.
+Not committed.
+
+### Pipeline status
+
+```text
+CHECKPOINT-2 applied = yes
+Global S4 COMPLETE at reviewed relationship grain
+S5 COMPLETE
+S6 profile COMPLETE
+CHECKPOINT-3 prepared, not decided or applied
+S7 NOT started
+```
+
+## 2026-09-21 — CHECKPOINT-3 supervisor consultation complete
+
+Recorded supervisor decisions in
+`docs/data_curation/checkpoint3_supervisor_decisions_2026-09-21.md`.
+Final decisions: cap each target at 3% of the post-cap identity denominator;
+no additional target-family balancing (known family labels secondary only);
+retain E2–E4 and keep E5 excluded; retain the protein-only corpus; and apply
+Amin's deterministic whole-cluster removal rule (target-pure first,
+least-collateral mixed clusters only if needed, stable `cluster_id` tie-break,
+recompute after every removal).
+
+Additional constraints: freeze REF/EVAL before fine-tuning or hyperparameter
+decisions; split train/validation only within FT; preserve the two observed
+sequence-length regimes for splitting and null/reference distributions; do
+not publish sequence data publicly (only aggregate statistics, provenance,
+and reconstruction procedures); and complete a pre-publication GitHub leakage
+audit. Ian requested an E5 population/inclusion-impact diagnostic; E5 remains
+excluded. No scientific data or S4/S5/S6 output changed. S7/final capping and
+splitting have not yet run. Not committed.

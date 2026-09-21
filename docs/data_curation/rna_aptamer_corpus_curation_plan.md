@@ -2,9 +2,11 @@
 
 **Project:** RNAGenesis aptamer MRes (`rnagenesis-aptamer-mres`)
 **Owner:** Laura
-**Version:** 1.3 — 2026-09-10
+**Version:** 1.4 — 2026-09-17
 **Status:** Ready for implementation. All blocking questions resolved. AptaDiff A/B
-canonical molecule identity is ssDNA (see §2.1).
+canonical molecule identity is ssDNA (see §2.1). S5 clustering interpretation
+was corrected in v1.4: ENA families are positive must-links, not global
+90%-identity ground truth.
 
 **Companion documents (authoritative inputs):**
 
@@ -393,8 +395,8 @@ One record = one (sequence, target) pair (§2.0).
 | 39 | `pubmed_id` | str | | |
 | 40 | `accession` | str | | ENA/GenBank/SRA accession |
 | 41 | `experiment_group_id` | str | | Carried where the source provides it; drives §2.2.1 tier 2 |
-| 42 | `near_duplicate_family_id` | str | | Carried where provided; validates clustering |
-| 43 | `cluster_id` | str | | Assigned at S5 |
+| 42 | `near_duplicate_family_id` | str | | Carried where provided; S5 positive must-link provenance, not negative 90%-identity ground truth |
+| 43 | `cluster_id` | str | | Leakage-safe grouping assigned at S5E |
 | 44 | `is_cluster_representative` | bool | | Assigned at S5 |
 | 45 | `partition` | str | | `FT` / `REF` / `EVAL`; assigned at S7 |
 | 46 | `qc_flags` | str | | Pipe-delimited non-fatal flags |
@@ -718,13 +720,30 @@ resolved-type disagreements (§5.1).
    Separately report (a) sequences appearing against **multiple targets** — polyspecificity or
    conflict, either way it goes in the report — and (b) records sharing a `sequence_core` but
    differing in `sequence_full`, which is corroboration across construct scopes, not a conflict.
-2. **Cluster** on sequences at 90% identity:
+2. **Cluster** on sequences at 90% identity with MMseqs2:
    `mmseqs easy-cluster --min-seq-id 0.9 -c 0.8 --cov-mode 1 -s 7.5`.
    ⚠ Sequences are short (median ~50–75 nt) and MMseqs2's k-mer prefilter loses sensitivity below
-   ~50 nt, hence the raised sensitivity. Validate against ENA's `near_duplicate_family_id` — the 56
-   real families are free ground truth, and the materialised singletons should stay singletons. If
-   recall is poor, fall back to `cd-hit-est -c 0.9 -n 8`.
-3. Assign `cluster_id`; mark one `is_cluster_representative` per cluster.
+   ~50 nt, hence the raised sensitivity. MMseqs remains the primary corpus-wide 90%
+   sequence-similarity method. Its frozen membership is persisted as
+   `sequence_cluster_id_mmseqs` and is never overwritten.
+   ENA `near_duplicate_family_id` is **positive validation / must-link provenance**, not
+   complete positive-and-negative global 90%-identity ground truth. Source families were
+   constructed only within `(experiment_group_id, target_key)` as union-find components
+   that include exact duplicates, reverse complements, ~95% Hamming matches,
+   substring/truncation relationships, edit-distance edges, transitivity, and differing
+   lengths. Materialised `ena_singleton_*` IDs are **not** global cannot-link constraints
+   and do not mean “globally sequence-isolated”. Different family IDs may share a
+   cluster under corpus-wide MMseqs similarity.
+   After sequence clustering, retained real multi-member ENA families are unioned into
+   leakage-safe final connected components. Final `cluster_id` is therefore:
+
+   `MMseqs 90% similarity-cluster membership ∪ trusted source-family must-links`.
+
+   CD-HIT-est `-c 0.9 -n 8` was tested after apparent poor family recall. It did not
+   resolve the semantic contradiction (families that are intrinsically incompatible with a
+   global 90% same-strand identity rule) and is **not** selected for v1 final clustering.
+3. Assign final `cluster_id`; mark one `is_cluster_representative` per final cluster
+   (technical only).
 4. Report cross-source overlap as an n×n matrix, sequences unique to each source, and the
    `corroboration_count` distribution.
 
@@ -745,7 +764,9 @@ wanted now, and whether the E4 threshold or protein-only policy should be relaxe
 **Out:** `data/processed/`.
 
 1. Apply the per-target cap at cluster level for sources that enter the primary RNA corpus
-   (§2.1). AptaDiff A/B do not participate in that RNA-corpus cap.
+   (§2.1). AptaDiff A/B do not participate in that RNA-corpus cap. The unique S5 scientific-row
+   identifier `scientific_identity_id` must be retained in the final schema; donor `record_id`
+   remains provenance and is not unique.
 2. Assign `FT`/`REF`/`EVAL` at cluster level, stratified by `target_family` (§1.1).
 3. Write:
 
@@ -962,7 +983,11 @@ Implement as assertions in the pipeline, not manual checks.
 - [ ] Every record has exactly one `cluster_id`; every cluster exactly one representative.
 - [ ] `contributing_sources` of every deduplicated record contains its `source_db`, and
       `corroboration_count == len(contributing_sources)`.
-- [ ] ENA `near_duplicate_family_id` families do not split across clusters (clustering sanity check).
+- [ ] Real multi-member ENA `near_duplicate_family_id` families do not split across
+      final clusters (positive must-link recall). Materialised singleton family IDs
+      are not required to remain globally singleton, and distinct family IDs may share
+      a cluster: original family generation was scoped within experiment/target and is
+      not negative global 90%-identity ground truth.
 - [ ] Length distribution tested for bimodality; if bimodal, the report says so prominently.
 - [ ] `corpus_final.txt` has no duplicate lines, and its line count equals the number of distinct
       `sequence_core` values in the `FT` partition.
@@ -1202,3 +1227,4 @@ sequences, so both are safe to track under `docs/`.
 | 1.1 | 2026-08-04 | Confirmed AptaDiff downsampling; three sequence columns plus constant-region detection; three-way partition and evidence ladder confirmed; supervisor profile report added as its own stage and checkpoint before balancing; target normalisation made to precede all grouping and splitting; corroboration-as-reliability and redistribution status added; riboaptamer promoted after the truncation fix; source registry made authoritative over the inventory. |
 | 1.2 | 2026-08-04 | Q1–Q6 resolved against the refreshed 203-file inventory. Record grain defined as (sequence, target) and dedup keyed accordingly. ENA input registered as the 679-row review_v2 file with a required 679-vs-676 reconciliation and an explicit singleton policy. riboaptamer resolved to `all_sequences_509_rows.csv` with Category treated as a prior rather than a rule. AptaDB resolved to interaction-grain via `interaction.csv`, upgrading it from E5-by-default and seeding the target dictionary with 194 UniProt entries. Precision-SELEX layout resolved (column B primary, even rows from row 4). Selektion D9 confirmed RNA, with the resulting thesis reframing recorded. `li_et_al` removed. Added `alphabet_as_reported` / `t_to_u_applied` transcription provenance and `target_type_source`. `TRAINING_SEQUENCE_COLUMN` fixed to `sequence_core`. Added §17 project log and §18 version-control and data-handling policy. |
 | 1.3 | 2026-09-10 | AptaDiff A/B source identity corrected from primary-paper review: experimental molecule is ssDNA, canonical S2 retains DNA with no T→U, P6 sequences are random-region-only, and ordinary valid rows later park as ssDNA. They do not enter ordinary primary-RNA target capping. Dataset A remains uncapped for a separate replication/comparability file; any future RNA-alphabet Dataset-A representation is derived and replication-specific. The previous instruction to computationally transcribe A/B to RNA for the canonical corpus is superseded. |
+| 1.4 | 2026-09-17 | S5 clustering interpretation corrected after S5D showed that ENA `near_duplicate_family_id` is not complete global 90%-identity ground truth. MMseqs remains the primary 90% sequence-clustering method. Retained real multi-member ENA families are positive must-links unioned into leakage-safe final `cluster_id` components. Materialised singleton IDs are not cannot-link constraints. CD-HIT was tested and is not selected. S1–S4 scientific decisions are unchanged. |
