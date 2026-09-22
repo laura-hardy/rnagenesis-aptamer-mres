@@ -11096,4 +11096,78 @@ new application/freeze tests.
 **Boundary:** No model training. No REF calibration. No EVAL
 evaluation. No S7D. Not committed. Not pushed.
 
+## 2026-09-22 — S7D final corpus build and validation
+
+**Stage:** Aim 2 / data curation / S7D final assembly, diagnostics,
+reporting and validation
+
+**What was done:** Verified every frozen S7A/S7B/S7C authority against
+the recorded SHA256 and semantic freeze hashes. Assembled ignored
+`data/processed/` deliverables by byte-copying frozen partition files
+and concatenating authoritative parked/rejected/evaluation-reference
+lanes. Wrote `corpus_final.txt` from frozen FT TRAIN `sequence_core`
+values only, deduplicated by first occurrence. Completed the CHECKPOINT-3
+E5 inclusion-impact diagnostic without promoting E5. Independently
+re-ran integrity, leakage, split, target-cap and sequence-safety gates.
+Did not alter any frozen split. Did not start model fine-tuning. Did not
+calculate AptaRank reference distributions. Did not evaluate models on
+EVAL. Did not commit or push.
+
+```text
+S7D final build complete
+all frozen splits unchanged
+model work has not started
+final sequence-bearing data remain under ignored data/
+```
+
+**Contract:** `config/global_s7d_final_build.json`.
+**Adapter / CLI:** `scripts/data_preparation/adapters/s7_final_build.py`,
+`scripts/data_preparation/s7_finalise.py`.
+**Documentation:** `docs/data_curation/global_s7d_final_build.md`.
+
+**Boundary:** TRAIN/VALIDATION/REF/EVAL remain the frozen S7C/S7B
+authorities. E5 promoted = no. Non-protein promoted = no. Repository
+HEAD baseline `c1081c14cb3f20869affeddea49f5dd740b0bc51`. `git ls-files
+data` empty. Pre-publication history leakage audit remains required.
+
+**Tests:**
+`PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/data_preparation/test_s7_final_build.py tests/data_preparation/test_s7_ft_train_validation.py tests/data_preparation/test_s7_partition.py tests/data_preparation/test_s7_target_cap.py tests/data_preparation/test_s5_final_clustering.py tests/data_preparation/test_s6_profile.py`
+= 178 passed / 0 failed / 0 skipped (166 prior S7C/S7B/S7A/S5E/S6 + 12 new S7D).
+
+Not committed. Not pushed.
+
+## 2026-09-22 — S7D parked-completeness audit patch
+
+**Stage:** Aim 2 / data curation / S7D documentation and audit completeness
+
+**What was done:** Bounded documentation/audit pass after scientific S7D
+acceptance. Independently reverified frozen scientific hashes. Inventoried
+every earlier parked route from frozen CHECKPOINT-1 applied artefacts and
+global-S4 routing/audit metadata. Wrote sequence-safe
+`data/processed/parked_inventory.csv` so residual chemistry, molecule,
+construct, and S4 hold/unresolved parks remain attributable without being
+coerced into ssDNA / non-protein / E5. Clarified that 235 E5D diagnostic
+cluster units are a counterfactual approximation, not exact future S5
+clusters. Confirmed Dataset A is replication-only. Did not change
+`corpus_final.csv`, `corpus_final.txt`, TRAIN, VALIDATION, REF, EVAL,
+S7A results, or any S7B/S7C split. Did not commit or push.
+
+```text
+S7D scientific corpus changed by this audit patch = no
+unaccounted parked lanes = 0
+E5 promoted = no
+frozen corpus changed = no
+model work started = no
+commit performed = no
+push performed = no
+```
+
+**Tests:**
+`PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/data_preparation/test_s7_final_build.py tests/data_preparation/test_s7_ft_train_validation.py tests/data_preparation/test_s7_partition.py tests/data_preparation/test_s7_target_cap.py tests/data_preparation/test_s5_final_clustering.py tests/data_preparation/test_s6_profile.py`
+= 179 passed / 0 failed / 0 skipped (166 prior S7C/S7B/S7A/S5E/S6 + 13 S7D).
+
+Not committed. Not pushed.
+
+
+
 

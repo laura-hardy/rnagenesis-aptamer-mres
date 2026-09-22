@@ -134,8 +134,10 @@ polyspecificity data or arbitrarily pick one target. Consequences:
   polyspecificity (interesting, keep) or a target-annotation conflict (route to review).
 - **Clustering** operates on sequences, so a multi-target sequence lands in exactly one cluster and
   the partition stays clean.
-- `corpus_final.txt` is deduplicated **on sequence** within the `FT` partition, so a polyspecific
-  aptamer is not over-represented in the training text.
+- `corpus_final.txt` is deduplicated **on sequence** for RNAGenesis fitting. After the S7C
+  TRAIN/VALIDATION freeze, that file is built from **frozen FT TRAIN only** (not from REF,
+  EVAL, or FT VALIDATION). Older wording that said “FT partition” is superseded by this
+  TRAIN-only rule. A polyspecific aptamer is not over-represented in the training text.
 
 ### 2.1 AptaDiff A/B molecule identity and replication — **DECIDED (v1.3)**
 
@@ -166,10 +168,12 @@ RNAGenesis replication and comparability:
 
 - `corpus_final.csv` — primary RNA fine-tuning corpus (A/B excluded by
   default under the ssDNA parking policy).
-- `corpus_replication_datasetA.csv` — Dataset A alone, same schema,
-  uncapped. Any future RNA-alphabet Dataset-A representation is a
-  **derived replication-specific transformation** with explicit
-  provenance, not a change to experimental molecule identity.
+- `corpus_replication_datasetA.csv` — Dataset A alone, uncapped. Dataset A
+  never entered global S4/S5/S7, so the reconstructible authoritative
+  source is the CHECKPOINT-1 applied parked-ssDNA / canonical schema, not
+  the primary scientific-identity schema. Any future RNA-alphabet Dataset-A
+  representation is a **derived replication-specific transformation** with
+  explicit provenance, not a change to experimental molecule identity.
 
 Never merge these. Do not reduce Dataset A to the 13,802-row `x_z`
 derivative.
@@ -863,11 +867,12 @@ not started.
 | File | Contents |
 |---|---|
 | `corpus_final.csv` | Full schema, all retained records |
-| `corpus_final.txt` | `sequence_core` only, one per line, `FT` partition, **deduplicated on sequence** |
-| `corpus_replication_datasetA.csv` | Dataset A alone, uncapped, same schema |
+| `corpus_final.txt` | `sequence_core` only, one per line, **frozen FT TRAIN only**, **deduplicated on sequence** (first occurrence in `ft_train.csv`) |
+| `corpus_replication_datasetA.csv` | Dataset A parked ssDNA alone, uncapped, CHECKPOINT-1 canonical/parked schema |
 | `parked_ssdna.csv` | Cleaned ssDNA |
 | `parked_non_protein_targets.csv` | Cleaned non-protein-target records |
 | `parked_evidence_e5.csv` | Cleaned E5 records |
+| `parked_inventory.csv` | Sequence-safe index of every parked lane, including residual source-level parks that are not ssDNA / non-protein / E5 |
 | `evaluation_references.csv` | NDM-1 / KPC-2 references from Tier 1-eval |
 | `rejected_all.csv` | Concatenated rejection logs |
 | `corpus_report.md` | §9.2 final build report |
@@ -1084,7 +1089,7 @@ Implement as assertions in the pipeline, not manual checks.
       not negative global 90%-identity ground truth.
 - [ ] Length distribution tested for bimodality; if bimodal, the report says so prominently.
 - [ ] `corpus_final.txt` has no duplicate lines, and its line count equals the number of distinct
-      `sequence_core` values in the `FT` partition.
+      `sequence_core` values in frozen FT TRAIN.
 - [ ] riboaptamer regression: <1% of its sequences end in `.`/`…`; median length >20 nt.
 
 ---
@@ -1331,4 +1336,4 @@ before publication.
 | 1.2 | 2026-08-04 | Q1–Q6 resolved against the refreshed 203-file inventory. Record grain defined as (sequence, target) and dedup keyed accordingly. ENA input registered as the 679-row review_v2 file with a required 679-vs-676 reconciliation and an explicit singleton policy. riboaptamer resolved to `all_sequences_509_rows.csv` with Category treated as a prior rather than a rule. AptaDB resolved to interaction-grain via `interaction.csv`, upgrading it from E5-by-default and seeding the target dictionary with 194 UniProt entries. Precision-SELEX layout resolved (column B primary, even rows from row 4). Selektion D9 confirmed RNA, with the resulting thesis reframing recorded. `li_et_al` removed. Added `alphabet_as_reported` / `t_to_u_applied` transcription provenance and `target_type_source`. `TRAINING_SEQUENCE_COLUMN` fixed to `sequence_core`. Added §17 project log and §18 version-control and data-handling policy. |
 | 1.3 | 2026-09-10 | AptaDiff A/B source identity corrected from primary-paper review: experimental molecule is ssDNA, canonical S2 retains DNA with no T→U, P6 sequences are random-region-only, and ordinary valid rows later park as ssDNA. They do not enter ordinary primary-RNA target capping. Dataset A remains uncapped for a separate replication/comparability file; any future RNA-alphabet Dataset-A representation is derived and replication-specific. The previous instruction to computationally transcribe A/B to RNA for the canonical corpus is superseded. |
 | 1.4 | 2026-09-17 | S5 clustering interpretation corrected after S5D showed that ENA `near_duplicate_family_id` is not complete global 90%-identity ground truth. MMseqs remains the primary 90% sequence-clustering method. Retained real multi-member ENA families are positive must-links unioned into leakage-safe final `cluster_id` components. Materialised singleton IDs are not cannot-link constraints. CD-HIT was tested and is not selected. S1–S4 scientific decisions are unchanged. |
-| 1.5 | 2026-09-21 | Records completed CHECKPOINT-3 supervisor decisions. Active `MAX_TARGET_FRACTION` changes from the previous 5% placeholder to **3%** of the current/post-removal identity denominator. Partition strategy changes from target-family-primary to multi-objective comparability across canonical target, evidence, sequence-length regime, and source; `target_family` is a secondary diagnostic only. Retains E2–E4 with E5 parked, and the protein-only primary corpus. Records the deterministic whole-cluster C3-05 removal policy, REF/EVAL freezing before fine-tuning/model-selection/hyperparameter use, cluster-level FT-only train/validation splitting after the top-level split, preservation of the two S6 sequence-length regimes, and the pre-publication repository leakage-audit requirement. Historical S6 observations and candidate-cap simulations are not rewritten. |
+| 1.5 | 2026-09-21 | Records completed CHECKPOINT-3 supervisor decisions. Active `MAX_TARGET_FRACTION` changes from the previous 5% placeholder to **3%** of the current/post-removal identity denominator. Partition strategy changes from target-family-primary to multi-objective comparability across canonical target, evidence, sequence-length regime, and source; `target_family` is a secondary diagnostic only. Retains E2–E4 with E5 parked, and the protein-only primary corpus. Records the deterministic whole-cluster C3-05 removal policy, REF/EVAL freezing before fine-tuning/model-selection/hyperparameter use, cluster-level FT-only train/validation splitting after the top-level split, preservation of the two S6 sequence-length regimes, and the pre-publication repository leakage-audit requirement. Historical S6 observations and candidate-cap simulations are not rewritten. Documentation-only S7D finalisation notes (2026-09-22; no scientific revision): `corpus_final.txt` is frozen FT TRAIN only; Dataset A replication uses the CHECKPOINT-1 parked/canonical schema because A never entered S4/S5; S7D is assembly/diagnostic/reporting/validation only. Documentation/audit-completeness note (2026-09-22): `parked_inventory.csv` indexes every parked lane, including residual source-level parks that are not coerced into ssDNA/non-protein/E5; E5D diagnostic cluster units are a counterfactual approximation, not exact future S5 clusters. |

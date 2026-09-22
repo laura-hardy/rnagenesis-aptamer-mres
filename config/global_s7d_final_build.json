@@ -1,0 +1,938 @@
+{
+  "contract_id": "global_s7d_final_build",
+  "milestone": "S7D_final_corpus_build_and_validation",
+  "build_date": "2026-09-22",
+  "governing_plan_version": "1.5",
+  "repository_head_baseline": "c1081c14cb3f20869affeddea49f5dd740b0bc51",
+  "max_target_fraction": 0.03,
+  "training_sequence_column": "sequence_core",
+  "corpus_final_txt_source": "frozen_ft_train_only",
+  "corpus_final_txt_dedup": "exact_sequence_core",
+  "corpus_final_txt_order": "first_occurrence_in_frozen_ft_train_csv",
+  "output_dir": "data/processed",
+  "diagnostics_dir": "data/processed/diagnostics/e5_inclusion",
+  "s7a_config": "config/global_s7a_target_cap.json",
+  "s7b_config": "config/global_s7b_partition.json",
+  "s7c_config": "config/global_s7c_ft_train_validation.json",
+  "s5e_config": "config/global_s5e_final_clustering.json",
+  "s6_config": "config/global_s6_profile.json",
+  "s4_apply_config": "config/global_s4_checkpoint2_apply.json",
+  "s7b_freeze_record": "config/checkpoint_reviews/s7b_partition_freeze.json",
+  "s7c_freeze_record": "config/checkpoint_reviews/s7c_ft_split_freeze.json",
+  "curation_config": "config/curation_config.yaml",
+  "source_registry": "data/interim/registry/source_registry.csv",
+  "leakage_exclusion_set": "data/interim/leakage_exclusion_set.csv",
+  "expected_leakage_exclusion_sha256": "77c7ab53420f97a3d7c41197b6e66447eabcda789803388ebb37ec1791944730",
+  "leakage_target_aliases": "config/leakage_target_aliases.csv",
+  "expected_leakage_target_aliases_sha256": "98579996902d7a71d872dbdfb04f10b8b66bd02ad30c08bfc886779fc7bd1dfb",
+  "length_regime": {
+    "source": "frozen_s6_two_component_gmm",
+    "s6_bimodality_json": "data/interim/deduplicated/s6_profile/bimodality.json",
+    "assignment_method": "gmm_k2_maximum_posterior",
+    "grain": "distinct_sequence_core",
+    "refit": false
+  },
+  "expected_s6_gmm2": {
+    "means": [
+      38.887311544692416,
+      77.35623497594804
+    ],
+    "variances": [
+      63.42923673279216,
+      168.91459023894495
+    ],
+    "weights": [
+      0.5805142816481399,
+      0.41948571835186194
+    ]
+  },
+  "frozen_inputs": {
+    "s5_pre_cap_corpus": {
+      "path": "data/interim/deduplicated/corpus_clustered_final.csv",
+      "sha256": "615677d51aa81337a3660b8c67e9db9fae2a5c8abc7128e7668617a342689d30"
+    },
+    "s7a_post_cap": {
+      "path": "data/interim/s7a_target_cap/corpus_post_cap.csv",
+      "sha256": "6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd"
+    },
+    "s7a_removed_clusters": {
+      "path": "data/interim/s7a_target_cap/s7a_removed_clusters.csv",
+      "sha256": "46defa4e1b460a4b9fec91106f2cf2c432146348a23888399c3fae6c0072c40b"
+    },
+    "s7b_partitioned": {
+      "path": "data/interim/s7b_partition/corpus_partitioned.csv",
+      "sha256": "755e6afaf6a522be390073d3651311f8afc0ca9486322ac3bbfe348cd2a3fb1a"
+    },
+    "s7b_ft": {
+      "path": "data/interim/s7b_partition/ft.csv",
+      "sha256": "b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff"
+    },
+    "s7b_ref": {
+      "path": "data/interim/s7b_partition/ref.csv",
+      "sha256": "6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d",
+      "identity_set_hash": "54a74c8bb8ef67f36dd4b054d6ed43f201bd38d41d75244d9b69eb1583951abc",
+      "cluster_set_hash": "84afc5a5bb030db9cbdddb7246ceaab3457ef8eb02f1192575433d5f77f6cd82"
+    },
+    "s7b_eval": {
+      "path": "data/interim/s7b_partition/eval.csv",
+      "sha256": "88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d",
+      "identity_set_hash": "47ef50345fae50f14e99547426dbf3a3c34ed0caf49574005fb3f1da94315406",
+      "cluster_set_hash": "c923af78ef7b191b569c5ead859982eb7711460a6537d0a70612a1101ffa8138"
+    },
+    "s7c_train": {
+      "path": "data/interim/s7c_ft_split/ft_train.csv",
+      "sha256": "941fe8783ee8c99a2ce7598dea00ed123e62750026b7f157f28e7bbcc5d14a8f",
+      "identity_set_hash": "75e5cb8471d2fb3ee30529617aaf80ff584d5bf79e9976dc338434057a6aac6a",
+      "cluster_set_hash": "18c6df63ac4935557bad9c5fcc12610dd280b207652208faf04f0ba39d9c3349"
+    },
+    "s7c_validation": {
+      "path": "data/interim/s7c_ft_split/ft_validation.csv",
+      "sha256": "03be477e12f7b9ca20f8911e2ac88fde2949af2b6131c2d2aa43eef2ae6d9abc",
+      "identity_set_hash": "19121149b9e0e02dd9cda5eb5619c64df86940331603139b702d436e6bde67ac",
+      "cluster_set_hash": "088d6b4db826be5c970b410e74cfa2d52fc402fa4818c692f8be30e42f79c4f9"
+    },
+    "s7c_assignment": {
+      "path": "data/interim/s7c_ft_split/ft_split_assignment.csv",
+      "sha256": "22f3ef6236e8f59303670497772707e71625f2f444785fda4e7f9f9daa28eb04"
+    },
+    "s4_reviewed_relationships": {
+      "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
+      "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502"
+    },
+    "s4_reviewed_dictionary": {
+      "path": "data/interim/global_s4/global_s4_reviewed_target_dictionary.csv",
+      "sha256": "e7234d9a9308dd899cbb3f801ff20ba05b2960071ede98812c6109db0f21b5ec"
+    },
+    "s4_record_map": {
+      "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
+      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b"
+    },
+    "s4_parked_audit": {
+      "path": "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
+      "sha256": "98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7"
+    },
+    "s4_routing_summary": {
+      "path": "data/interim/global_s4/global_s4_routing_summary.csv",
+      "sha256": "46bc0c91a121f1737f3816ec4b16fef4630b388310c9599171cf054b17e74635"
+    },
+    "s4_combined_input": {
+      "path": "data/interim/global_s4/combined_global_s4_input.csv",
+      "sha256": "24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0"
+    }
+  },
+  "expected_counts": {
+    "n_scientific_identities": 1173,
+    "n_distinct_sequence_core": 1036,
+    "n_final_clusters": 794,
+    "n_canonical_targets": 411,
+    "n_ft": 895,
+    "n_ref": 114,
+    "n_eval": 164,
+    "n_train": 746,
+    "n_validation": 149,
+    "n_train_cores": 678,
+    "n_validation_cores": 117,
+    "n_ref_cores": 103,
+    "n_eval_cores": 138,
+    "n_train_clusters": 571,
+    "n_validation_clusters": 64,
+    "n_ref_clusters": 80,
+    "n_eval_clusters": 79,
+    "n_train_targets": 333,
+    "n_validation_targets": 102,
+    "max_target_count": 34,
+    "max_target_name": "HIV-1 Rev protein",
+    "ngf_count": 23,
+    "e5_in_primary": 0,
+    "non_protein_in_primary": 0
+  },
+  "expected_evidence": {
+    "corpus": {
+      "E2": 803,
+      "E3": 247,
+      "E4": 123,
+      "E5": 0
+    },
+    "TRAIN": {
+      "E2": 513,
+      "E3": 156,
+      "E4": 77
+    },
+    "VALIDATION": {
+      "E2": 102,
+      "E3": 31,
+      "E4": 16
+    },
+    "REF": {
+      "E2": 77,
+      "E3": 25,
+      "E4": 12
+    },
+    "EVAL": {
+      "E2": 111,
+      "E3": 35,
+      "E4": 18
+    }
+  },
+  "expected_length_regime_cores": {
+    "corpus": {
+      "short": 595,
+      "long": 441
+    },
+    "TRAIN": {
+      "short": 382,
+      "long": 296
+    },
+    "VALIDATION": {
+      "short": 66,
+      "long": 51
+    },
+    "REF": {
+      "short": 64,
+      "long": 39
+    },
+    "EVAL": {
+      "short": 83,
+      "long": 55
+    }
+  },
+  "expected_source_identities": {
+    "corpus": {
+      "aptabase": 102,
+      "aptadb": 70,
+      "aptaindex": 62,
+      "aptamerbase": 491,
+      "ena": 127,
+      "riboaptamer": 217,
+      "utexas": 104
+    },
+    "TRAIN": {
+      "aptabase": 75,
+      "aptadb": 45,
+      "aptaindex": 43,
+      "aptamerbase": 307,
+      "ena": 78,
+      "riboaptamer": 140,
+      "utexas": 58
+    },
+    "VALIDATION": {
+      "aptabase": 15,
+      "aptadb": 9,
+      "aptaindex": 8,
+      "aptamerbase": 61,
+      "ena": 16,
+      "riboaptamer": 28,
+      "utexas": 12
+    },
+    "REF": {
+      "aptabase": 3,
+      "aptadb": 6,
+      "aptaindex": 3,
+      "aptamerbase": 56,
+      "ena": 15,
+      "riboaptamer": 19,
+      "utexas": 12
+    },
+    "EVAL": {
+      "aptabase": 9,
+      "aptadb": 10,
+      "aptaindex": 8,
+      "aptamerbase": 67,
+      "ena": 18,
+      "riboaptamer": 30,
+      "utexas": 22
+    }
+  },
+  "parked_ssdna_sources": [
+    {
+      "source": "aptadb",
+      "path": "data/interim/checkpoints/aptadb_cp1/resolved/aptadb_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "990d4438b33cab9a8237a62829151d40d2db5a1e2ba412b48b5c857f77d00d1a",
+      "canonical_path": "data/interim/checkpoints/aptadb_cp1/resolved/aptadb_checkpoint1_applied_canonical.csv",
+      "molecule_type_filter": null
+    },
+    {
+      "source": "aptadiff_a",
+      "path": "data/interim/checkpoints/aptadiff_a_cp1/resolved/aptadiff_a_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "9eee65367fe0a1d668a21d9daaea11a4ee66cec218587ab766145636fdfb5686",
+      "canonical_path": "data/interim/checkpoints/aptadiff_a_cp1/resolved/aptadiff_a_checkpoint1_applied_canonical.csv",
+      "molecule_type_filter": null
+    },
+    {
+      "source": "aptadiff_b",
+      "path": "data/interim/checkpoints/aptadiff_b_cp1/resolved/aptadiff_b_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "35edfd917c3c417764e945805c85d95ef2244ebd8e190a2997882474503b0a6a",
+      "canonical_path": "data/interim/checkpoints/aptadiff_b_cp1/resolved/aptadiff_b_checkpoint1_applied_canonical.csv",
+      "molecule_type_filter": null
+    },
+    {
+      "source": "aptaindex",
+      "path": "data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "9dbbff2be18c6a8f4102dcadb7273432e918b325f9daa36304b8539ae2e88c6c",
+      "canonical_path": "data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_canonical.csv",
+      "molecule_type_filter": null
+    },
+    {
+      "source": "aptamerbase",
+      "path": "data/interim/checkpoints/aptamerbase_cp1/resolved/aptamerbase_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "c2691630400910d8bee0187a9988ca1d0ed5c16f09e0935e16a8398b5de08b00",
+      "canonical_path": "data/interim/checkpoints/aptamerbase_cp1/resolved/aptamerbase_checkpoint1_applied_canonical.csv",
+      "molecule_type_filter": null
+    },
+    {
+      "source": "riboaptamer",
+      "path": "data/interim/checkpoints/riboaptamer_cp1/resolved/riboaptamer_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "fd7683e8063d6b951f0f42106e1df0924077dc1b590744230246ffd740b9594e",
+      "canonical_path": "data/interim/checkpoints/riboaptamer_cp1/resolved/riboaptamer_checkpoint1_applied_canonical.csv",
+      "molecule_type_filter": null
+    },
+    {
+      "source": "utexas",
+      "path": "data/interim/checkpoints/utexas_cp1/utexas_s3_parks.csv",
+      "sha256": "1e6b2463c6ef2874ff2b791de320fdb06cf8925ef4b6eb32e474db41f1e1bc10",
+      "canonical_path": "data/interim/checkpoints/utexas_cp1/utexas_s3_canonical.csv",
+      "molecule_type_filter": [
+        "ssDNA"
+      ]
+    }
+  ],
+  "parked_ssdna_notes": {
+    "aptabase": "CHECKPOINT-1 ssDNA-like S3 parks were rejected_after_checkpoint1, not parked. No authoritative parked_ssdna artefact.",
+    "ena": "CHECKPOINT-1 parks are construct parks, not ssDNA. Not included.",
+    "ncbi_nuc": "CHECKPOINT-1 parks are molecule-unresolved, not ssDNA. Not included."
+  },
+  "parked_non_protein_sources": [
+    {
+      "source": "global_s4",
+      "lane": "global_s4_park_non_protein",
+      "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
+      "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502",
+      "filter_field": "s4_route",
+      "filter_value": "park_non_protein"
+    },
+    {
+      "source": "aptadb",
+      "lane": "checkpoint1_s3_parked_non_protein",
+      "path": "data/interim/checkpoints/aptadb_cp1/resolved/aptadb_checkpoint1_applied_parked_non_protein.csv",
+      "sha256": "f0b5580d4de25ca0d22ec0e923176d0e6156edf5489cb24e35a29a1eba060416",
+      "filter_field": null,
+      "filter_value": null
+    }
+  ],
+  "parked_e5_source": {
+    "lane": "global_s4_park_evidence_e5",
+    "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
+    "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502",
+    "filter_field": "s4_route",
+    "filter_value": "park_evidence_e5"
+  },
+  "parked_inventory_output": "data/processed/parked_inventory.csv",
+  "parked_inventory_lanes": [
+    {
+      "source": "aptadb",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_ssdna",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptadb_cp1/resolved/aptadb_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "990d4438b33cab9a8237a62829151d40d2db5a1e2ba412b48b5c857f77d00d1a",
+      "expected_row_count": 1037,
+      "sequence_bearing": true,
+      "consolidated_output": "parked_ssdna.csv",
+      "final_disposition": "consolidated_parked_ssdna"
+    },
+    {
+      "source": "aptadb",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_non_protein",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptadb_cp1/resolved/aptadb_checkpoint1_applied_parked_non_protein.csv",
+      "sha256": "f0b5580d4de25ca0d22ec0e923176d0e6156edf5489cb24e35a29a1eba060416",
+      "expected_row_count": 115,
+      "sequence_bearing": true,
+      "consolidated_output": "parked_non_protein_targets.csv",
+      "final_disposition": "consolidated_parked_non_protein"
+    },
+    {
+      "source": "aptadiff_a",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_ssdna",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptadiff_a_cp1/resolved/aptadiff_a_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "9eee65367fe0a1d668a21d9daaea11a4ee66cec218587ab766145636fdfb5686",
+      "expected_row_count": 13802,
+      "sequence_bearing": true,
+      "consolidated_output": "parked_ssdna.csv",
+      "final_disposition": "consolidated_parked_ssdna"
+    },
+    {
+      "source": "aptadiff_b",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_ssdna",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptadiff_b_cp1/resolved/aptadiff_b_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "35edfd917c3c417764e945805c85d95ef2244ebd8e190a2997882474503b0a6a",
+      "expected_row_count": 11532,
+      "sequence_bearing": true,
+      "consolidated_output": "parked_ssdna.csv",
+      "final_disposition": "consolidated_parked_ssdna"
+    },
+    {
+      "source": "aptaindex",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_ssdna",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "9dbbff2be18c6a8f4102dcadb7273432e918b325f9daa36304b8539ae2e88c6c",
+      "expected_row_count": 614,
+      "sequence_bearing": true,
+      "consolidated_output": "parked_ssdna.csv",
+      "final_disposition": "consolidated_parked_ssdna"
+    },
+    {
+      "source": "aptaindex",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_chemistry_review",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_parked_chemistry.csv",
+      "sha256": "4c1a76bd0b42f02f84984aa62f0ee50b69bf3f879b9fd671ad1c0aacf95ed578",
+      "expected_row_count": 33,
+      "sequence_bearing": true,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "Unresolved chemistry/molecule/construct park; not ssDNA, non-protein, or E5. Retained in the frozen CHECKPOINT-1 applied artefact."
+    },
+    {
+      "source": "aptamerbase",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_ssdna",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptamerbase_cp1/resolved/aptamerbase_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "c2691630400910d8bee0187a9988ca1d0ed5c16f09e0935e16a8398b5de08b00",
+      "expected_row_count": 845,
+      "sequence_bearing": true,
+      "consolidated_output": "parked_ssdna.csv",
+      "final_disposition": "consolidated_parked_ssdna"
+    },
+    {
+      "source": "aptamerbase",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_chemistry_review",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptamerbase_cp1/resolved/aptamerbase_checkpoint1_applied_parked_chemistry.csv",
+      "sha256": "ef05ce95369bb4d86689a3ebae755c6fa92d4113dad0157291a862ef8623e5c6",
+      "expected_row_count": 7,
+      "sequence_bearing": true,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "Unresolved chemistry/molecule/construct park; not ssDNA, non-protein, or E5. Retained in the frozen CHECKPOINT-1 applied artefact."
+    },
+    {
+      "source": "aptamerbase",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_molecule_unresolved",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptamerbase_cp1/resolved/aptamerbase_checkpoint1_applied_parked_molecule.csv",
+      "sha256": "12e4c2bff96ba2875a558036ca24fabbbf59d549b9a7b385cb3b3f454ffc1c2f",
+      "expected_row_count": 0,
+      "sequence_bearing": true,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "CHECKPOINT-1 applied molecule-unresolved route; S3 parks were resolved at review and zero remain parked."
+    },
+    {
+      "source": "aptamerbase",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_construct_review",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptamerbase_cp1/resolved/aptamerbase_checkpoint1_applied_parked_construct.csv",
+      "sha256": "12e4c2bff96ba2875a558036ca24fabbbf59d549b9a7b385cb3b3f454ffc1c2f",
+      "expected_row_count": 0,
+      "sequence_bearing": true,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "CHECKPOINT-1 applied construct-review route; S3 parks were resolved at review and zero remain parked."
+    },
+    {
+      "source": "ena",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_construct_review",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/ena_cp1/resolved/ena_checkpoint1_applied_parked_construct.csv",
+      "sha256": "a51eb535939fa48d92e15ae5892f18228c96e57cfb1ebcb7c794dda801865301",
+      "expected_row_count": 0,
+      "sequence_bearing": true,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "ENA CHECKPOINT-1 parks are construct parks, not ssDNA. Applied artefact has zero remaining parked records after review."
+    },
+    {
+      "source": "ncbi_nuc",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_molecule_unresolved",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/ncbi_nuc_cp1/resolved/ncbi_nuc_checkpoint1_applied_parked.csv",
+      "sha256": "5b29b2b29adcd5a856efef20928661d6ddef26ccfd79006ee44c53b9fff4a9fc",
+      "expected_row_count": 9,
+      "sequence_bearing": true,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "Unresolved chemistry/molecule/construct park; not ssDNA, non-protein, or E5. Retained in the frozen CHECKPOINT-1 applied artefact."
+    },
+    {
+      "source": "riboaptamer",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_ssdna",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/riboaptamer_cp1/resolved/riboaptamer_checkpoint1_applied_parked_ssdna.csv",
+      "sha256": "fd7683e8063d6b951f0f42106e1df0924077dc1b590744230246ffd740b9594e",
+      "expected_row_count": 0,
+      "sequence_bearing": true,
+      "consolidated_output": "parked_ssdna.csv",
+      "final_disposition": "consolidated_parked_ssdna"
+    },
+    {
+      "source": "utexas",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_ssdna",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/utexas_cp1/utexas_s3_parks.csv",
+      "sha256": "1e6b2463c6ef2874ff2b791de320fdb06cf8925ef4b6eb32e474db41f1e1bc10",
+      "filters": [
+        {
+          "field": "molecule_type",
+          "value": "ssDNA"
+        }
+      ],
+      "expected_row_count": 896,
+      "sequence_bearing": true,
+      "consolidated_output": "parked_ssdna.csv",
+      "final_disposition": "consolidated_parked_ssdna"
+    },
+    {
+      "source": "utexas",
+      "stage": "CHECKPOINT-1",
+      "route": "non_rna_molecule",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/utexas_cp1/utexas_s3_parks.csv",
+      "sha256": "1e6b2463c6ef2874ff2b791de320fdb06cf8925ef4b6eb32e474db41f1e1bc10",
+      "filters": [
+        {
+          "field": "molecule_type",
+          "value": "DNA"
+        }
+      ],
+      "expected_row_count": 13,
+      "sequence_bearing": true,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "UTexas DNA parks are non-RNA molecule parks, not the ssDNA reusable class. Retained in the frozen S3 parks artefact."
+    },
+    {
+      "source": "utexas",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_molecule_unresolved",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/utexas_cp1/utexas_s3_parks.csv",
+      "sha256": "1e6b2463c6ef2874ff2b791de320fdb06cf8925ef4b6eb32e474db41f1e1bc10",
+      "filters": [
+        {
+          "field": "molecule_type",
+          "value": "unknown"
+        }
+      ],
+      "expected_row_count": 3,
+      "sequence_bearing": true,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "Unresolved chemistry/molecule/construct park; not ssDNA, non-protein, or E5. Retained in the frozen CHECKPOINT-1 applied artefact."
+    },
+    {
+      "source": "utexas",
+      "stage": "CHECKPOINT-1",
+      "route": "complex_construct_unresolved",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/utexas_cp1/resolved/utexas_checkpoint1_resolution.csv",
+      "sha256": "d2b45a8be46b0a582a896f7994fc31d7a60e4ab80b56dc937467a556a2cd1c86",
+      "filters": [
+        {
+          "field": "resolved_decision",
+          "value": "park"
+        },
+        {
+          "field": "resolved_reason",
+          "value": "complex_construct_unresolved"
+        }
+      ],
+      "expected_row_count": 4,
+      "sequence_bearing": false,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "Unresolved chemistry/molecule/construct park; not ssDNA, non-protein, or E5. Retained in the frozen CHECKPOINT-1 applied artefact."
+    },
+    {
+      "source": "aptabase",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_molecule_unresolved",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_resolution.csv",
+      "sha256": "7ed7a6f877f664f08900080bd0277f47e22d02acb97fcb942361fae1d77189c3",
+      "filters": [
+        {
+          "field": "resolved_decision",
+          "value": "park"
+        },
+        {
+          "field": "primary_reason",
+          "value": "molecule_type_unresolved"
+        }
+      ],
+      "expected_row_count": 67,
+      "sequence_bearing": false,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "Unresolved chemistry/molecule/construct park; not ssDNA, non-protein, or E5. Retained in the frozen CHECKPOINT-1 applied artefact."
+    },
+    {
+      "source": "aptabase",
+      "stage": "CHECKPOINT-1",
+      "route": "parked_ambiguous_sequence",
+      "grain": "source_record",
+      "path": "data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_resolution.csv",
+      "sha256": "7ed7a6f877f664f08900080bd0277f47e22d02acb97fcb942361fae1d77189c3",
+      "filters": [
+        {
+          "field": "resolved_decision",
+          "value": "park"
+        },
+        {
+          "field": "primary_reason",
+          "value": "ambiguous_sequence_requires_review"
+        }
+      ],
+      "expected_row_count": 1,
+      "sequence_bearing": false,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "Unresolved chemistry/molecule/construct park; not ssDNA, non-protein, or E5. Retained in the frozen CHECKPOINT-1 applied artefact."
+    },
+    {
+      "source": "global_s4",
+      "stage": "S4",
+      "route": "park_non_protein",
+      "grain": "reviewed_relationship",
+      "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
+      "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502",
+      "filters": [
+        {
+          "field": "s4_route",
+          "value": "park_non_protein"
+        }
+      ],
+      "expected_row_count": 578,
+      "sequence_bearing": true,
+      "consolidated_output": "parked_non_protein_targets.csv",
+      "final_disposition": "consolidated_parked_non_protein"
+    },
+    {
+      "source": "global_s4",
+      "stage": "S4",
+      "route": "park_non_protein",
+      "grain": "source_record",
+      "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
+      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b",
+      "filters": [
+        {
+          "field": "s4_record_route",
+          "value": "park_non_protein"
+        }
+      ],
+      "expected_row_count": 541,
+      "sequence_bearing": false,
+      "consolidated_output": "parked_non_protein_targets.csv",
+      "final_disposition": "consolidated_parked_non_protein"
+    },
+    {
+      "source": "global_s4",
+      "stage": "S4",
+      "route": "park_evidence_e5",
+      "grain": "reviewed_relationship",
+      "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
+      "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502",
+      "filters": [
+        {
+          "field": "s4_route",
+          "value": "park_evidence_e5"
+        }
+      ],
+      "expected_row_count": 521,
+      "sequence_bearing": true,
+      "consolidated_output": "parked_evidence_e5.csv",
+      "final_disposition": "consolidated_parked_e5"
+    },
+    {
+      "source": "global_s4",
+      "stage": "S4",
+      "route": "park_evidence_e5",
+      "grain": "source_record",
+      "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
+      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b",
+      "filters": [
+        {
+          "field": "s4_record_route",
+          "value": "park_evidence_e5"
+        }
+      ],
+      "expected_row_count": 521,
+      "sequence_bearing": false,
+      "consolidated_output": "parked_evidence_e5.csv",
+      "final_disposition": "consolidated_parked_e5"
+    },
+    {
+      "source": "global_s4",
+      "stage": "S4",
+      "route": "hold_target_unresolved",
+      "grain": "reviewed_relationship",
+      "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
+      "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502",
+      "filters": [
+        {
+          "field": "s4_route",
+          "value": "hold_target_unresolved"
+        }
+      ],
+      "expected_row_count": 389,
+      "sequence_bearing": true,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "S4 unresolved/hold/scientific-park route; not ssDNA, non-protein, or E5. Retained in the frozen global-S4 artefact. Not coerced into a consolidated parked CSV."
+    },
+    {
+      "source": "global_s4",
+      "stage": "S4",
+      "route": "hold_target_unresolved",
+      "grain": "source_record",
+      "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
+      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b",
+      "filters": [
+        {
+          "field": "s4_record_route_reason",
+          "value": "target_type_unknown"
+        }
+      ],
+      "expected_row_count": 389,
+      "sequence_bearing": false,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "S4 unresolved/hold/scientific-park route; not ssDNA, non-protein, or E5. Retained in the frozen global-S4 artefact. Not coerced into a consolidated parked CSV."
+    },
+    {
+      "source": "global_s4",
+      "stage": "S4",
+      "route": "unresolved_no_relationship",
+      "grain": "source_record",
+      "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
+      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b",
+      "filters": [
+        {
+          "field": "s4_record_route_reason",
+          "value": "relationship_status=unresolved"
+        }
+      ],
+      "expected_row_count": 57,
+      "sequence_bearing": false,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "S4 unresolved/hold/scientific-park route; not ssDNA, non-protein, or E5. Retained in the frozen global-S4 artefact. Not coerced into a consolidated parked CSV."
+    },
+    {
+      "source": "global_s4",
+      "stage": "S4",
+      "route": "relationship_parked",
+      "grain": "source_record",
+      "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
+      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b",
+      "filters": [
+        {
+          "field": "s4_record_route_reason",
+          "value": "relationship_park_unresolved"
+        }
+      ],
+      "expected_row_count": 9,
+      "sequence_bearing": false,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "S4 unresolved/hold/scientific-park route; not ssDNA, non-protein, or E5. Retained in the frozen global-S4 artefact. Not coerced into a consolidated parked CSV."
+    },
+    {
+      "source": "global_s4",
+      "stage": "S4",
+      "route": "relationship_parked",
+      "grain": "relationship",
+      "path": "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
+      "sha256": "98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7",
+      "filters": [
+        {
+          "field": "audit_class",
+          "value": "relationship_parked"
+        }
+      ],
+      "expected_row_count": 19,
+      "sequence_bearing": false,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "S4 unresolved/hold/scientific-park route; not ssDNA, non-protein, or E5. Retained in the frozen global-S4 artefact. Not coerced into a consolidated parked CSV."
+    },
+    {
+      "source": "global_s4",
+      "stage": "S4",
+      "route": "target_parked",
+      "grain": "source_record",
+      "path": "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
+      "sha256": "98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7",
+      "filters": [
+        {
+          "field": "audit_class",
+          "value": "target_parked"
+        }
+      ],
+      "expected_row_count": 12,
+      "sequence_bearing": false,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "S4 unresolved/hold/scientific-park route; not ssDNA, non-protein, or E5. Retained in the frozen global-S4 artefact. Not coerced into a consolidated parked CSV."
+    },
+    {
+      "source": "global_s4",
+      "stage": "S4",
+      "route": "target_parked",
+      "grain": "scientific_identity",
+      "path": "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
+      "sha256": "98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7",
+      "filters": [
+        {
+          "field": "audit_class",
+          "value": "target_parked"
+        }
+      ],
+      "distinct_field": "target_dictionary_id",
+      "expected_row_count": 5,
+      "sequence_bearing": false,
+      "consolidated_output": "",
+      "final_disposition": "retained_in_source_level_park",
+      "not_consolidated_reason": "CHECKPOINT-2 park_unresolved target identities. Different grain from the 12 source-record target_parked audit rows. Not ssDNA, non-protein, or E5."
+    }
+  ],
+  "evaluation_references": {
+    "path": "data/interim/evaluation/evaluation_reference_manifest.csv",
+    "sha256": "b6ba6b2cde4a18c04130ecdc457626c5e60b8b90d3ad5b9bae6cb1bfd1f77dad",
+    "resolution_note": "docs/data_curation/carbapenemase_evaluation_reference_resolution.md"
+  },
+  "replication_dataset_a": {
+    "enabled": true,
+    "source": "aptadiff_a",
+    "parked_path": "data/interim/checkpoints/aptadiff_a_cp1/resolved/aptadiff_a_checkpoint1_applied_parked_ssdna.csv",
+    "canonical_path": "data/interim/checkpoints/aptadiff_a_cp1/resolved/aptadiff_a_checkpoint1_applied_canonical.csv",
+    "schema_note": "CHECKPOINT-1 applied canonical / parked-ssDNA schema. Dataset A never entered S4/S5/S7, so this file cannot use the primary scientific-identity schema without reopening earlier decisions.",
+    "role": "replication_comparability_only",
+    "part_of_primary_rna_corpus": false,
+    "contributes_to_corpus_final_txt": false,
+    "entered_s4_s5_primary_scientific_identities": false
+  },
+  "rejection_sources": [
+    {
+      "source": "aptadb",
+      "stage": "CHECKPOINT-1",
+      "path": "data/interim/checkpoints/aptadb_cp1/resolved/aptadb_checkpoint1_applied_rejection.csv"
+    },
+    {
+      "source": "aptadiff_a",
+      "stage": "CHECKPOINT-1",
+      "path": "data/interim/checkpoints/aptadiff_a_cp1/resolved/aptadiff_a_checkpoint1_applied_rejection.csv"
+    },
+    {
+      "source": "aptadiff_b",
+      "stage": "CHECKPOINT-1",
+      "path": "data/interim/checkpoints/aptadiff_b_cp1/resolved/aptadiff_b_checkpoint1_applied_rejection.csv"
+    },
+    {
+      "source": "aptaindex",
+      "stage": "CHECKPOINT-1",
+      "path": "data/interim/checkpoints/aptaindex_cp1/resolved/aptaindex_checkpoint1_applied_rejection.csv"
+    },
+    {
+      "source": "aptamerbase",
+      "stage": "CHECKPOINT-1",
+      "path": "data/interim/checkpoints/aptamerbase_cp1/resolved/aptamerbase_checkpoint1_applied_rejection.csv"
+    },
+    {
+      "source": "ena",
+      "stage": "CHECKPOINT-1",
+      "path": "data/interim/checkpoints/ena_cp1/resolved/ena_checkpoint1_applied_rejection.csv"
+    },
+    {
+      "source": "ncbi_nuc",
+      "stage": "CHECKPOINT-1",
+      "path": "data/interim/checkpoints/ncbi_nuc_cp1/resolved/ncbi_nuc_checkpoint1_applied_rejection.csv"
+    },
+    {
+      "source": "riboaptamer",
+      "stage": "CHECKPOINT-1",
+      "path": "data/interim/checkpoints/riboaptamer_cp1/resolved/riboaptamer_checkpoint1_applied_rejection.csv"
+    },
+    {
+      "source": "aptabase",
+      "stage": "CHECKPOINT-1",
+      "path": "data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_rejected_ids.csv",
+      "sha256": "03934f043121ca697412ded974ca13fcbb7b35502e1f8de0be1676cfb858d02f",
+      "resolution_path": "data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_resolution.csv"
+    },
+    {
+      "source": "utexas",
+      "stage": "CHECKPOINT-1",
+      "path": "data/interim/checkpoints/utexas_cp1/resolved/utexas_checkpoint1_rejected_ids.csv"
+    }
+  ],
+  "s4_rejection_routes": [
+    "reject_no_binding_evidence",
+    "hold_target_unresolved",
+    "unresolved_no_relationship"
+  ],
+  "checkpoint_metadata_for_funnel": [
+    "config/checkpoint_reviews/aptabase_checkpoint1_metadata.json",
+    "config/checkpoint_reviews/aptadb_checkpoint1_metadata.json",
+    "config/checkpoint_reviews/aptadiff_a_checkpoint1_metadata.json",
+    "config/checkpoint_reviews/aptadiff_b_checkpoint1_metadata.json",
+    "config/checkpoint_reviews/aptaindex_checkpoint1_metadata.json",
+    "config/checkpoint_reviews/aptamerbase_checkpoint1_metadata.json",
+    "config/checkpoint_reviews/ena_checkpoint1_metadata.json",
+    "config/checkpoint_reviews/ncbi_nuc_checkpoint1_metadata.json",
+    "config/checkpoint_reviews/riboaptamer_checkpoint1_metadata.json",
+    "config/checkpoint_reviews/utexas_checkpoint1_metadata.json"
+  ],
+  "does_not": [
+    "choose_which_primary_identity_survives",
+    "change_3pct_cap",
+    "change_cluster_membership",
+    "reassign_ft_ref_eval",
+    "reassign_train_validation",
+    "promote_e5",
+    "promote_non_protein",
+    "start_fine_tuning",
+    "calculate_aptarank_reference_distributions",
+    "evaluate_models_on_eval",
+    "commit_or_push"
+  ],
+  "sequence_safety_scan_paths": [
+    "scripts/data_preparation/s7_finalise.py",
+    "scripts/data_preparation/adapters/s7_final_build.py",
+    "config/global_s7d_final_build.json",
+    "tests/data_preparation/test_s7_final_build.py",
+    "docs/data_curation/global_s7d_final_build.md",
+    "docs/data_curation/global_s7a_target_cap.md",
+    "docs/data_curation/global_s7b_partition.md",
+    "docs/data_curation/global_s7c_ft_train_validation.md",
+    "docs/data_curation/rna_aptamer_corpus_curation_plan.md",
+    "docs/log.md"
+  ],
+  "pre_publication_history_audit_required": true
+}
