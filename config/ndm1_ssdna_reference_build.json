@@ -1,0 +1,135 @@
+{
+  "contract_id": "ndm1_ssdna_published_reference_verification",
+  "milestone": "NDM1_ssDNA_primary_source_verification",
+  "build_date": "2026-09-22",
+  "repository_head_baseline": "095236dfb13d1d3b13f11bbb34c2e48319c10184",
+  "scope": "target_specific_ndm1_ssdna_published_reference_verification",
+  "not_a_corpus_curation_stage": true,
+  "identity_threshold": 0.9,
+  "normalisation": "uppercase_whitespace_display_grouping_only",
+  "comparison_representation_note": "Leakage diagnostics reuse comparison_form U-to-T collapse. That representation is never written into the ssDNA sequence field.",
+  "output_dir": "data/processed",
+  "transcription_path": "data/interim/evaluation/ndm1_ssdna_primary_source_transcriptions.csv",
+  "manual_primary_source_evidence_path": "data/interim/evaluation/ndm1_ssdna_manual_primary_source_evidence.csv",
+  "expected_manual_primary_source_evidence_sha256": "b818bc929e74a4367fd68556be373c5d70b7740644481513787b6055c0e3121b",
+  "additions_overrides_path": "data/raw/evaluation_references/carbapenemase_reference_additions_and_overrides.csv",
+  "evaluation_references_path": "data/processed/evaluation_references.csv",
+  "frozen_partitions": {
+    "TRAIN": "data/processed/ft_train.csv",
+    "VALIDATION": "data/processed/ft_validation.csv",
+    "REF": "data/processed/ref.csv",
+    "EVAL": "data/processed/eval.csv"
+  },
+  "frozen_corpus": {
+    "corpus_final.csv": "data/processed/corpus_final.csv",
+    "corpus_final.txt": "data/processed/corpus_final.txt"
+  },
+  "expected_frozen_sha256": {
+    "corpus_final.csv": "755e6afaf6a522be390073d3651311f8afc0ca9486322ac3bbfe348cd2a3fb1a",
+    "corpus_final.txt": "6f8c2091706cc28526ae53a1021395cad1b7943745ddffbaea631edc01df3340",
+    "ft_train.csv": "941fe8783ee8c99a2ce7598dea00ed123e62750026b7f157f28e7bbcc5d14a8f",
+    "ft_validation.csv": "03be477e12f7b9ca20f8911e2ac88fde2949af2b6131c2d2aa43eef2ae6d9abc",
+    "ref.csv": "6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d",
+    "eval.csv": "88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d",
+    "evaluation_references.csv": "b6ba6b2cde4a18c04130ecdc457626c5e60b8b90d3ad5b9bae6cb1bfd1f77dad"
+  },
+  "raw_sources": {
+    "sabrowski_2022_main_article.pdf": {
+      "path": "data/raw/evaluation_references/sabrowski_2022_main_article.pdf",
+      "sha256": "67e5a21a67bbd349eb2e288be1d30c9695746012cacbb9bf4a1adfd5f216538c"
+    },
+    "sabrowski_2022_supplementary.pdf": {
+      "path": "data/raw/evaluation_references/source_documents/sabrowski_2022_supplementary.pdf",
+      "sha256": "7affa350e3d4181cd783e62934850872cacad7825ff2b43089726bee919795c6"
+    },
+    "CN108949766B_patent.pdf": {
+      "path": "data/raw/evaluation_references/CN108949766B_patent.pdf",
+      "sha256": "7d95b21410f3e20fc528cb62b4f0ee21c60a1dc5119b99176aac5e5410c11a20"
+    },
+    "CN102965377B_patent.pdf": {
+      "path": "data/raw/evaluation_references/CN102965377B_patent.pdf",
+      "sha256": "c0f70934ab7162bb92ec40e396b5543fc2a126fa0b81dba4e0434517107dd63f"
+    },
+    "carbapenemase_reference_additions_and_overrides.csv": {
+      "path": "data/raw/evaluation_references/carbapenemase_reference_additions_and_overrides.csv",
+      "sha256": "1796f3180257e65d9a9af1ee4ade7fd31d230a9e2fe9c13be005648efed95423"
+    },
+    "README_carbapenemase_evaluation_references.md": {
+      "path": "data/raw/evaluation_references/README_carbapenemase_evaluation_references.md",
+      "sha256": "1aae69a0020468536c18bbc923ebe0972ad43a47f4b94ba121f55f974f0ba3a5"
+    }
+  },
+  "raw_evidence_immutable_hashes": {
+    "data/raw/evaluation_references/CN102965377B_patent.pdf": "c0f70934ab7162bb92ec40e396b5543fc2a126fa0b81dba4e0434517107dd63f",
+    "data/raw/evaluation_references/CN108949766B_patent.pdf": "7d95b21410f3e20fc528cb62b4f0ee21c60a1dc5119b99176aac5e5410c11a20",
+    "data/raw/evaluation_references/README_carbapenemase_evaluation_references.md": "1aae69a0020468536c18bbc923ebe0972ad43a47f4b94ba121f55f974f0ba3a5",
+    "data/raw/evaluation_references/carbapenemase_reference_additions_and_overrides.csv": "1796f3180257e65d9a9af1ee4ade7fd31d230a9e2fe9c13be005648efed95423",
+    "data/raw/evaluation_references/chen_2020_xk10_application.pdf": "7c037c8eefb4e22081d8f58f7d62ec909594a12f6b38f53bad8ae48af64a035f",
+    "data/raw/evaluation_references/sabrowski_2022_main_article.pdf": "67e5a21a67bbd349eb2e288be1d30c9695746012cacbb9bf4a1adfd5f216538c",
+    "data/raw/evaluation_references/shi2025_kpc2kp.pdf": "64f085042549a2250e1f48911bb9c68664682f58e851bc2e7470ad56892acba4",
+    "data/raw/evaluation_references/source_documents/sabrowski_2022_supplementary.pdf": "7affa350e3d4181cd783e62934850872cacad7825ff2b43089726bee919795c6",
+    "data/raw/evaluation_references/source_documents/shi_2025_supplementary.pdf": "c81ad016eb1f22b6c3de985fda2c457d790a4021d1e438e4c0b7c72dc4dc930d"
+  },
+  "protected_untracked_files": [
+    "Consent to Act as Corresponding Author.pdf",
+    "docs/dataset_search_curation_inventory_log_entry.md",
+    "docs/fine-tuning-implementation-plan.md"
+  ],
+  "expected_canonical_sequence_sha256": {
+    "sabrowski2022_ndm1_h14_2_43": "b28763c2a5704e8478a5ce2363345241ba5ec0312bbd34797364cbc4a72e628a",
+    "sabrowski2022_ndm1_h14_01": "74ce7f2d2373466ac3121d35cc80016f8c644c969db3809dc0a45c3da12c9afb",
+    "sabrowski2022_ndm1_h14_01_fr": "9fdeaf5f672c10e34b8517e00372710f0090f9493dfe07346ae2a6f7f8cd2fbf",
+    "cn108949766b_apnv": "f197fe1b483b344239f92b589fdcb52ec56e8e4a5f2ba6d03ac82cc3ba887045",
+    "cn102965377b_seq1": "c0aeeeaa7a3050b80b63fb031c836e549254b979ebd182005f83b375213e8e71",
+    "sabrowski2022_con1": "7255e3ccda4a04a9c775161ca8ed3e5a5d0a1d7684eaf02493c5ad2e5429a7c1",
+    "sabrowski2022_consc": "9450adf9fa452995b05d9f7384d09a087db485a5a4a8a91cb9d38b32e46baa3a"
+  },
+  "expected_sequence_lengths": {
+    "sabrowski2022_ndm1_h14_2_43": 80,
+    "sabrowski2022_ndm1_h14_01": 80,
+    "sabrowski2022_ndm1_h14_01_fr": 44,
+    "cn108949766b_apnv": 35,
+    "cn102965377b_seq1": 88,
+    "sabrowski2022_con1": 80,
+    "sabrowski2022_consc": 80
+  },
+  "expected_counts": {
+    "candidate_or_reference_records": 7,
+    "included_verified_references": 3,
+    "needs_human_review": 0,
+    "excluded_control": 4,
+    "distinct_canonical_nucleotide_sequences": 7,
+    "experimental_constructs": 14,
+    "binding_measurements": 16
+  },
+  "sabrowski_library_flanks": {
+    "fixed_5p_length": 18,
+    "fixed_3p_length": 18,
+    "variable_length": 44,
+    "full_length": 80,
+    "source_location": "Sabrowski main article, Nucleic acid preparation, PDF page 8"
+  },
+  "cn108_library_flanks": {
+    "fixed_5p_length": 19,
+    "fixed_3p_length": 22,
+    "variable_length": 35,
+    "source_location": "CN108949766B paragraph [0054], PDF page 6"
+  },
+  "cn102_library_architecture": {
+    "fixed_5p_length": 19,
+    "n_random": 45,
+    "fixed_3p_length": 22,
+    "stated_total_length": 86,
+    "sequence_listing_length": 88,
+    "source_location": "CN102965377B paragraphs [0052]-[0056], PDF page 6; sequence listing PDF page 9"
+  },
+  "cn102_human_review": {
+    "reference_role": "positive_ndm1_binder",
+    "verification_status": "verified",
+    "include_in_final_reference_set": true,
+    "sequence_discrepancy": "source_internal_library_architecture_conflict",
+    "human_review_resolution": "explicit_sequence_listing_accepted_over_generic_library_architecture",
+    "human_reviewer": "Laura",
+    "human_review_resolution_date": "2026-09-22"
+  }
+}
