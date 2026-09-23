@@ -4,7 +4,7 @@
 **Status:** Approved modelling strategy; implementation plan to be completed before any GPU training  
 **Plan revision date:** 23 September 2026  
 **Frozen corpus commit:** `095236dfb13d1d3b13f11bbb34c2e48319c10184` — `Complete S7D final corpus build and validation`  
-**Primary compute:** One NVIDIA H200 NVL GPU, GPU0 only, on host `aai`  
+**Primary compute:** One NVIDIA H200 NVL GPU on host `aai`; GPU0 is the default. GPU1 may be used only when explicitly authorised for that session/run.  
 **Primary MRes strategy:** freeze the complete released RNAGenesis sequence autoencoder and fine-tune the released generic latent-diffusion denoiser on the frozen TRAIN aptamer corpus  
 **Deferred to PhD:** parameter-efficient diffusion adaptation, partial diffusion unfreezing, Q-Former/decoder adaptation, joint latent-space realignment, target-conditioned generation, target-aware guidance, extensive hyperparameter optimisation and wet-lab feedback loops
 
@@ -1107,15 +1107,23 @@ Use H200 for:
 - D1 full training;
 - large B1/D1 generation runs.
 
-### 12.3 GPU0 only
+### 12.3 GPU selection policy
 
-The project is authorized to use GPU0 only.
+GPU0 is the default device for this project.
 
-Every GPU command must isolate the process, for example:
+GPU1 is also authorised **only when its use is explicitly stated for that session/run**. Permission to use GPU1 in one session does not change the default for later sessions.
+
+Every GPU command must explicitly isolate the selected device, for example:
 
 ```bash
+# Default
 CUDA_VISIBLE_DEVICES=0 ...
+
+# Only when GPU1 has been explicitly authorised for the current session/run
+CUDA_VISIBLE_DEVICES=1 ...
 ```
+
+The selected physical GPU must be recorded in the run manifest and log.
 
 ### 12.4 Shared-server safety
 
@@ -1123,10 +1131,11 @@ Before every GPU run:
 
 1. run `nvidia-smi`;
 2. record the output in the run log;
-3. verify that sufficient GPU0 memory is actually free;
-4. do not infer availability from low GPU utilization alone;
-5. do not kill or reconfigure another user's process;
-6. postpone the run if memory is insufficient.
+3. identify the GPU authorised for that session, defaulting to GPU0;
+4. verify that sufficient memory is actually free on the selected GPU;
+5. do not infer availability from low GPU utilization alone;
+6. do not kill or reconfigure another user's process;
+7. postpone the run if memory is insufficient.
 
 All project outputs, caches, code, environments and checkpoints must remain under directories owned by `laura`, except where university policy explicitly requires datasets to use another approved storage location.
 
@@ -1932,7 +1941,7 @@ This yields the final held-out estimate of the generator/ranking pipeline select
 | Existing B2 implementation differs from frozen protocol | Medium | code audit | correct/reuse before regeneration; record diff |
 | Modified chemistry overinterpreted | Medium | methods review | model base sequence only; preserve chemistry metadata; explicit wording |
 | AdaLayerNorm patch omitted after environment rebuild | High | startup verification | automated patch/hash check |
-| GPU0 occupied by other users | High | `nvidia-smi` before run | postpone; never kill other users' processes |
+| Default/authorised GPU occupied by other users | High | `nvidia-smi` before run | postpone or, only if explicitly authorised for that session, use GPU1; never kill other users' processes |
 | Single training seed understates uncertainty | Medium | run registry | target three final D1 seeds |
 | Extensive hyperparameter tuning consumes MRes scope | High | milestone gate | one approved strategy; bounded LR repair only |
 | Generation sample size produces misleading significance | Medium | stats review | effect sizes/seed-aware uncertainty; not raw-N p-values |
@@ -2022,7 +2031,7 @@ Proceed in this order:
 8. reconstruct/verify the B0 30,080-sequence manifest;
 9. characterize B1 `max_seq_len` versus cleaned sequence length and freeze the empirical length-matching algorithm;
 10. complete M0-M4 review;
-11. only then run M5 synthetic/training smoke tests on GPU0 when adequate memory is available.
+11. only then run M5 synthetic/training smoke tests on GPU0 by default when adequate memory is available, or on GPU1 only when GPU1 has been explicitly authorised for that session/run.
 
 ---
 
