@@ -11181,7 +11181,7 @@ Not committed. Not pushed.
 - `aptabase:123`: TRAIN, 49 nt 2F-RNA core `UGAUCAAAUCGAGCUUUAACCCAACAGAGCAUCCGUAUCUAUCCAAAUG`.
 - `aptabase:82`: VALIDATION, 47 nt RNA core `GACAGCGUGCCUAGAAGUCCAAGCUUAAAUAACCACGCUCGACAAGC`.
 
-**Implementation boundary:** Aptabase CHECKPOINT-1 seven-record overlay, global S4 refresh, then S5–S7D rerun. S7B local search kept the same objective and gained a category-count hot path so the rerun could finish; the partition rule did not change. No RNAGenesis training, generation, or evaluation was run. EVAL was not used to choose splits.
+**Implementation boundary:** Rerun stages, in order: Aptabase CHECKPOINT-1 overlay; global S4/CHECKPOINT-2; S5A exact dedup; S5B validation; S5C MMseqs clustering; S5D CD-HIT diagnostic; S5E final clustering; S6 profile; S7A target cap; S7B partition; S7C FT split; S7D final build. S7B local search kept the same objective and gained a category-count hot path so the rerun could finish; the partition rule did not change. No RNAGenesis training, generation, or evaluation was run. EVAL was not used to choose splits.
 
 **Final primary corpus:** 1170 identities, 1031 cores, 790 clusters. TRAIN 726 / 569 / 669. VALIDATION 132 / 63 / 95. REF 131 / 79 / 113. EVAL 181 / 79 / 154. `corpus_final.txt` has 669 unique TRAIN cores. Cross-role cluster leakage 0. Cross-role core leakage 0. TRAIN/VALIDATION cores match `^[ACGU]+$`.
 
@@ -11195,7 +11195,7 @@ Not committed. Not pushed.
 - `corpus_final.csv` `2797e6767f78029574df1b6cdf51bbe7952ea8affce83870441b3d3d93c98849`
 - `corpus_manifest.json` `08da8d5e44413ea9ab57c128dbe4ef7986dab7a2bfa794cfef6fb4724577565f`
 
-This commit supersedes frozen corpus commit `095236dfb13d1d3b13f11bbb34c2e48319c10184`. RNAGenesis M0 may resume only against these plan hashes. The S7D `repository_head_baseline` pin remains the pre-closure HEAD `5afc24147fdc9b40a3d563cf68430da867ea6aa1`; rerunning S7D requires a new pin. Sequence-bearing files stay under ignored `data/`.
+**Closure:** `10aac629bb0ef0337107c3d628b23e1897962af9`, subject `Complete corrective corpus revision for RNA modelling alphabet gate`. This commit supersedes frozen corpus commit `095236dfb13d1d3b13f11bbb34c2e48319c10184`. RNAGenesis M0 resumes from this corrected corpus and must not rerun S7D. Use only the hashes in this entry. The S7D `repository_head_baseline` pin remains the pre-closure HEAD `5afc24147fdc9b40a3d563cf68430da867ea6aa1`. Sequence-bearing files stay under ignored `data/`.
 
 
 
