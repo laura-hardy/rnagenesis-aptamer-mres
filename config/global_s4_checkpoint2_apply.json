@@ -1,7 +1,7 @@
 {
   "contract_id": "global_s4_checkpoint2_application",
   "milestone": "M5_apply_checkpoint2_complete_global_s4",
-  "expected_combined_records": 2960,
+  "expected_combined_records": 2957,
   "expected_reviewed_resolved_targets": 164,
   "expected_inactive_target_exclusions": 36,
   "expected_target_scientific_parks": 5,
@@ -18,7 +18,7 @@
   "expected_hashes": {
     "combined_input": [
       "data/interim/global_s4/combined_global_s4_input.csv",
-      "24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0"
+      "6609f1839cbe8ce335f04a9be4fa865b6127514d307c757c77ff71871c558fd0"
     ],
     "target_review": [
       "data/interim/global_s4/checkpoint2/checkpoint2_target_dictionary_review.csv",

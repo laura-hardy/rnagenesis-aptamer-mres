@@ -27,7 +27,9 @@ from adapters.aptabase_s2 import (  # noqa: E402
     S2_QC_COLUMNS,
     AptaBaseS2Error,
     AptaBaseS2Stats,
+    CORRECTION_CONFIG_REL,
     assert_no_legacy_cleaner_import,
+    corrections_for_records,
     is_review_candidate,
     load_aptabase_policy,
     normalise_aptabase_record,
@@ -808,6 +810,11 @@ def run_aptabase_s2(
     stats.order_preserved = True
     stats.provenance_preserved = True
     stats.sequence_raw_unchanged = True
+    corrections = corrections_for_records(
+        repo_root / CORRECTION_CONFIG_REL,
+        repo_root=repo_root,
+        record_ids=(row["record_id"] for row in canonical_rows),
+    )
 
     normalised_rows: list[dict[str, str]] = []
     qc_rows: list[dict[str, str]] = []
@@ -819,6 +826,7 @@ def run_aptabase_s2(
             meta_row,
             policy=policy,
             rules=rules,
+            corrections=corrections,
         )
         if result.canonical["record_id"] != s1_row["record_id"]:
             stats.order_preserved = False
@@ -878,7 +886,8 @@ def run_aptabase_s2(
             "AptaBase S2 must not emit constant-region proposals without groups"
         )
 
-    # Full equals core for every nonmissing record; no approved trim.
+    # Approved per-record corrections still keep sequence_full == sequence_core.
+    # sequence_raw remains the original Aptabase construct string.
     for row in normalised_rows:
         if row["sequence_full"] == "" and row["sequence_core"] == "":
             continue

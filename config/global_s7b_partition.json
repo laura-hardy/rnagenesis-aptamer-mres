@@ -7,21 +7,21 @@
   "s5e_config": "config/global_s5e_final_clustering.json",
   "curation_config": "config/curation_config.yaml",
   "authoritative_corpus": "data/interim/s7a_target_cap/corpus_post_cap.csv",
-  "expected_input_sha256": "6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd",
+  "expected_input_sha256": "0c17e8eea27498ff6f724021915c1567fc2e988977e0430f532897484fe427d7",
   "expected_s7a_artefact_hashes": {
-    "data/interim/s7a_target_cap/corpus_post_cap.csv": "6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd",
-    "data/interim/s7a_target_cap/s7a_target_cap_removal_trace.csv": "da3cd922e53c1388f25d2e1e9fcd714cdc22119fdecc11057e7a2205e1df1048",
+    "data/interim/s7a_target_cap/corpus_post_cap.csv": "0c17e8eea27498ff6f724021915c1567fc2e988977e0430f532897484fe427d7",
+    "data/interim/s7a_target_cap/s7a_target_cap_removal_trace.csv": "104ff814bc6a011d713207339544670db91ec4267aea94fbedcc7f103271b14a",
     "data/interim/s7a_target_cap/s7a_removed_clusters.csv": "46defa4e1b460a4b9fec91106f2cf2c432146348a23888399c3fae6c0072c40b",
-    "data/interim/s7a_target_cap/s7a_post_cap_target_distribution.csv": "f2be67a8c117335157577464362dc5eb1e89c28feeb9689f2b342453532ac2c7",
+    "data/interim/s7a_target_cap/s7a_post_cap_target_distribution.csv": "1ea12f5e5255d386085b16e1ab865b3fcc24593ebf4071ecb3014e34d766b52b",
     "data/interim/s7a_target_cap/s7a_mixed_cluster_collateral.csv": "91eb65f42d4469e48ba3b1c3d915c14a4d34145645169c918cd0eed3e6aacc5e",
-    "data/interim/s7a_target_cap/s7a_target_cap_report.md": "12a1b1207826995a31c5229f39d6c5654783bd7bf24d8593d55ff1e04df3d08b",
-    "data/interim/s7a_target_cap/s7a_target_cap_manifest.json": "c6f7d5846761bbc3e66eaea275c4eaa6ad835062ecdaf6d483d0e0277eb5d01c"
+    "data/interim/s7a_target_cap/s7a_target_cap_report.md": "110e24a869d007c683c2f1bc036a88921ac6038d82401918f82c3f0713090326",
+    "data/interim/s7a_target_cap/s7a_target_cap_manifest.json": "2cd78d96f4df02eaa31280d898eee0aae68a99818c2e661a285d10f31bbc2d1b"
   },
   "expected_input_counts": {
-    "n_scientific_identities": 1173,
-    "n_distinct_sequence_core": 1036,
-    "n_final_clusters": 794,
-    "n_canonical_targets": 411
+    "n_scientific_identities": 1170,
+    "n_distinct_sequence_core": 1031,
+    "n_final_clusters": 790,
+    "n_canonical_targets": 409
   },
   "partition_fractions": {
     "FT": 0.80,
@@ -42,9 +42,9 @@
     "refit_on_post_cap": false
   },
   "expected_s6_gmm2": {
-    "means": [38.887311544692416, 77.35623497594804],
-    "variances": [63.42923673279216, 168.91459023894495],
-    "weights": [0.5805142816481399, 0.41948571835186194]
+    "means": [38.959315119436454, 77.29072043239506],
+    "variances": [63.1958166211836, 169.75577345871622],
+    "weights": [0.5830380028129531, 0.416961997187046]
   },
   "primary_criteria": ["target", "evidence", "length_regime", "source"],
   "target_family_role": "secondary_diagnostic_only",
@@ -62,6 +62,10 @@
   ],
   "local_search": "deterministic_first_improvement_pairwise_swaps",
   "local_search_max_passes": 200,
+  "local_search_max_evals": null,
+  "local_search_max_seconds": null,
+  "local_search_progress": true,
+  "local_search_progress_every": 5000,
   "random_baseline_seeds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 42],
   "write_authoritative_partitioned_corpus": true,
   "freeze_ref": true,
@@ -73,7 +77,7 @@
   "output_dir": "data/interim/s7b_partition",
   "approval_record": "config/checkpoint_reviews/s7b_partition_approval.json",
   "freeze_record": "config/checkpoint_reviews/s7b_partition_freeze.json",
-  "freeze_date": "2026-09-21",
+  "freeze_date": "2026-09-24",
   "freeze_reason": "top-level FT/REF/EVAL assignment approved before any model-selection, fine-tuning, hyperparameter or REF-calibration use",
   "does_not": [
     "write_corpus_final",
@@ -83,7 +87,11 @@
     "rewrite_s5",
     "rewrite_s6",
     "rewrite_s7a",
-    "start_s7c"
+    "start_s7c",
+    "write_authoritative_partitioned_corpus",
+    "freeze_ref",
+    "freeze_eval",
+    "populate_partition_on_s7a_input"
   ],
   "sequence_safety_scan_paths": [
     "scripts/data_preparation/s7_partition.py",

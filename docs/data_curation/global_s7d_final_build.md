@@ -41,11 +41,13 @@ non-protein records.
 3. Frozen S7A / S7B / S7C contracts and freeze records
 4. `config/global_s7d_final_build.json`
 
-Repository baseline for this build:
+The 2026-09-22 build in commit `095236dfb13d1d3b13f11bbb34c2e48319c10184` is superseded by the 2026-09-25 corrective rebuild. Counts and hashes below are that rebuild. The closure commit subject is `Complete corrective corpus revision for RNA modelling alphabet gate`.
+
+Repository baseline for the corrective rebuild:
 
 ```text
 branch = main
-HEAD = origin/main = c1081c14cb3f20869affeddea49f5dd740b0bc51
+HEAD at S7D validation = 5afc24147fdc9b40a3d563cf68430da867ea6aa1
 git ls-files data = empty
 ```
 
@@ -53,13 +55,13 @@ git ls-files data = empty
 
 | authority | path | SHA256 |
 | --- | --- | --- |
-| S7A post-cap | `data/interim/s7a_target_cap/corpus_post_cap.csv` | `6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd` |
-| S7B partitioned | `data/interim/s7b_partition/corpus_partitioned.csv` | `755e6afaf6a522be390073d3651311f8afc0ca9486322ac3bbfe348cd2a3fb1a` |
-| S7B FT | `data/interim/s7b_partition/ft.csv` | `b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff` |
-| S7B REF | `data/interim/s7b_partition/ref.csv` | `6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d` |
-| S7B EVAL | `data/interim/s7b_partition/eval.csv` | `88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d` |
-| S7C TRAIN | `data/interim/s7c_ft_split/ft_train.csv` | `941fe8783ee8c99a2ce7598dea00ed123e62750026b7f157f28e7bbcc5d14a8f` |
-| S7C VALIDATION | `data/interim/s7c_ft_split/ft_validation.csv` | `03be477e12f7b9ca20f8911e2ac88fde2949af2b6131c2d2aa43eef2ae6d9abc` |
+| S7A post-cap | `data/interim/s7a_target_cap/corpus_post_cap.csv` | `0c17e8eea27498ff6f724021915c1567fc2e988977e0430f532897484fe427d7` |
+| S7B partitioned | `data/interim/s7b_partition/corpus_partitioned.csv` | `2797e6767f78029574df1b6cdf51bbe7952ea8affce83870441b3d3d93c98849` |
+| S7B FT | `data/interim/s7b_partition/ft.csv` | `4206b431d6f674887dc07b13502ef060c097e6c7f7abf9e7de7b73041ac3b3d5` |
+| S7B REF | `data/interim/s7b_partition/ref.csv` | `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23` |
+| S7B EVAL | `data/interim/s7b_partition/eval.csv` | `ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015` |
+| S7C TRAIN | `data/interim/s7c_ft_split/ft_train.csv` | `84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0` |
+| S7C VALIDATION | `data/interim/s7c_ft_split/ft_validation.csv` | `cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd` |
 
 REF / EVAL / TRAIN / VALIDATION semantic freeze hashes are those recorded
 in `config/checkpoint_reviews/s7b_partition_freeze.json` and
@@ -75,12 +77,12 @@ hard stop.
 Expected:
 
 ```text
-identities = 1173
-cores      = 1036
-clusters   = 794
-targets    = 411
-FT / REF / EVAL identities = 895 / 114 / 164
-max target share = HIV-1 Rev protein 34 / 1173 = 0.0289855072
+identities = 1170
+cores      = 1031
+clusters   = 790
+targets    = 409
+FT / REF / EVAL identities = 858 / 131 / 181
+max target share = HIV-1 Rev protein 34 / 1170 = 0.0290598291
 E5 = 0
 non-protein = 0
 ```
@@ -92,7 +94,7 @@ first-occurrence order in `ft_train.csv`. No re-normalisation and no
 near-duplicate filter.
 
 ```text
-expected lines = 678
+expected lines = 669
 duplicate lines = 0
 VALIDATION/REF/EVAL contamination = 0
 ```

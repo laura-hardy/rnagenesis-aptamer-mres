@@ -11168,6 +11168,35 @@ push performed = no
 
 Not committed. Not pushed.
 
+## 2026-09-25 — Corrective corpus revision for the RNA modelling alphabet gate
+
+**Why reopened:** The frozen corpus in `095236dfb13d1d3b13f11bbb34c2e48319c10184` failed the RNAGenesis M0 alphabet gate. Seven Aptabase records still carried literal `T` or the wrong molecule class in the modelling core.
+
+**Dispositions, from primary evidence, without silent T-to-U:**
+
+- `aptabase:592` and `aptabase:593`: genuine ssDNA heparanase aptamers; parked out of the RNA corpus.
+- `aptabase:104`: corrected RNA core is 19 nt, below the 20 nt minimum; rejected.
+- `aptabase:185`: TRAIN, 24 nt RNA core `ACCCUGAUGGUAGACGCCGGGGUG`.
+- `aptabase:118`: TRAIN, 49 nt 2F-RNA core `UUGUAAUUCAAAACAAAGGUUUCCUGGACUCCCCGCAGGUCUUGUGAAU`.
+- `aptabase:123`: TRAIN, 49 nt 2F-RNA core `UGAUCAAAUCGAGCUUUAACCCAACAGAGCAUCCGUAUCUAUCCAAAUG`.
+- `aptabase:82`: VALIDATION, 47 nt RNA core `GACAGCGUGCCUAGAAGUCCAAGCUUAAAUAACCACGCUCGACAAGC`.
+
+**Implementation boundary:** Aptabase CHECKPOINT-1 seven-record overlay, global S4 refresh, then S5–S7D rerun. S7B local search kept the same objective and gained a category-count hot path so the rerun could finish; the partition rule did not change. No RNAGenesis training, generation, or evaluation was run. EVAL was not used to choose splits.
+
+**Final primary corpus:** 1170 identities, 1031 cores, 790 clusters. TRAIN 726 / 569 / 669. VALIDATION 132 / 63 / 95. REF 131 / 79 / 113. EVAL 181 / 79 / 154. `corpus_final.txt` has 669 unique TRAIN cores. Cross-role cluster leakage 0. Cross-role core leakage 0. TRAIN/VALIDATION cores match `^[ACGU]+$`.
+
+**Final hashes:**
+
+- `ft_train.csv` `84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0`
+- `corpus_final.txt` `d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d`
+- `ft_validation.csv` `cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd`
+- `ref.csv` `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`
+- `eval.csv` `ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015`
+- `corpus_final.csv` `2797e6767f78029574df1b6cdf51bbe7952ea8affce83870441b3d3d93c98849`
+- `corpus_manifest.json` `08da8d5e44413ea9ab57c128dbe4ef7986dab7a2bfa794cfef6fb4724577565f`
+
+This commit supersedes frozen corpus commit `095236dfb13d1d3b13f11bbb34c2e48319c10184`. RNAGenesis M0 may resume only against these plan hashes. The S7D `repository_head_baseline` pin remains the pre-closure HEAD `5afc24147fdc9b40a3d563cf68430da867ea6aa1`; rerunning S7D requires a new pin. Sequence-bearing files stay under ignored `data/`.
+
 
 
 

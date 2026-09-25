@@ -734,8 +734,8 @@ def test_live_train_text_semantics() -> None:
         ref_rows=ref,
         eval_rows=eval_rows,
     )
-    assert gates["line_count"] == 678
-    assert gates["distinct_sequences"] == 678
+    assert gates["line_count"] == 669
+    assert gates["distinct_sequences"] == 669
     assert gates["duplicate_lines"] == 0
     assert gates["validation_contamination"] == 0
     assert gates["ref_contamination"] == 0

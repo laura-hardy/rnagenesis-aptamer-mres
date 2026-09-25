@@ -8,39 +8,39 @@
   "ft_csv": "data/interim/s7b_partition/ft.csv",
   "ref_csv": "data/interim/s7b_partition/ref.csv",
   "eval_csv": "data/interim/s7b_partition/eval.csv",
-  "expected_ft_sha256": "b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff",
-  "expected_ref_sha256": "6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d",
-  "expected_eval_sha256": "88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d",
-  "expected_ref_identity_set_hash": "54a74c8bb8ef67f36dd4b054d6ed43f201bd38d41d75244d9b69eb1583951abc",
-  "expected_ref_cluster_set_hash": "84afc5a5bb030db9cbdddb7246ceaab3457ef8eb02f1192575433d5f77f6cd82",
-  "expected_eval_identity_set_hash": "47ef50345fae50f14e99547426dbf3a3c34ed0caf49574005fb3f1da94315406",
-  "expected_eval_cluster_set_hash": "c923af78ef7b191b569c5ead859982eb7711460a6537d0a70612a1101ffa8138",
-  "expected_ref_clusters": 80,
+  "expected_ft_sha256": "4206b431d6f674887dc07b13502ef060c097e6c7f7abf9e7de7b73041ac3b3d5",
+  "expected_ref_sha256": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
+  "expected_eval_sha256": "ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015",
+  "expected_ref_identity_set_hash": "254178519388939ddaf711910e4841a9641370220ebf6e9a8c243861d49b4906",
+  "expected_ref_cluster_set_hash": "91aa1aec052535ca91cbdb2a10a875390f147cc2b45d4cc2b64fe324bd19a1bd",
+  "expected_eval_identity_set_hash": "4ebd8347fd532581ffe46acbd0684f8763aa1ce40f33e6b86ab300e82e802ef0",
+  "expected_eval_cluster_set_hash": "f9098d8795ba17d6c0e0de9b7dad7d17a97f762888594689f810f9c7f08f2e1c",
+  "expected_ref_clusters": 79,
   "expected_eval_clusters": 79,
   "expected_input_counts": {
-    "n_scientific_identities": 895,
-    "n_distinct_sequence_core": 795,
-    "n_final_clusters": 635,
-    "n_canonical_targets": 390
+    "n_scientific_identities": 858,
+    "n_distinct_sequence_core": 764,
+    "n_final_clusters": 632,
+    "n_canonical_targets": 379
   },
   "expected_evidence": {
-    "E2": 615,
-    "E3": 187,
-    "E4": 93,
+    "E2": 586,
+    "E3": 181,
+    "E4": 91,
     "E5": 0
   },
   "expected_length_regime_cores": {
-    "short": 448,
-    "long": 347
+    "short": 441,
+    "long": 323
   },
   "expected_source_identities": {
-    "aptabase": 90,
-    "aptadb": 54,
-    "aptaindex": 51,
-    "aptamerbase": 368,
-    "ena": 94,
-    "riboaptamer": 168,
-    "utexas": 70
+    "aptabase": 84,
+    "aptadb": 52,
+    "aptaindex": 50,
+    "aptamerbase": 358,
+    "ena": 87,
+    "riboaptamer": 163,
+    "utexas": 64
   },
   "split_fractions": {
     "TRAIN": 0.90,
@@ -60,9 +60,9 @@
     "refit_on_post_cap": false
   },
   "expected_s6_gmm2": {
-    "means": [38.887311544692416, 77.35623497594804],
-    "variances": [63.42923673279216, 168.91459023894495],
-    "weights": [0.5805142816481399, 0.41948571835186194]
+    "means": [38.959315119436454, 77.29072043239506],
+    "variances": [63.1958166211836, 169.75577345871622],
+    "weights": [0.5830380028129531, 0.416961997187046]
   },
   "primary_criteria": ["target", "evidence", "length_regime", "source"],
   "target_family_role": "secondary_diagnostic_only",
@@ -97,9 +97,11 @@
   "output_dir": "data/interim/s7c_ft_split",
   "approval_record": "config/checkpoint_reviews/s7c_ft_split_approval.json",
   "freeze_record": "config/checkpoint_reviews/s7c_ft_split_freeze.json",
-  "freeze_date": "2026-09-21",
+  "freeze_date": "2026-09-24",
   "freeze_reason": "approved v2 FT train/validation assignment frozen before any model training, checkpoint selection, hyperparameter comparison, REF calibration or EVAL evaluation",
   "does_not": [
+    "write_ft_train_csv",
+    "write_ft_validation_csv",
     "write_corpus_final",
     "alter_ft_csv",
     "alter_ref_csv",

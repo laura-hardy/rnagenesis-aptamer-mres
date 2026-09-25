@@ -26,37 +26,37 @@
   "expected_s4_hashes": {
     "reviewed_relationships": [
       "data/interim/global_s4/global_s4_reviewed_relationships.csv",
-      "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502"
+      "252987d71839623566ea1fa5ddf0c0c591d23fe39fad858f84d212d7abf5d458"
     ],
     "reviewed_dictionary": [
       "data/interim/global_s4/global_s4_reviewed_target_dictionary.csv",
-      "e7234d9a9308dd899cbb3f801ff20ba05b2960071ede98812c6109db0f21b5ec"
+      "afcd8f02e13feee26bb54cf1caad76508780828d4cee3816ab5c9c1cf0b178d8"
     ],
     "record_map": [
       "data/interim/global_s4/global_s4_record_relationship_map.csv",
-      "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b"
+      "701acc7134f010401a49c137e80ff4bc50f31a9645b71cda4ae686426a032d7f"
     ],
     "parked_audit": [
       "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
-      "98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7"
+      "d46730de8de9e4f111866f2543269b6d72c56e45bc89e65f92de36481c6aabd2"
     ],
     "routing_summary": [
       "data/interim/global_s4/global_s4_routing_summary.csv",
-      "46bc0c91a121f1737f3816ec4b16fef4630b388310c9599171cf054b17e74635"
+      "add4655eaf498e3b369f66b12866c6a32e837e28b4d49bc44a1c5245ab939ff6"
     ],
     "combined_input": [
       "data/interim/global_s4/combined_global_s4_input.csv",
-      "24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0"
+      "6609f1839cbe8ce335f04a9be4fa865b6127514d307c757c77ff71871c558fd0"
     ]
   },
   "expected_s5a_hashes": {
     "corpus_dedup_csv": [
       "data/interim/deduplicated/corpus_dedup.csv",
-      "9dae7d8f59f36590945fa71baf473a8bfbbad95e9794355b5acab91ccc3cd2c2"
+      "f92a4858afe354db036b974cf90456de409131a24d257b30c400a00d4a351d86"
     ],
     "membership_csv": [
       "data/interim/deduplicated/exact_duplicate_membership.csv",
-      "802c9d8dfed036639307e8456dbb330541dec2c519b5f06600c7cb82d113c618"
+      "c6a34cb0158dc9492f45683bd18fc8f0355c659ffcc1ec6f2d542bcf6a7b582c"
     ],
     "groups_csv": [
       "data/interim/deduplicated/exact_duplicate_groups.csv",
@@ -68,26 +68,26 @@
     ],
     "multi_target_csv": [
       "data/interim/deduplicated/multi_target_sequence_report.csv",
-      "f1634ccc81ae857425aaf93bd939dbea756486112a9aa45fe02e200913d2dc80"
+      "7c81edf29df24ee06a8218a6ebb8c00dd15a21bb3efbaccf4cd108ca6498963b"
     ],
     "overlap_matrix_csv": [
       "data/interim/deduplicated/exact_overlap_matrix.csv",
-      "7b89d674c6a94eb7b36d920a185ec4a726793a1ca86cdc1ff47706416cc9211c"
+      "8de8bbb1d1c569e3be5117591033ad1963a649ccabe6e576a9c8b0d0c1e2f348"
     ],
     "report_md": [
       "data/interim/deduplicated/s5a_exact_dedup_report.md",
-      "685f7a98c77e79af7cb9985b74f7759475e782bf9f32e40115f822214ecb0136"
+      "77d43b1299389cd90f0de076431d8a1adfc9f2ff38ef244d45e82a5d0ab22062"
     ]
   },
   "expected_counts": {
-    "n_input_relationships": 1460,
-    "n_membership_rows": 1460,
-    "n_scientific_identities": 1281,
-    "n_distinct_sequence_core": 1144,
+    "n_input_relationships": 1457,
+    "n_membership_rows": 1457,
+    "n_scientific_identities": 1278,
+    "n_distinct_sequence_core": 1139,
     "n_exact_duplicate_groups": 157,
     "n_duplicate_excess": 179,
-    "n_multi_target_sequence_cores": 118,
-    "n_multi_target_sequence_rows": 326,
+    "n_multi_target_sequence_cores": 119,
+    "n_multi_target_sequence_rows": 329,
     "n_target_dictionary_id_conflict_groups": 9,
     "n_groups_multiple_evidence_levels": 38,
     "n_groups_conflicting_affinity_values": 3,
@@ -98,7 +98,7 @@
     "n_groups_multiple_trim_statuses": 107,
     "n_independently_attested_by_permissive_source_true": 0,
     "corroboration_count_distribution": {
-      "1": 1143,
+      "1": 1140,
       "2": 131,
       "3": 6,
       "4": 1

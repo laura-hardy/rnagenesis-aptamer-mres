@@ -22,6 +22,7 @@ import json
 import math
 import random
 import sys
+import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from fractions import Fraction
@@ -111,6 +112,10 @@ ABSDEV_COMPARISON_TUPLE_FIELDS: tuple[str, ...] = (
     "sum_primary_D",
     "assignment_signature",
 )
+# Screened candidate rejection only. An exact js_from_vec rescore still
+# decides every swap that this margin cannot prove is strictly worse.
+_JSD_SCREEN_EPS = 1e-8
+_SEARCH_BATCH_CHUNK = 64
 CLUSTER_ORDERING: tuple[str, ...] = (
     "n_identities_descending",
     "n_distinct_canonical_targets_descending",
@@ -850,6 +855,72 @@ def js_from_vec(counts_vec: Any, global_p: Any, *, log_base: float = JSD_LOG_BAS
     return 0.5 * _kl_vec(probs, mixture, log_base) + 0.5 * _kl_vec(global_p, mixture, log_base)
 
 
+def js_divergence_rows(
+    counts: Any,
+    global_p: Any,
+    *,
+    log_base: float = JSD_LOG_BASE,
+) -> Any:
+    """Row-wise JSD used only to reject clearly worse swaps.
+
+    Each row is a category-count vector on ``global_p``'s support. The
+    values match ``js_from_vec`` up to summation order (well inside
+    ``_JSD_SCREEN_EPS``). Accept/reject decisions do not use this value
+    unless it proves the swap is strictly worse than the current exact
+    objective by more than that margin.
+    """
+    matrix = np.asarray(counts, dtype=float)
+    if matrix.ndim == 1:
+        matrix = matrix.reshape(1, -1)
+    totals = matrix.sum(axis=1)
+    out = np.empty(matrix.shape[0], dtype=float)
+    empty = empty_jsd(log_base=log_base)
+    dead = totals <= 0.0
+    out[dead] = empty
+    live = ~dead
+    if not np.any(live):
+        return out
+    probs = np.zeros_like(matrix)
+    probs[live] = matrix[live] / totals[live, None]
+    mixture = 0.5 * (probs + np.asarray(global_p, dtype=float))
+
+    def _kl_rows(p: Any, q: Any) -> Any:
+        mask = p > 0.0
+        contrib = np.zeros_like(p)
+        if log_base == 2.0:
+            contrib[mask] = p[mask] * np.log2(p[mask] / q[mask])
+        else:
+            contrib[mask] = p[mask] * (np.log(p[mask] / q[mask]) / math.log(log_base))
+        return contrib.sum(axis=1)
+
+    out[live] = 0.5 * _kl_rows(probs, mixture)[live] + 0.5 * _kl_rows(
+        np.broadcast_to(np.asarray(global_p, dtype=float), probs.shape), mixture
+    )[live]
+    return out
+
+
+def _screen_rejects_swap(
+    batch_prefix: tuple[Any, ...],
+    current_prefix: tuple[Any, ...],
+    *,
+    eps: float = _JSD_SCREEN_EPS,
+) -> bool:
+    """True only when batch O1 is strictly worse than the exact O1 by ``eps``.
+
+    The comparison tuple is ordered by O1 first. A one-ulp decrease in O1
+    is an improvement even when the later lexicographic terms get worse, so
+    a within-margin O1 tie is never rejected here. Lexicographic terms,
+    the divergence sum, and the assignment signature stay on the exact path.
+    """
+    return float(batch_prefix[0]) > float(current_prefix[0]) + eps
+
+
+def format_search_prefix(prefix: tuple[Any, ...]) -> str:
+    """Compact O1 / descending-D / O3 text for progress logs."""
+    lex = ",".join(f"{float(value):.6f}" for value in prefix[1])
+    return f"({float(prefix[0]):.6f},[{lex}],{float(prefix[2]):.6f})"
+
+
 def score_partition_states(
     states: Mapping[str, PartitionCounts],
     space: FeatureSpace,
@@ -1275,10 +1346,15 @@ def pairwise_local_search(
     max_accepted_swaps: int = 1_000_000,
     max_evals: int | None = None,
     max_passes: int = 10_000,
+    max_seconds: float | None = None,
+    progress: bool = False,
+    progress_every: int = 5_000,
+    evaluator: str = "screened",
     partition_labels: Sequence[str] | None = None,
     placement_labels: Sequence[str] | None = None,
     log_prefix: str = "S7B",
     objective_profile: str | None = None,
+    search_stats: dict[str, Any] | None = None,
 ) -> tuple[dict[str, str], int, int, bool]:
     """Deterministic first-improvement pairwise swap search.
 
@@ -1291,10 +1367,21 @@ def pairwise_local_search(
     ``max_passes`` is a safety cap only; hitting it is reported and is not
     the intended scientific termination.
 
-    The hot path keeps Python lists of category counts and only updates
-    membership after an accepted swap. Default labels are the frozen S7B
-    FT/REF/EVAL set; ``log_prefix`` defaults to ``S7B``. Default
-    ``objective_profile`` is frozen S7B ``jsd_minimax``.
+    The hot path keeps per-partition category-count vectors and only
+    updates membership after an accepted swap. For the frozen
+    ``jsd_minimax`` profile, candidate swaps are scored in deterministic
+    chunks. A chunked Jensen-Shannon screen may skip a swap only when it
+    is strictly worse than the current exact objective by more than
+    ``_JSD_SCREEN_EPS``. Every other candidate, and every accepted swap,
+    is confirmed with the original ``js_from_vec`` prefix. The
+    absolute-deviation profile always uses that exact scalar path.
+    ``evaluator="scalar"`` forces the original per-swap path.
+
+    ``max_evals`` and ``max_seconds`` are fail-closed diagnostic bounds:
+    exceeding either raises ``S7PartitionError`` and must not be treated
+    as an accepted partition. ``max_passes`` remains a soft safety cap.
+    Default labels are the frozen S7B FT/REF/EVAL set; ``log_prefix``
+    defaults to ``S7B``.
     """
     report_labels = resolve_partition_labels(partition_labels)
     place_labels = resolve_placement_labels(placement_labels)
@@ -1408,6 +1495,166 @@ def pairwise_local_search(
     accepted = 0
     n_passes = 0
     n_evals = 0
+    n_exact = 0
+    started = time.perf_counter()
+    use_screen = evaluator != "scalar" and profile != OBJECTIVE_PROFILE_ABSDEV
+    if evaluator not in {"screened", "scalar"}:
+        raise S7PartitionError(f"unknown local-search evaluator {evaluator!r}")
+    pair_candidates = 0
+    label_list = list(place_labels)
+    for i, label_a in enumerate(label_list):
+        n_a = sum(1 for label in current.values() if label == label_a)
+        for label_b in label_list[i + 1 :]:
+            n_b = sum(1 for label in current.values() if label == label_b)
+            pair_candidates += n_a * n_b
+
+    def _publish() -> None:
+        if search_stats is None:
+            return
+        search_stats["n_evals"] = n_evals
+        search_stats["n_exact_evals"] = n_exact
+        search_stats["n_accepted_swaps"] = accepted
+        search_stats["n_passes"] = n_passes
+        search_stats["elapsed_seconds"] = time.perf_counter() - started
+        search_stats["pair_candidates_per_pass"] = pair_candidates
+        search_stats["evaluator"] = "scalar" if not use_screen else "screened"
+
+    def _enforce_bounds() -> None:
+        elapsed = time.perf_counter() - started
+        if max_evals is not None and n_evals > max_evals:
+            _publish()
+            raise S7PartitionError(
+                "S7B local-search bound exceeded "
+                f"(considered={n_evals}, max_evals={max_evals}, elapsed={elapsed:.1f}s); "
+                "no partition output accepted"
+            )
+        if max_seconds is not None and elapsed > max_seconds:
+            _publish()
+            raise S7PartitionError(
+                "S7B local-search bound exceeded "
+                f"(elapsed={elapsed:.1f}s, max_seconds={max_seconds}, considered={n_evals}); "
+                "no partition output accepted"
+            )
+
+    def _maybe_progress(*, force: bool = False) -> None:
+        if not progress:
+            return
+        if not force and (progress_every <= 0 or n_evals == 0 or n_evals % progress_every != 0):
+            return
+        elapsed = time.perf_counter() - started
+        rate = n_evals / elapsed if elapsed > 0 else 0.0
+        done = ""
+        if pair_candidates:
+            frac = min(1.0, n_evals / pair_candidates)
+            done = f" pass_progress~{frac:.1%}"
+        sys.stderr.write(
+            f"{log_prefix} local-search clusters={len(current)} "
+            f"pass={n_passes} considered={n_evals} exact={n_exact} "
+            f"accepted={accepted} elapsed={elapsed:.1f}s "
+            f"swaps_per_s={rate:.0f} "
+            f"objective={format_search_prefix(current_prefix)}{done}\n"
+        )
+        sys.stderr.flush()
+
+    def _consider_exact(cluster_a: str, label_a: str, cluster_b: str, label_b: str) -> bool:
+        nonlocal accepted, improved, current_prefix, current_sig, n_exact
+        feat_a = features[cluster_a]
+        feat_b = features[cluster_b]
+        n_exact += 1
+        cached = (
+            j_target[label_a],
+            j_evidence[label_a],
+            j_length[label_a],
+            j_source[label_a],
+            j_target[label_b],
+            j_evidence[label_b],
+            j_length[label_b],
+            j_source[label_b],
+        )
+        _move(feat_a, label_a, label_b)
+        _move(feat_b, label_b, label_a)
+        _rescore(label_a)
+        _rescore(label_b)
+        new_prefix = _prefix()
+        better = new_prefix < current_prefix
+        if new_prefix == current_prefix:
+            if current_sig is None:
+                current_sig = assignment_signature(current)
+            trial = dict(current)
+            trial[cluster_a] = label_b
+            trial[cluster_b] = label_a
+            better = assignment_signature(trial) < current_sig
+        if better:
+            members[label_a].remove(cluster_a)
+            members[label_b].remove(cluster_b)
+            members[label_a].add(cluster_b)
+            members[label_b].add(cluster_a)
+            current[cluster_a] = label_b
+            current[cluster_b] = label_a
+            accepted += 1
+            improved = True
+            current_prefix = new_prefix
+            current_sig = None
+            if accepted > max_accepted_swaps:
+                raise S7PartitionError("pairwise local search exceeded max accepted swaps")
+            return True
+        _move(feat_a, label_b, label_a)
+        _move(feat_b, label_a, label_b)
+        (
+            j_target[label_a],
+            j_evidence[label_a],
+            j_length[label_a],
+            j_source[label_a],
+            j_target[label_b],
+            j_evidence[label_b],
+            j_length[label_b],
+            j_source[label_b],
+        ) = cached
+        return False
+
+    def _screened_prefixes(
+        label_a: str,
+        label_b: str,
+        feat_a: ClusterFeature,
+        chunk: Sequence[ClusterFeature],
+    ) -> list[tuple[Any, ...]]:
+        third = [label for label in report_labels if label not in {label_a, label_b}]
+        bundles = (
+            (target, global_target, j_target, feat_a.target_vec, [item.target_vec for item in chunk]),
+            (
+                evidence,
+                global_evidence,
+                j_evidence,
+                feat_a.evidence_vec,
+                [item.evidence_vec for item in chunk],
+            ),
+            (length, global_length, j_length, feat_a.length_vec, [item.length_vec for item in chunk]),
+            (source, global_source, j_source, feat_a.source_vec, [item.source_vec for item in chunk]),
+        )
+        worst: list[Any] = []
+        for store, global_p, cached_j, vec_a, rows in bundles:
+            mat_b = np.vstack(rows)
+            new_a = store[label_a][None, :] - vec_a[None, :] + mat_b
+            new_b = store[label_b][None, :] - mat_b + vec_a[None, :]
+            ja = js_divergence_rows(new_a, global_p, log_base=log_base)
+            jb = js_divergence_rows(new_b, global_p, log_base=log_base)
+            other = max((cached_j[label] for label in third), default=0.0)
+            worst.append(np.maximum(np.maximum(ja, jb), other))
+        prefixes: list[tuple[Any, ...]] = []
+        for index in range(len(chunk)):
+            values = tuple(float(column[index]) for column in worst)
+            lex = tuple(sorted(values, reverse=True))
+            prefixes.append((max(lex), lex, values[0] + values[1] + values[2] + values[3]))
+        return prefixes
+
+    if progress:
+        sys.stderr.write(
+            f"{log_prefix} local-search start clusters={len(current)} "
+            f"pair_candidates_per_pass={pair_candidates} "
+            f"evaluator={'screened' if use_screen else 'scalar'}\n"
+        )
+        sys.stderr.flush()
+
     while True:
         n_passes += 1
         improved = False
@@ -1422,78 +1669,70 @@ def pairwise_local_search(
                     if cluster_a not in members[label_a]:
                         continue
                     feat_a = features[cluster_a]
-                    for cluster_b in clusters_b:
+                    if not use_screen:
+                        for cluster_b in clusters_b:
+                            if cluster_a not in members[label_a]:
+                                break
+                            if cluster_b not in members[label_b]:
+                                continue
+                            n_evals += 1
+                            _enforce_bounds()
+                            _maybe_progress()
+                            if _consider_exact(cluster_a, label_a, cluster_b, label_b):
+                                break
+                        continue
+                    pending = [cluster_b for cluster_b in clusters_b if cluster_b in members[label_b]]
+                    cursor = 0
+                    accepted_here = False
+                    while cursor < len(pending):
                         if cluster_a not in members[label_a]:
                             break
-                        if cluster_b not in members[label_b]:
+                        window = pending[cursor : cursor + _SEARCH_BATCH_CHUNK]
+                        cursor += len(window)
+                        active = [cluster_b for cluster_b in window if cluster_b in members[label_b]]
+                        if not active:
                             continue
-                        feat_b = features[cluster_b]
-                        n_evals += 1
-                        if max_evals is not None and n_evals > max_evals:
-                            return current, accepted, n_passes, False
-                        cached = (
-                            j_target[label_a],
-                            j_evidence[label_a],
-                            j_length[label_a],
-                            j_source[label_a],
-                            j_target[label_b],
-                            j_evidence[label_b],
-                            j_length[label_b],
-                            j_source[label_b],
+                        screened = _screened_prefixes(
+                            label_a,
+                            label_b,
+                            feat_a,
+                            [features[cluster_b] for cluster_b in active],
                         )
-                        _move(feat_a, label_a, label_b)
-                        _move(feat_b, label_b, label_a)
-                        _rescore(label_a)
-                        _rescore(label_b)
-                        new_prefix = _prefix()
-                        better = new_prefix < current_prefix
-                        if new_prefix == current_prefix:
-                            if current_sig is None:
-                                current_sig = assignment_signature(current)
-                            trial = dict(current)
-                            trial[cluster_a] = label_b
-                            trial[cluster_b] = label_a
-                            better = assignment_signature(trial) < current_sig
-                        if better:
-                            members[label_a].remove(cluster_a)
-                            members[label_b].remove(cluster_b)
-                            members[label_a].add(cluster_b)
-                            members[label_b].add(cluster_a)
-                            current[cluster_a] = label_b
-                            current[cluster_b] = label_a
-                            accepted += 1
-                            improved = True
-                            current_prefix = new_prefix
-                            current_sig = None
-                            if accepted > max_accepted_swaps:
-                                raise S7PartitionError(
-                                    "pairwise local search exceeded max accepted swaps"
-                                )
+                        for cluster_b, batch_prefix in zip(active, screened):
+                            if cluster_a not in members[label_a]:
+                                accepted_here = True
+                                break
+                            if cluster_b not in members[label_b]:
+                                continue
+                            n_evals += 1
+                            _enforce_bounds()
+                            _maybe_progress()
+                            if _screen_rejects_swap(batch_prefix, current_prefix):
+                                continue
+                            if _consider_exact(cluster_a, label_a, cluster_b, label_b):
+                                accepted_here = True
+                                break
+                        if accepted_here:
                             break
-                        _move(feat_a, label_b, label_a)
-                        _move(feat_b, label_a, label_b)
-                        (
-                            j_target[label_a],
-                            j_evidence[label_a],
-                            j_length[label_a],
-                            j_source[label_a],
-                            j_target[label_b],
-                            j_evidence[label_b],
-                            j_length[label_b],
-                            j_source[label_b],
-                        ) = cached
-        if len(current) >= 50:
+        if progress or len(current) >= 50:
             metric_name = "R1" if profile == OBJECTIVE_PROFILE_ABSDEV else "O1"
+            elapsed = time.perf_counter() - started
             sys.stderr.write(
                 f"{log_prefix} local-search pass="
-                f"{n_passes} accepted={accepted} "
-                f"{metric_name}={current_prefix[0]:.9f} improved={improved}\n"
+                f"{n_passes} considered={n_evals} exact={n_exact} "
+                f"accepted={accepted} "
+                f"elapsed={elapsed:.1f}s "
+                f"{metric_name}={current_prefix[0]:.9f} "
+                f"objective={format_search_prefix(current_prefix)} improved={improved}\n"
             )
             sys.stderr.flush()
         if not improved:
+            _publish()
             return current, accepted, n_passes, True
         if n_passes >= max_passes:
+            _publish()
             return current, accepted, n_passes, False
+    _publish()
     return current, accepted, n_passes, False
 
 
@@ -1546,12 +1785,23 @@ def optimise_partition(
     quotas: Any,
     *,
     max_passes: int = 10_000,
+    max_evals: int | None = None,
+    max_seconds: float | None = None,
+    progress: bool = False,
+    progress_every: int = 5_000,
+    evaluator: str = "screened",
     partition_labels: Sequence[str] | None = None,
     placement_labels: Sequence[str] | None = None,
     log_prefix: str = "S7B",
     objective_profile: str | None = None,
 ) -> dict[str, Any]:
     profile = resolve_objective_profile(objective_profile)
+    if progress:
+        quota_text = ",".join(f"{label}={count}" for label, count in quotas.as_dict().items())
+        sys.stderr.write(
+            f"{log_prefix} quota-init clusters={len(features)} {quota_text}\n"
+        )
+        sys.stderr.flush()
     greedy = greedy_assign(
         features,
         space,
@@ -1560,15 +1810,22 @@ def optimise_partition(
         placement_labels=placement_labels,
         objective_profile=profile,
     )
+    search_stats: dict[str, Any] = {}
     improved, n_accepted, n_passes, converged = pairwise_local_search(
         greedy,
         features,
         space,
         max_passes=max_passes,
+        max_evals=max_evals,
+        max_seconds=max_seconds,
+        progress=progress,
+        progress_every=progress_every,
+        evaluator=evaluator,
         partition_labels=partition_labels,
         placement_labels=placement_labels,
         log_prefix=log_prefix,
         objective_profile=profile,
+        search_stats=search_stats,
     )
     score = score_assignment(
         improved,
@@ -1592,6 +1849,9 @@ def optimise_partition(
         "greedy_score": greedy_score,
         "n_accepted_swaps": n_accepted,
         "n_local_search_passes": n_passes,
+        "n_evals": int(search_stats.get("n_evals", 0)),
+        "n_exact_evals": int(search_stats.get("n_exact_evals", 0)),
+        "search_elapsed_seconds": float(search_stats.get("elapsed_seconds", 0.0)),
         "local_search_converged": converged,
         "comparison_tuple": score.comparison_tuple(improved),
         "objective_profile": profile,
@@ -1604,6 +1864,11 @@ def select_preview_assignment(
     quota_candidates: Sequence[Any],
     *,
     max_passes: int = 10_000,
+    max_evals: int | None = None,
+    max_seconds: float | None = None,
+    progress: bool = False,
+    progress_every: int = 5_000,
+    evaluator: str = "screened",
     partition_labels: Sequence[str] | None = None,
     placement_labels: Sequence[str] | None = None,
     log_prefix: str = "S7B",
@@ -1614,12 +1879,23 @@ def select_preview_assignment(
     profile = resolve_objective_profile(objective_profile)
     best: dict[str, Any] | None = None
     all_results: list[dict[str, Any]] = []
-    for quotas in quota_candidates:
+    for index, quotas in enumerate(quota_candidates, start=1):
+        if progress:
+            sys.stderr.write(
+                f"{log_prefix} quota-candidate {index}/{len(quota_candidates)} "
+                f"{quotas.as_tuple}\n"
+            )
+            sys.stderr.flush()
         result = optimise_partition(
             features,
             space,
             quotas,
             max_passes=max_passes,
+            max_evals=max_evals,
+            max_seconds=max_seconds,
+            progress=progress,
+            progress_every=progress_every,
+            evaluator=evaluator,
             partition_labels=partition_labels,
             placement_labels=placement_labels,
             log_prefix=log_prefix,

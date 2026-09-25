@@ -7,7 +7,8 @@
   "review_rows": 431,
   "no_review_rows": 179,
   "total_records": 610,
-  "review_file_sha256": "1591663fd525860a59df1110129b6998f9d70e5906d2e42c47278449e8cc84f4",
+  "review_file_sha256": "e5bdfc604338b6f8a34ec2e66693a57a58c419aca6120fe6bb8ed4759b4a0464",
   "checkpoint_status": "closed",
-  "next_stage": "S4_target_normalisation"
+  "next_stage": "S4_target_normalisation",
+  "apply_mode": "seven_record_frozen_overlay"
 }

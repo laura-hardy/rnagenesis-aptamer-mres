@@ -1,0 +1,19 @@
+{
+  "source_key": "aptabase",
+  "apply_mode": "seven_record_frozen_overlay",
+  "approved_record_ids": [
+    "aptabase:592",
+    "aptabase:593",
+    "aptabase:104",
+    "aptabase:185",
+    "aptabase:118",
+    "aptabase:123",
+    "aptabase:82"
+  ],
+  "overlay_baseline": "data/interim/checkpoints/aptabase_cp1/seven_record_overlay_preview/aptabase_overlay_baseline.csv",
+  "overlay_review": "data/interim/checkpoints/aptabase_cp1/seven_record_overlay_preview/aptabase_overlay_review.csv",
+  "frozen_audit_baseline": "data/interim/checkpoints/aptabase_cp1/audit/aptabase_checkpoint1_local_detail.csv",
+  "supersedes": "Previous CHECKPOINT-1 override_to_accept actions for the seven approved records. Does not adopt the current-normaliser rerun.",
+  "authorised_for_s4_count": 159,
+  "review_file_sha256": "e5bdfc604338b6f8a34ec2e66693a57a58c419aca6120fe6bb8ed4759b4a0464"
+}

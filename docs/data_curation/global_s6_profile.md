@@ -7,7 +7,7 @@ S7.
 
 ```text
 frozen final S5 corpus
-  corpus_clustered_final.csv (1281 identities)
+  corpus_clustered_final.csv (1278 identities)
   clusters_final.tsv / cluster_summary_final.csv
   S5A membership + exact overlap provenance
         ->
@@ -22,9 +22,9 @@ The principal S6 grain is one S5 scientific identity = one exact
 `(sequence_core, canonical_target_name)` relationship.
 
 ```text
-records / identities = 1281
-distinct sequence_core = 1144
-final clusters         = 796
+records / identities = 1278
+distinct sequence_core = 1139
+final clusters         = 792
 ```
 
 Donor `record_id` remains provenance and is not unique at this grain.
@@ -37,7 +37,7 @@ clusters are retained, multi-target cluster treatment, ordering, or
 collateral removal of other-target identities. S6 therefore reports
 diagnostic bounds only:
 
-- nominal identity threshold = `floor(fraction * 1281)`;
+- nominal identity threshold = `floor(fraction * 1278)`;
 - idealised record-wise capped size (not executable S7 output);
 - cluster-union upper bound if every cluster touching an
   overrepresented target were removed.

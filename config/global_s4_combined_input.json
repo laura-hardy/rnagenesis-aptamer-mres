@@ -3,7 +3,7 @@
   "combination_mode": "row_preserving_concatenation",
   "canonical_schema_module": "scripts/data_preparation/common/corpus_schema.py",
   "canonical_columns_symbol": "CORPUS_COLUMNS",
-  "expected_combined_records": 2960,
+  "expected_combined_records": 2957,
   "output_csv": "data/interim/global_s4/combined_global_s4_input.csv",
   "output_summary": "data/interim/global_s4/combined_global_s4_input_summary.md",
   "output_manifest": "data/interim/global_s4/combined_global_s4_input_manifest.json",
@@ -66,7 +66,7 @@
     {
       "source_key": "aptabase",
       "source_config": "config/global_s4_sources/aptabase.json",
-      "expected_records": 162,
+      "expected_records": 159,
       "record_id_prefix": "aptabase:",
       "principal_extra_fields": []
     },

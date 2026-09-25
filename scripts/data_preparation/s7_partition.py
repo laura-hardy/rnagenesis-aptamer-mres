@@ -271,8 +271,21 @@ def _derive_s7b_assignment(
     fractions = config.get("partition_fractions") or {"FT": 0.80, "REF": 0.10, "EVAL": 0.10}
     quota_candidates = derive_integer_quotas(space.n_clusters, fractions)
     max_passes = int(config.get("local_search_max_passes") or 10_000)
+    raw_evals = config.get("local_search_max_evals")
+    raw_seconds = config.get("local_search_max_seconds")
+    max_evals = None if raw_evals in (None, "") else int(raw_evals)
+    max_seconds = None if raw_seconds in (None, "") else float(raw_seconds)
+    progress = bool(config.get("local_search_progress", False))
+    progress_every = int(config.get("local_search_progress_every") or 5_000)
+    search_kwargs = {
+        "max_passes": max_passes,
+        "max_evals": max_evals,
+        "max_seconds": max_seconds,
+        "progress": progress,
+        "progress_every": progress_every,
+    }
     selected = select_preview_assignment(
-        features, space, quota_candidates, max_passes=max_passes
+        features, space, quota_candidates, **search_kwargs
     )
     if repeat_for_determinism:
         reversed_features, reversed_space = build_cluster_features(
@@ -282,7 +295,7 @@ def _derive_s7b_assignment(
             reversed_features,
             reversed_space,
             quota_candidates,
-            max_passes=max_passes,
+            **search_kwargs,
         )
         if again["assignment"] != selected["assignment"]:
             raise S7PartitionError("S7B assignment depends on input row order")
@@ -581,8 +594,24 @@ def run_s7b_partition_preview(
         "output_hashes": output_hashes,
         "n_accepted_swaps": int(selected["n_accepted_swaps"]),
         "n_local_search_passes": int(selected["n_local_search_passes"]),
+        "n_evals": int(selected["n_evals"]),
+        "n_exact_evals": int(selected["n_exact_evals"]),
+        "search_elapsed_seconds": float(selected["search_elapsed_seconds"]),
         "local_search_converged": bool(selected["local_search_converged"]),
         "greedy_o1": float(selected["greedy_score"].o1),
+        "quota_search_stats": [
+            {
+                "quotas": list(item["quotas"].as_tuple),
+                "n_passes": int(item["n_local_search_passes"]),
+                "n_evals": int(item["n_evals"]),
+                "n_exact_evals": int(item["n_exact_evals"]),
+                "n_accepted_swaps": int(item["n_accepted_swaps"]),
+                "elapsed_seconds": float(item["search_elapsed_seconds"]),
+                "converged": bool(item["local_search_converged"]),
+                "O1": float(item["score"].o1),
+            }
+            for item in selected.get("all_quota_results") or []
+        ],
         "features": features,
         "space": space,
         "gmm": gmm,
@@ -1073,6 +1102,14 @@ def main() -> int:
                         },
                         "O1": score.o1,
                         "O3": score.o3,
+                        "n_accepted_swaps": result["n_accepted_swaps"],
+                        "n_local_search_passes": result["n_local_search_passes"],
+                        "n_evals": result["n_evals"],
+                        "n_exact_evals": result["n_exact_evals"],
+                        "search_elapsed_seconds": result["search_elapsed_seconds"],
+                        "local_search_converged": result["local_search_converged"],
+                        "hit_max_passes": not result["local_search_converged"],
+                        "quota_search_stats": result["quota_search_stats"],
                         "ref_frozen": False,
                         "eval_frozen": False,
                         "authoritative_partitioned_corpus_written": False,

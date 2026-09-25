@@ -6,6 +6,8 @@ import the legacy AptaBase cleaner. Does not accept, reject or park records.
 
 from __future__ import annotations
 
+import csv
+import hashlib
 import json
 import math
 import re
@@ -14,6 +16,8 @@ from pathlib import Path
 from typing import Any, Final, Iterable, Mapping, Sequence
 
 from common.corpus_schema import (
+    ALPHABET_AS_REPORTED_VOCABULARY,
+    CHEMISTRY_VOCABULARY,
     format_qc_flags,
     validate_s2_record,
 )
@@ -21,6 +25,7 @@ from common.sequence_normalisation import (
     ALPHABET_DNA_T,
     ALPHABET_MISSING,
     ALPHABET_RNA,
+    TRIM_CONFIDENCE_HIGH,
     TRIM_CONFIDENCE_NA,
     SequenceNormalisationRules,
     classify_alphabet,
@@ -138,6 +143,157 @@ _NEW_MOLECULE_CATEGORY: Final[dict[str, str]] = {
 
 class AptaBaseS2Error(ValueError):
     """Hard failure during AptaBase S2 normalisation."""
+
+
+CORRECTION_CONFIG_REL: Final[str] = (
+    "config/source_normalisation/aptabase_record_corrections.json"
+)
+OPERATION_REPLACE_CORE: Final[str] = "replace_modelling_core"
+OPERATION_SET_MOLECULE: Final[str] = "retain_sequence_set_molecule"
+ALLOWED_CORRECTION_OPERATIONS: Final[frozenset[str]] = frozenset(
+    {OPERATION_REPLACE_CORE, OPERATION_SET_MOLECULE}
+)
+STALE_CORRECTION_FLAGS: Final[frozenset[str]] = frozenset(
+    {
+        "mixed_t_u",
+        "t_in_reported_rna",
+        "u_in_reported_dna",
+        "trim_requires_review",
+        "molecule_type_unknown",
+        "core_below_min_length",
+        "core_above_max_length",
+    }
+)
+CORE_LENGTH_MIN: Final[int] = 20
+CORE_LENGTH_MAX: Final[int] = 100
+
+
+@dataclass(frozen=True)
+class AptabaseRecordCorrection:
+    """One approved AptaBase record correction. Sequence lives only on this object."""
+
+    record_id: str
+    operation: str
+    molecule_type: str
+    chemistry: str
+    alphabet_as_reported: str
+    t_to_u_applied: bool
+    expected_core_length: int
+    core_sha256: str
+    sequence_core: str
+    note: str
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _require_correction_core(correction: AptabaseRecordCorrection) -> None:
+    if correction.t_to_u_applied:
+        raise AptaBaseS2Error(
+            f"{correction.record_id} correction must not set t_to_u_applied"
+        )
+    if len(correction.sequence_core) != correction.expected_core_length:
+        raise AptaBaseS2Error(
+            f"{correction.record_id} core length {len(correction.sequence_core)} "
+            f"!= expected {correction.expected_core_length}"
+        )
+    digest = _sha256_text(correction.sequence_core)
+    if digest != correction.core_sha256:
+        raise AptaBaseS2Error(
+            f"{correction.record_id} core SHA-256 does not match the tracked config"
+        )
+    if correction.operation == OPERATION_REPLACE_CORE and "T" in correction.sequence_core:
+        raise AptaBaseS2Error(
+            f"{correction.record_id} RNA modelling core must not contain T"
+        )
+
+
+def load_aptabase_record_corrections(
+    config_path: str | Path,
+    *,
+    repo_root: str | Path,
+) -> dict[str, AptabaseRecordCorrection]:
+    """Load the tracked correction config and the ignored sequence table."""
+    config_file = Path(config_path)
+    payload = json.loads(config_file.read_text(encoding="utf-8"))
+    if payload.get("source_key") != "aptabase":
+        raise AptaBaseS2Error("AptaBase correction config source_key must be aptabase")
+    records = payload.get("records")
+    if not isinstance(records, dict) or not records:
+        raise AptaBaseS2Error("AptaBase correction config has no records")
+    sequences_rel = payload.get("sequences_path")
+    if not isinstance(sequences_rel, str) or not sequences_rel:
+        raise AptaBaseS2Error("AptaBase correction config missing sequences_path")
+    sequences_path = Path(repo_root) / sequences_rel
+    if not sequences_path.is_file():
+        raise AptaBaseS2Error(
+            f"Missing AptaBase correction sequence table: {sequences_path}"
+        )
+    with sequences_path.open(encoding="utf-8", newline="") as handle:
+        sequence_rows = list(csv.DictReader(handle))
+    sequences = {row["record_id"]: row["sequence_core"] for row in sequence_rows}
+    if set(sequences) != set(records):
+        raise AptaBaseS2Error(
+            "Correction sequence table record_ids must match the tracked config"
+        )
+    loaded: dict[str, AptabaseRecordCorrection] = {}
+    for record_id, cfg in records.items():
+        operation = cfg.get("operation")
+        if operation not in ALLOWED_CORRECTION_OPERATIONS:
+            raise AptaBaseS2Error(
+                f"Unknown correction operation for {record_id}: {operation!r}"
+            )
+        chemistry = cfg.get("chemistry", "")
+        alphabet = cfg.get("alphabet_as_reported", "")
+        if chemistry not in CHEMISTRY_VOCABULARY:
+            raise AptaBaseS2Error(f"Invalid chemistry for {record_id}: {chemistry!r}")
+        if alphabet not in ALPHABET_AS_REPORTED_VOCABULARY:
+            raise AptaBaseS2Error(
+                f"Invalid alphabet_as_reported for {record_id}: {alphabet!r}"
+            )
+        if cfg.get("t_to_u_applied") is not False:
+            raise AptaBaseS2Error(f"{record_id} t_to_u_applied must be false")
+        note = cfg.get("note") or ""
+        if "|" in note:
+            raise AptaBaseS2Error(f"{record_id} correction note must not contain '|'")
+        correction = AptabaseRecordCorrection(
+            record_id=record_id,
+            operation=operation,
+            molecule_type=str(cfg.get("molecule_type") or ""),
+            chemistry=chemistry,
+            alphabet_as_reported=alphabet,
+            t_to_u_applied=False,
+            expected_core_length=int(cfg["expected_core_length"]),
+            core_sha256=str(cfg["core_sha256"]),
+            sequence_core=sequences[record_id],
+            note=note,
+        )
+        if correction.molecule_type not in {"RNA", "ssDNA", "DNA", "unknown"}:
+            raise AptaBaseS2Error(
+                f"Invalid molecule_type for {record_id}: {correction.molecule_type!r}"
+            )
+        _require_correction_core(correction)
+        loaded[record_id] = correction
+    return loaded
+
+
+def corrections_for_records(
+    config_path: str | Path,
+    *,
+    repo_root: str | Path,
+    record_ids: Iterable[str],
+) -> dict[str, AptabaseRecordCorrection] | None:
+    """Load corrections only when an input row is one of the approved records."""
+    ids = set(record_ids)
+    config_file = Path(config_path)
+    if not config_file.is_file():
+        return None
+    payload = json.loads(config_file.read_text(encoding="utf-8"))
+    declared = set(payload.get("records") or {})
+    if not ids & declared:
+        return None
+    return load_aptabase_record_corrections(config_file, repo_root=repo_root)
 
 
 @dataclass(frozen=True)
@@ -974,6 +1130,7 @@ def normalise_aptabase_record(
     *,
     policy: AptabaseNormalisationPolicy,
     rules: SequenceNormalisationRules | None = None,
+    corrections: Mapping[str, AptabaseRecordCorrection] | None = None,
 ) -> AptaBaseS2RowResult:
     """Normalise one AptaBase S1 record into S2 canonical + QC rows."""
     active_rules = rules if rules is not None else load_normalisation_rules()
@@ -1074,7 +1231,8 @@ def normalise_aptabase_record(
         rules=active_rules,
     )
 
-    # AptaBase has no approved trim plan in this milestone.
+    # AptaBase has no motif-trim plan. Approved per-record corrections may
+    # replace the modelling core, but sequence_full stays equal to that core.
     sequence_full = norm.sequence_full or ""
     sequence_core = sequence_full
     five_motifs, three_motifs = _motif_names_by_side(norm.detected_motifs)
@@ -1085,10 +1243,53 @@ def normalise_aptabase_record(
         trim_status = "review_required"
     else:
         trim_status = "not_trimmed"
+    trim_confidence = TRIM_CONFIDENCE_NA
 
-    # Ensure molecule_type_unknown is present when still unknown.
     resolved_molecule = norm.molecule_type
-    if resolved_molecule == "unknown":
+    alphabet_as_reported = norm.alphabet_as_reported
+    t_to_u_applied = bool(norm.t_to_u_applied)
+    chemistry = s1_record.get("chemistry", "")
+    correction = None if corrections is None else corrections.get(s1_record["record_id"])
+    if correction is not None:
+        _require_correction_core(correction)
+        if correction.operation == OPERATION_REPLACE_CORE:
+            sequence_full = correction.sequence_core
+            sequence_core = correction.sequence_core
+            trim_status = "primers_removed"
+            trim_confidence = TRIM_CONFIDENCE_HIGH
+        elif correction.operation == OPERATION_SET_MOLECULE:
+            if sequence_full != correction.sequence_core:
+                raise AptaBaseS2Error(
+                    f"{correction.record_id} retain-sequence correction does not "
+                    "match the cleaned source sequence"
+                )
+        else:
+            raise AptaBaseS2Error(
+                f"Unknown correction operation {correction.operation!r}"
+            )
+        resolved_molecule = correction.molecule_type
+        alphabet_as_reported = correction.alphabet_as_reported
+        t_to_u_applied = False
+        chemistry = correction.chemistry
+        qc_flags = [flag for flag in qc_flags if flag not in STALE_CORRECTION_FLAGS]
+        core_len = len(sequence_core)
+        if core_len < CORE_LENGTH_MIN:
+            qc_flags.append("core_below_min_length")
+        elif core_len > CORE_LENGTH_MAX:
+            qc_flags.append("core_above_max_length")
+        qc_flags.append("approved_aptabase_record_correction")
+        if correction.note:
+            qc_flags.append(correction.note)
+        molecule = MoleculeEvidenceResult(
+            molecule_type=resolved_molecule,
+            evidence_source="approved_record_correction",
+            evidence_category="human_disposition",
+            rna_terms_found=(),
+            dna_terms_found=(),
+            conflict=False,
+            qc_flags=(),
+        )
+    elif resolved_molecule == "unknown":
         qc_flags.append("molecule_type_unknown")
 
     length_diag = compare_reported_length(
@@ -1099,13 +1300,13 @@ def normalise_aptabase_record(
     gc_diag = compare_gc_content(
         source_metadata.get("aptabase_gc_content_reported", ""),
         sequence_full if sequence_full else None,
-        norm.alphabet_as_reported,
+        alphabet_as_reported,
         threshold_pp=policy.gc_difference_review_threshold_percentage_points,
     )
     legacy = compare_legacy_diagnostics(
         sequence_full=sequence_full if sequence_full else None,
         sequence_length_full=len(sequence_full) if sequence_full else None,
-        alphabet_as_reported=norm.alphabet_as_reported,
+        alphabet_as_reported=alphabet_as_reported,
         molecule_type=resolved_molecule,
         molecule_evidence_source=molecule.evidence_source,
         gc_calculated_s2=gc_diag.gc_calculated_s2,
@@ -1123,12 +1324,13 @@ def normalise_aptabase_record(
     canonical["sequence_length_core"] = str(len(sequence_core))
     canonical["construct_scope"] = "full_equals_core_untrimmed"
     canonical["trim_status"] = trim_status
-    canonical["trim_confidence"] = TRIM_CONFIDENCE_NA
+    canonical["trim_confidence"] = trim_confidence
     canonical["detected_constant_5p"] = five_motifs
     canonical["detected_constant_3p"] = three_motifs
     canonical["molecule_type"] = resolved_molecule
-    canonical["alphabet_as_reported"] = norm.alphabet_as_reported
-    canonical["t_to_u_applied"] = "true" if norm.t_to_u_applied else "false"
+    canonical["alphabet_as_reported"] = alphabet_as_reported
+    canonical["t_to_u_applied"] = "true" if t_to_u_applied else "false"
+    canonical["chemistry"] = chemistry
     canonical["qc_flags"] = format_qc_flags(qc_flags)
 
     validated = validate_s2_record(canonical, s1_record=s1_record)

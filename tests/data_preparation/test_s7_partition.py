@@ -43,6 +43,8 @@ from adapters.s7_partition import (  # noqa: E402
     input_unmutated,
     integrity_gates,
     js_divergence,
+    js_divergence_rows,
+    js_from_vec,
     load_frozen_s6_gmm,
     optimise_partition,
     pairwise_local_search,
@@ -1066,4 +1068,68 @@ def test_shared_optimiser_preserves_frozen_s7b_synthetic_assignment() -> None:
     assert absdev["score"].profile == OBJECTIVE_PROFILE_ABSDEV
     assert len(absdev["score"].scientific_prefix()) == 5
     assert assignment_signature(result["assignment"]) == S7B_SYNTHETIC_ASSIGNMENT_FINGERPRINT
+
+
+def test_fast_js_rows_match_scalar_objective_within_screen_margin() -> None:
+    import numpy as np
+
+    from adapters.s7_partition import _JSD_SCREEN_EPS
+
+    rng = np.random.default_rng(7)
+    global_p = rng.random(48)
+    global_p = global_p / global_p.sum()
+    counts = rng.integers(0, 5, size=(40, 48)).astype(float)
+    batched = js_divergence_rows(counts, global_p)
+    for index in range(counts.shape[0]):
+        scalar = js_from_vec(counts[index], global_p)
+        assert abs(float(batched[index]) - scalar) < _JSD_SCREEN_EPS
+
+
+def test_screened_search_matches_scalar_search_on_fixture() -> None:
+    rows = [
+        _row(
+            index=i,
+            target=f"T{i % 11}",
+            cluster_id=f"c{i:02d}",
+            evidence_level=("E2", "E3", "E4")[i % 3],
+            source_db=("srcA", "srcB")[i % 2],
+            target_family=("enzyme", "receptor")[i % 2],
+            length=30 if i % 2 == 0 else 80,
+        )
+        for i in range(18)
+    ]
+    features, space = _features(rows)
+    quotas = derive_integer_quotas(len(features))[0]
+    scalar = optimise_partition(features, space, quotas, evaluator="scalar", progress=False)
+    screened = optimise_partition(features, space, quotas, evaluator="screened", progress=False)
+    assert screened["assignment"] == scalar["assignment"]
+    assert screened["comparison_tuple"] == scalar["comparison_tuple"]
+    assert screened["score"].scientific_prefix() == scalar["score"].scientific_prefix()
+    counts = Counter(screened["assignment"].values())
+    assert counts == {"FT": quotas.n_FT, "REF": quotas.n_REF, "EVAL": quotas.n_EVAL}
+    assert set(screened["assignment"]) == set(features)
+    assert len(screened["assignment"]) == len(features)
+    assert "family" not in PRIMARY_CRITERIA
+    assert screened["score"].as_dict()["target_family_in_primary_objective"] is False
+    mutated = {
+        cluster_id: feature
+        for cluster_id, feature in features.items()
+    }
+    for feature in mutated.values():
+        feature.family_counts = {"rewritten-family": feature.n_identities}
+    family_changed = optimise_partition(
+        mutated, space, quotas, evaluator="screened", progress=False
+    )
+    assert family_changed["assignment"] == screened["assignment"]
+    assert family_changed["comparison_tuple"][:3] == screened["comparison_tuple"][:3]
+
+
+def test_local_search_bound_rejects_partial_assignment() -> None:
+    rows = [_row(index=i, target=f"T{i}", cluster_id=f"c{i:02d}") for i in range(12)]
+    features, space = _features(rows)
+    start = greedy_assign(features, space, _quotas(8, 2, 2))
+    with pytest.raises(S7PartitionError, match="no partition output accepted"):
+        pairwise_local_search(start, features, space, max_evals=3, evaluator="scalar")
+    with pytest.raises(S7PartitionError, match="no partition output accepted"):
+        pairwise_local_search(start, features, space, max_seconds=0.0, evaluator="screened")
 

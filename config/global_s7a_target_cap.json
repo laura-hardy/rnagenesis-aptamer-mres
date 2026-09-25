@@ -7,12 +7,12 @@
   "curation_config": "config/curation_config.yaml",
   "authoritative_corpus": "data/interim/deduplicated/corpus_clustered_final.csv",
   "expected_input_sha256_from": "config/global_s6_profile.json#expected_s5_final_hashes.corpus_clustered_final_csv",
-  "expected_input_sha256": "615677d51aa81337a3660b8c67e9db9fae2a5c8abc7128e7668617a342689d30",
+  "expected_input_sha256": "c6ee6288423d863e55bbfa1b73ccee66f2999e27f3bae04d3b95d200c35e56d6",
   "expected_input_counts": {
-    "n_scientific_identities": 1281,
-    "n_distinct_sequence_core": 1144,
-    "n_final_clusters": 796,
-    "n_canonical_targets": 411
+    "n_scientific_identities": 1278,
+    "n_distinct_sequence_core": 1139,
+    "n_final_clusters": 792,
+    "n_canonical_targets": 409
   },
   "max_target_fraction": 0.03,
   "max_target_fraction_source": "config/curation_config.yaml",

@@ -2,109 +2,109 @@
   "contract_id": "s7c_ft_split_freeze",
   "checkpoint": "CHECKPOINT-3",
   "milestone": "S7C_ft_train_validation_application_and_freeze",
-  "decision_date": "2026-09-21",
-  "freeze_date": "2026-09-21",
+  "decision_date": "2026-09-24",
+  "freeze_date": "2026-09-24",
   "freeze_reason": "approved v2 FT train/validation assignment frozen before any model training, checkpoint selection, hyperparameter comparison, REF calibration or EVAL evaluation",
-  "frozen_ft_input_sha256": "b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff",
-  "approved_v2_preview_hash": "2f11a2b129f025965a428d0f6344e98fd9f615d519c68ba49a49c7d0386951ee",
-  "approved_v2_preview_manifest_hash": "5bb05e2d73651221e8a553b453c807114427da950968b7bafe6b769900e20838",
-  "authoritative_assignment_hash": "22f3ef6236e8f59303670497772707e71625f2f444785fda4e7f9f9daa28eb04",
+  "frozen_ft_input_sha256": "4206b431d6f674887dc07b13502ef060c097e6c7f7abf9e7de7b73041ac3b3d5",
+  "approved_v2_preview_hash": "9f310e6b9ec31311ddd4674c2150d575ed22bebf867a23cf5872d5ef84ded03b",
+  "approved_v2_preview_manifest_hash": "1f9a069d95b57c2eca53c116915820df64f7a9a7e283ce685c616314e4444383",
+  "authoritative_assignment_hash": "74b2f7db21184cd418580bc299a3cac6af61450848d9e7e45c963a0667f2a27a",
   "preview_application_mismatch_count": 0,
   "split_quotas": {
-    "TRAIN": 571,
-    "VALIDATION": 64
+    "TRAIN": 569,
+    "VALIDATION": 63
   },
   "TRAIN": {
-    "clusters": 571,
-    "identities": 746,
-    "cores": 678,
-    "targets_represented": 333,
-    "file_sha256": "941fe8783ee8c99a2ce7598dea00ed123e62750026b7f157f28e7bbcc5d14a8f",
-    "identity_set_hash": "75e5cb8471d2fb3ee30529617aaf80ff584d5bf79e9976dc338434057a6aac6a",
-    "cluster_set_hash": "18c6df63ac4935557bad9c5fcc12610dd280b207652208faf04f0ba39d9c3349",
+    "clusters": 569,
+    "identities": 726,
+    "cores": 669,
+    "targets_represented": 320,
+    "file_sha256": "84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0",
+    "identity_set_hash": "be5d3c700534633fce62498ea0b5d69cf0bfab148ad6a07931bc3b875efc9d5d",
+    "cluster_set_hash": "07f6dac62f5a280b5f4204724d20a3a1448bc5be13c99d8b6eda63dfc491d02e",
     "frozen": true
   },
   "VALIDATION": {
-    "clusters": 64,
-    "identities": 149,
-    "cores": 117,
-    "targets_represented": 102,
-    "file_sha256": "03be477e12f7b9ca20f8911e2ac88fde2949af2b6131c2d2aa43eef2ae6d9abc",
-    "identity_set_hash": "19121149b9e0e02dd9cda5eb5619c64df86940331603139b702d436e6bde67ac",
-    "cluster_set_hash": "088d6b4db826be5c970b410e74cfa2d52fc402fa4818c692f8be30e42f79c4f9",
+    "clusters": 63,
+    "identities": 132,
+    "cores": 95,
+    "targets_represented": 100,
+    "file_sha256": "cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd",
+    "identity_set_hash": "4a632efeb3fe20b8d09441812f6e06e533cebece132f5bec810135e78221f4ec",
+    "cluster_set_hash": "8223fa96dd4a84ee69445e856595cef2e9347283b50d68e29abef1f020556673",
     "frozen": true
   },
   "REF": {
-    "file_sha256": "6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d",
-    "identity_set_hash": "54a74c8bb8ef67f36dd4b054d6ed43f201bd38d41d75244d9b69eb1583951abc",
-    "cluster_set_hash": "84afc5a5bb030db9cbdddb7246ceaab3457ef8eb02f1192575433d5f77f6cd82",
+    "file_sha256": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
+    "identity_set_hash": "254178519388939ddaf711910e4841a9641370220ebf6e9a8c243861d49b4906",
+    "cluster_set_hash": "91aa1aec052535ca91cbdb2a10a875390f147cc2b45d4cc2b64fe324bd19a1bd",
     "frozen": true
   },
   "EVAL": {
-    "file_sha256": "88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d",
-    "identity_set_hash": "47ef50345fae50f14e99547426dbf3a3c34ed0caf49574005fb3f1da94315406",
-    "cluster_set_hash": "c923af78ef7b191b569c5ead859982eb7711460a6537d0a70612a1101ffa8138",
+    "file_sha256": "ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015",
+    "identity_set_hash": "4ebd8347fd532581ffe46acbd0684f8763aa1ce40f33e6b86ab300e82e802ef0",
+    "cluster_set_hash": "f9098d8795ba17d6c0e0de9b7dad7d17a97f762888594689f810f9c7f08f2e1c",
     "frozen": true
   },
   "objective": {
     "profile": "max_abs_proportion_deviation",
     "log_base": 2.0,
     "J_target": {
-      "TRAIN": 0.052039505540865325,
-      "VALIDATION": 0.43146710309576275
+      "TRAIN": 0.04947789947066262,
+      "VALIDATION": 0.4559281414000081
     },
     "J_evidence": {
-      "TRAIN": 9.3435973199372e-07,
-      "VALIDATION": 2.301452558293158e-05
+      "TRAIN": 5.026224561594406e-08,
+      "VALIDATION": 1.5170137987200122e-06
     },
     "J_length": {
-      "TRAIN": 7.358579051964533e-09,
-      "VALIDATION": 2.471485994031135e-07
+      "TRAIN": 4.4195459236430696e-08,
+      "VALIDATION": 2.1930805006481913e-06
     },
     "J_source": {
-      "TRAIN": 2.2978735808370176e-06,
-      "VALIDATION": 5.848076141135722e-05
+      "TRAIN": 1.2006527559989136e-06,
+      "VALIDATION": 3.61580874970774e-05
     },
-    "D_target": 0.43146710309576275,
-    "D_evidence": 2.301452558293158e-05,
-    "D_length": 2.471485994031135e-07,
-    "D_source": 5.848076141135722e-05,
-    "O1": 0.43146710309576275,
+    "D_target": 0.4559281414000081,
+    "D_evidence": 1.5170137987200122e-06,
+    "D_length": 2.1930805006481913e-06,
+    "D_source": 3.61580874970774e-05,
+    "O1": 0.4559281414000081,
     "lexicographic_descending_D_vector": [
-      0.43146710309576275,
-      5.848076141135722e-05,
-      2.301452558293158e-05,
-      2.471485994031135e-07
+      0.4559281414000081,
+      3.61580874970774e-05,
+      2.1930805006481913e-06,
+      1.5170137987200122e-06
     ],
-    "O3": 0.4315488455313565,
+    "O3": 0.45596800958180456,
     "A_target": {
-      "TRAIN": 0.0033519553072625698,
-      "VALIDATION": 0.016782272880656892
+      "TRAIN": 0.002331002331002332,
+      "VALIDATION": 0.01282051282051282
     },
     "A_evidence": {
-      "TRAIN": 0.0006934563481959671,
-      "VALIDATION": 0.0034719358104308012
+      "TRAIN": 0.0002119093028184471,
+      "VALIDATION": 0.0011655011655011815
     },
     "A_length": {
-      "TRAIN": 0.00010018367006181528,
-      "VALIDATION": 0.0005805515239477588
+      "TRAIN": 0.0002445628780942122,
+      "VALIDATION": 0.0017222375310003146
     },
     "A_source": {
-      "TRAIN": 0.0006575104467775941,
-      "VALIDATION": 0.0032919650556784558
+      "TRAIN": 0.0005297732570459929,
+      "VALIDATION": 0.0029137529137529122
     },
-    "M_target": 0.016782272880656892,
-    "M_evidence": 0.0034719358104308012,
-    "M_length": 0.0005805515239477588,
-    "M_source": 0.0032919650556784558,
-    "R1": 0.016782272880656892,
+    "M_target": 0.01282051282051282,
+    "M_evidence": 0.0011655011655011815,
+    "M_length": 0.0017222375310003146,
+    "M_source": 0.0029137529137529122,
+    "R1": 0.01282051282051282,
     "lexicographic_descending_M_vector": [
-      0.016782272880656892,
-      0.0034719358104308012,
-      0.0032919650556784558,
-      0.0005805515239477588
+      0.01282051282051282,
+      0.0029137529137529122,
+      0.0017222375310003146,
+      0.0011655011655011815
     ],
-    "R3": 0.024126725270713908,
+    "R3": 0.01862200443076723,
     "arbitrary_manually_chosen_criterion_weights": null,
     "target_family_in_primary_objective": false,
     "comparison_tuple_fields": [

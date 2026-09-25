@@ -3,7 +3,7 @@
   "milestone": "S7D_final_corpus_build_and_validation",
   "build_date": "2026-09-22",
   "governing_plan_version": "1.5",
-  "repository_head_baseline": "c1081c14cb3f20869affeddea49f5dd740b0bc51",
+  "repository_head_baseline": "5afc24147fdc9b40a3d563cf68430da867ea6aa1",
   "max_target_fraction": 0.03,
   "training_sequence_column": "sequence_core",
   "corpus_final_txt_source": "frozen_ft_train_only",
@@ -34,26 +34,26 @@
   },
   "expected_s6_gmm2": {
     "means": [
-      38.887311544692416,
-      77.35623497594804
+      38.959315119436454,
+      77.29072043239506
     ],
     "variances": [
-      63.42923673279216,
-      168.91459023894495
+      63.1958166211836,
+      169.75577345871622
     ],
     "weights": [
-      0.5805142816481399,
-      0.41948571835186194
+      0.5830380028129531,
+      0.416961997187046
     ]
   },
   "frozen_inputs": {
     "s5_pre_cap_corpus": {
       "path": "data/interim/deduplicated/corpus_clustered_final.csv",
-      "sha256": "615677d51aa81337a3660b8c67e9db9fae2a5c8abc7128e7668617a342689d30"
+      "sha256": "c6ee6288423d863e55bbfa1b73ccee66f2999e27f3bae04d3b95d200c35e56d6"
     },
     "s7a_post_cap": {
       "path": "data/interim/s7a_target_cap/corpus_post_cap.csv",
-      "sha256": "6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd"
+      "sha256": "0c17e8eea27498ff6f724021915c1567fc2e988977e0430f532897484fe427d7"
     },
     "s7a_removed_clusters": {
       "path": "data/interim/s7a_target_cap/s7a_removed_clusters.csv",
@@ -61,85 +61,85 @@
     },
     "s7b_partitioned": {
       "path": "data/interim/s7b_partition/corpus_partitioned.csv",
-      "sha256": "755e6afaf6a522be390073d3651311f8afc0ca9486322ac3bbfe348cd2a3fb1a"
+      "sha256": "2797e6767f78029574df1b6cdf51bbe7952ea8affce83870441b3d3d93c98849"
     },
     "s7b_ft": {
       "path": "data/interim/s7b_partition/ft.csv",
-      "sha256": "b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff"
+      "sha256": "4206b431d6f674887dc07b13502ef060c097e6c7f7abf9e7de7b73041ac3b3d5"
     },
     "s7b_ref": {
       "path": "data/interim/s7b_partition/ref.csv",
-      "sha256": "6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d",
-      "identity_set_hash": "54a74c8bb8ef67f36dd4b054d6ed43f201bd38d41d75244d9b69eb1583951abc",
-      "cluster_set_hash": "84afc5a5bb030db9cbdddb7246ceaab3457ef8eb02f1192575433d5f77f6cd82"
+      "sha256": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
+      "identity_set_hash": "254178519388939ddaf711910e4841a9641370220ebf6e9a8c243861d49b4906",
+      "cluster_set_hash": "91aa1aec052535ca91cbdb2a10a875390f147cc2b45d4cc2b64fe324bd19a1bd"
     },
     "s7b_eval": {
       "path": "data/interim/s7b_partition/eval.csv",
-      "sha256": "88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d",
-      "identity_set_hash": "47ef50345fae50f14e99547426dbf3a3c34ed0caf49574005fb3f1da94315406",
-      "cluster_set_hash": "c923af78ef7b191b569c5ead859982eb7711460a6537d0a70612a1101ffa8138"
+      "sha256": "ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015",
+      "identity_set_hash": "4ebd8347fd532581ffe46acbd0684f8763aa1ce40f33e6b86ab300e82e802ef0",
+      "cluster_set_hash": "f9098d8795ba17d6c0e0de9b7dad7d17a97f762888594689f810f9c7f08f2e1c"
     },
     "s7c_train": {
       "path": "data/interim/s7c_ft_split/ft_train.csv",
-      "sha256": "941fe8783ee8c99a2ce7598dea00ed123e62750026b7f157f28e7bbcc5d14a8f",
-      "identity_set_hash": "75e5cb8471d2fb3ee30529617aaf80ff584d5bf79e9976dc338434057a6aac6a",
-      "cluster_set_hash": "18c6df63ac4935557bad9c5fcc12610dd280b207652208faf04f0ba39d9c3349"
+      "sha256": "84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0",
+      "identity_set_hash": "be5d3c700534633fce62498ea0b5d69cf0bfab148ad6a07931bc3b875efc9d5d",
+      "cluster_set_hash": "07f6dac62f5a280b5f4204724d20a3a1448bc5be13c99d8b6eda63dfc491d02e"
     },
     "s7c_validation": {
       "path": "data/interim/s7c_ft_split/ft_validation.csv",
-      "sha256": "03be477e12f7b9ca20f8911e2ac88fde2949af2b6131c2d2aa43eef2ae6d9abc",
-      "identity_set_hash": "19121149b9e0e02dd9cda5eb5619c64df86940331603139b702d436e6bde67ac",
-      "cluster_set_hash": "088d6b4db826be5c970b410e74cfa2d52fc402fa4818c692f8be30e42f79c4f9"
+      "sha256": "cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd",
+      "identity_set_hash": "4a632efeb3fe20b8d09441812f6e06e533cebece132f5bec810135e78221f4ec",
+      "cluster_set_hash": "8223fa96dd4a84ee69445e856595cef2e9347283b50d68e29abef1f020556673"
     },
     "s7c_assignment": {
       "path": "data/interim/s7c_ft_split/ft_split_assignment.csv",
-      "sha256": "22f3ef6236e8f59303670497772707e71625f2f444785fda4e7f9f9daa28eb04"
+      "sha256": "74b2f7db21184cd418580bc299a3cac6af61450848d9e7e45c963a0667f2a27a"
     },
     "s4_reviewed_relationships": {
       "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
-      "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502"
+      "sha256": "252987d71839623566ea1fa5ddf0c0c591d23fe39fad858f84d212d7abf5d458"
     },
     "s4_reviewed_dictionary": {
       "path": "data/interim/global_s4/global_s4_reviewed_target_dictionary.csv",
-      "sha256": "e7234d9a9308dd899cbb3f801ff20ba05b2960071ede98812c6109db0f21b5ec"
+      "sha256": "afcd8f02e13feee26bb54cf1caad76508780828d4cee3816ab5c9c1cf0b178d8"
     },
     "s4_record_map": {
       "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
-      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b"
+      "sha256": "701acc7134f010401a49c137e80ff4bc50f31a9645b71cda4ae686426a032d7f"
     },
     "s4_parked_audit": {
       "path": "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
-      "sha256": "98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7"
+      "sha256": "d46730de8de9e4f111866f2543269b6d72c56e45bc89e65f92de36481c6aabd2"
     },
     "s4_routing_summary": {
       "path": "data/interim/global_s4/global_s4_routing_summary.csv",
-      "sha256": "46bc0c91a121f1737f3816ec4b16fef4630b388310c9599171cf054b17e74635"
+      "sha256": "add4655eaf498e3b369f66b12866c6a32e837e28b4d49bc44a1c5245ab939ff6"
     },
     "s4_combined_input": {
       "path": "data/interim/global_s4/combined_global_s4_input.csv",
-      "sha256": "24c49bcdb5f313bd9242f4a7b90671150263de532bcb1c55597d82766b55dbf0"
+      "sha256": "6609f1839cbe8ce335f04a9be4fa865b6127514d307c757c77ff71871c558fd0"
     }
   },
   "expected_counts": {
-    "n_scientific_identities": 1173,
-    "n_distinct_sequence_core": 1036,
-    "n_final_clusters": 794,
-    "n_canonical_targets": 411,
-    "n_ft": 895,
-    "n_ref": 114,
-    "n_eval": 164,
-    "n_train": 746,
-    "n_validation": 149,
-    "n_train_cores": 678,
-    "n_validation_cores": 117,
-    "n_ref_cores": 103,
-    "n_eval_cores": 138,
-    "n_train_clusters": 571,
-    "n_validation_clusters": 64,
-    "n_ref_clusters": 80,
+    "n_scientific_identities": 1170,
+    "n_distinct_sequence_core": 1031,
+    "n_final_clusters": 790,
+    "n_canonical_targets": 409,
+    "n_ft": 858,
+    "n_ref": 131,
+    "n_eval": 181,
+    "n_train": 726,
+    "n_validation": 132,
+    "n_train_cores": 669,
+    "n_validation_cores": 95,
+    "n_ref_cores": 113,
+    "n_eval_cores": 154,
+    "n_train_clusters": 569,
+    "n_validation_clusters": 63,
+    "n_ref_clusters": 79,
     "n_eval_clusters": 79,
-    "n_train_targets": 333,
-    "n_validation_targets": 102,
+    "n_train_targets": 320,
+    "n_validation_targets": 100,
     "max_target_count": 34,
     "max_target_name": "HIV-1 Rev protein",
     "ngf_count": 23,
@@ -148,57 +148,57 @@
   },
   "expected_evidence": {
     "corpus": {
-      "E2": 803,
+      "E2": 800,
       "E3": 247,
       "E4": 123,
       "E5": 0
     },
     "TRAIN": {
-      "E2": 513,
-      "E3": 156,
+      "E2": 496,
+      "E3": 153,
       "E4": 77
     },
     "VALIDATION": {
-      "E2": 102,
-      "E3": 31,
-      "E4": 16
+      "E2": 90,
+      "E3": 28,
+      "E4": 14
     },
     "REF": {
-      "E2": 77,
-      "E3": 25,
-      "E4": 12
+      "E2": 88,
+      "E3": 30,
+      "E4": 13
     },
     "EVAL": {
-      "E2": 111,
-      "E3": 35,
-      "E4": 18
+      "E2": 126,
+      "E3": 36,
+      "E4": 19
     }
   },
   "expected_length_regime_cores": {
     "corpus": {
       "short": 595,
-      "long": 441
+      "long": 436
     },
     "TRAIN": {
-      "short": 382,
-      "long": 296
+      "short": 386,
+      "long": 283
     },
     "VALIDATION": {
-      "short": 66,
-      "long": 51
+      "short": 55,
+      "long": 40
     },
     "REF": {
-      "short": 64,
-      "long": 39
+      "short": 65,
+      "long": 48
     },
     "EVAL": {
-      "short": 83,
-      "long": 55
+      "short": 89,
+      "long": 65
     }
   },
   "expected_source_identities": {
     "corpus": {
-      "aptabase": 102,
+      "aptabase": 99,
       "aptadb": 70,
       "aptaindex": 62,
       "aptamerbase": 491,
@@ -207,40 +207,40 @@
       "utexas": 104
     },
     "TRAIN": {
-      "aptabase": 75,
-      "aptadb": 45,
-      "aptaindex": 43,
-      "aptamerbase": 307,
-      "ena": 78,
-      "riboaptamer": 140,
-      "utexas": 58
+      "aptabase": 71,
+      "aptadb": 44,
+      "aptaindex": 42,
+      "aptamerbase": 303,
+      "ena": 74,
+      "riboaptamer": 138,
+      "utexas": 54
     },
     "VALIDATION": {
-      "aptabase": 15,
-      "aptadb": 9,
+      "aptabase": 13,
+      "aptadb": 8,
       "aptaindex": 8,
-      "aptamerbase": 61,
-      "ena": 16,
-      "riboaptamer": 28,
-      "utexas": 12
+      "aptamerbase": 55,
+      "ena": 13,
+      "riboaptamer": 25,
+      "utexas": 10
     },
     "REF": {
-      "aptabase": 3,
-      "aptadb": 6,
+      "aptabase": 2,
+      "aptadb": 7,
       "aptaindex": 3,
-      "aptamerbase": 56,
-      "ena": 15,
-      "riboaptamer": 19,
-      "utexas": 12
+      "aptamerbase": 62,
+      "ena": 16,
+      "riboaptamer": 24,
+      "utexas": 17
     },
     "EVAL": {
-      "aptabase": 9,
-      "aptadb": 10,
-      "aptaindex": 8,
-      "aptamerbase": 67,
-      "ena": 18,
+      "aptabase": 13,
+      "aptadb": 11,
+      "aptaindex": 9,
+      "aptamerbase": 71,
+      "ena": 24,
       "riboaptamer": 30,
-      "utexas": 22
+      "utexas": 23
     }
   },
   "parked_ssdna_sources": [
@@ -306,7 +306,7 @@
       "source": "global_s4",
       "lane": "global_s4_park_non_protein",
       "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
-      "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502",
+      "sha256": "252987d71839623566ea1fa5ddf0c0c591d23fe39fad858f84d212d7abf5d458",
       "filter_field": "s4_route",
       "filter_value": "park_non_protein"
     },
@@ -322,7 +322,7 @@
   "parked_e5_source": {
     "lane": "global_s4_park_evidence_e5",
     "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
-    "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502",
+    "sha256": "252987d71839623566ea1fa5ddf0c0c591d23fe39fad858f84d212d7abf5d458",
     "filter_field": "s4_route",
     "filter_value": "park_evidence_e5"
   },
@@ -575,7 +575,7 @@
       "route": "parked_molecule_unresolved",
       "grain": "source_record",
       "path": "data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_resolution.csv",
-      "sha256": "7ed7a6f877f664f08900080bd0277f47e22d02acb97fcb942361fae1d77189c3",
+      "sha256": "0082051ab658d61c8015fee10024041fe007360c80679639f9e7fd710a5d7684",
       "filters": [
         {
           "field": "resolved_decision",
@@ -598,7 +598,7 @@
       "route": "parked_ambiguous_sequence",
       "grain": "source_record",
       "path": "data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_resolution.csv",
-      "sha256": "7ed7a6f877f664f08900080bd0277f47e22d02acb97fcb942361fae1d77189c3",
+      "sha256": "0082051ab658d61c8015fee10024041fe007360c80679639f9e7fd710a5d7684",
       "filters": [
         {
           "field": "resolved_decision",
@@ -621,7 +621,7 @@
       "route": "park_non_protein",
       "grain": "reviewed_relationship",
       "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
-      "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502",
+      "sha256": "252987d71839623566ea1fa5ddf0c0c591d23fe39fad858f84d212d7abf5d458",
       "filters": [
         {
           "field": "s4_route",
@@ -639,7 +639,7 @@
       "route": "park_non_protein",
       "grain": "source_record",
       "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
-      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b",
+      "sha256": "701acc7134f010401a49c137e80ff4bc50f31a9645b71cda4ae686426a032d7f",
       "filters": [
         {
           "field": "s4_record_route",
@@ -657,7 +657,7 @@
       "route": "park_evidence_e5",
       "grain": "reviewed_relationship",
       "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
-      "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502",
+      "sha256": "252987d71839623566ea1fa5ddf0c0c591d23fe39fad858f84d212d7abf5d458",
       "filters": [
         {
           "field": "s4_route",
@@ -675,7 +675,7 @@
       "route": "park_evidence_e5",
       "grain": "source_record",
       "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
-      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b",
+      "sha256": "701acc7134f010401a49c137e80ff4bc50f31a9645b71cda4ae686426a032d7f",
       "filters": [
         {
           "field": "s4_record_route",
@@ -693,7 +693,7 @@
       "route": "hold_target_unresolved",
       "grain": "reviewed_relationship",
       "path": "data/interim/global_s4/global_s4_reviewed_relationships.csv",
-      "sha256": "dc0afb900231b2a4ef821f906bf6f5dab3c9329a49e5e9090c2aba2c818bb502",
+      "sha256": "252987d71839623566ea1fa5ddf0c0c591d23fe39fad858f84d212d7abf5d458",
       "filters": [
         {
           "field": "s4_route",
@@ -712,7 +712,7 @@
       "route": "hold_target_unresolved",
       "grain": "source_record",
       "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
-      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b",
+      "sha256": "701acc7134f010401a49c137e80ff4bc50f31a9645b71cda4ae686426a032d7f",
       "filters": [
         {
           "field": "s4_record_route_reason",
@@ -731,7 +731,7 @@
       "route": "unresolved_no_relationship",
       "grain": "source_record",
       "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
-      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b",
+      "sha256": "701acc7134f010401a49c137e80ff4bc50f31a9645b71cda4ae686426a032d7f",
       "filters": [
         {
           "field": "s4_record_route_reason",
@@ -750,7 +750,7 @@
       "route": "relationship_parked",
       "grain": "source_record",
       "path": "data/interim/global_s4/global_s4_record_relationship_map.csv",
-      "sha256": "632df4888f50d60cf376e8dee506c4cbde2044914f5158d9af26215de55b999b",
+      "sha256": "701acc7134f010401a49c137e80ff4bc50f31a9645b71cda4ae686426a032d7f",
       "filters": [
         {
           "field": "s4_record_route_reason",
@@ -769,7 +769,7 @@
       "route": "relationship_parked",
       "grain": "relationship",
       "path": "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
-      "sha256": "98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7",
+      "sha256": "d46730de8de9e4f111866f2543269b6d72c56e45bc89e65f92de36481c6aabd2",
       "filters": [
         {
           "field": "audit_class",
@@ -788,7 +788,7 @@
       "route": "target_parked",
       "grain": "source_record",
       "path": "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
-      "sha256": "98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7",
+      "sha256": "d46730de8de9e4f111866f2543269b6d72c56e45bc89e65f92de36481c6aabd2",
       "filters": [
         {
           "field": "audit_class",
@@ -807,7 +807,7 @@
       "route": "target_parked",
       "grain": "scientific_identity",
       "path": "data/interim/global_s4/global_s4_parked_excluded_audit.csv",
-      "sha256": "98ae60ac81c585b44deb229d93e8601271d71512bffbf62cb8113ff0d7e23bc7",
+      "sha256": "d46730de8de9e4f111866f2543269b6d72c56e45bc89e65f92de36481c6aabd2",
       "filters": [
         {
           "field": "audit_class",
@@ -883,7 +883,7 @@
       "source": "aptabase",
       "stage": "CHECKPOINT-1",
       "path": "data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_rejected_ids.csv",
-      "sha256": "03934f043121ca697412ded974ca13fcbb7b35502e1f8de0be1676cfb858d02f",
+      "sha256": "66167d03c4d824af4819916e012d9a0bb76460d949400b9518a59a4e9c294897",
       "resolution_path": "data/interim/checkpoints/aptabase_cp1/resolved/aptabase_checkpoint1_resolution.csv"
     },
     {

@@ -9,27 +9,27 @@
     "ChatGPT"
   ],
   "max_target_fraction": 0.03,
-  "frozen_input_sha256": "615677d51aa81337a3660b8c67e9db9fae2a5c8abc7128e7668617a342689d30",
+  "frozen_input_sha256": "c6ee6288423d863e55bbfa1b73ccee66f2999e27f3bae04d3b95d200c35e56d6",
   "preview_dir": "data/interim/s7a_target_cap_preview",
   "reviewed_preview": {
-    "input_identities": 1281,
+    "input_identities": 1278,
     "proposed_removed_clusters": 2,
     "proposed_removed_identities": 108,
-    "expected_post_cap_identities": 1173,
-    "expected_post_cap_clusters": 794,
-    "expected_max_target_share": "0.0289855072",
+    "expected_post_cap_identities": 1170,
+    "expected_post_cap_clusters": 790,
+    "expected_max_target_share": "0.0290598291",
     "selected_cluster_ids": [
       "S5C_629ca63ba64422c6f25c3bdacb0702eac54c44eae84344f08d8cec56f7dd41d2",
       "S5C_ec040aa0cd8764359b703c14330a4aade4c169a8797444a73330610477afce7c"
     ]
   },
   "reviewed_preview_hashes": {
-    "s7a_target_cap_removal_trace.csv": "da3cd922e53c1388f25d2e1e9fcd714cdc22119fdecc11057e7a2205e1df1048",
+    "s7a_target_cap_removal_trace.csv": "104ff814bc6a011d713207339544670db91ec4267aea94fbedcc7f103271b14a",
     "s7a_removed_clusters.csv": "46defa4e1b460a4b9fec91106f2cf2c432146348a23888399c3fae6c0072c40b",
-    "s7a_post_cap_target_distribution.csv": "f2be67a8c117335157577464362dc5eb1e89c28feeb9689f2b342453532ac2c7",
+    "s7a_post_cap_target_distribution.csv": "1ea12f5e5255d386085b16e1ab865b3fcc24593ebf4071ecb3014e34d766b52b",
     "s7a_mixed_cluster_collateral.csv": "91eb65f42d4469e48ba3b1c3d915c14a4d34145645169c918cd0eed3e6aacc5e",
-    "s7a_target_cap_preview_report.md": "e08ccab6f0cf3d9f22c9f9e516d780a4cab0c6820720cdc6b10f14db8e896f14",
-    "s7a_target_cap_preview_manifest.json": "f230d70db5cff5b445e730a0ee6664600584a1d5dde1e12ca8c174d044dce65a"
+    "s7a_target_cap_preview_report.md": "0b7e552266e21b9db95a31535ba76cea35f5ab6896e9c314b0af6157a20973c1",
+    "s7a_target_cap_preview_manifest.json": "d58379123d0c63de8603ba8e9fd50397e9dd0786e8f660b0698101874f337296"
   },
   "usage": {
     "audit_record_only": true,

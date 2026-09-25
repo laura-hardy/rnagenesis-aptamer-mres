@@ -2,8 +2,8 @@
 
 **Project:** Towards prediction-guided generative design of RNA aptamers against carbapenemase targets  
 **Status:** Approved modelling strategy; implementation plan to be completed before any GPU training  
-**Plan revision date:** 23 September 2026  
-**Frozen corpus commit:** `095236dfb13d1d3b13f11bbb34c2e48319c10184` — `Complete S7D final corpus build and validation`  
+**Plan revision date:** 25 September 2026  
+**Frozen corpus commit:** superseded `095236dfb13d1d3b13f11bbb34c2e48319c10184` — `Complete S7D final corpus build and validation`. The corrected corpus is closed by the commit on `main` with subject `Complete corrective corpus revision for RNA modelling alphabet gate`. That commit cannot embed its own hash; use the SHA reported for that subject.  
 **Primary compute:** One NVIDIA H200 NVL GPU on host `aai`; GPU0 is the default. GPU1 may be used only when explicitly authorised for that session/run.  
 **Primary MRes strategy:** freeze the complete released RNAGenesis sequence autoencoder and fine-tune the released generic latent-diffusion denoiser on the frozen TRAIN aptamer corpus  
 **Deferred to PhD:** parameter-efficient diffusion adaptation, partial diffusion unfreezing, Q-Former/decoder adaptation, joint latent-space realignment, target-conditioned generation, target-aware guidance, extensive hyperparameter optimisation and wet-lab feedback loops
@@ -135,19 +135,19 @@ The curation pipeline S1-S7D is complete. The corpus is immutable unless a separ
 ### 3.1 TRAIN
 
 ```text
-identities = 746
-distinct sequence cores = 678
-clusters = 571
-targets represented = 333
+identities = 726
+distinct sequence cores = 669
+clusters = 569
+targets represented = 320
 
 ft_train.csv SHA256 =
-941fe8783ee8c99a2ce7598dea00ed123e62750026b7f157f28e7bbcc5d14a8f
+84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0
 
 corpus_final.txt =
-678 unique TRAIN sequence_core values only
+669 unique TRAIN sequence_core values only
 
 corpus_final.txt SHA256 =
-6f8c2091706cc28526ae53a1021395cad1b7943745ddffbaea631edc01df3340
+d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d
 ```
 
 **Role:** RNAGenesis fitting only.
@@ -157,13 +157,13 @@ The authoritative RNAGenesis training sequence file is `corpus_final.txt`.
 ### 3.2 VALIDATION
 
 ```text
-identities = 149
-cores = 117
-clusters = 64
-targets represented = 102
+identities = 132
+cores = 95
+clusters = 63
+targets represented = 100
 
 ft_validation.csv SHA256 =
-03be477e12f7b9ca20f8911e2ac88fde2949af2b6131c2d2aa43eef2ae6d9abc
+cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd
 ```
 
 **Role:** model-development decisions only, including:
@@ -179,13 +179,13 @@ VALIDATION must never be merged into TRAIN during model development.
 ### 3.3 REF
 
 ```text
-identities = 114
-cores = 103
-clusters = 80
-targets represented = 88
+identities = 131
+cores = 113
+clusters = 79
+targets represented = 97
 
 ref.csv SHA256 =
-6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d
+531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23
 ```
 
 **Role:** fitting/calibrating empirical AptaRank reference distributions only.
@@ -200,13 +200,13 @@ REF must not be used to:
 ### 3.4 EVAL
 
 ```text
-identities = 164
-cores = 138
+identities = 181
+cores = 154
 clusters = 79
 targets represented = 111
 
 eval.csv SHA256 =
-88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d
+ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015
 ```
 
 **Role:** final held-out assessment only, after generator and downstream pipeline decisions are frozen.
@@ -300,8 +300,8 @@ The existing 30,080-sequence H200 pool generated from B0 is an existing baseline
 Definition:
 
 - no neural model;
-- sequence lengths sampled from the frozen TRAIN empirical length distribution;
-- nucleotide identities sampled independently from frozen TRAIN nucleotide frequencies;
+- sequence lengths sampled from the frozen TRAIN empirical length distribution of the corrected 669 unique TRAIN cores;
+- nucleotide identities sampled independently from frozen TRAIN nucleotide frequencies of those same 669 cores;
 - no learned structure, motif, positional dependency or binding information.
 
 Preferred thesis wording:
@@ -330,7 +330,7 @@ Definition:
 
 - released frozen `EncDec`;
 - diffusion model initialized from B1 (`configs/rnagenesis/diffusion`);
-- full latent diffusion denoiser fine-tuned on the 678 frozen TRAIN sequence cores;
+- full latent diffusion denoiser fine-tuned on the 669 frozen TRAIN sequence cores;
 - VALIDATION used for development decisions;
 - no protein-target conditioning.
 
@@ -410,7 +410,7 @@ unless a later documented failure shows that the generic checkpoint cannot be us
 
 #### Small-data suitability
 
-TRAIN contains only 678 distinct sequence cores. The selected approach preserves the high-capacity pretrained sequence representation and decoder instead of attempting to relearn them from 678 sequences.
+TRAIN contains only 669 distinct sequence cores. The selected approach preserves the high-capacity pretrained sequence representation and decoder instead of attempting to relearn them from 669 sequences.
 
 The experiment therefore performs transfer learning on an existing latent generative prior rather than training a new latent representation or decoder.
 
@@ -609,9 +609,9 @@ Use:
 data/processed/corpus_final.txt
 ```
 
-containing exactly 678 unique frozen TRAIN `sequence_core` values.
+containing exactly 669 unique frozen TRAIN `sequence_core` values.
 
-Do not construct the training stream from the 746 scientific-identity rows.
+Do not construct the training stream from the 726 scientific-identity rows.
 
 ### 7.2 Why one row per unique sequence core
 
@@ -953,7 +953,7 @@ Do not report the denoiser parameter count by estimating from its 7.4 GB checkpo
 
 The upstream example configuration is not copied blindly because it was designed for much larger corpora.
 
-For 678 TRAIN sequences, an effective batch of 256 would yield only approximately three optimizer updates per epoch, and a fixed 50-step warmup would span many effective epochs.
+For 669 TRAIN sequences, an effective batch of 256 would yield only approximately three optimizer updates per epoch, and a fixed 50-step warmup would span many effective epochs.
 
 ### 11.1 Optimizer
 
@@ -1284,7 +1284,7 @@ warnings/retries/deviations
 Use deterministic informative names, e.g.:
 
 ```text
-D1_generic-diffusion__data-6f8c2091__lr-3e-5__ebs-32__seed-42__epoch-03__git-<sha>
+D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-42__epoch-03__git-<sha>
 ```
 
 Do not use ambiguous names such as:
@@ -1324,26 +1324,27 @@ Create a tracked machine-readable contract containing at least:
 
 ```json
 {
-  "corpus_commit": "095236dfb13d1d3b13f11bbb34c2e48319c10184",
+  "corpus_commit_supersedes": "095236dfb13d1d3b13f11bbb34c2e48319c10184",
+  "corpus_commit_subject": "Complete corrective corpus revision for RNA modelling alphabet gate",
   "roles": {
     "TRAIN": {
-      "sha256": "941fe8783ee8c99a2ce7598dea00ed123e62750026b7f157f28e7bbcc5d14a8f",
+      "sha256": "84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0",
       "allowed": ["fit"]
     },
     "TRAIN_TEXT": {
-      "sha256": "6f8c2091706cc28526ae53a1021395cad1b7943745ddffbaea631edc01df3340",
+      "sha256": "d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d",
       "allowed": ["fit"]
     },
     "VALIDATION": {
-      "sha256": "03be477e12f7b9ca20f8911e2ac88fde2949af2b6131c2d2aa43eef2ae6d9abc",
+      "sha256": "cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd",
       "allowed": ["development_evaluate", "checkpoint_select"]
     },
     "REF": {
-      "sha256": "6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d",
+      "sha256": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
       "allowed": ["aptarank_calibrate"]
     },
     "EVAL": {
-      "sha256": "88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d",
+      "sha256": "ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015",
       "allowed": ["final_evaluate_after_unlock"]
     }
   }
@@ -1499,9 +1500,9 @@ Prove that the frozen data can enter RNAGenesis without transformation or leakag
 
 **Outputs/tests**
 
-- exactly 678 TRAIN lines;
-- exactly 678 unique TRAIN cores;
-- exactly 117 unique VALIDATION cores;
+- exactly 669 TRAIN lines;
+- exactly 669 unique TRAIN cores;
+- exactly 95 unique VALIDATION cores;
 - A/C/G/U-only assertion;
 - length summaries;
 - chemistry distribution report from metadata;
@@ -1930,7 +1931,7 @@ This yields the final held-out estimate of the generator/ranking pipeline select
 | Risk | Severity | Detection | Mitigation |
 |---|---:|---|---|
 | Generic checkpoint provenance insufficiently documented | Medium | asset/release review | use conservative condition name `generic released RNAGenesis`; record uncertainty |
-| Full denoiser overfits 678 sequences | High | VALIDATION loss; TRAIN copying; diversity collapse | low LR; few updates; save all epochs; fixed guardrails |
+| Full denoiser overfits 669 sequences | High | VALIDATION loss; TRAIN copying; diversity collapse | low LR; few updates; save all epochs; fixed guardrails |
 | Upstream random split leaks/repartitions frozen roles | Blocker | code review/tests | bypass/remove automatic split; explicit TRAIN/VALIDATION loader |
 | EncDec accidentally becomes trainable | Blocker | parameter/gradient/tensor assertions | fail closed |
 | REF used for RNAGenesis decisions | Blocker | role guards/manifests | software rejection; keep REF off training workspace where possible |
@@ -2041,7 +2042,7 @@ Proceed in this order:
 
 **Reasons:**
 
-1. **small-data inductive bias:** preserves the pretrained sequence representation/decoder instead of relearning them from 678 sequences;
+1. **small-data inductive bias:** preserves the pretrained sequence representation/decoder instead of relearning them from 669 sequences;
 2. **architectural consistency:** adapts the probability distribution over an unchanged latent space;
 3. **released-code support:** directly matches the upstream RNAGenesis fine-tuning design;
 4. **experimental clarity:** B1 and D1 share architecture/checkpoint family and differ primarily by MRes TRAIN adaptation;
@@ -2054,6 +2055,6 @@ Proceed in this order:
 - partial diffusion unfreezing — arbitrary layer-selection boundary without evidence;
 - Q-Former/decoder fine-tuning — higher direct memorisation risk and moves the latent coordinate system while leaving the generative prior mismatched;
 - joint autoencoder/diffusion training — data-hungry and substantially beyond MRes scope;
-- diffusion from scratch — discards the strongest available pretrained prior and is inappropriate for 678 sequences.
+- diffusion from scratch — discards the strongest available pretrained prior and is inappropriate for 669 sequences.
 
 This decision remains in force unless a documented implementation failure demonstrates that D1 cannot be executed with the released assets/code. Any such failure requires a new human-reviewed strategy decision rather than an implicit fallback.

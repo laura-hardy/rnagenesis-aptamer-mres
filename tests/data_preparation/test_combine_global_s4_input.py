@@ -41,7 +41,7 @@ EXPECTED_SOURCE_ORDER = [
     "ncbi_nuc",
 ]
 EXPECTED_SOURCE_COUNTS = {
-    "aptabase": 162,
+    "aptabase": 159,
     "utexas": 468,
     "aptadb": 151,
     "riboaptamer": 397,
@@ -229,7 +229,7 @@ def _run(repo: Path, config_path: Path):
 
 def test_live_contract_is_sequence_safe_and_explicitly_ordered() -> None:
     payload = json.loads(LIVE_CONTRACT.read_text(encoding="utf-8"))
-    assert payload["expected_combined_records"] == 2960
+    assert payload["expected_combined_records"] == 2957
     keys = [item["source_key"] for item in payload["contributing_sources"]]
     assert keys == EXPECTED_SOURCE_ORDER
     counts = {
@@ -237,7 +237,7 @@ def test_live_contract_is_sequence_safe_and_explicitly_ordered() -> None:
         for item in payload["contributing_sources"]
     }
     assert counts == EXPECTED_SOURCE_COUNTS
-    assert sum(counts.values()) == 2960
+    assert sum(counts.values()) == 2957
     zeros = [item["source_key"] for item in payload["zero_authorised_sources"]]
     assert zeros == ["aptadiff_a", "aptadiff_b"]
     for item in payload["zero_authorised_sources"]:

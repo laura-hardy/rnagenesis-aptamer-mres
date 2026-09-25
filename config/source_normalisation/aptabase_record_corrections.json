@@ -1,0 +1,78 @@
+{
+  "source_key": "aptabase",
+  "correction_policy_version": "aptabase_seven_record_v1",
+  "sequences_path": "data/interim/normalised/aptabase_record_correction_sequences.csv",
+  "notes": "Tracked file contains no sequences. Exact cores live only in the ignored sequences_path. t_to_u_applied is false for every record.",
+  "records": {
+    "aptabase:123": {
+      "operation": "replace_modelling_core",
+      "molecule_type": "RNA",
+      "chemistry": "2F-RNA",
+      "alphabet_as_reported": "DNA_T",
+      "t_to_u_applied": false,
+      "expected_core_length": 49,
+      "core_sha256": "40929ceb27cb6419e42ac299d5034968aebb958e4ff264e42281064776af7296",
+      "note": "core reconstructed from primary-paper randomized-region table; not silent T→U of the 89-nt Aptabase construct. sequence_raw preserves the original Aptabase construct. sequence_full is the corrected canonical modelling form, not the literal full experimental construct."
+    },
+    "aptabase:118": {
+      "operation": "replace_modelling_core",
+      "molecule_type": "RNA",
+      "chemistry": "2F-RNA",
+      "alphabet_as_reported": "DNA_T",
+      "t_to_u_applied": false,
+      "expected_core_length": 49,
+      "core_sha256": "03ba63133fbc2b324da4be9b2f2327bd728c521f4cb217017a01f0cf38251283",
+      "note": "core reconstructed from primary-paper randomized-region table; not silent T→U of the 89-nt Aptabase construct. sequence_raw preserves the original Aptabase construct. sequence_full is the corrected canonical modelling form, not the literal full experimental construct."
+    },
+    "aptabase:82": {
+      "operation": "replace_modelling_core",
+      "molecule_type": "RNA",
+      "chemistry": "RNA",
+      "alphabet_as_reported": "RNA",
+      "t_to_u_applied": false,
+      "expected_core_length": 47,
+      "core_sha256": "f68f98ef276ff6c5b55d1c3bebffa1635f7babf80307e036ec3b08278c83ce47",
+      "note": "47-nt core reconstructed from paper Table 1 / selected core; 93-nt Aptabase string preserved in sequence_raw as construct/flank source string. sequence_full is the corrected canonical modelling form, not the literal full experimental construct."
+    },
+    "aptabase:185": {
+      "operation": "replace_modelling_core",
+      "molecule_type": "RNA",
+      "chemistry": "RNA",
+      "t_to_u_applied": false,
+      "alphabet_as_reported": "RNA",
+      "expected_core_length": 24,
+      "core_sha256": "e7e1b58111f03aa3a80dffe6d4241de119c3f4d84a4ec2549ef3f851210317ed",
+      "note": "terminal T residues moved to construct/chemistry metadata; not converted to U. Terminal deoxy/phosphorothioate thymine linker retained as construct metadata. sequence_raw preserves the original mixed construct. sequence_full is the corrected canonical modelling form, not the literal full experimental construct."
+    },
+    "aptabase:104": {
+      "operation": "replace_modelling_core",
+      "molecule_type": "RNA",
+      "chemistry": "RNA",
+      "alphabet_as_reported": "RNA",
+      "t_to_u_applied": false,
+      "expected_core_length": 19,
+      "core_sha256": "d140c3538f22c7cb327000deb64f2b3e943eeba6878802db974a7d59895537e6",
+      "note": "terminal T treated as cap/construct metadata; corrected biological RNA core is 19 nt and therefore fails existing 20 nt minimum. sequence_raw preserves the original construct. sequence_full is the corrected canonical modelling form, not the literal full experimental construct."
+    },
+    "aptabase:592": {
+      "operation": "retain_sequence_set_molecule",
+      "molecule_type": "ssDNA",
+      "chemistry": "DNA",
+      "alphabet_as_reported": "DNA_T",
+      "t_to_u_applied": false,
+      "expected_core_length": 72,
+      "core_sha256": "e8d6e917e0e408e1725d8ff46ba000e5b1e83361af5a6947a32f92d01f3d5c23",
+      "note": "genuine ssDNA heparanase aptamer; no sequence edit; not T-to-U; parked out of the RNA corpus."
+    },
+    "aptabase:593": {
+      "operation": "retain_sequence_set_molecule",
+      "molecule_type": "ssDNA",
+      "chemistry": "DNA",
+      "alphabet_as_reported": "DNA_T",
+      "t_to_u_applied": false,
+      "expected_core_length": 72,
+      "core_sha256": "a21658426c7a6ae1e73d5bd5b2d13e1fdad0b6f8e8d9ba1c2379925fe7319cd4",
+      "note": "genuine ssDNA heparanase aptamer; no sequence edit; not T-to-U; parked out of the RNA corpus."
+    }
+  }
+}

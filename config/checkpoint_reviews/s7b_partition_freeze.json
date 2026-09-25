@@ -2,83 +2,116 @@
   "contract_id": "s7b_partition_freeze",
   "checkpoint": "CHECKPOINT-3",
   "milestone": "S7B_partition_application_and_freeze",
-  "decision_date": "2026-09-21",
-  "freeze_date": "2026-09-21",
+  "decision_date": "2026-09-24",
+  "freeze_date": "2026-09-24",
   "freeze_reason": "top-level FT/REF/EVAL assignment approved before any model-selection, fine-tuning, hyperparameter or REF-calibration use",
-  "input_s7a_sha256": "6bbf040af6f1c541001a6a6ee4c461539f554737158ff11598aa93e4f137f9cd",
-  "assignment_preview_sha256": "5e74ec91469fd33309d0bd1034866a6d752316b10e89a2dafecaab7c5f4402b1",
-  "authoritative_assignment_sha256": "6278d42a067e741b0f057169a862112351f8f183da49103952074f6f65376072",
+  "input_s7a_sha256": "0c17e8eea27498ff6f724021915c1567fc2e988977e0430f532897484fe427d7",
+  "assignment_preview_sha256": "c2bbe256af1aa095e3ed0166c40cb85c2b4c92f4a6c9c64c30925a2799db07e9",
+  "authoritative_assignment_sha256": "a012644ebae1de0ad23ef0b38bd378b072181793bed1207e54068e9e35f8d073",
   "preview_application_mismatch_count": 0,
   "partition_quotas": {
-    "FT": 635,
-    "REF": 80,
+    "FT": 632,
+    "REF": 79,
     "EVAL": 79
   },
   "FT": {
-    "clusters": 635,
-    "identities": 895,
-    "cores": 795,
-    "targets_represented": 390,
-    "file_sha256": "b680ace037be73f650e386a34d97db915e4925a2dcd59e3053b7542b6d6fb4ff",
+    "clusters": 632,
+    "identities": 858,
+    "cores": 764,
+    "targets_represented": 379,
+    "file_sha256": "4206b431d6f674887dc07b13502ef060c097e6c7f7abf9e7de7b73041ac3b3d5",
     "assigned": true,
     "train_validation_split": false,
     "frozen": false
   },
   "REF": {
-    "clusters": 80,
-    "identities": 114,
-    "cores": 103,
-    "targets_represented": 88,
-    "file_sha256": "6c8bf5cdec625bdddb9f42b18a15f435826bebabb119dfc268ff737c89b7408d",
-    "semantic_identity_set_hash": "54a74c8bb8ef67f36dd4b054d6ed43f201bd38d41d75244d9b69eb1583951abc",
-    "semantic_cluster_set_hash": "84afc5a5bb030db9cbdddb7246ceaab3457ef8eb02f1192575433d5f77f6cd82",
+    "clusters": 79,
+    "identities": 131,
+    "cores": 113,
+    "targets_represented": 97,
+    "file_sha256": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
+    "semantic_identity_set_hash": "254178519388939ddaf711910e4841a9641370220ebf6e9a8c243861d49b4906",
+    "semantic_cluster_set_hash": "91aa1aec052535ca91cbdb2a10a875390f147cc2b45d4cc2b64fe324bd19a1bd",
     "frozen": true
   },
   "EVAL": {
     "clusters": 79,
-    "identities": 164,
-    "cores": 138,
+    "identities": 181,
+    "cores": 154,
     "targets_represented": 111,
-    "file_sha256": "88fe1d8c2c78ed9dc478306c7390cff7016cd49541cfb1019d48ba8c1272c89d",
-    "semantic_identity_set_hash": "47ef50345fae50f14e99547426dbf3a3c34ed0caf49574005fb3f1da94315406",
-    "semantic_cluster_set_hash": "c923af78ef7b191b569c5ead859982eb7711460a6537d0a70612a1101ffa8138",
+    "file_sha256": "ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015",
+    "semantic_identity_set_hash": "4ebd8347fd532581ffe46acbd0684f8763aa1ce40f33e6b86ab300e82e802ef0",
+    "semantic_cluster_set_hash": "f9098d8795ba17d6c0e0de9b7dad7d17a97f762888594689f810f9c7f08f2e1c",
     "frozen": true
   },
-  "corpus_partitioned_sha256": "755e6afaf6a522be390073d3651311f8afc0ca9486322ac3bbfe348cd2a3fb1a",
+  "corpus_partitioned_sha256": "2797e6767f78029574df1b6cdf51bbe7952ea8affce83870441b3d3d93c98849",
   "objective": {
+    "profile": "jsd_minimax",
     "log_base": 2.0,
     "J_target": {
-      "FT": 0.02489064238794677,
-      "REF": 0.2694536956975229,
-      "EVAL": 0.26944246122261317
+      "FT": 0.04120565208517133,
+      "REF": 0.2651670832178181,
+      "EVAL": 0.26514534678473456
     },
     "J_evidence": {
-      "FT": 5.598701874995565e-06,
-      "REF": 8.629690438492248e-05,
-      "EVAL": 6.305052920693201e-05
+      "FT": 1.664696613117684e-06,
+      "REF": 0.0003621586886345721,
+      "EVAL": 0.00017134613316740886
     },
     "J_length": {
-      "FT": 8.580625352666224e-05,
-      "REF": 0.001660102797405985,
-      "EVAL": 0.0005477397065489012
+      "FT": 9.862636379245546e-09,
+      "REF": 2.6333731848120863e-06,
+      "EVAL": 4.879001177974878e-07
     },
     "J_source": {
-      "FT": 0.0006983576103930154,
-      "REF": 0.01954623798492084,
-      "EVAL": 0.006128067137458337
+      "FT": 0.0010028365465604644,
+      "REF": 0.02791414733622999,
+      "EVAL": 0.004465246049932588
     },
-    "D_target": 0.2694536956975229,
-    "D_evidence": 8.629690438492248e-05,
-    "D_length": 0.001660102797405985,
-    "D_source": 0.01954623798492084,
-    "O1": 0.2694536956975229,
+    "D_target": 0.2651670832178181,
+    "D_evidence": 0.0003621586886345721,
+    "D_length": 2.6333731848120863e-06,
+    "D_source": 0.02791414733622999,
+    "O1": 0.2651670832178181,
     "lexicographic_descending_D_vector": [
-      0.2694536956975229,
-      0.01954623798492084,
-      0.001660102797405985,
-      8.629690438492248e-05
+      0.2651670832178181,
+      0.02791414733622999,
+      0.0003621586886345721,
+      2.6333731848120863e-06
     ],
-    "O3": 0.29074633338423467,
+    "O3": 0.2934460226158675,
+    "A_target": {
+      "FT": 0.006837606837606838,
+      "REF": 0.0177725582305735,
+      "EVAL": 0.03006563724795769
+    },
+    "A_evidence": {
+      "FT": 0.0009324009324009341,
+      "REF": 0.017896522476675142,
+      "EVAL": 0.012371912924399098
+    },
+    "A_length": {
+      "FT": 0.00011552856221530572,
+      "REF": 0.0018883633897839314,
+      "EVAL": 0.0008124755942409134
+    },
+    "A_source": {
+      "FT": 0.0142968142968143,
+      "REF": 0.06934820904286554,
+      "EVAL": 0.038182934315531006
+    },
+    "M_target": 0.03006563724795769,
+    "M_evidence": 0.017896522476675142,
+    "M_length": 0.0018883633897839314,
+    "M_source": 0.06934820904286554,
+    "R1": 0.06934820904286554,
+    "lexicographic_descending_M_vector": [
+      0.06934820904286554,
+      0.03006563724795769,
+      0.017896522476675142,
+      0.0018883633897839314
+    ],
+    "R3": 0.1191987321572823,
     "arbitrary_manually_chosen_criterion_weights": null,
     "target_family_in_primary_objective": false,
     "comparison_tuple_fields": [
