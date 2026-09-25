@@ -11168,6 +11168,36 @@ push performed = no
 
 Not committed. Not pushed.
 
+## 2026-09-23 — RNAGenesis fine-tuning strategy and implementation-plan freeze
+
+**Stage:** Aim 2 / modelling preparation / RNAGenesis fine-tuning design
+
+**What was done:** Completed read-only H200 inspection of the released
+RNAGenesis assets and current upstream fine-tuning code. Confirmed that the
+generic released diffusion checkpoint at `configs/rnagenesis/diffusion`
+differs from the released aptamer-adapted checkpoint at
+`checkpoints/Aptamer/diffusion`. Reviewed the upstream diffusion-only
+fine-tuning workflow and selected a single MRes strategy: freeze the complete
+released `EncDec` stack and fine-tune only the latent diffusion denoiser from
+the generic released checkpoint on the frozen 678-core TRAIN corpus.
+
+Replaced the earlier Q-Former/decoder-primary draft with the approved tracked
+implementation plan at `docs/fine-tuning-implementation-plan.md`. Locked the
+condition terminology B1 = generic released RNAGenesis, B0 = released
+aptamer-adapted RNAGenesis, B2 = TRAIN-matched empirical RNA null, and
+D1 = MRes curated-aptamer diffusion-adapted RNAGenesis. Recorded that the
+existing 30,080-sequence B0 pool is retained and that `scripts/null_model.py`
+will be reused/hardened to regenerate 30,000 B2 sequences.
+
+Verified the Mac and H200 MRes repositories are synchronized at
+`5afc24147fdc9b40a3d563cf68430da867ea6aa1`, and reverified the frozen H200
+TRAIN/VALIDATION hashes. GPU0 remains the default H200 device; GPU1 may be used
+only when explicitly authorised for that session/run.
+
+**Boundary:** No RNAGenesis optimisation or GPU training started. REF remains
+reserved for AptaRank calibration and EVAL remains untouched. Next stage is
+M0 reproducibility/data-contract/code-integration implementation.
+
 ## 2026-09-25 — Corrective corpus revision for the RNA modelling alphabet gate
 
 **Why reopened:** The frozen corpus in `095236dfb13d1d3b13f11bbb34c2e48319c10184` failed the RNAGenesis M0 alphabet gate. Seven Aptabase records still carried literal `T` or the wrong molecule class in the modelling core.
@@ -11196,7 +11226,3 @@ Not committed. Not pushed.
 - `corpus_manifest.json` `08da8d5e44413ea9ab57c128dbe4ef7986dab7a2bfa794cfef6fb4724577565f`
 
 **Closure:** `10aac629bb0ef0337107c3d628b23e1897962af9`, subject `Complete corrective corpus revision for RNA modelling alphabet gate`. This commit supersedes frozen corpus commit `095236dfb13d1d3b13f11bbb34c2e48319c10184`. RNAGenesis M0 resumes from this corrected corpus and must not rerun S7D. Use only the hashes in this entry. The S7D `repository_head_baseline` pin remains the pre-closure HEAD `5afc24147fdc9b40a3d563cf68430da867ea6aa1`. Sequence-bearing files stay under ignored `data/`.
-
-
-
-
