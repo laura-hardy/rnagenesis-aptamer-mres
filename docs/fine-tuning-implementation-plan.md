@@ -3,7 +3,7 @@
 **Project:** Towards prediction-guided generative design of RNA aptamers against carbapenemase targets  
 **Status:** Approved modelling strategy; implementation plan to be completed before any GPU training  
 **Plan revision date:** 25 September 2026  
-**Frozen corpus commit:** superseded `095236dfb13d1d3b13f11bbb34c2e48319c10184` — `Complete S7D final corpus build and validation`. The corrected corpus is closed by the commit on `main` with subject `Complete corrective corpus revision for RNA modelling alphabet gate`. That commit cannot embed its own hash; use the SHA reported for that subject.  
+**Frozen corpus commit:** `10aac629bb0ef0337107c3d628b23e1897962af9` — `Complete corrective corpus revision for RNA modelling alphabet gate`. This corrected closure supersedes `095236dfb13d1d3b13f11bbb34c2e48319c10184` — `Complete S7D final corpus build and validation`.\
 **Primary compute:** One NVIDIA H200 NVL GPU on host `aai`; GPU0 is the default. GPU1 may be used only when explicitly authorised for that session/run.  
 **Primary MRes strategy:** freeze the complete released RNAGenesis sequence autoencoder and fine-tune the released generic latent-diffusion denoiser on the frozen TRAIN aptamer corpus  
 **Deferred to PhD:** parameter-efficient diffusion adaptation, partial diffusion unfreezing, Q-Former/decoder adaptation, joint latent-space realignment, target-conditioned generation, target-aware guidance, extensive hyperparameter optimisation and wet-lab feedback loops
@@ -675,7 +675,7 @@ Before training, record:
 - corresponding VALIDATION summary;
 - frozen S6 short/long regime membership.
 
-The frozen curation already records a two-component length regime, with TRAIN containing 382 short and 296 long distinct cores.
+The corrected frozen S6 length regime contains **386 short and 283 long TRAIN cores** (669 total), and **55 short and 40 long VALIDATION cores** (95 total), as recorded in `config/global_s7d_final_build.json` under `expected_length_regime_cores`. Use these recorded assignments without refitting the length model.
 
 ---
 
@@ -1320,10 +1320,11 @@ Every generated sample set must preserve:
 
 ### 15.1 Frozen data contract
 
-Create a tracked machine-readable contract containing at least:
+The machine-readable contract is `config/modelling/frozen_data_contract.json`. Its read-only validator is `scripts/modelling/verify_modelling_contract.py`; local results and repeatable checks are documented in `docs/fine_tuning/m0_data_contract_verification.md`. The minimum role/hash fields are:
 
 ```json
 {
+  "corpus_commit": "10aac629bb0ef0337107c3d628b23e1897962af9",
   "corpus_commit_supersedes": "095236dfb13d1d3b13f11bbb34c2e48319c10184",
   "corpus_commit_subject": "Complete corrective corpus revision for RNA modelling alphabet gate",
   "roles": {

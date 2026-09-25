@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "contract_id": "rnagenesis_corrected_669_core_m0",
+  "corpus_commit": "10aac629bb0ef0337107c3d628b23e1897962af9",
+  "corpus_commit_subject": "Complete corrective corpus revision for RNA modelling alphabet gate",
+  "corpus_commit_supersedes": "095236dfb13d1d3b13f11bbb34c2e48319c10184",
+  "provenance": {
+    "source_config": "config/global_s7d_final_build.json",
+    "source_config_sha256": "abd3e1b29f422848aabd309ab0bb985731b9fb3941ddfbd2ec0f43d31a98b475",
+    "s7d_repository_head_baseline": "5afc24147fdc9b40a3d563cf68430da867ea6aa1",
+    "baseline_is_not_corpus_closure": true,
+    "corpus_manifest_path": "data/processed/corpus_manifest.json",
+    "corpus_manifest_sha256": "08da8d5e44413ea9ab57c128dbe4ef7986dab7a2bfa794cfef6fb4724577565f"
+  },
+  "roles": {
+    "TRAIN": {
+      "path": "data/processed/ft_train.csv",
+      "sha256": "84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0",
+      "allowed": [
+        "fit"
+      ],
+      "available_during_generator_development": true,
+      "counts": {
+        "identities": 726,
+        "cores": 669,
+        "clusters": 569,
+        "targets": 320
+      },
+      "identity_set_hash": "be5d3c700534633fce62498ea0b5d69cf0bfab148ad6a07931bc3b875efc9d5d",
+      "cluster_set_hash": "07f6dac62f5a280b5f4204724d20a3a1448bc5be13c99d8b6eda63dfc491d02e",
+      "partition": "FT",
+      "ft_split": "TRAIN"
+    },
+    "VALIDATION": {
+      "path": "data/processed/ft_validation.csv",
+      "sha256": "cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd",
+      "allowed": [
+        "development_evaluate",
+        "checkpoint_select"
+      ],
+      "available_during_generator_development": true,
+      "counts": {
+        "identities": 132,
+        "cores": 95,
+        "clusters": 63,
+        "targets": 100
+      },
+      "identity_set_hash": "4a632efeb3fe20b8d09441812f6e06e533cebece132f5bec810135e78221f4ec",
+      "cluster_set_hash": "8223fa96dd4a84ee69445e856595cef2e9347283b50d68e29abef1f020556673",
+      "partition": "FT",
+      "ft_split": "VALIDATION"
+    },
+    "REF": {
+      "path": "data/processed/ref.csv",
+      "sha256": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
+      "allowed": [
+        "aptarank_calibrate"
+      ],
+      "available_during_generator_development": false,
+      "counts": {
+        "identities": 131,
+        "cores": 113,
+        "clusters": 79
+      },
+      "identity_set_hash": "254178519388939ddaf711910e4841a9641370220ebf6e9a8c243861d49b4906",
+      "cluster_set_hash": "91aa1aec052535ca91cbdb2a10a875390f147cc2b45d4cc2b64fe324bd19a1bd"
+    },
+    "EVAL": {
+      "path": "data/processed/eval.csv",
+      "sha256": "ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015",
+      "allowed": [
+        "final_evaluate_after_unlock"
+      ],
+      "available_during_generator_development": false,
+      "counts": {
+        "identities": 181,
+        "cores": 154,
+        "clusters": 79
+      },
+      "identity_set_hash": "4ebd8347fd532581ffe46acbd0684f8763aa1ce40f33e6b86ab300e82e802ef0",
+      "cluster_set_hash": "f9098d8795ba17d6c0e0de9b7dad7d17a97f762888594689f810f9c7f08f2e1c"
+    },
+    "TRAIN_TEXT": {
+      "path": "data/processed/corpus_final.txt",
+      "sha256": "d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d",
+      "allowed": [
+        "fit"
+      ],
+      "available_during_generator_development": true,
+      "counts": {
+        "lines": 669,
+        "unique_cores": 669
+      },
+      "source_role": "TRAIN",
+      "order": "first_occurrence_in_frozen_ft_train_csv",
+      "authoritative_rnagenesis_fitting_input": true
+    }
+  },
+  "sequence_policy": {
+    "column": "sequence_core",
+    "training_grain": "one_distinct_TRAIN_sequence_core",
+    "validation_grain": "one_distinct_VALIDATION_sequence_core",
+    "alphabet_regex": "^[ACGU]+$",
+    "silent_t_to_u": false,
+    "whitespace_or_case_normalisation": false,
+    "new_length_filter_or_truncation": false,
+    "chemistry_metadata_is_not_a_model_input": true
+  },
+  "split_policy": {
+    "immutable_roles": true,
+    "rerun_curation": false,
+    "random_resplit": false,
+    "merge_validation_into_train": false,
+    "require_zero_core_cluster_identity_overlap": true,
+    "all_role_leakage_evidence": "corrective_S7D_closure_not_recomputed_at_M0"
+  },
+  "length_regime": {
+    "source": "frozen_s6_two_component_gmm",
+    "refit": false,
+    "counts_source": "config/global_s7d_final_build.json#expected_length_regime_cores",
+    "TRAIN": {
+      "short": 386,
+      "long": 283
+    },
+    "VALIDATION": {
+      "short": 55,
+      "long": 40
+    }
+  },
+  "access_policy": {
+    "development_read_allowlist": [
+      "TRAIN",
+      "TRAIN_TEXT",
+      "VALIDATION"
+    ],
+    "development_transfer_allowlist": [
+      "TRAIN",
+      "TRAIN_TEXT",
+      "VALIDATION"
+    ],
+    "ref_requires_generator_freeze": true,
+    "eval_locked": true,
+    "eval_unlock_requires": [
+      "M9C_complete_pipeline_freeze",
+      "explicit_EVAL_unlock_record"
+    ],
+    "restricted_hashes_are_metadata_only": true,
+    "do_not_transfer_combined_corpus_or_interim_curation_data": true
+  }
+}
