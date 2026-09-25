@@ -541,6 +541,10 @@ rm_encoder = false
 rm_qt = false
 ```
 
+**M0 reconstruction decision approved — 25 September 2026:** restore the biomap encoder using `xTrimoPGLMModel` and the character-wise tokenizer from `Zaixi/RNAGenesis` revision `d8a42130984cbf04f6a5e16a3aa0c0d6578036a8`, with encoder weights from the released RNAGenesis `EncDec` checkpoint. The approved call is `encoder(input_ids)` with no explicit `position_ids` and no encoder `attention_mask`; transpose its `[L, B, 1280]` output to `[B, L, 1280]`, then pass the frozen collator mask only to the Q-Former. Diffusion receives the Q-Former's pre-`transform` latent `[B, 32, 160]`.
+
+This is a human-approved reconstruction following the published `AutoModel`/released `struct_pred` convention. The missing historical `get_latent` source has not been recovered, so equivalence to its original training-time call cannot be established. See the [approved decision and residual uncertainty](fine_tuning/biomap_reconstruction_decision.md) and [pinned dependency manifest](fine_tuning/model_asset_manifest.md#pinned-biomap-encoder-dependency). Runtime integration remains to be verified; the complete `EncDec` stays frozen and only the denoiser is trainable.
+
 ### 6.5 Diffusion architecture
 
 Observed generic denoiser configuration includes:
@@ -900,8 +904,8 @@ REF remains untouched until AptaRank calibration.
 
 For each TRAIN sequence:
 
-1. tokenize using the released RNA tokenizer;
-2. encode to a latent with the frozen `EncDec` under `torch.no_grad()`;
+1. tokenize canonical A/C/G/U character-wise using the pinned biomap encoder tokenizer, with no BOS/CLS/EOS additions, as recorded in Section 6.4;
+2. encode to the pre-`transform` Q-Former latent `[B, 32, 160]` with the frozen `EncDec` in eval mode under `torch.no_grad()`, using the approved reconstruction in Section 6.4;
 3. sample timestep `t`;
 4. sample Gaussian noise `epsilon`;
 5. create noisy latent using the released DDIM scheduler;
@@ -1019,7 +1023,9 @@ Maximum development run:
 5 epochs
 ```
 
-At effective batch 32, this gives approximately 22 optimizer updates per epoch and approximately 110 updates over five epochs.
+For 669 unique TRAIN cores at effective batch 32, the corrected plan arithmetic is `ceil(669 / 32) = 21` optimizer updates per epoch and `5 * 21 = 105` updates over five epochs. This assumes the final partial batch is retained (`drop_last=False`) and any final incomplete accumulation window is stepped at the epoch boundary. On one GPU, each permitted microbatch/accumulation combination in Section 11.3 gives 21 updates under these assumptions.
+
+This M0 housekeeping correction replaces the previous approximately 22/110 estimate; it does not change the 669-core corpus, effective batch target, five-epoch maximum or optimisation strategy. Verify and record the actual loader/accumulation update count before execution, and derive warmup from that count using Section 11.5.
 
 Save every epoch.
 
@@ -1411,6 +1417,8 @@ Establish the exact data/software/model boundary before implementation.
 - verified diffusers patch;
 - TRAIN/VALIDATION hashes on H200;
 - proof REF/EVAL are absent or inaccessible during training;
+- [approved biomap reconstruction decision](fine_tuning/biomap_reconstruction_decision.md), including the external dependency pin, call convention and residual historical uncertainty;
+- corrected 21/105 plan arithmetic, with actual loader/accumulation and warmup counts verified before execution;
 - RNAGenesis code-integration diff reviewed.
 
 **Human gate**  
@@ -1423,7 +1431,7 @@ Confirm that the imported trainer and data contract match this plan.
 - no corpus modification.
 
 **Current status**  
-H200 asset inspection is substantially complete; implementation/code integration remains.
+H200 asset inspection is substantially complete. The biomap encoder identity, nucleotide IDs and encoder/Q-Former orientation are resolved by the recorded inspection; the published call convention is human-approved with residual uncertainty about the missing historical `get_latent`. The 21/105 arithmetic correction is recorded. Dependency integration, synthetic runtime verification, code-integration review and the full M0 human gate remain incomplete. This decision does not authorise biological-data optimisation.
 
 ---
 

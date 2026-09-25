@@ -66,6 +66,51 @@ models/autoencoder/decoder/progen_configs/config-progen2-small-rna_tokenizer_v2.
 models/autoencoder/decoder/progen_configs/tokenizer_rna_v2.json
 ```
 
+### Pinned biomap encoder dependency
+
+The subsequent read-only compatibility inspection identified the missing
+biomap encoder class and tokenizer. The [human-approved reconstruction
+decision](biomap_reconstruction_decision.md) records the call convention and
+the remaining uncertainty about the historical `get_latent` source.
+
+```text
+external repository: Zaixi/RNAGenesis
+revision: d8a42130984cbf04f6a5e16a3aa0c0d6578036a8
+H200 source directory: /home/laura/rnagenesis-external/Zaixi-RNAGenesis-d8a4213
+encoder class: xTrimoPGLMModel
+tokenizer class: xTrimoPGLMTokenizer
+```
+
+Source/config/tokenizer files are pinned to this revision. The seven hashes
+below were reported as matching before and after the compatibility inspection
+in *Experimental Boundary Checklist* on 25 September 2026; they were not
+remeasured in this documentation update. Paths are relative to the external
+source directory, not the RNAGenesis checkout.
+
+| File | SHA256 |
+| --- | --- |
+| `config.json` | `bf7ef6843232f370f3f7fc37d608f85cb0ff0d75291eed35cef52213e34978f7` |
+| `configuration_xtrimopglm.py` | `0319ade99c137c3ba47b9e49396be0b0ae4ac63ab02c54420b323891437a6844` |
+| `modeling_xtrimopglm.py` | `cfbf899a55bd34fe3ff4bf8f6e7fc4ad74fdca2edb28f0203cc4bfad40a87602` |
+| `tokenization_xtrimopglm.py` | `6a176d9f27d7f3650c1f3eb9728ae7bccbe008c432a80639f093382eb2d1d81e` |
+| `tokenizer.model` | `482251d7ac279f7a3f308b2f4356190742b2d065429502baa9015cb53a99365c` |
+| `tokenizer_config.json` | `93fe4fc340c4f156ea3e4cb8f0373f6d69e9876a2036f1b99317b8c8403bc34a` |
+| `special_tokens_map.json` | `50d488a23997fc928a51db1311bc131b942aba6e21e8f2df1f84124ffa28b760` |
+
+Use the external files only to recover the class/config/tokenizer. All encoder
+weights must come from the released `configs/rnagenesis/autoencoder/pytorch_model.bin`
+`encoder.*` state recorded below; do not download or substitute the external
+Hugging Face weights. The inspection found exact key, shape and FP32 dtype
+compatibility for all 433 encoder tensors, with no missing or unexpected keys.
+This was a metadata/meta-device comparison, not a completed strict runtime
+weight load or end-to-end latent test.
+
+Clean modeling-module import remains blocked by `deepspeed` and missing
+`quantization.py`; the inspection used in-process stubs without editing the
+pinned files. The pinned config has `quantization_bit=0`. Narrow import
+integration and manifesting of any local changes remain implementation work
+and must preserve `xTrimoPGLMModel.forward` and the approved call convention.
+
 ## Required D1 assets
 
 | Asset | Role | Size | SHA256 |
@@ -186,6 +231,10 @@ Established for the released RNA generation path, and required for D1:
 - the two RNA decoder/tokenizer JSON files named above;
 - the B1 diffusion directory as the denoiser initialisation.
 
+For the approved D1 sequence-to-latent reconstruction, also restore the pinned
+biomap source/config/tokenizer dependency above. This encoder tokenizer is
+distinct from the RNA decoder tokenizer; both retain their recorded roles.
+
 Present in the checkout, and not established as a required D1 runtime asset
 at M0:
 
@@ -211,6 +260,13 @@ on biological data:
    Q-Former, query-token, latent-projection and decoder parameters;
 4. the loaded weight hashes equal the B1 hashes in this manifest;
 5. the B0 weight file is not the loaded initialisation.
+
+The synthetic-only dependency restoration must also verify strict loading of
+all released `encoder.*` tensors, the approved sequence-to-Q-Former path,
+latent shape `[B, 32, 160]` and deterministic repeated encoding in eval mode.
+These runtime checks were not performed by the metadata compatibility probe
+or by this documentation update. The historical-source uncertainty remains
+as recorded in the reconstruction decision even if those checks pass.
 
 The architecture fields opened in the two `unet/config.json` files are
 recorded in the B1 versus B0 section above. Optimiser membership and
