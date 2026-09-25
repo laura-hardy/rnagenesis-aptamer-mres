@@ -1,11 +1,14 @@
 # M0 biomap/xTrimoPGLM reconstruction decision — 25 September 2026
 
-**Status: human-approved reconstruction boundary. Full M0: incomplete.**
-Laura approved the published/released encoder call convention in
+**Status: human-approved reconstruction boundary. M0: COMPLETE / GO —
+25 September 2026.** Laura approved the published/released encoder call
+convention in
 [Experimental Boundary Checklist](chatgpt-conversation://6ab4891a-ab80-83ec-809e-f9e59c792c00)
 after review of the read-only compatibility report. This record documents
-that approval; it does not claim that dependency integration, strict runtime
-weight loading or end-to-end latent verification has been completed.
+that approval. M0 closure is in
+[M0 data contract verification](m0_data_contract_verification.md). The
+missing historical `get_latent` is still unrecovered, and this decision
+does not authorise biological fine-tuning.
 
 ## Approved decision and unchanged scientific design
 
@@ -108,20 +111,22 @@ methods reporting even after synthetic runtime checks pass. Any change to
 the approved call requires a new documented human-reviewed decision.
 
 The encoder identity, nucleotide mapping and output orientation are resolved
-by the recorded evidence. Dependency restoration and runtime verification
-remain outstanding. Clean import currently fails on `deepspeed` and missing
-`quantization.py`; the metadata probe used in-process stubs. The pinned
-config has `quantization_bit=0`. Resolve these import issues narrowly during
-implementation, record any local integration changes, and preserve
-`xTrimoPGLMModel.forward` and the approved scientific path.
+by the recorded evidence. Clean import at the time of this decision failed
+on `deepspeed` and missing `quantization.py`; the metadata probe used
+in-process stubs. The pinned config has `quantization_bit=0`. RNAGenesis
+`29619df` (`Restore biomap latent encoding path`) and `81418f9` (`Document
+biomap upstream attribution`) are the integration commits reviewed at M0
+closure. They do not recover `get_latent`.
 
-The first implementation verification is synthetic-only: strictly load all
-released encoder tensors; verify character-wise IDs, padding, transpose and
-Q-Former mask routing; confirm `[B, 32, 160]` pre-`transform` latents and
-deterministic repeated eval-mode encoding; and verify that the complete
-`EncDec` is frozen. Do not import `train_diffusion.py` or access biological
-TRAIN/VALIDATION for that dependency-restoration check. Full M0 and the later
-training gates remain incomplete; this record authorises no training run.
+The clean M0 preflight then loaded `EncDec` from
+`configs/rnagenesis/autoencoder` with `EncDec frozen = true`, on the
+development TRAIN/VALIDATION contract, with no optimizer step and no
+generation. That preflight did not report a separate synthetic measurement
+of strict encoder-tensor loading, character-wise IDs, latent shape
+`[B, 32, 160]`, or deterministic repeated encoding. Those details remain
+unrecorded here. M0 is COMPLETE / GO on the evidence in the data-contract
+closure. This decision still authorises no biological fine-tuning run.
+The next milestone is M1.
 
 ## M0 plan arithmetic housekeeping
 
@@ -132,6 +137,9 @@ five-epoch maximum. This corrects the previous approximately 22/110 estimate;
 it does not change the data, batch target, epoch limit or optimisation design.
 The actual loader/accumulation count and derived warmup integer must be
 recorded before execution using Sections 11.4-11.5 of the implementation plan.
+The clean M0 preflight recorded them: 84 dataloader batches/epoch, 21
+optimizer updates/epoch, 105 updates maximum, warmup 10. No optimizer step
+was taken.
 
 This change records documentation only. No data, curation outputs, AptaRank
 drafts, RNAGenesis code, training configs or model assets are changed.

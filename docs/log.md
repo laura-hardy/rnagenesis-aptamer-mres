@@ -11226,3 +11226,19 @@ M0 reproducibility/data-contract/code-integration implementation.
 - `corpus_manifest.json` `08da8d5e44413ea9ab57c128dbe4ef7986dab7a2bfa794cfef6fb4724577565f`
 
 **Closure:** `10aac629bb0ef0337107c3d628b23e1897962af9`, subject `Complete corrective corpus revision for RNA modelling alphabet gate`. This commit supersedes frozen corpus commit `095236dfb13d1d3b13f11bbb34c2e48319c10184`. RNAGenesis M0 resumes from this corrected corpus and must not rerun S7D. Use only the hashes in this entry. The S7D `repository_head_baseline` pin remains the pre-closure HEAD `5afc24147fdc9b40a3d563cf68430da867ea6aa1`. Sequence-bearing files stay under ignored `data/`.
+
+## 2026-09-25 — M0 technical preflight closure
+
+**Stage:** Aim 2 / modelling / M0 reproducibility and frozen-contract verification
+
+**Status:** COMPLETE / GO. The human gate accepts that the imported trainer and development data contract match the fine-tuning plan. M0 completion does not mean biological fine-tuning has run. No optimizer step and no generation occurred. Next is M1, released-behaviour and numerical training smoke validation, before the substantive D1 fitting run.
+
+**Versions:** MRes source before this documentation closure `4d8730f4eb82f7066c2d8d107b97240897687021`. RNAGenesis branch `mres-d1-diffusion-finetune`: `29619df` restore biomap latent encoding, `81418f9` document biomap attribution, `789ecc2` add the MRes D1 diffusion trainer, `e20f556` correct denoiser parameter accounting. Clean preflight git `e20f5567526a6d76a173eba87e363e8edf130cd6`. Output `/home/laura/rnagenesis-mres-runs/m0_preflight_e20f556_clean`. `working_tree_dirty = false` after rerun with `PYTHONDONTWRITEBYTECODE=1`.
+
+**Contract:** development verifier passed before the preflight. `input_directory_isolation = PASS`. `restricted_role_files_opened = []`. Contract SHA256 `396c83c3dbf9afc656ad5c60ec05c94fce3c5a684990c3cc1cebfb2411ccd5ff`. TRAIN 669 examples, `/home/laura/rnagenesis-mres-data/development/corpus_final.txt`, SHA256 `d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d`. VALIDATION 95 unique cores, `/home/laura/rnagenesis-mres-data/development/ft_validation.csv`, SHA256 `cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd`. No REF/EVAL access. `preflight = true`. `fixture = false`.
+
+**Model:** B1 `configs/rnagenesis/diffusion`. EncDec `configs/rnagenesis/autoencoder`, frozen. Denoiser and trainable parameter count 1,911,589,344. Registered buffer elements 50,331,648. Serialized state elements 1,961,920,992. EMA false. The first preflight correctly failed on the old assertion that the parameter count equalled the serialized-element total, before optimizer construction. The 50,331,648-element difference is 24 registered `transformer_blocks.0`–`23.pos_embed.pe` buffers, corrected in `e20f556`. The clean rerun passed.
+
+**Schedule observed, not run:** microbatch 8, accumulation 4, effective batch 32, 84 dataloader batches/epoch, 21 optimizer updates/epoch, 5 epochs, 105 updates maximum, warmup 10, AdamW, learning rate 3e-5, betas 0.95/0.999, epsilon 1e-8, weight decay 1e-6, cosine schedule, gradient clip 1.0, mixed precision no. TRAIN/DataLoader/diffusion seed 42. Fixed VALIDATION seed 1, one draw per sequence. Validation sequence SHA256 `b23647f40bb8fccee463009a5562411eceabe8070b953dfe0dcd59e10d8dc088`. Timestep SHA256 `aa20a66ed2c91351b667baf726f011d3522a9bb2e569046db5041e0242bfe080`. Noise SHA256 `248a65d462be827afe313523b3dd8481394ae0d627633c56bbe965037d84b410`.
+
+**Documentation:** `docs/fine_tuning/m0_data_contract_verification.md`, `docs/fine-tuning-implementation-plan.md`, `docs/fine_tuning/model_asset_manifest.md`, `docs/fine_tuning/environment_manifest.md`, `docs/fine_tuning/biomap_reconstruction_decision.md`. Documentation only. Not committed. Not pushed.

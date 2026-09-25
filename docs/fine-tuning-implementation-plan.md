@@ -543,7 +543,7 @@ rm_qt = false
 
 **M0 reconstruction decision approved — 25 September 2026:** restore the biomap encoder using `xTrimoPGLMModel` and the character-wise tokenizer from `Zaixi/RNAGenesis` revision `d8a42130984cbf04f6a5e16a3aa0c0d6578036a8`, with encoder weights from the released RNAGenesis `EncDec` checkpoint. The approved call is `encoder(input_ids)` with no explicit `position_ids` and no encoder `attention_mask`; transpose its `[L, B, 1280]` output to `[B, L, 1280]`, then pass the frozen collator mask only to the Q-Former. Diffusion receives the Q-Former's pre-`transform` latent `[B, 32, 160]`.
 
-This is a human-approved reconstruction following the published `AutoModel`/released `struct_pred` convention. The missing historical `get_latent` source has not been recovered, so equivalence to its original training-time call cannot be established. See the [approved decision and residual uncertainty](fine_tuning/biomap_reconstruction_decision.md) and [pinned dependency manifest](fine_tuning/model_asset_manifest.md#pinned-biomap-encoder-dependency). Runtime integration remains to be verified; the complete `EncDec` stays frozen and only the denoiser is trainable.
+This is a human-approved reconstruction following the published `AutoModel`/released `struct_pred` convention. The missing historical `get_latent` source has not been recovered, so equivalence to its original training-time call cannot be established. See the [approved decision and residual uncertainty](fine_tuning/biomap_reconstruction_decision.md) and [pinned dependency manifest](fine_tuning/model_asset_manifest.md#pinned-biomap-encoder-dependency). The clean M0 preflight loaded `EncDec` from `configs/rnagenesis/autoencoder` with `EncDec` frozen and the denoiser as the trainable parameter set. That check does not establish equivalence to the missing historical `get_latent`. The complete `EncDec` stays frozen and only the denoiser is trainable.
 
 ### 6.5 Diffusion architecture
 
@@ -564,6 +564,8 @@ num_train_timesteps = 1000
 ```
 
 The exact trainable parameter count must be measured programmatically and logged before the first optimisation run; do not infer the count only from checkpoint size.
+
+**Measured at the clean M0 preflight on 25 September 2026, RNAGenesis `e20f556`, before any optimizer step:** denoiser parameter count = 1,911,589,344; trainable parameter count = 1,911,589,344; registered buffer elements = 50,331,648; serialized state elements = 1,961,920,992. Safetensors metadata reports 1,961,920,992 FP32 elements because that file total includes the 24 registered `transformer_blocks.0`–`23.pos_embed.pe` buffers. The runtime `nn.Parameter` count is 1,911,589,344. See the [model asset manifest](fine_tuning/model_asset_manifest.md).
 
 ### 6.6 H200 environment
 
@@ -1027,6 +1029,8 @@ For 669 unique TRAIN cores at effective batch 32, the corrected plan arithmetic 
 
 This M0 housekeeping correction replaces the previous approximately 22/110 estimate; it does not change the 669-core corpus, effective batch target, five-epoch maximum or optimisation strategy. Verify and record the actual loader/accumulation update count before execution, and derive warmup from that count using Section 11.5.
 
+**Recorded by the clean M0 preflight on 25 September 2026, before any optimizer step:** microbatch 8, gradient accumulation 4, effective batch 32, dataloader batches/epoch 84, optimizer updates/epoch 21, epochs maximum 5, total optimizer updates maximum 105, warmup updates 10. Those loader and accumulation counts match this arithmetic. Warmup 10 is the stored integer from `max(1, round(0.10 * 105))`.
+
 Save every epoch.
 
 Report both epochs and optimizer-update counts.
@@ -1430,8 +1434,11 @@ Confirm that the imported trainer and data contract match this plan.
 - no EVAL access;
 - no corpus modification.
 
-**Current status**  
-H200 asset inspection is substantially complete. The biomap encoder identity, nucleotide IDs and encoder/Q-Former orientation are resolved by the recorded inspection; the published call convention is human-approved with residual uncertainty about the missing historical `get_latent`. The 21/105 arithmetic correction is recorded. Dependency integration, synthetic runtime verification, code-integration review and the full M0 human gate remain incomplete. This decision does not authorise biological-data optimisation.
+**Current status: COMPLETE / GO — 25 September 2026.**
+
+The human gate is GO: the imported trainer and development data contract match this plan, as recorded in [M0 data contract verification](fine_tuning/m0_data_contract_verification.md). The clean real-data preflight passed on RNAGenesis `e20f556` (`mres-d1-diffusion-finetune`) after `e20f556` corrected denoiser parameter accounting. Evidence in that record covers the frozen contract, H200 TRAIN/VALIDATION hashes, development-directory isolation with no REF/EVAL access, the exact denoiser parameter count, the verified 21/105 loader and warmup counts, and review of the RNAGenesis integration commits through `e20f556`.
+
+M0 completion does not mean biological fine-tuning has run. The final preflight constructed no optimizer step and performed no generation. The missing historical `get_latent` source remains unrecovered. The next milestone is M1: released-behaviour and numerical training smoke validation, before the substantive D1 fitting run.
 
 ---
 
@@ -2027,7 +2034,7 @@ The MRes RNAGenesis modelling implementation is complete when:
 
 ## 22. Immediate next actions
 
-No training is authorised yet.
+M0 is COMPLETE / GO. Biological fine-tuning is not authorised. M1, released-behaviour and numerical training smoke validation, comes before the substantive D1 fitting run. M2–M4 remain open, so the fitting run is still not authorised.
 
 Proceed in this order:
 
@@ -2040,7 +2047,7 @@ Proceed in this order:
 7. audit and harden the existing `scripts/null_model.py` B2 empirical-null generator;
 8. reconstruct/verify the B0 30,080-sequence manifest;
 9. characterize B1 `max_seq_len` versus cleaned sequence length and freeze the empirical length-matching algorithm;
-10. complete M0-M4 review;
+10. M0 review is complete; complete the M1–M4 review;
 11. only then run M5 synthetic/training smoke tests on GPU0 by default when adequate memory is available, or on GPU1 only when GPU1 has been explicitly authorised for that session/run.
 
 ---

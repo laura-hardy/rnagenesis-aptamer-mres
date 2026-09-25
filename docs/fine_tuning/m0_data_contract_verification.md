@@ -1,8 +1,12 @@
 # M0 data contract verification — 25 September 2026
 
-**Local data-contract checkpoint: PASS. Full M0: incomplete.** No curation,
-optimisation, generation, model evaluation, remote connection or GPU use was
-performed. The two AptaRank planning documents remain outside this change.
+**Local data-contract checkpoint: PASS. M0: COMPLETE / GO — 25 September 2026.**
+The local checkpoint below is unchanged. The H200 development preflight in
+the closure section passed, and the human-gate recommendation is GO. M0
+completion does not mean biological fine-tuning has run: the final preflight
+took no optimizer step and performed no generation. The next milestone is
+M1, released-behaviour and numerical training smoke validation, before the
+substantive D1 fitting run.
 
 ## Frozen authority
 
@@ -79,29 +83,117 @@ The Mac's `data/processed` is the curation store and contains held-out files.
 The `local-corpus` profile is appropriate here and makes no claim that this is
 an isolated training workspace. Do not transfer this directory wholesale.
 
-## Remaining M0 work
+No optimiser run on biological data was authorised by the local contract PASS.
+No VALIDATION text view or derived corpus was created in that local step. GPU1
+was authorised for the 25 September 2026 session and was not used for the local
+checkpoint; that is a session-level permission, not a permanent change to the
+data contract or GPU0 default.
 
-1. Review this contract together with the eventual trainer integration. The
-   current validator is not wired into an upstream trainer; future entry points
-   must verify the contract and their actual input files before creating an
-   optimizer. They must use TRAIN text for fitting and unique VALIDATION cores
-   for development evaluation, bypassing the upstream automatic split.
-2. Prepare a dedicated H200 data directory containing only `ft_train.csv`,
-   `corpus_final.txt`, and `ft_validation.csv`, using direct secure transfer.
-   Transfer neither the combined corpus nor REF/EVAL/interim curation data.
-   Keep sequence files outside Git. With the closure present in the H200
-   repository, run the same validator there with `--profile development` and
-   `--data-dir` pointing to that dedicated directory. This profile checks the
-   entire directory entry allowlist before opening any inputs.
-3. Separately document that REF/EVAL are absent or inaccessible throughout the
-   actual H200 training workspace and loader search paths. A successful
-   directory check is not proof of isolation across an entire host.
-4. Complete the model asset and environment manifests, exact denoiser parameter
-   count, diffusers compatibility-patch verification and trainer integration
-   review required by the plan's M0 human gate.
+## M0 closure — 25 September 2026
 
-No optimiser run on biological data is authorised by a local contract PASS.
-No VALIDATION text view or derived corpus was created in this step. GPU1 is
-authorised for this session on 25 September 2026 but was not used; that is a
-session-level permission, not a permanent change to the data contract or GPU0
-default. GPU execution remains unnecessary for this checkpoint.
+**Status: COMPLETE / GO.** The human gate confirms that the imported trainer
+and this data contract match the implementation plan. M0 completion records
+that boundary. It does not mean biological fine-tuning has run.
+
+MRes source commit before this documentation closure:
+`4d8730f4eb82f7066c2d8d107b97240897687021`.
+
+RNAGenesis branch `mres-d1-diffusion-finetune`:
+
+| Commit | Subject |
+| --- | --- |
+| `29619df` | Restore biomap latent encoding path |
+| `81418f9` | Document biomap upstream attribution |
+| `789ecc2` | Add MRes D1 diffusion trainer |
+| `e20f556` | Correct denoiser parameter accounting |
+
+Final clean real-data preflight, RNAGenesis
+`e20f5567526a6d76a173eba87e363e8edf130cd6`. Output directory
+`/home/laura/rnagenesis-mres-runs/m0_preflight_e20f556_clean`, outside the
+protected development input directory. `preflight = true`. `fixture = false`.
+`working_tree_dirty = false` after the rerun with
+`PYTHONDONTWRITEBYTECODE=1`.
+
+The development contract verifier passed before that preflight:
+
+```text
+input_directory_isolation = PASS
+restricted_role_files_opened = []
+contract SHA256 = 396c83c3dbf9afc656ad5c60ec05c94fce3c5a684990c3cc1cebfb2411ccd5ff
+```
+
+Development inputs opened by the preflight:
+
+| Role | Path | SHA256 | Count |
+| --- | --- | --- | --- |
+| TRAIN | `/home/laura/rnagenesis-mres-data/development/corpus_final.txt` | `d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d` | 669 examples |
+| VALIDATION | `/home/laura/rnagenesis-mres-data/development/ft_validation.csv` | `cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd` | 95 unique sequence cores |
+
+These hashes match the local TRAIN text and VALIDATION CSV hashes above.
+No REF or EVAL file was accessed.
+
+Model boundary:
+
+```text
+B1 = configs/rnagenesis/diffusion
+EncDec = configs/rnagenesis/autoencoder
+EncDec frozen = true
+denoiser parameter count = 1,911,589,344
+trainable parameter count = 1,911,589,344
+registered buffer elements = 50,331,648
+serialized state elements = 1,961,920,992
+EMA = false
+```
+
+The first preflight correctly failed on the old parameter-accounting
+assertion, before optimizer construction. That assertion treated the
+1,961,920,992 serialized state elements as the denoiser parameter count.
+Forensic inspection established that the 50,331,648-element difference
+comprises 24 registered `transformer_blocks.0`–`23.pos_embed.pe` buffers.
+RNAGenesis `e20f556` corrected the accounting. The clean corrected preflight
+then passed. `1,911,589,344 + 50,331,648 = 1,961,920,992`.
+
+Training configuration observed, with no optimizer step:
+
+```text
+microbatch = 8
+gradient accumulation = 4
+effective batch = 32
+dataloader batches/epoch = 84
+optimizer updates/epoch = 21
+epochs maximum = 5
+total optimizer updates maximum = 105
+warmup updates = 10
+learning rate = 3e-5
+optimizer = AdamW
+beta1 = 0.95
+beta2 = 0.999
+epsilon = 1e-8
+weight decay = 1e-6
+scheduler = cosine
+gradient clip = 1.0
+mixed_precision = no
+```
+
+Seeds and fixed VALIDATION draws:
+
+```text
+TRAIN/DataLoader/diffusion seed = 42
+fixed VALIDATION seed = 1
+validation draws per sequence = 1
+validation sequence SHA256 = b23647f40bb8fccee463009a5562411eceabe8070b953dfe0dcd59e10d8dc088
+validation timestep SHA256 = aa20a66ed2c91351b667baf726f011d3522a9bb2e569046db5041e0242bfe080
+validation noise SHA256 = 248a65d462be827afe313523b3dd8481394ae0d627633c56bbe965037d84b410
+```
+
+Boundary of the passing preflight: no optimizer step, no generation, no
+REF/EVAL access, and output outside the protected development input directory.
+
+The model-asset manifest, environment manifest and biomap reconstruction
+decision remain the M0 inventories. The diffusers patch verification stays
+the record in the environment manifest; this preflight did not re-measure
+that file. Residual uncertainty about the missing historical `get_latent`
+is unchanged.
+
+**Next milestone:** M1, released-behaviour and numerical training smoke
+validation, before the substantive D1 fitting run.

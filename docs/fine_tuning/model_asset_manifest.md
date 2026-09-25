@@ -1,10 +1,12 @@
 # M0 model asset manifest — 25 September 2026
 
-**Model-asset inventory: recorded. Full M0: incomplete.** No training,
-generation, optimiser construction, biological-data access or GPU computation
-was performed. These hashes describe the released RNAGenesis checkout after
-its tracked working tree was restored to clean. They do not authorise a
-training run.
+**Model-asset inventory: recorded. M0: COMPLETE / GO — 25 September 2026.**
+The hashes below are the 25 September asset inspection. They were not
+re-measured by the clean preflight. That preflight, recorded in
+[M0 data contract verification](m0_data_contract_verification.md), passed
+after denoiser parameter accounting was corrected. M0 completion does not
+mean biological fine-tuning has run, and this manifest does not authorise
+the D1 fitting run.
 
 ## Purpose
 
@@ -155,7 +157,7 @@ not:
 
 Safetensors metadata inspection:
 
-| Checkpoint | Tensor count | Exact parameter count | Dtype parameter counts |
+| Checkpoint | Tensor count | Serialized FP32 elements | Dtype element counts |
 | --- | ---: | ---: | --- |
 | B1 | 366 | 1,961,920,992 | F32: 1,961,920,992 |
 | B0 | 366 | 1,961,920,992 | F32: 1,961,920,992 |
@@ -165,7 +167,7 @@ Comparison of the two safetensors files:
 ```text
 same tensor names = true
 same tensor shapes = true
-same parameter count = true
+same serialized element count = true
 ```
 
 Both `unet/config.json` files were opened. Every architecture field inspected
@@ -202,26 +204,40 @@ change the inspected architecture. The 531-byte and 549-byte file sizes
 match that metadata difference. Both denoiser weight files are
 7,847,725,416 bytes and still have different SHA256 values, so equal length
 does not make the weights interchangeable. B1 and B0 have identical tensor
-names and shapes, and both contain exactly 1,961,920,992 FP32 parameters.
+names and shapes, and both contain exactly 1,961,920,992 FP32 elements.
+That safetensors total is the serialized state. It is not the runtime
+`nn.Parameter` count: it includes registered sinusoidal position buffers.
+The runtime split is in the next section.
 
 ## Exact denoiser parameter count
 
-The exact full `TransformerDenoiser` parameter count is:
+Safetensors inspection on 25 September 2026 counted 1,961,920,992 FP32
+elements and labelled them parameters. The clean M0 preflight corrected
+that label.
+
+Runtime counts at RNAGenesis `e20f556`, before any optimizer step:
 
 ```text
-1,961,920,992
+denoiser parameter count = 1,911,589,344
+trainable parameter count = 1,911,589,344
+registered buffer elements = 50,331,648
+serialized state elements = 1,961,920,992
 ```
 
-This is the intended D1 trainable-model parameter count because the approved
-strategy trains the complete denoiser. Every recorded parameter is F32.
-This count comes from safetensors metadata. It was not inferred from
-checkpoint file size.
+`1,911,589,344 + 50,331,648 = 1,961,920,992`. The 50,331,648 buffer
+elements are 24 registered `transformer_blocks.0`–`23.pos_embed.pe`
+buffers. Every safetensors element inspected earlier is F32. The count
+was not inferred from the 7.4 GB checkpoint size.
 
-Optimiser membership and `requires_grad` were not measured. Those runtime
-properties must still be independently verified during trainer integration
-and M5. This manifest does not claim that the optimiser contains only
-denoiser parameters, or that `EncDec` parameters have
-`requires_grad=False`.
+The first preflight correctly failed on the old assertion that the loaded
+denoiser parameter count equals 1,961,920,992. That failure happened before
+optimizer construction. RNAGenesis `e20f556` (`Correct denoiser parameter
+accounting`) separated parameters from those buffers. The clean corrected
+preflight then passed, with `EncDec` frozen and the trainable count equal
+to the denoiser parameter count. `EMA = false`.
+
+This manifest still does not claim that an optimizer was built or stepped,
+or that loaded weight hashes were recomputed during the preflight.
 
 ## What is and is not a runtime dependency
 
@@ -249,36 +265,40 @@ generation path. Its SHA256 was not measured here.
 biomap RNA path does not instantiate it, so it is not a runtime model
 dependency for this released RNA path.
 
-## Unresolved verification
+## Verification after the asset inspection
 
-Trainer integration and M5 must still verify, before any optimiser is built
-on biological data:
+The clean M0 preflight closed the parameter-count check: the loaded denoiser
+parameter count is 1,911,589,344, not the 1,961,920,992 serialized-element
+total, and `EncDec frozen = true`.
 
-1. the loaded denoiser parameter count equals 1,961,920,992;
-2. optimiser membership is exactly the complete `TransformerDenoiser`;
-3. `requires_grad` is false for every `EncDec` parameter, including encoder,
-   Q-Former, query-token, latent-projection and decoder parameters;
-4. the loaded weight hashes equal the B1 hashes in this manifest;
-5. the B0 weight file is not the loaded initialisation.
+Still not established by the recorded preflight facts, and still required
+before a biological optimisation step by the plan's frozen-model assertions:
 
-The synthetic-only dependency restoration must also verify strict loading of
-all released `encoder.*` tensors, the approved sequence-to-Q-Former path,
-latent shape `[B, 32, 160]` and deterministic repeated encoding in eval mode.
-These runtime checks were not performed by the metadata compatibility probe
-or by this documentation update. The historical-source uncertainty remains
-as recorded in the reconstruction decision even if those checks pass.
+1. optimiser membership is exactly the complete `TransformerDenoiser`;
+2. loaded weight hashes equal the B1 hashes in this manifest;
+3. the B0 weight file is not the loaded initialisation.
 
-The architecture fields opened in the two `unet/config.json` files are
-recorded in the B1 versus B0 section above. Optimiser membership and
-`requires_grad` remain unverified.
+Section 10.2 also requires those freeze assertions again after the first
+optimisation update. That update has not happened. These open checks do not
+keep M0 incomplete; they belong to M1 smoke validation and the later fitting
+gates.
 
-## Remaining M0 work
+The metadata compatibility probe did not execute strict loading of every
+released `encoder.*` tensor, the approved sequence-to-Q-Former path, latent
+shape `[B, 32, 160]`, or deterministic repeated encoding. The clean preflight
+record does not add those measurements. Historical-source uncertainty about
+the missing `get_latent` remains as recorded in the reconstruction decision.
+The architecture fields opened in the two `unet/config.json` files stay in
+the B1 versus B0 section above.
 
-This manifest does not complete M0. The local data-contract checkpoint is a
-separate record. H200 development-profile validation, proof that REF and
-EVAL are absent from the training workspace, RNAGenesis code-integration
-review, and the M0 human gate remain outside this document.
+## M0 status
 
-GPU1 was explicitly authorised for this session on 25 September 2026 and was
-not used. That authorisation is session-specific. GPU0 remains the project
-default.
+M0 is COMPLETE / GO. The development-profile preflight, REF/EVAL access
+record, RNAGenesis integration commits and human gate are in
+[M0 data contract verification](m0_data_contract_verification.md). This
+manifest remains the asset inventory. M0 completion does not authorise
+biological fine-tuning.
+
+GPU1 was explicitly authorised for the asset-inspection session on
+25 September 2026 and was not used for that inspection. That authorisation
+is session-specific. GPU0 remains the project default.

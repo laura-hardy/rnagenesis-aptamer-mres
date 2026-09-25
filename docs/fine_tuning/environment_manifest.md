@@ -1,9 +1,12 @@
 # M0 environment manifest — 25 September 2026
 
-**Environment inventory: recorded on host `aai`. Full M0: incomplete.** No
-GPU computation, training, generation, optimiser construction or
-biological-data access occurred during this inspection. This record does not
-authorise a training run.
+**Environment inventory: recorded on host `aai`. M0: COMPLETE / GO —
+25 September 2026.** No GPU computation, training, generation, optimiser
+construction or biological-data access occurred during this inspection.
+The clean preflight that closed M0 is recorded in
+[M0 data contract verification](m0_data_contract_verification.md). It did
+not re-measure this environment or the diffusers patch. This record does
+not authorise biological fine-tuning.
 
 ## Host and Conda environment
 
@@ -116,14 +119,19 @@ and should be checked against the current file SHA256 recorded here. The
 Conda history hash records the environment history file; it does not by
 itself reproduce the site-packages edit.
 
-## Remaining M0 work
+## M0 status
 
-This manifest does not complete M0. Model-asset hashes are a separate
-record. Trainer integration must still confirm that the process which loads
-RNAGenesis is this environment, that the patch is present, and that
-optimiser membership and `requires_grad` match the approved D1 boundary.
-H200 development-profile data validation, REF/EVAL isolation, RNAGenesis
-code-integration review, and the M0 human gate remain outside this document.
+M0 is COMPLETE / GO. Development-profile validation, REF/EVAL isolation,
+RNAGenesis code-integration review and the human gate are recorded in
+[M0 data contract verification](m0_data_contract_verification.md). Model-asset
+hashes remain a separate record. This inspection's patch hash is still the
+diffusers verification for M0; the passing preflight did not re-hash
+`normalization.py`.
+
+Optimiser membership was not measured here, and the preflight took no
+optimizer step. That check remains a later frozen-model assertion. It does
+not leave M0 incomplete.
 
 No GPU computation was needed or performed for the M0 data, environment or
-asset inspections.
+asset inspections. M0 completion does not mean biological fine-tuning has
+run. The next milestone is M1.
