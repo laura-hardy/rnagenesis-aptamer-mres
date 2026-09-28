@@ -1505,6 +1505,10 @@ Approve B0 as external aptamer-adapted comparator.
 - no D1 training;
 - no reinterpretation of B0 as generic/unadapted.
 
+**Current status: COMPLETE / GO — 28 September 2026.**
+
+The human gate is GO. On 28 September 2026, Laura Hardy approved B0 as the external aptamer-adapted comparator. B0 is the authors’ released aptamer-adapted comparator, scientific label `B0_released_aptamer_adapted_RNAGenesis`, not generic, unadapted or pretrained-only. Provenance is `DIRECT_HUMAN_CONFIRMED_PROVENANCE`. The final account is [M2 published aptamer comparator verification](fine_tuning/m2_published_aptamer_comparator_verification.md). Pool accounting is raw 30,080, accepted 30,080, rejected 0, unique accepted 30,080, duplicate accepted 0, and cleaned length 36 throughout. Raw artifacts remained unchanged. Recovered settings and seeds are recorded in that report. The published metric is `INFEASIBLE_WITH_RELEASED_EVIDENCE`; no metric was calculated. The missing contemporaneous 10 June checkpoint hash remains an explicit limitation. No biological-quality claim follows from syntactic acceptance or uniqueness. No D1 training, generation, model selection, REF/EVAL access or unauthorised GPU use occurred. No GPU is currently authorised for later work. Numerical diffusion-training smoke remains formal M5. M3 is the next formal milestone.
+
 ---
 
 ### M3 — Frozen corpus loader and modelling-interface gates

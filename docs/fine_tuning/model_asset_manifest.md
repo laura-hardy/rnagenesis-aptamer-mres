@@ -142,6 +142,48 @@ from B1. It is not a D1 initialisation asset.
 | `checkpoints/Aptamer/diffusion/unet/config.json` | B0 denoiser configuration | 549 bytes | `fab9c517efba8269c0edf194b7d0379f317e93da0f849b5ce815e098088b4756` |
 | `checkpoints/Aptamer/diffusion/unet/diffusion_pytorch_model.safetensors` | B0 denoiser weights | 7,847,725,416 bytes | `149f012287b1ae83865c25867d7c0bbe0952fa51bcc068e259725092d5dff0ca` |
 
+## B0 generated-pool record — 28 September 2026
+
+This section records the existing B0 sequence pool. It does not replace
+the checkpoint inventory above, and it does not authorise D1 training.
+
+Role: external aptamer-adapted comparator pool. Scientific label:
+`B0_released_aptamer_adapted_RNAGenesis`. Provenance classification:
+`DIRECT_HUMAN_CONFIRMED_PROVENANCE`. On 28 September 2026, Laura Hardy
+confirmed that the ten tracked chunks are the pool she generated earlier
+in 2026 from the authors’ released aptamer-fine-tuned checkpoint. The
+authoritative account is
+[M2 published aptamer comparator verification](m2_published_aptamer_comparator_verification.md).
+
+The pool is not D1 initialisation, not the generic or pretrained-only
+checkpoint, and not the length-matched causal baseline. Historical paths
+under `results/phase4_1_unadapted_rnagenesis_30k/` keep an obsolete name.
+That name is not the condition label.
+
+| Quantity | Value |
+| --- | --- |
+| Raw records | 30,080 |
+| Accepted records | 30,080 |
+| Rejected records | 0 |
+| Unique accepted | 30,080 |
+| Duplicate accepted | 0 |
+| Cleaned length | 36 on every record |
+| Nominal `max_seq_len` | 37 |
+| Numeric raw concatenation SHA-256 | `ed612277105c6b8747fc7365cc6b67fa8a94e8e5e8e64ee535ecadcb37ff4aaa` |
+| Pooled cleaned SHA-256 | `51ccf2b997f1e6386438be303e5affaf908f102bd098bab243a2a9ba1d94d6e1` |
+| Pooled evidence JSON SHA-256 | `83ad84ee3c1cf49e8cbcd88cd31cd5580dbf16fb2994e7bba715c8b356f70f1d` |
+
+Limitations, recorded and not treated as resolved: no contemporaneous
+10 June checkpoint hash was retained, so the B0 weight hash in the table
+above does not prove the historical checkpoint bytes. The limited
+published aptamer metric is `INFEASIBLE_WITH_RELEASED_EVIDENCE`; no
+metric was calculated. Syntactic A/C/G/U acceptance is not biological
+quality. The human gate is GO. On 28 September 2026, Laura Hardy approved
+B0 as the external aptamer-adapted comparator. Formal M2 is
+COMPLETE / GO — 28 September 2026. M3 is the next formal milestone. No
+GPU is currently authorised for later work. Numerical diffusion-training
+smoke remains formal M5.
+
 ## B1 versus B0
 
 `model_index.json` and `scheduler/scheduler_config.json` have identical

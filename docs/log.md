@@ -11262,3 +11262,21 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Boundary:** No TRAIN, VALIDATION, REF or EVAL sequence was accessed. No backward pass, optimizer step, fine-tuning or model selection occurred. No biological-data, optimizer or fine-tuning boundary was crossed. No numerical training smoke was performed. The human gate chose the existing formal ordering. The broader “released-behaviour and numerical training smoke validation” wording does not reassign M5 work into M1. M2–M4 remain required before M5.
 
 **Documentation:** `docs/fine_tuning/m1_released_inference_validation.md` and a current-status paragraph in the formal M1 section of `docs/fine-tuning-implementation-plan.md`. Documentation only. Not committed. Not pushed.
+
+## 2026-09-28 — Formal M2 evidence assembly
+
+**Stage:** Aim 2 / modelling / M2 published aptamer comparator verification
+
+**Status:** COMPLETE / GO — 28 September 2026. The human gate approved B0 as the external aptamer-adapted comparator. Formal M2 is closed. M3 is the next formal milestone.
+
+**Identity:** Scientific label `B0_released_aptamer_adapted_RNAGenesis`. Provenance `DIRECT_HUMAN_CONFIRMED_PROVENANCE`. Laura Hardy confirmed on 28 September 2026 that the ten tracked chunks are the B0 pool she generated earlier in 2026 from the authors’ released aptamer-fine-tuned RNAGenesis checkpoint. Historical `unadapted` path names are preserved obsolete labels. B0 is the authors’ released aptamer-adapted comparator, not generic, unadapted or pretrained-only. It is not D1 and it is not the length-matched causal baseline.
+
+**Pool:** Raw 30,080; accepted 30,080; rejected 0; unique accepted 30,080; duplicate accepted 0. Raw length 38 throughout; cleaned length 36 throughout. Nominal `max_seq_len=37`. Numeric raw concatenation SHA-256 `ed612277105c6b8747fc7365cc6b67fa8a94e8e5e8e64ee535ecadcb37ff4aaa`. Pooled cleaned SHA-256 `51ccf2b997f1e6386438be303e5affaf908f102bd098bab243a2a9ba1d94d6e1`. Guidance and tree search were not enabled. Raw artifacts remained unchanged. Recovered settings and seeds are recorded in the M2 report. The missing contemporaneous 10 June checkpoint hash remains an explicit limitation. No biological-quality claim follows from syntactic acceptance or uniqueness.
+
+**Execution:** Attempt 1 `SAFE_STOP_OUTPUT_DIRECTORY_ALREADY_EXISTED`; no cleaning. Attempt 2 PASS. Pooled evidence JSON SHA-256 `83ad84ee3c1cf49e8cbcd88cd31cd5580dbf16fb2994e7bba715c8b356f70f1d`. Raw hashes unchanged. Audit utility tests 16/16 under CPU-only Python 3.13.13. That test does not reproduce the Python 3.8 generation environment.
+
+**Published metric:** `INFEASIBLE_WITH_RELEASED_EVIDENCE`. Version 1 (64,000/13,802) stays separate from versions 2 and 3 (25,600/13,802). No metric was calculated. This infeasibility is the documented “where feasible” outcome and is not a B0 pool-verification failure.
+
+**Boundary:** No D1 training, generation, model selection, REF/EVAL access or unauthorised GPU use occurred. No GPU is currently authorised for later work. Numerical diffusion-training smoke remains formal M5.
+
+**Documentation:** `docs/fine-tuning-implementation-plan.md`, `docs/fine_tuning/model_asset_manifest.md`, `docs/fine_tuning/m2_published_aptamer_comparator_verification.md` and `docs/log.md` are being committed and pushed in the closure commit.
