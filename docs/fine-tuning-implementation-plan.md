@@ -1471,6 +1471,10 @@ Accept inference regression.
 - no fine-tuning;
 - no model-selection use of EVAL/REF.
 
+**Current status: COMPLETE / GO — 28 September 2026.**
+
+The human gate is GO and chose the existing formal ordering. The accepted evidence is `/home/laura/rnagenesis-mres-runs/m1_inference_e20f556/m1_released_inference_evidence.json`, SHA-256 `ec518b3f8f78de19227abe5a14e138bcf381c231bc888689a298a16c946ee774`, recorded in [M1 released-inference validation](fine_tuning/m1_released_inference_validation.md). Released and current B0 raw outputs are byte-identical, and released and current B1 raw outputs are byte-identical. Cleaning accepted A/C/G/U sequences only. No fine-tuning ran, and no TRAIN, VALIDATION, REF or EVAL sequence was accessed. Numerical diffusion-training smoke was not performed and remains formal M5, after M2–M4. The broader “released-behaviour and numerical training smoke validation” wording does not reassign that M5 work into M1.
+
 ---
 
 ### M2 — Published aptamer implementation/comparator verification

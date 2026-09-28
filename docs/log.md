@@ -11242,3 +11242,23 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Schedule observed, not run:** microbatch 8, accumulation 4, effective batch 32, 84 dataloader batches/epoch, 21 optimizer updates/epoch, 5 epochs, 105 updates maximum, warmup 10, AdamW, learning rate 3e-5, betas 0.95/0.999, epsilon 1e-8, weight decay 1e-6, cosine schedule, gradient clip 1.0, mixed precision no. TRAIN/DataLoader/diffusion seed 42. Fixed VALIDATION seed 1, one draw per sequence. Validation sequence SHA256 `b23647f40bb8fccee463009a5562411eceabe8070b953dfe0dcd59e10d8dc088`. Timestep SHA256 `aa20a66ed2c91351b667baf726f011d3522a9bb2e569046db5041e0242bfe080`. Noise SHA256 `248a65d462be827afe313523b3dd8481394ae0d627633c56bbe965037d84b410`.
 
 **Documentation:** `docs/fine_tuning/m0_data_contract_verification.md`, `docs/fine-tuning-implementation-plan.md`, `docs/fine_tuning/model_asset_manifest.md`, `docs/fine_tuning/environment_manifest.md`, `docs/fine_tuning/biomap_reconstruction_decision.md`. Documentation only. Not committed. Not pushed.
+
+## 2026-09-28 — Formal M1 released-inference execution
+
+**Stage:** Aim 2 / modelling / M1 released inference
+
+**Status:** COMPLETE / GO — 28 September 2026. The formal M1 human gate is GO. The released-inference milestone is closed. M2 is the next formal milestone. Numerical diffusion-training smoke remains formal M5 and remains pending after M2–M4.
+
+**Design:** Six runs. Current lineage twice for B0 and twice for B1 at RNAGenesis `e20f5567526a6d76a173eba87e363e8edf130cd6`, worktree `/home/laura/RNAGenesis`. Released lineage once for B0 and once for B1 at `d00899eef60d664cc7b5880c0bb43f2a9e7a1b01`, worktree `/home/laura/rnagenesis-mres-worktrees/released-d00899e-m1`. Settings were a technical smoke: seed 42, eta 0.0, five DDIM steps, two sequences, `max_seq_len` 37. Guidance and search arguments were present and inert.
+
+**Identity:** Current B0 run 1 and run 2 match. Current B1 run 1 and run 2 match. Released and current B0 raw outputs are byte-identical (`407ed27564fdc200f190ff78eddae04466dd4ba3e7d4a0c30c5af64e8a91f25d`). Released and current B1 raw outputs are byte-identical (`b5bf57a8977476e05119d380aeefa7a407daec002ecefad9ea747c1dd3ef835d`). B0 and B1 denoiser weights differ. The two-sequence B0 versus B1 output difference is not biological evidence.
+
+**Cleaning:** Boundary-only rule. All 12 rows had raw prefix `11`, an empty suffix, raw length 38 and cleaned length 36. All 12 were accepted as A/C/G/U. Zero rows were rejected. Raw hashes were unchanged by cleaning.
+
+**Audit utility:** `112a120282667c382790031fe74942f89f7b84eb`, subject `Add M1 generation output audit`. Pre-commit rerun: audit utility tests 16/16; lightweight trainer tests 39/39. Those tallies are not fields of the evidence JSON.
+
+**Evidence:** `/home/laura/rnagenesis-mres-runs/m1_inference_e20f556/m1_released_inference_evidence.json`, SHA-256 `ec518b3f8f78de19227abe5a14e138bcf381c231bc888689a298a16c946ee774`. Authoritative MRes commit `6bb2aa8564d3493c598122545c0baa640b29bfe4`.
+
+**Boundary:** No TRAIN, VALIDATION, REF or EVAL sequence was accessed. No backward pass, optimizer step, fine-tuning or model selection occurred. No biological-data, optimizer or fine-tuning boundary was crossed. No numerical training smoke was performed. The human gate chose the existing formal ordering. The broader “released-behaviour and numerical training smoke validation” wording does not reassign M5 work into M1. M2–M4 remain required before M5.
+
+**Documentation:** `docs/fine_tuning/m1_released_inference_validation.md` and a current-status paragraph in the formal M1 section of `docs/fine-tuning-implementation-plan.md`. Documentation only. Not committed. Not pushed.
