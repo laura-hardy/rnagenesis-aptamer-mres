@@ -1,0 +1,311 @@
+{
+  "contract_id": "ndm1_rna_d9_reference_verification",
+  "milestone": "NDM1_RNA_D9_primary_source_verification",
+  "build_date": "2026-09-27",
+  "repository_head_baseline": "6bb2aa8564d3493c598122545c0baa640b29bfe4",
+  "scope": "target_specific_ndm1_rna_d9_reference_enrichment",
+  "not_a_corpus_curation_stage": true,
+  "does_not_migrate_s0b_classifications": true,
+  "identity_threshold": 0.9,
+  "comparison_representation_note": "Leakage diagnostics reuse comparison_form U-to-T collapse. Canonical RNA retains U. Reported and cleaned source forms retain T.",
+  "output_dir": "data/processed",
+  "source_registry_path": "config/source_registry.csv",
+  "registered_source_key": "von_laer_2013_d9_table6",
+  "registered_csv_path": "data/raw/evaluation_references/selektion_paper/table6_d9_ndm1_sequences.csv",
+  "previous_registered_csv_path": "data/raw/selektion_paper/table6_d9_ndm1_sequences.csv",
+  "operational_registry_path": "data/interim/registry/source_registry.csv",
+  "evaluation_references_path": "data/processed/evaluation_references.csv",
+  "evaluation_reference_manifest_path": "data/interim/evaluation/evaluation_reference_manifest.csv",
+  "leakage_exclusion_set_path": "data/interim/leakage_exclusion_set.csv",
+  "s7d_manifest_path": "data/processed/corpus_manifest.json",
+  "historical_s7d_source_registry_sha256": "0bdc009821deff19a1e74fe7524b5dff78b2f03165a2c23283886df55f03aa20",
+  "frozen_partitions": {
+    "TRAIN": "data/processed/ft_train.csv",
+    "VALIDATION": "data/processed/ft_validation.csv",
+    "REF": "data/processed/ref.csv",
+    "EVAL": "data/processed/eval.csv"
+  },
+  "frozen_corpus": {
+    "corpus_final.csv": "data/processed/corpus_final.csv",
+    "corpus_final.txt": "data/processed/corpus_final.txt"
+  },
+  "expected_frozen_sha256": {
+    "corpus_final.csv": "2797e6767f78029574df1b6cdf51bbe7952ea8affce83870441b3d3d93c98849",
+    "corpus_final.txt": "d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d",
+    "ft_train.csv": "84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0",
+    "ft_validation.csv": "cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd",
+    "ref.csv": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
+    "eval.csv": "ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015",
+    "evaluation_references.csv": "b6ba6b2cde4a18c04130ecdc457626c5e60b8b90d3ad5b9bae6cb1bfd1f77dad",
+    "evaluation_reference_manifest.csv": "b6ba6b2cde4a18c04130ecdc457626c5e60b8b90d3ad5b9bae6cb1bfd1f77dad",
+    "leakage_exclusion_set.csv": "77c7ab53420f97a3d7c41197b6e66447eabcda789803388ebb37ec1791944730",
+    "corpus_manifest.json": "08da8d5e44413ea9ab57c128dbe4ef7986dab7a2bfa794cfef6fb4724577565f"
+  },
+  "untouched_during_run": [
+    "config/global_s7d_final_build.json",
+    "config/ndm1_ssdna_reference_build.json",
+    "scripts/data_preparation/s0_build_leakage_exclusion.py"
+  ],
+  "protected_untracked_files": [
+    "docs/aptarank-two-stage-evaluation-implementation-plan.md",
+    "docs/aptarank_full_mres_thesis_evaluation_plan.md",
+    "docs/planned_evaluation_report.md"
+  ],
+  "raw_sources": {
+    "dissertation_pdf": {
+      "path": "data/raw/evaluation_references/selektion_paper/Selektion und Charakterisierung von RNAAptameren zur Genregulation und Antibiotikatherapie copy.pdf",
+      "sha256": "c39440e2e3ed6c2c3406d837feef8e9a0c52650574ec6b17fd28de49007d8cf4",
+      "role": "primary_scientific_authority"
+    },
+    "table6_csv": {
+      "path": "data/raw/evaluation_references/selektion_paper/table6_d9_ndm1_sequences.csv",
+      "sha256": "baf2bb04578775642c8a70d06c2c3b60a2212982b4f39450a409de14247515a2",
+      "role": "machine_readable_transcription"
+    },
+    "data_xlsx": {
+      "path": "data/raw/evaluation_references/selektion_paper/data.xlsx",
+      "sha256": "c536815248f3fd138f85d16a2265e9188774ae97148c077b0f3806e797ddeb99",
+      "role": "corroborating"
+    },
+    "readme_rtf": {
+      "path": "data/raw/evaluation_references/selektion_paper/readme.rtf",
+      "sha256": "371932081eb4e2e639a7d46c89c983519e42a3722f4325cae2a7d74e06978dc3",
+      "role": "corroborating"
+    }
+  },
+  "publication": {
+    "publication_type": "doctoral_dissertation",
+    "publication_title": "Selektion und Charakterisierung von RNA-Aptameren zur Genregulation und Antibiotikatherapie",
+    "first_author": "Karl Ludwig von Laer",
+    "year": "2013",
+    "target": "NDM-1",
+    "selection_pool": "D9",
+    "selection_round": "9",
+    "selection_method": "RNA SELEX",
+    "molecule_type": "RNA",
+    "source_reported_alphabet": "DNA_T"
+  },
+  "table6_locator": {
+    "table": "Table 6",
+    "pdf_page": 42,
+    "dissertation_page": 36,
+    "section": "3.2.6 Charakterisierung der Einzelsequenzen"
+  },
+  "filter_retention_locator": {
+    "assay_type": "filter_retention",
+    "pdf_page": 43,
+    "dissertation_page": 37,
+    "figure": "Abbildung 18",
+    "concentration_range": "1 nM to 1 µM NDM-1",
+    "concentration_threshold": "no tested sequence showed binding below 1 µM NDM-1",
+    "quantitative_affinity_reported": false
+  },
+  "inhibition_locator": {
+    "assay_type": "nitrocefin_activity",
+    "clone_id": "D909",
+    "result_pdf_pages": "46-47",
+    "result_dissertation_pages": "40-41",
+    "methods_pdf_page": 90,
+    "methods_dissertation_page": 84,
+    "enzyme_concentration": "30 nM NDM-1",
+    "rna_concentration_range": "1-30 µM D909",
+    "substrate": "100 µM nitrocefin",
+    "preincubation": "30 min at 37 C",
+    "replicates": "triplicate",
+    "activity_decrease_from": "about 10 µM D909",
+    "reduction_at_30_uM": "about 70 percent",
+    "no_inhibition_at": "300 nM NDM-1",
+    "excess": "very large RNA excess; about one-thousand-fold at 30 nM NDM-1",
+    "quantitative_affinity_reported": false
+  },
+  "expected_clone_ids": ["D902", "D907", "D909", "D913", "D914", "D918", "D920"],
+  "expected_reported_lengths": {
+    "D902": 50,
+    "D907": 50,
+    "D909": 50,
+    "D913": 50,
+    "D914": 50,
+    "D918": 50,
+    "D920": 50
+  },
+  "expected_cleaned_lengths": {
+    "D902": 50,
+    "D907": 34,
+    "D909": 48,
+    "D913": 50,
+    "D914": 50,
+    "D918": 49,
+    "D920": 50
+  },
+  "expected_trailing_gap_counts": {
+    "D902": 0,
+    "D907": 16,
+    "D909": 2,
+    "D913": 0,
+    "D914": 0,
+    "D918": 1,
+    "D920": 0
+  },
+  "expected_cleaned_source_sha256": {
+    "D902": "c8ad39d792ab9bf807226d47afac97cb2a2c6a36c29becfd844efd3dfc75d291",
+    "D907": "b81e9139745d1bd77ce2d33f81fb172336d98a06284fa835568537b0053cb95f",
+    "D909": "b429fbf944792ccb2a5dee3c4a3423cfc288180ea96a8860c4c7116548db0b4c",
+    "D913": "b71339a033741fb0f3a30cd451284c659357420f44a75205a625778abb302d89",
+    "D914": "4639f4dae15430064a6e99aa3db623ebdbb37a384cf3569f3fbc13a53efb656d",
+    "D918": "f09d6e932884b4bc1574ea58cdaea54f9a1639fefa772dd9cef228caa9d02ff1",
+    "D920": "4217d9bddccd3775478bac21f5c9cf8ed6de72fc6142d99007f70bb4c88c2bd0"
+  },
+  "expected_canonical_rna_sha256": {
+    "D902": "3982fac99df4cc48c56f5edee3a1b3355f3d23d8704f79e915b3e534b0030bf4",
+    "D907": "8cc7432428b91dfc579407f714e9ba2074703c9c8678dacf09342042302e4eb4",
+    "D909": "4e02b6b836855a7bea9cd369e24d7051ebe67c5b59ce113a1a1bc8fb23c80cb6",
+    "D913": "a01cc4ef4dd31f3ce16dcac5981a001d55e4c9ad3d7e3575fd23ed75097dfff9",
+    "D914": "aa65bc2aca417954cdf24f799af5134a7e16b1a3a81700a0adde050d0578f76b",
+    "D918": "53654e53b1664ef9b5718e0312d0e7bc213c9fd0363eba27fc21111eaf61c9ca",
+    "D920": "1a740386a6fb07c490b7ac82fe7118ec35400d130fa0c8ff5ae7bb621a4e3a34"
+  },
+  "expected_reported_sha256": {
+    "D902": "c8ad39d792ab9bf807226d47afac97cb2a2c6a36c29becfd844efd3dfc75d291",
+    "D907": "6b467e204936331fa27dbc9d05882aeeee814e17e9f3782256bbfd6fb35f471f",
+    "D909": "5c900f976c3d717aa818470615e587941f5f9acf93258a1d170d1f367e02fc2a",
+    "D913": "b71339a033741fb0f3a30cd451284c659357420f44a75205a625778abb302d89",
+    "D914": "4639f4dae15430064a6e99aa3db623ebdbb37a384cf3569f3fbc13a53efb656d",
+    "D918": "968dd12af72714d576fabfc7de3c9259d07d05249778fac59b03006a6f17ddfb",
+    "D920": "4217d9bddccd3775478bac21f5c9cf8ed6de72fc6142d99007f70bb4c88c2bd0"
+  },
+  "clones": {
+    "D902": {
+      "reference_id": "von_laer_2013_ndm1_rna_d902",
+      "legacy_s0b_reference_id": "von_laer_2013_d902",
+      "legacy_exclusion_id": "lex_0023_e93470caef91",
+      "legacy_evaluation_label": "pool_nonbinder",
+      "legacy_evaluation_role": "pool_nonbinder_or_control",
+      "qualitative_binding_status": "no_detectable_binding",
+      "sequence_comparison_role": "no_detectable_binding_comparator",
+      "evidence_strength": "qualitative_filter_retention",
+      "clone_frequency": 8,
+      "clone_frequency_support": "explicit_eight_occurrences",
+      "legacy_discrepancy_code": "legacy_pool_nonbinder_does_not_distinguish_no_detectable_binding",
+      "discrepancy_codes": "legacy_pool_nonbinder_does_not_distinguish_no_detectable_binding|source_following_sentence_groups_d902_with_weak_binders",
+      "human_review_status": "verified_enriched_classification_legacy_migration_deferred",
+      "proposed_disposition": "retain_existing_s0b_and_leakage_record_enrich_separately_do_not_duplicate"
+    },
+    "D907": {
+      "reference_id": "von_laer_2013_ndm1_rna_d907",
+      "legacy_s0b_reference_id": "von_laer_2013_d907",
+      "legacy_exclusion_id": "lex_0024_80535f03ee87",
+      "legacy_evaluation_label": "pool_nonbinder",
+      "legacy_evaluation_role": "pool_nonbinder_or_control",
+      "qualitative_binding_status": "weak_binding",
+      "sequence_comparison_role": "weak_binding_contextual_reference",
+      "evidence_strength": "qualitative_filter_retention",
+      "clone_frequency": 1,
+      "clone_frequency_support": "implied_single_occurrence_among_14_n50_clones_after_eight_d902",
+      "legacy_discrepancy_code": "legacy_pool_nonbinder_collapses_source_supported_weak_binding",
+      "discrepancy_codes": "legacy_pool_nonbinder_collapses_source_supported_weak_binding",
+      "human_review_status": "verified_enriched_classification_legacy_migration_deferred",
+      "proposed_disposition": "retain_existing_s0b_and_leakage_record_enrich_separately_do_not_duplicate"
+    },
+    "D909": {
+      "reference_id": "von_laer_2013_ndm1_rna_d909",
+      "legacy_s0b_reference_id": "von_laer_2013_d909",
+      "legacy_exclusion_id": "lex_0025_7db2bd822aaf",
+      "legacy_evaluation_label": "positive",
+      "legacy_evaluation_role": "primary_positive_rna_reference",
+      "qualitative_binding_status": "positive_strongest",
+      "sequence_comparison_role": "primary_positive_reference",
+      "evidence_strength": "qualitative_filter_retention_plus_limited_inhibition_assay",
+      "clone_frequency": 1,
+      "clone_frequency_support": "implied_single_occurrence_among_14_n50_clones_after_eight_d902",
+      "legacy_discrepancy_code": "",
+      "discrepancy_codes": "",
+      "human_review_status": "verified",
+      "proposed_disposition": "retain_existing_s0b_and_leakage_record_enrich_separately_do_not_duplicate"
+    },
+    "D913": {
+      "reference_id": "von_laer_2013_ndm1_rna_d913",
+      "legacy_s0b_reference_id": "von_laer_2013_d913",
+      "legacy_exclusion_id": "lex_0026_a75914a5d0fa",
+      "legacy_evaluation_label": "pool_nonbinder",
+      "legacy_evaluation_role": "pool_nonbinder_or_control",
+      "qualitative_binding_status": "weak_binding",
+      "sequence_comparison_role": "weak_binding_contextual_reference",
+      "evidence_strength": "qualitative_filter_retention",
+      "clone_frequency": 1,
+      "clone_frequency_support": "implied_single_occurrence_among_14_n50_clones_after_eight_d902",
+      "legacy_discrepancy_code": "legacy_pool_nonbinder_collapses_source_supported_weak_binding",
+      "discrepancy_codes": "legacy_pool_nonbinder_collapses_source_supported_weak_binding",
+      "human_review_status": "verified_enriched_classification_legacy_migration_deferred",
+      "proposed_disposition": "retain_existing_s0b_and_leakage_record_enrich_separately_do_not_duplicate"
+    },
+    "D914": {
+      "reference_id": "von_laer_2013_ndm1_rna_d914",
+      "legacy_s0b_reference_id": "von_laer_2013_d914",
+      "legacy_exclusion_id": "lex_0027_111643c7759c",
+      "legacy_evaluation_label": "pool_nonbinder",
+      "legacy_evaluation_role": "pool_nonbinder_or_control",
+      "qualitative_binding_status": "weak_binding",
+      "sequence_comparison_role": "weak_binding_contextual_reference",
+      "evidence_strength": "qualitative_filter_retention",
+      "clone_frequency": 1,
+      "clone_frequency_support": "implied_single_occurrence_among_14_n50_clones_after_eight_d902",
+      "legacy_discrepancy_code": "legacy_pool_nonbinder_collapses_source_supported_weak_binding",
+      "discrepancy_codes": "legacy_pool_nonbinder_collapses_source_supported_weak_binding",
+      "human_review_status": "verified_enriched_classification_legacy_migration_deferred",
+      "proposed_disposition": "retain_existing_s0b_and_leakage_record_enrich_separately_do_not_duplicate"
+    },
+    "D918": {
+      "reference_id": "von_laer_2013_ndm1_rna_d918",
+      "legacy_s0b_reference_id": "von_laer_2013_d918",
+      "legacy_exclusion_id": "lex_0028_c3d9d1fc762b",
+      "legacy_evaluation_label": "secondary_positive",
+      "legacy_evaluation_role": "secondary_positive_rna_reference",
+      "qualitative_binding_status": "positive_secondary",
+      "sequence_comparison_role": "secondary_positive_reference",
+      "evidence_strength": "qualitative_filter_retention",
+      "clone_frequency": 1,
+      "clone_frequency_support": "implied_single_occurrence_among_14_n50_clones_after_eight_d902",
+      "legacy_discrepancy_code": "",
+      "discrepancy_codes": "",
+      "human_review_status": "verified",
+      "proposed_disposition": "retain_existing_s0b_and_leakage_record_enrich_separately_do_not_duplicate"
+    },
+    "D920": {
+      "reference_id": "von_laer_2013_ndm1_rna_d920",
+      "legacy_s0b_reference_id": "von_laer_2013_d920",
+      "legacy_exclusion_id": "lex_0029_c04289bba807",
+      "legacy_evaluation_label": "secondary_positive",
+      "legacy_evaluation_role": "secondary_positive_rna_reference",
+      "qualitative_binding_status": "positive_secondary",
+      "sequence_comparison_role": "secondary_positive_reference",
+      "evidence_strength": "qualitative_filter_retention",
+      "clone_frequency": 1,
+      "clone_frequency_support": "implied_single_occurrence_among_14_n50_clones_after_eight_d902",
+      "legacy_discrepancy_code": "",
+      "discrepancy_codes": "",
+      "human_review_status": "verified",
+      "proposed_disposition": "retain_existing_s0b_and_leakage_record_enrich_separately_do_not_duplicate"
+    }
+  },
+  "expected_counts": {
+    "reference_records": 7,
+    "binding_evidence_records": 8,
+    "positive_references": 3,
+    "weak_binding_references": 3,
+    "no_detectable_binding_references": 1,
+    "leakage_exclusion_matches": 7
+  },
+  "expected_leakage": {
+    "any_exact_in_frozen_partitions_or_corpus": false,
+    "any_identity_ge_threshold": false
+  },
+  "s0b_migration_would_affect": [
+    "data/processed/evaluation_references.csv",
+    "data/interim/evaluation/evaluation_reference_manifest.csv",
+    "data/interim/leakage_exclusion_set.csv",
+    "config/global_s7d_final_build.json#expected_leakage_exclusion_sha256",
+    "config/global_s7d_final_build.json#evaluation_references.sha256",
+    "config/ndm1_ssdna_reference_build.json#expected_frozen_sha256.evaluation_references.csv",
+    "scripts/data_preparation/s0_build_leakage_exclusion.py#D9_EVALUATION_LABELS"
+  ]
+}
