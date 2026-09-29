@@ -1,0 +1,315 @@
+# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+# This file must not be consumed by an executable workflow.
+# Fixed-draw validation and generated-sample guardrails are approved for implementation only.
+# This approval does not create the draw tensors and does not select a checkpoint.
+
+document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
+human_approval:
+  approving_person: Laura Hardy
+  approval_date: 29 September 2026
+  approval_recorded_timestamp: "2026-09-29T14:57:40+10:00"
+  approval_source: formal human approval in the M4 review chat
+  approval_scope: Stage 1 protocol package for M4 implementation only
+  explicitly_not_approved:
+    - scientific_execution
+    - biological_data_runs
+    - B2_generation
+    - validation_artifact_creation
+    - model_loading
+    - GPU_use
+    - B1_generation
+    - D1_training
+    - staging
+    - committing
+    - pushing
+  m4_complete: false
+  previous_document_status: DRAFT_PENDING_HUMAN_APPROVAL
+schema_version: m4-stage1-draft-1
+metric_set_id: validation_metrics_v1_draft
+condition_registry_schema_version: m4-stage1-draft-1
+created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
+
+fixed_draw_validation:
+  status: APPROVED_STAGE_1_DESIGN
+  role: VALIDATION
+  grain: first_occurrence_frozen_VALIDATION_cores
+  sequence_count: 95
+  ordering: frozen_first_occurrence_order
+  validation_csv_sha256: cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd
+  validation_csv_sha256_does_not_substitute_for_ordering_hashes: true
+  validation_identity_rows_not_used_as_grain: 132
+  repeated_identity_rows_accounted_elsewhere: 37
+  seed: 1
+  stochastic_draws_per_sequence: 4
+  total_sequence_draw_pairs: 380
+  draw_creation_device: cpu
+  noise_dtype: float32
+  timestep_dtype: int64
+  timestep_dtype_note: >
+    APPROVED_STAGE_1_DESIGN. Latent encoding, the denoiser forward
+    pass, scheduler arithmetic, noise, and the denoising MSE arithmetic are
+    float32. Timestep indices are int64 because the released scheduler and
+    the tracked trainer at RNAGenesis e3b855 consume integer timesteps.
+    This approval does not cast timestep indices to float32 and does not
+    create the draw tensors.
+  scheduler:
+    class_name: DDIMScheduler
+    config_sha256: 6b470b030031daa7c812ef9a6dfe49f14fa695c17a939406f1c780bad6a91396
+    prediction_type: epsilon
+    num_train_timesteps: 1000
+  proposed_draw_recipe:
+    status: APPROVED_STAGE_1_DESIGN
+    generator: torch.Generator
+    generator_device: cpu
+    seed_call: manual_seed(1)
+    global_rng_used: false
+    order: sequence_major_then_draw_index
+    latent_shape: [32, 160]
+    timestep_shape: [95, 4]
+    noise_shape: [95, 4, 32, 160]
+    per_pair_timestep: "torch.randint(0, num_train_timesteps, (1,), generator=generator, dtype=torch.long)"
+    per_pair_noise: "torch.randn(32, 160, generator=generator)"
+    alignment_note: >
+      This recipe matches the training draw and the fixed-draw walker in
+      tracked RNAGenesis train_diffusion_mres.py at e3b855. That file's
+      current default draw count is 1. This approved design uses 4. The code
+      default is not the approved protocol.
+  persistence:
+    persisted_before_training: true
+    tensors_created_in_this_stage: false
+    artifacts:
+      - timestep_tensor
+      - noise_tensor
+      - metadata_manifest
+    independent_hashes: true
+    reused_for_initialisation_and_every_checkpoint: true
+    regeneration_during_a_training_run: false
+    rebuild_from_seed_inside_a_run: false
+  ordered_core_provenance_artifact:
+    status: APPROVED_STAGE_1_DESIGN
+    created_in_this_stage: false
+    created_in_stage_2a: false
+    contains_sequence_text: false
+    hash_status: PENDING_ARTIFACT_NOT_CREATED
+    serialization:
+      encoding: utf-8
+      format: csv
+      line_ending: LF
+      bom: false
+      carriage_returns: false
+      header: "role,zero_based_frozen_index,sequence_core_sha256,biological_length"
+      data_rows: 95
+      row_order: frozen_first_occurrence_order
+      csv_quoting: minimal
+      final_lf_required: true
+      hash: sha256_of_the_exact_serialized_bytes
+    future_artifact_fields_only:
+      - role
+      - zero_based_frozen_index
+      - sequence_core_sha256
+      - biological_length
+  validation_sequence_order_sha256:
+    value: null
+    status: PENDING_ARTIFACT_NOT_CREATED
+    definition: >
+      SHA-256 of the concatenation of each of the 95 ASCII sequence cores
+      followed by exactly one LF byte, in frozen first-occurrence order.
+  validation_order_artifact_sha256:
+    value: null
+    status: PENDING_ARTIFACT_NOT_CREATED
+    definition: >
+      SHA-256 of the exact serialized no-sequence order artifact: UTF-8 CSV,
+      LF line endings, no BOM, no carriage returns, the exact header
+      role,zero_based_frozen_index,sequence_core_sha256,biological_length,
+      exactly 95 data rows in frozen order, minimal CSV quoting, and a
+      required final LF.
+  fixed_draw_metadata_manifest_records:
+    - validation_csv_sha256
+    - validation_sequence_order_sha256
+    - validation_order_artifact_sha256
+  prohibited_roles:
+    - REF
+    - EVAL
+  deterministic_execution:
+    status: APPROVED_STAGE_1_DESIGN
+    tensors_created_in_this_stage: false
+    seed: 1
+    stochastic_draws_per_sequence: 4
+    complete_frozen_encdec: evaluation_mode
+    denoiser: evaluation_mode
+    dropout: disabled_by_evaluation_mode
+    torch_no_grad: true
+    autocast: false
+    float32_arithmetic:
+      - latent_encoding
+      - denoiser_forward_pass
+      - scheduler_arithmetic
+      - noise
+      - mse_arithmetic
+    timestep_dtype: int64
+    same_stored_timestep_and_noise_tensors_at_initialization_and_every_checkpoint: true
+    mixing_raw_and_ema_weight_variants_within_a_comparison: prohibited
+    evaluated_weight_variant_recorded_in_the_manifest: true
+    draw_tensors_and_metadata_independently_hashed: true
+  aggregation:
+    status: APPROVED_STAGE_1_DESIGN
+    pair_loss: >
+      Mean squared error across all [32, 160] latent elements for one
+      sequence/draw pair.
+    reported_metric: sum_of_the_380_pair_losses_divided_by_exactly_380
+    primary_value: unweighted_mean_of_380_pair_mses
+    weighted_composite_score: false
+    prohibited_batch_reduction: >
+      An implementation must not average batch means with equal batch weight
+      when batch sizes differ. The reported metric is the sum of the 380
+      pair losses divided by exactly 380.
+    note: >
+      With exactly four draws on every sequence, that reported metric equals
+      the unweighted mean of the 95 per-sequence means. No other weighting
+      is defined.
+
+primary_checkpoint_selection:
+  status: APPROVED_STAGE_1_DESIGN
+  weighted_composite_score_defined: false
+  rule: >
+    Select the checkpoint with the lowest fixed-draw VALIDATION denoising
+    MSE, provided it passes every approved hard generated-sample guardrail.
+  ineligible_if_any_approved_hard_threshold_fails: true
+  lowest_loss_does_not_override_a_failed_hard_guardrail: true
+  secondary_metrics_may_select_the_checkpoint: false
+
+why_four_draws:
+  status: APPROVED_STAGE_1_DESIGN
+  rationale: >
+    Fixed draws remove checkpoint-to-checkpoint resampling noise. Four
+    timesteps per sequence provide more stable schedule coverage than one
+    while remaining bounded for 95 sequences.
+
+hard_guardrails:
+  status: APPROVED_STAGE_1_DESIGN
+  non_length_guardrail_status: APPROVED_STAGE_1_DESIGN
+  requested_length_threshold_status: PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE
+  sample:
+    status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+    raw_attempts_per_evaluated_neural_checkpoint: 1000
+    length_protocol: approved_length_allocation_protocol_after_phase_a_and_phase_b
+    paired_seed_schedule: approved_design_blocked_until_length_algorithm_approved
+    target_length_sampling_seed: 43000
+    generation_seed_base: 44000
+    execution_blocked_until_length_mapping_or_rejection_resampling_algorithm_approved: true
+    executable_now: false
+  threshold_label: APPROVED_STAGE_1_DESIGN
+  requested_length_threshold_label: PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE
+  thresholds:
+    - id: valid_nonempty_acgu_fraction
+      label: APPROVED_STAGE_1_DESIGN
+      minimum: 0.99
+      numerator: raw_attempts_whose_cleaned_body_is_nonempty_and_matches_ACGU
+      denominator: raw_attempts
+    - id: empty_or_unparseable_fraction
+      label: APPROVED_STAGE_1_DESIGN
+      maximum: 0.01
+      numerator: raw_attempts_that_are_empty_or_unparseable
+      denominator: raw_attempts
+    - id: unique_fraction
+      label: APPROVED_STAGE_1_DESIGN
+      minimum: 0.95
+      numerator: unique_valid_outputs
+      denominator: valid_outputs
+    - id: exact_train_match_rate
+      label: APPROVED_STAGE_1_DESIGN
+      maximum: 0.01
+      numerator: valid_outputs_exactly_equal_to_a_TRAIN_core
+      denominator: valid_outputs
+    - id: largest_duplicate_share
+      label: APPROVED_STAGE_1_DESIGN
+      maximum: 0.01
+      numerator: count_of_the_most_frequent_valid_output
+      denominator: valid_outputs
+    - id: requested_length_exact_hit_rate
+      label: PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE
+      minimum: 0.90
+      numerator: valid_outputs_whose_cleaned_length_equals_the_requested_biological_length
+      denominator: valid_outputs
+      measured_before_rejection_or_resampling: true
+      invalid_attempts_remain_visible_through: raw_attempt_validity_guardrail
+      zero_valid_outputs_exact_hit_rate: 0.0
+      report_together:
+        - raw_attempts
+        - valid_outputs
+        - exact_hits
+      applies_to:
+        - B1_generic_released_rnagenesis
+        - D1_mres_curated_aptamer_diffusion_adapted
+      does_not_apply_to:
+        - B2_train_matched_empirical_null
+        - B0_existing_pool_as_a_checkpoint_eligibility_rule
+    - id: per_length_exact_hit_floor
+      label: PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE
+      rule: >
+        No requested length represented by at least 16 raw characterization
+        attempts may have an exact-hit rate below 0.50. Phase B uses 16 raw
+        attempts for every tested TRAIN length, so every Phase B length is
+        eligible for this guardrail.
+      minimum_exact_hit_rate: 0.50
+      minimum_raw_attempts_before_the_rule_binds: 16
+      numerator_within_length: valid_outputs_for_that_requested_length_whose_cleaned_length_equals_the_requested_biological_length
+      denominator_within_length: valid_outputs_for_that_requested_length
+      zero_valid_outputs:
+        exact_hit_rate: 0.0
+        result_once_the_raw_attempt_minimum_is_reached: failure
+        validity_reported_separately: true
+      lengths_with_fewer_than_16_raw_attempts: reported_and_do_not_trip_this_rule
+      report_together:
+        - raw_attempts
+        - valid_outputs
+        - exact_hits
+  denominator_rules:
+    - Report raw attempts, parsed outputs, valid outputs, unique valid outputs, duplicate outputs, and invalid outputs separately.
+    - Do not silently remove invalid attempts.
+    - Do not silently remove duplicate attempts.
+    - Unique fraction, exact TRAIN match rate, and largest duplicate share use valid outputs as the denominator.
+    - Validity and empty-or-unparseable fractions use raw attempts as the denominator.
+    - The requested-length exact-hit numerator is the count of valid outputs whose cleaned length equals the requested biological length.
+    - The requested-length exact-hit denominator remains valid outputs.
+    - The requested-length exact-hit rate is computed on valid outputs before any rejection or resampling.
+    - Invalid attempts remain visible through the raw-attempt validity guardrail.
+    - Zero valid outputs yields an exact-hit rate of 0.0 and fails the per-length rule once the raw-attempt minimum is reached.
+    - Raw attempts, valid outputs, and exact hits must always be reported together.
+  eligibility:
+    any_failed_approved_hard_threshold_makes_the_checkpoint_ineligible: true
+    applies_even_if_validation_loss_is_lowest: true
+
+report_only_diagnostics:
+  purpose: reporting_not_threshold_optimization
+  no_threshold_in_this_draft: true
+  items:
+    - nearest_TRAIN_normalized_edit_distance
+    - maximum_identity_to_TRAIN
+    - generated_cluster_concentration
+    - nucleotide_distribution
+    - dinucleotide_distribution
+    - mfe
+    - mfe_per_nucleotide
+    - paired_fraction
+    - representation_space_distance_to_VALIDATION
+    - full_length_stratified_results
+  clustering_identity_threshold:
+    status: UNRESOLVED_HUMAN_DECISION
+    value: null
+    clustering_dependent_claims_permitted: false
+    blocked_until_frozen:
+      - generated_cluster_concentration
+      - cluster_count
+      - singleton_fraction
+      - largest_cluster_share
+      - shannon_diversity
+      - effective_cluster_count
+  representation_model:
+    status: UNRESOLVED_HUMAN_DECISION
+    embedding_aggregation: UNRESOLVED_HUMAN_DECISION
+    constraint: frozen_representation_model_only
+    development_reference: VALIDATION
+    prohibited_reference_during_development: [REF, EVAL]
+    do_not_train_a_representation_model_on_EVAL: true

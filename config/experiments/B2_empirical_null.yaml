@@ -1,0 +1,338 @@
+# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+# This file must not be consumed by an executable workflow.
+# Stage 2A may harden scripts/null_model.py. Do not run it on biological data.
+
+document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
+human_approval:
+  approving_person: Laura Hardy
+  approval_date: 29 September 2026
+  approval_recorded_timestamp: "2026-09-29T14:57:40+10:00"
+  approval_source: formal human approval in the M4 review chat
+  approval_scope: Stage 1 protocol package for M4 implementation only
+  explicitly_not_approved:
+    - scientific_execution
+    - biological_data_runs
+    - B2_generation
+    - validation_artifact_creation
+    - model_loading
+    - GPU_use
+    - B1_generation
+    - D1_training
+    - staging
+    - committing
+    - pushing
+  m4_complete: false
+  previous_document_status: DRAFT_PENDING_HUMAN_APPROVAL
+schema_version: m4-stage1-draft-1
+experiment_id: B2_empirical_null_draft
+condition_manifest_label: B2_train_matched_empirical_null
+condition_registry_schema_version: m4-stage1-draft-1
+created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
+
+stage_2a_correction:
+  status: UNDER_REVIEW
+  execution_authorised: false
+  success_claimed: false
+  m4_complete: false
+  first_implementation: failed_review
+  first_implementation_failure: >
+    The first Stage 2A implementation failed review because production
+    accepted caller-controlled --repo-root and --config arguments. Those
+    arguments could replace the repository configuration authority.
+  corrected_implementation: under_review
+  note: >
+    A corrected implementation is under review. This record is not a
+    success claim and does not authorise a biological run.
+
+execution:
+  authorised: false
+  evidence_directory_created_by_this_stage: false
+  overwrite_existing_output: refuse
+  overwrite_or_append_existing_evidence_directory: refuse
+  runner_gate: >
+    scripts/null_model.py must refuse execution while
+    consumable_by_executable_workflow is false. It must also refuse while
+    document_status is APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION.
+    A future scientific run requires consumable_by_executable_workflow true
+    and document_status APPROVED_FOR_SCIENTIFIC_EXECUTION. Stage 2A sets
+    neither of those execution signals.
+  manifest_serialization: >
+    Deterministic UTF-8 JSON. Declared key order. Compact separators comma
+    and colon. ensure_ascii false. No spaces outside strings. No BOM. No
+    carriage returns. One trailing LF. Float64 quantities are decimal
+    strings produced with format .17g. Unknown run results are explicit
+    nulls with status UNKNOWN_UNTIL_RUN only when a field is genuinely
+    unavailable. A completed run must record observed values for fields it
+    can observe. The corrected implementation writes a manifest only after
+    the execution gate passes. This configuration does not pass that gate,
+    this review does not write a manifest, and this review does not
+    authorise a run.
+
+input:
+  authoritative_role: TRAIN_TEXT
+  expected_repository_relative_name: data/processed/corpus_final.txt
+  expected_development_path: /home/laura/rnagenesis-mres-data/development/corpus_final.txt
+  expected_sha256: d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d
+  expected_sequence_count: 669
+  expected_unique_count: 669
+  alphabet: "^[ACGU]+$"
+  order: first_occurrence_in_frozen_ft_train_csv
+  prohibited_inputs:
+    - ft_train.csv
+    - ft_validation.csv
+    - ref.csv
+    - eval.csv
+  note: >
+    The 726 TRAIN identity rows are not the sampling multiset. Sampling uses
+    the 669-core TRAIN text, one row per unique core.
+
+sampler:
+  status: APPROVED_STAGE_1_DESIGN
+  raw_sequence_count: 30000
+  numpy_generator: numpy.random.default_rng
+  seed: 42
+  proposed_seed: 42
+  length_source: empirical_length_list_of_the_669_cores
+  length_sampling: with_replacement
+  nucleotide_sampling: independent_draws_from_pooled_TRAIN_nucleotide_frequencies
+  proposed_probability_order: [A, C, U, G]
+  probability_order: [A, C, U, G]
+  probability_order_status: APPROVED_STAGE_1_DESIGN
+  probability_dtype: float64
+  probability_sum_rule: "abs(sum(probabilities) - 1.0) <= 1e-12"
+  absolute_tolerance: 1.0e-12
+  relative_tolerance: 0
+  probability_order_reason: >
+    scripts/null_model.py builds frequencies with insertion order A, C, U, G.
+    That order is the approved Stage 1 design. Numeric probabilities are
+    computed in float64 only when an authorised run reads TRAIN text.
+    This stage does not compute them and does not invent them.
+  rng_consumption_order:
+    - one_draw_of_30000_lengths_with_replacement_from_the_669_length_list
+    - then_for_each_sampled_length_in_that_order_independent_nucleotide_draws
+  deduplication: false
+  filtering: false
+  truncation: false
+  t_to_u_conversion: false
+  rewriting: false
+  retain_all_attempts: true
+  attempt_order_preserved: true
+  unique_count_of_the_30000:
+    role: reported_diagnostic_only
+    not_an_acceptance_threshold: true
+    not_a_reason_to_drop_rows: true
+
+expected_empirical_length_counts:
+  status: copied_from_m3_recorded_histogram_not_recomputed_here
+  source: docs/fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md
+  n_cores: 669
+  distinct_lengths: 89
+  minimum: 20
+  median: 50
+  mean: 55.35276532137519
+  maximum: 123
+  counts:
+    20: 12
+    21: 4
+    22: 5
+    23: 2
+    24: 3
+    25: 5
+    26: 2
+    27: 1
+    28: 4
+    29: 10
+    30: 33
+    31: 4
+    32: 5
+    33: 6
+    34: 11
+    35: 14
+    36: 16
+    37: 11
+    38: 20
+    39: 48
+    40: 54
+    41: 5
+    42: 13
+    43: 6
+    44: 4
+    45: 5
+    46: 3
+    47: 2
+    48: 5
+    49: 12
+    50: 28
+    51: 13
+    52: 1
+    53: 4
+    54: 9
+    55: 6
+    56: 10
+    57: 8
+    58: 1
+    59: 3
+    60: 6
+    61: 2
+    62: 4
+    63: 3
+    64: 4
+    65: 4
+    66: 1
+    67: 5
+    68: 6
+    69: 7
+    70: 9
+    71: 21
+    72: 5
+    73: 5
+    74: 6
+    75: 14
+    76: 4
+    77: 13
+    78: 6
+    79: 10
+    80: 22
+    81: 9
+    82: 6
+    83: 9
+    84: 5
+    85: 2
+    86: 5
+    87: 3
+    88: 2
+    89: 9
+    90: 7
+    91: 4
+    92: 7
+    93: 7
+    95: 4
+    96: 4
+    97: 2
+    98: 2
+    99: 4
+    100: 1
+    104: 2
+    106: 1
+    107: 1
+    109: 1
+    112: 1
+    114: 2
+    116: 1
+    117: 2
+    123: 1
+  absent_lengths_from_20_through_123: [94, 101, 102, 103, 105, 108, 110, 111, 113, 115, 118, 119, 120, 121, 122]
+
+raw_record_fields:
+  status: APPROVED_STAGE_1_DESIGN
+  serialization: utf8_json_lines
+  one_object_per_attempt: true
+  canonical_bytes:
+    status: APPROVED_STAGE_1_DESIGN
+    encoding: utf-8
+    one_json_object_per_attempt: true
+    key_order: exact_declared_field_order
+    separators:
+      item: ","
+      key_value: ":"
+    ensure_ascii: false
+    spaces_outside_string_values: false
+    line_ending: LF
+    lf_after_every_record_including_the_final_record: true
+    bom: false
+    carriage_returns: false
+    raw_output_sha256: sha256_of_those_exact_file_bytes
+  fields:
+    - name: attempt_index
+      type: integer
+      indexing: zero_based
+    - name: seed
+      type: integer
+    - name: sampled_length
+      type: integer
+    - name: sequence
+      type: string
+    - name: valid_acgu
+      type: boolean
+    - name: sequence_sha256
+      type: string
+      definition: sha256_of_utf8_sequence_bytes_without_a_trailing_newline
+
+required_manifest_fields:
+  - input_role
+  - expected_input_sha256
+  - actual_input_sha256
+  - expected_sequence_count
+  - actual_sequence_count
+  - expected_unique_count
+  - actual_unique_count
+  - derived_nucleotide_counts
+  - derived_nucleotide_probabilities
+  - nucleotide_probability_order
+  - full_empirical_length_counts
+  - numpy_version
+  - rng_name
+  - seed
+  - raw_count
+  - unique_count_diagnostic_only
+  - output_sha256
+  - command
+  - repository_sha
+  - start_timestamp
+  - end_timestamp
+  - exit_status
+  - overwrite_refusal_check
+output_sha256_definition: sha256_of_the_canonical_raw_json_lines_file_bytes
+
+future_implementation_must_reject:
+  status: APPROVED_STAGE_1_DESIGN
+  nucleotide_probabilities_computed_in_this_stage: false
+  probability_sum_tolerance:
+    value: 1.0e-12
+    absolute_tolerance: 1.0e-12
+    relative_tolerance: 0
+    dtype: float64
+    status: APPROVED_STAGE_1_DESIGN
+    ordered_values: [A, C, U, G]
+    finite_and_nonnegative_required: true
+    rule: >
+      Compute probabilities in float64. Reject non-finite or negative
+      values. Reject any ordered A/C/U/G vector unless
+      abs(sum(probabilities) - 1.0) <= 1e-12. Relative tolerance is zero.
+      This stage does not compute nucleotide probabilities.
+  reject:
+    - an_empty_TRAIN_stream
+    - a_non_ACGU_character
+    - a_count_other_than_669
+    - a_duplicate_input_sequence
+    - non_finite_or_negative_probabilities
+    - any_probability_vector_whose_ordered_A_C_U_G_values_do_not_sum_to_1_within_a_documented_numerical_tolerance
+
+existing_script_gap:
+  path: scripts/null_model.py
+  modified_by_stage_1: false
+  modified_by_stage_2a: true
+  execution_authorised: false
+  stage_2a_scope: implementation_and_synthetic_tests_only
+  retains_statistical_design:
+    - numpy.random.default_rng
+    - lengths_sampled_with_replacement
+    - independent_nucleotide_draws
+  implemented_for_a_future_authorised_run:
+    - frozen_hash_check
+    - explicit_probability_order
+    - float64_probability_validation
+    - absolute_tolerance_1e-12_relative_tolerance_0
+    - raw_records
+    - canonical_json_lines_bytes
+    - rejection_of_an_empty_stream_a_non_acgu_character_a_count_other_than_669_or_a_duplicate_input_sequence
+    - rejection_of_non_finite_negative_or_out_of_tolerance_probability_vectors
+    - manifest_schema_with_unknown_run_values_left_explicit
+    - refusal_to_overwrite
+    - retention_accounting
+  stage_2a_correction_status: under_review_not_a_success_claim
+  still_not_authorised:
+    - biological_data_run
+    - generation_of_the_30000_sequence_pool
+    - creation_of_a_directory_under_/home/laura/rnagenesis-mres-runs/

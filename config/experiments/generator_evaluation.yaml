@@ -1,0 +1,187 @@
+# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+# This file must not be consumed by an executable workflow.
+# Guardrails, checkpoint selection, diagnostics, and final evaluation are approved for implementation only.
+# No clustering identity threshold is defined here. M4 is not complete.
+
+document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
+human_approval:
+  approving_person: Laura Hardy
+  approval_date: 29 September 2026
+  approval_recorded_timestamp: "2026-09-29T14:57:40+10:00"
+  approval_source: formal human approval in the M4 review chat
+  approval_scope: Stage 1 protocol package for M4 implementation only
+  explicitly_not_approved:
+    - scientific_execution
+    - biological_data_runs
+    - B2_generation
+    - validation_artifact_creation
+    - model_loading
+    - GPU_use
+    - B1_generation
+    - D1_training
+    - staging
+    - committing
+    - pushing
+  m4_complete: false
+  previous_document_status: DRAFT_PENDING_HUMAN_APPROVAL
+schema_version: m4-stage1-draft-1
+experiment_id: generator_evaluation_draft
+condition_registry_schema_version: m4-stage1-draft-1
+metric_set: config/modelling/validation_metrics_v1.yaml
+metric_set_schema_version: m4-stage1-draft-1
+created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
+evidence_directory_created_by_this_stage: false
+
+layers:
+  hard_guardrails:
+    role: eligibility
+    config: config/modelling/validation_metrics_v1.yaml
+    selects_among_eligible_checkpoints: false
+    failure_makes_a_checkpoint_ineligible: true
+  primary_validation_loss_selection:
+    role: choose_the_eligible_checkpoint
+    metric: lowest_fixed_draw_VALIDATION_denoising_mse
+    weighted_composite: false
+    rule: >
+      Select the checkpoint with the lowest fixed-draw VALIDATION denoising
+      MSE, provided it passes every approved hard generated-sample guardrail.
+  secondary_distribution_diagnostics:
+    role: interpretation_only
+    may_replace_the_primary_rule: false
+    may_be_threshold_optimized: false
+    items:
+      - nearest_TRAIN_normalized_edit_distance
+      - maximum_identity_to_TRAIN
+      - generated_cluster_concentration
+      - nucleotide_and_dinucleotide_distributions
+      - mfe_and_mfe_per_nucleotide
+      - paired_fraction
+      - representation_space_distance_to_VALIDATION
+      - full_length_stratified_results
+  final_held_out_evaluation:
+    role: EVAL_only_after_M9C_unlock
+    may_influence_development_decisions: false
+    after_seeing_eval_prohibited:
+      - retrain_rnagenesis
+      - recalibrate_aptarank
+      - change_thresholds_to_improve_eval
+      - return_to_validation_and_reopen_eval
+
+data_roles:
+  TRAIN:
+    permitted: [fitting, copying_and_novelty_reference]
+    prohibited: [checkpoint_selection, aptarank_calibration]
+  VALIDATION:
+    permitted: [development_decisions, fixed_draw_checkpoint_selection, development_generator_comparison]
+    prohibited: [fitting, final_held_out_claim]
+  REF:
+    permitted: [later_aptarank_calibration_after_generator_freeze]
+    prohibited_until_m9b: true
+    prohibited_for:
+      - rnagenesis_fitting
+      - checkpoint_selection
+      - hyperparameter_choice
+      - development_generator_comparison
+  EVAL:
+    permitted: [final_assessment_after_m9c_unlock]
+    locked_until: explicit_M9C_unlock_record
+    physical_absence_preferred_until_m10: true
+
+conditions:
+  primary_controlled_comparison: [B1_generic_released_rnagenesis, D1_mres_curated_aptamer_diffusion_adapted]
+  empirical_null: B2_train_matched_empirical_null
+  external_comparator: B0_released_aptamer_rnagenesis
+  b0_is_not_the_primary_causal_baseline: true
+  b0_length_sensitive_comparisons_require_one_of:
+    - normalization
+    - stratification
+    - preregistered_comparable_length_subset
+  b0_existing_pool_raw_attempts: 30080
+  new_condition_primary_generation_target_raw_attempts: 30000
+  development_diagnostic_sample_raw_attempts: 1000
+
+accounting:
+  report_separately:
+    - raw_attempted_sequences
+    - successfully_parsed_outputs
+    - valid_acgu_outputs
+    - unique_valid_outputs
+    - duplicate_outputs
+    - invalid_outputs
+    - metric_specific_denominator
+  silent_removal_of_invalid_or_duplicate_attempts: prohibited
+  requested_length_exact_hit:
+    label: PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE
+    numerator: valid_outputs_whose_cleaned_length_equals_the_requested_biological_length
+    denominator: valid_outputs
+    invalid_attempts_remain_visible_through: raw_attempt_validity_guardrail
+    zero_valid_outputs_exact_hit_rate: 0.0
+    zero_valid_outputs_fails_the_per_length_rule_once_the_raw_attempt_minimum_is_reached: true
+    always_report_together:
+      - raw_attempts
+      - valid_outputs
+      - exact_hits
+
+sequence_clustering_identity_threshold:
+  status: UNRESOLVED_HUMAN_DECISION
+  value: null
+  invented_in_this_draft: false
+  clustering_dependent_claims_permitted: false
+  blocked_quantities_until_the_threshold_is_frozen:
+    - generated_cluster_concentration
+    - cluster_count
+    - singleton_fraction
+    - largest_cluster_share
+    - shannon_diversity
+    - effective_cluster_count
+
+structure_metrics:
+  software: ViennaRNA
+  recorded_h200_version_not_a_new_pin: 2.7.0
+  more_negative_mfe_is_not_inherently_better: true
+  interpretation: distributional_plausibility_not_protein_binding
+
+representation_metrics:
+  model_status: UNRESOLVED_HUMAN_DECISION
+  embedding_aggregation: UNRESOLVED_HUMAN_DECISION
+  must_be_frozen: true
+  development_distance_reference: VALIDATION
+  eval_distance_only_after_m9c: true
+  do_not_train_on_eval: true
+
+statistical_reporting:
+  prefer:
+    - full_distributions
+    - effect_sizes
+    - seed_level_summaries
+    - confidence_intervals_that_respect_seed_structure
+    - length_stratification
+  avoid: tiny_p_values_produced_only_by_tens_of_thousands_of_generated_sequences
+
+final_m4_closure_blockers:
+  status: OPEN_AFTER_STAGE_1_IMPLEMENTATION_APPROVAL_UNTIL_FINAL_M4_COMPLETE
+  may_remain_open_after_approval_of_this_stage_1_package: true
+  may_remain_open_after_approval_of_this_draft: true
+  m4_complete: false
+  must_be_resolved_before: final_M4_COMPLETE_GO
+  items:
+    - final_B1_length_matching_or_rejection_resampling_algorithm
+    - evidence_based_decision_on_the_proposed_requested_length_thresholds
+    - complete_B1_D1_generation_wrapper_and_overwrite_protection
+    - creation_and_verification_of_fixed_validation_tensors_and_order_artifacts
+    - executable_B2_hardening_and_tests
+    - approved_clustering_identity_threshold_or_explicit_removal_of_clustering_dependent_M4_claims
+    - approved_frozen_representation_model_and_embedding_aggregation_or_explicit_deferral_or_removal_of_that_metric
+    - frozen_evaluation_code_commit_and_configuration_hashes
+    - final_D1_pilot_configuration_fields_that_M4_can_freeze_without_M5_evidence
+  explicitly_deferred_to_m5:
+    - microbatch
+    - gradient_accumulation
+    - mixed_precision
+    - ema
+  m5_deferral_does_not_by_itself_block_final_m4_closure: true
+  m5_deferral_note: >
+    The implementation plan assigns microbatch, accumulation, mixed
+    precision, and EMA to M5. Do not mark M4 blocked merely because those
+    M5-dependent hardware results do not yet exist.

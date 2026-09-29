@@ -1,0 +1,261 @@
+# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+# This file must not be consumed by an executable workflow.
+# Phase A and Phase B are approved design and are not approved for GPU execution.
+# This file does not declare a final length-matching algorithm.
+
+document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
+human_approval:
+  approving_person: Laura Hardy
+  approval_date: 29 September 2026
+  approval_recorded_timestamp: "2026-09-29T14:57:40+10:00"
+  approval_source: formal human approval in the M4 review chat
+  approval_scope: Stage 1 protocol package for M4 implementation only
+  explicitly_not_approved:
+    - scientific_execution
+    - biological_data_runs
+    - B2_generation
+    - validation_artifact_creation
+    - model_loading
+    - GPU_use
+    - B1_generation
+    - D1_training
+    - staging
+    - committing
+    - pushing
+  m4_complete: false
+  previous_document_status: DRAFT_PENDING_HUMAN_APPROVAL
+schema_version: m4-stage1-draft-1
+experiment_id: B1_generic_generation_draft
+condition_manifest_label: B1_generic_released_rnagenesis
+condition_registry_schema_version: m4-stage1-draft-1
+metric_set_schema_version: m4-stage1-draft-1
+created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
+
+execution:
+  authorised: false
+  gpu_authorised_by_this_draft: false
+  gpu_authorised_by_this_approval: false
+  evidence_directory_created_by_this_stage: false
+  overwrite_existing_output: refuse
+  silent_truncation: false
+
+immutable_model_selection:
+  encdec: configs/rnagenesis/autoencoder
+  diffusion: configs/rnagenesis/diffusion
+  prohibited_diffusion: checkpoints/Aptamer/diffusion
+  generation_entry: generation.py
+  generation_entry_repository: RNAGenesis
+  cleaner: scripts/audit_generation_output.py
+  cleaner_commit: 112a120282667c382790031fe74942f89f7b84eb
+  prohibited_cleaner: scripts/clean_generated_sequences.py
+  prohibited_cleaner_repository: rnagenesis-aptamer-mres
+  recorded_b1_weight_sha256: c268021b6cab37423e3bffd495b139bb69698d8d11c7b96477fbfb239b0cff26
+
+shared_generation_settings:
+  status: APPROVED_DESIGN_NOT_APPROVED_FOR_GPU_EXECUTION
+  ddim_steps: 50
+  eta: 0
+  top_p: 0.95
+  top_k: 0
+  do_sample: true
+  guidance: false
+  bos_token: 1
+  eos_token: 2
+  decoder_config: config-progen2-small-rna_tokenizer_v2
+  batch_size_where_memory_permits: 16
+  automatic_batch_size_fallback: false
+  raw_output_preserved: true
+  silent_truncation: false
+  overwrite: false
+  released_generation_py_exist_ok: true
+  wrapper_must_refuse_before_invocation: true
+  wrapper_note: >
+    Released generation.py creates its output directory with exist_ok=True.
+    A future executor must refuse an existing output or evidence directory
+    before calling it. This approval does not add that wrapper.
+  physical_gpu: 0
+  physical_gpu_gate: separate_explicit_approval_required
+  cuda_visible_devices: "0"
+  visible_python_device: cuda:0
+  cpu_fallback: false
+  other_gpu_fallback: false
+
+cleaner_rule:
+  source: M1_approved_boundary_only_rule
+  implementation: RNAGenesis scripts/audit_generation_output.py
+  leading_run_of_1_and_2_removed: true
+  trailing_run_of_1_and_2_removed_after_the_prefix: true
+  middle_characters_unchanged: true
+  accept_only_nonempty_acgu: true
+  uppercasing: false
+  t_to_u: false
+  truncation: false
+  m1_observation_not_a_production_mapping:
+    ddim_steps: 5
+    sequences: 2
+    max_seq_len: 37
+    removed_prefix: "11"
+    removed_suffix: empty
+    raw_length: 38
+    cleaned_length: 36
+    limitation: five_step_two_sequence_smoke_not_a_50_step_length_law
+
+phase_a:
+  status: APPROVED_DESIGN_NOT_APPROVED_FOR_GPU_EXECUTION
+  blocked_until: separate_explicit_gpu0_approval
+  executable_now: false
+  purpose: characterize_max_seq_len_versus_cleaned_length
+  does_not_select_a_mapping: true
+  target_biological_lengths: [20, 30, 40, 50, 60, 70, 80, 90, 100, 112, 123]
+  target_order: ascending
+  target_index: zero_based
+  candidate_max_seq_len_for_each_target: [target, target_plus_1, target_plus_2]
+  raw_attempts_per_candidate: 16
+  invocations: 33
+  distinct_seeds: 11
+  seed_count_statement: >
+    There are 11 seeds, 41000 through 41010. The 33 invocations do not
+    receive 33 different seeds.
+  total_raw_attempts: 528
+  proposed_invocation_shape:
+    batch_size: 16
+    batch_num: 1
+  base_seed: 41000
+  seed_formula: "41000 + zero_based_target_index"
+  first_seed: 41000
+  last_seed: 41010
+  same_seed_for_target_and_target_plus_1_and_target_plus_2: true
+  each_candidate_invocation_initialized_with_the_target_seed: true
+  invocation_order: ascending_target_then_ascending_candidate
+  pairing_group: target_biological_length
+  attempt_within_candidate:
+    minimum_inclusive: 0
+    maximum_inclusive: 15
+  pairing_purpose: >
+    Sharing one seed across the three candidate caps for a target reduces
+    stochastic confounding when comparing decoder caps. It does not imply
+    that output strings must remain aligned after early termination or
+    stochastic divergence.
+  per_attempt_fields:
+    - requested_target
+    - max_seq_len
+    - pairing_group
+    - attempt_within_candidate
+    - seed
+    - raw_output
+    - raw_length
+    - detected_leading_boundary_run
+    - detected_trailing_boundary_run
+    - cleaned_output
+    - cleaned_length
+    - acceptance_status
+    - rejection_reason
+
+phase_b:
+  status: APPROVED_DESIGN_NOT_APPROVED_FOR_GPU_EXECUTION
+  blocked_until: human_review_of_phase_a
+  executable_now: false
+  human_approved_candidate_mapping_required: true
+  lengths: every_distinct_frozen_TRAIN_length_in_ascending_order
+  distinct_train_lengths_recorded_by_m3: 89
+  do_not_infer_a_mapping_for_untested_lengths: true
+  raw_attempts_per_length: 16
+  proposed_total_raw_attempts_if_89_lengths: 1424
+  total_raw_attempts_arithmetic: "89 * 16 = 1424"
+  base_seed: 42000
+  seed: "42000 + zero_based_length_index"
+  one_invocation_seed_per_ascending_length: true
+  first_seed: 42000
+  last_seed: 42088
+  proposed_invocation_shape:
+    batch_size: 16
+    batch_num: 1
+    note: >
+      Sixteen raw attempts are used for every one of the 89 distinct TRAIN
+      lengths. Every tested length is therefore eligible for the proposed
+      0.50 per-length exact-hit guardrail. If a length has zero valid
+      outputs, its exact-hit rate is 0.0 for guardrail purposes and that
+      length fails the per-length rule. Validity continues to be reported
+      separately.
+  review_triggers_before_phase_b:
+    status: APPROVED_DESIGN_NOT_APPROVED_FOR_GPU_EXECUTION
+    role: observations_requiring_human_interpretation
+    reason: >
+      Phase A exists to measure these behaviors. They are review triggers
+      before Phase B. They are not automatic correctness failures.
+    triggers:
+      - leading_boundary_run_differs_from_the_m1_observed_11
+      - any_trailing_1_or_2_run_is_present
+      - boundary_run_frequencies_vary_materially_with_target_length_or_candidate_cap
+      - early_termination_materially_changes_the_cleaned_length_distribution
+    also_stop_for_human_review_if:
+      - the_approved_max_seq_len_mapping_is_non_monotonic
+      - output_validity_drops_below_the_proposed_guardrail
+      - exact_length_cannot_be_achieved_without_trimming
+    trailing_eos_boundary:
+      by_itself_a_correctness_failure: false
+      may_still_make_a_proposed_length_matching_method_scientifically_unacceptable: true
+    numeric_gap_between_max_seq_len_and_cleaned_length:
+      by_itself_a_correctness_failure: false
+      reason: >
+        Phase A exists to measure that gap. The M1 observation used five
+        DDIM steps and two sequences, so it is a boundary reference, not a
+        50-step length law.
+  hard_implementation_failures:
+    status: APPROVED_DESIGN_NOT_APPROVED_FOR_GPU_EXECUTION
+    failures:
+      - the_cleaner_changes_an_interior_character
+      - the_cleaner_removes_a_character_outside_a_leading_or_trailing_run_of_1_or_2
+      - accepted_cleaned_output_is_empty_or_contains_a_non_ACGU_character
+      - raw_output_cannot_be_associated_unambiguously_with_its_attempt_metadata
+      - an_output_or_evidence_path_would_be_overwritten
+
+length_algorithm:
+  final_empirical_length_matching_algorithm_declared: false
+  final_rejection_or_resampling_algorithm_declared: false
+  human_decision_required_after: [phase_a_evidence, phase_b_evidence]
+  silent_truncation_to_force_a_length: prohibited
+
+limited_development_pool:
+  status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+  identification: >
+    This 1000-attempt pool is the proposed fixed diagnostic sample for B1
+    and, with the same target-length list and paired generation-seed
+    schedule, for later D1 comparison where technically applicable.
+  raw_target_lengths: 1000
+  sampling: with_replacement_from_the_669_core_TRAIN_empirical_length_list
+  target_length_sampling_seed: 43000
+  proposed_length_sampler: numpy.random.default_rng
+  length_sampler_status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+  generation_seed_base: 44000
+  generation_seed_schedule:
+    status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+    separate_from_target_length_sampling_seed: true
+    execution_plan:
+      - sample_exactly_1000_target_lengths_in_attempt_index_order_from_the_669_core_empirical_length_list
+      - retain_those_original_attempt_indexes
+      - group_attempts_by_target_length_in_ascending_target_length_order
+      - within_each_target_length_retain_original_attempt_index_order
+      - divide_each_group_into_consecutive_chunks_of_at_most_16
+      - invoke_generation_once_per_chunk_using_its_actual_chunk_size_with_batch_num_1
+      - assign_invocation_seeds_as_44000_plus_zero_based_invocation_index
+      - never_pad_duplicate_or_drop_an_attempt
+      - map_every_generated_record_back_to_its_original_target_length_attempt_index
+      - reuse_the_identical_target_list_grouping_rule_chunk_membership_and_invocation_seeds_for_paired_b1_d1_comparisons_where_technically_applicable
+    manifest_contains_the_complete_invocation_table_before_generation_begins: true
+    invocation_table_columns:
+      - zero_based_invocation_index
+      - invocation_seed
+      - target_length
+      - actual_chunk_size
+      - batch_num
+      - original_attempt_indexes_in_order
+    batch_num: 1
+  execution_blocked_until_length_mapping_or_rejection_resampling_algorithm_approved: true
+  do_not_change_1000_to_fit_batch_16: true
+  note: >
+    1000 is not divisible by 16. Chunks use their actual size, at most 16.
+    The schedule never pads, duplicates, or drops an attempt. Execution
+    stays blocked until the length-mapping or rejection/resampling
+    algorithm is approved.

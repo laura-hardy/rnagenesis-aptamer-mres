@@ -1,0 +1,214 @@
+# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+# This file must not be consumed by an executable workflow.
+# M4 Stage 1 condition labels are approved for implementation only.
+# This registry does not authorise generation, training, checkpoint selection, or a run.
+
+document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
+human_approval:
+  approving_person: Laura Hardy
+  approval_date: 29 September 2026
+  approval_recorded_timestamp: "2026-09-29T14:57:40+10:00"
+  approval_source: formal human approval in the M4 review chat
+  approval_scope: Stage 1 protocol package for M4 implementation only
+  explicitly_not_approved:
+    - scientific_execution
+    - biological_data_runs
+    - B2_generation
+    - validation_artifact_creation
+    - model_loading
+    - GPU_use
+    - B1_generation
+    - D1_training
+    - staging
+    - committing
+    - pushing
+  m4_complete: false
+  previous_document_status: DRAFT_PENDING_HUMAN_APPROVAL
+schema_version: m4-stage1-draft-1
+registry_id: rnagenesis_mres_conditions_m4_stage1_draft
+created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
+implementation_plan_sha256: bcd5f5d4a9d6abd45757ed430fe587943abccf7fc3189c8063b87c1199769e2c
+frozen_data_contract_sha256: 396c83c3dbf9afc656ad5c60ec05c94fce3c5a684990c3cc1cebfb2411ccd5ff
+frozen_contract_id: rnagenesis_corrected_669_core_m0
+corpus_commit: 10aac629bb0ef0337107c3d628b23e1897962af9
+
+primary_controlled_comparison:
+  left_manifest_label: B1_generic_released_rnagenesis
+  right_manifest_label: D1_mres_curated_aptamer_diffusion_adapted
+  statement: >
+    B1 versus D1 is the primary controlled comparison. Both use the released
+    frozen EncDec and the generic diffusion family. D1 differs by unconditional
+    aptamer-domain adaptation on the frozen TRAIN cores.
+
+shared_claim_limitations:
+  - The generator-level claim, if later supported, is only that diffusion adaptation changed generated-sequence characteristics toward held-out aptamer distributions while retaining specified validity, novelty, and diversity.
+  - No condition demonstrates binding to KPC-2, NDM-1, OXA-48, or any other protein.
+  - No condition demonstrates affinity, biological activity, target selectivity, or a binding mechanism.
+  - No condition is target-conditioned. Target prioritisation, if done later, is downstream AptaRank ranking and is not evidence that the generator learned target binding.
+  - RNAGenesis receives canonical nucleotide identity only. Modified chemistry recorded in metadata is not a model input and is not learned.
+  - aptamer-like means measured similarity to curated aptamer sequence or structure distributions. It does not mean proven binding, function, specificity, or experimental validation.
+  - REF and EVAL are prohibited during development. EVAL remains locked until an M9C unlock record.
+
+conditions:
+  - canonical_display_name: "B0 — released aptamer-adapted RNAGenesis"
+    manifest_label: B0_released_aptamer_rnagenesis
+    scientific_audit_alias: B0_released_aptamer_adapted_RNAGenesis
+    label_identity: >
+      The manifest label B0_released_aptamer_rnagenesis and the approved
+      scientific/audit alias B0_released_aptamer_adapted_RNAGenesis identify
+      one condition. They are not two comparators.
+    model_checkpoint_definition:
+      neural: true
+      encdec: configs/rnagenesis/autoencoder
+      diffusion: checkpoints/Aptamer/diffusion
+      initialisation_for_d1: false
+      prohibited_substitution: configs/rnagenesis/diffusion
+      recorded_weight_sha256: 149f012287b1ae83865c25867d7c0bbe0952fa51bcc068e259725092d5dff0ca
+      recorded_unet_config_sha256: fab9c517efba8269c0edf194b7d0379f317e93da0f849b5ce815e098088b4756
+      provenance: DIRECT_HUMAN_CONFIRMED_PROVENANCE
+      historical_hash_limitation: >
+        The M2 record states that no contemporaneous 10 June checkpoint hash
+        was retained. The weight hash above is the later asset inspection.
+        It does not prove the historical checkpoint bytes.
+    permitted_data_roles:
+      - none_for_generation
+      - existing_generated_pool_only
+    prohibited_data_roles:
+      - TRAIN
+      - TRAIN_TEXT
+      - VALIDATION
+      - REF
+      - EVAL
+    neural: true
+    target_conditioned: false
+    generation_status: existing_external_pool_retained
+    regenerate_by_default: false
+    comparison_role: external_aptamer_adapted_comparator
+    primary_causal_baseline: false
+    existing_pool:
+      raw_attempts: 30080
+      accepted: 30080
+      rejected: 0
+      unique_accepted: 30080
+      duplicate_accepted: 0
+      cleaned_length_nt: 36
+      nominal_max_seq_len: 37
+      ddim_steps: 50
+      eta: 0
+      top_p: 0.95
+      top_k: 0
+      batch_size: 16
+      batch_num: 188
+      seeds: [4201, 4202, 4203, 4204, 4205, 4206, 4207, 4208, 4209, 4210]
+      numeric_raw_concatenation_sha256: ed612277105c6b8747fc7365cc6b67fa8a94e8e5e8e64ee535ecadcb37ff4aaa
+      pooled_cleaned_sha256: 51ccf2b997f1e6386438be303e5affaf908f102bd098bab243a2a9ba1d94d6e1
+      source_record: docs/fine_tuning/m2_published_aptamer_comparator_verification.md
+    claim_limitations:
+      - B0 is the external released aptamer-adapted comparator. It is not regenerated by default.
+      - B0 is not generic, unadapted, or pretrained-only.
+      - B0 is not D1 and must not initialise D1.
+      - B0 is not the primary causal baseline. Its existing pool uses the released 37-nt maximum regime and cleaned length 36 throughout.
+      - Length-sensitive comparisons require normalization, stratification, or a preregistered comparable-length subset.
+      - Syntactic acceptance and uniqueness are not biological quality.
+      - The published aptamer metric remains INFEASIBLE_WITH_RELEASED_EVIDENCE. No metric was calculated in M2.
+
+  - canonical_display_name: "B1 — generic released RNAGenesis"
+    manifest_label: B1_generic_released_rnagenesis
+    scientific_audit_alias: null
+    model_checkpoint_definition:
+      neural: true
+      encdec: configs/rnagenesis/autoencoder
+      diffusion: configs/rnagenesis/diffusion
+      prohibited_diffusion: checkpoints/Aptamer/diffusion
+      generation_entry: generation.py
+      cleaner: scripts/audit_generation_output.py
+      prohibited_cleaner: scripts/clean_generated_sequences.py
+      recorded_weight_sha256: c268021b6cab37423e3bffd495b139bb69698d8d11c7b96477fbfb239b0cff26
+      recorded_unet_config_sha256: 3a9975ff165bbd5ca82923e6ed1c5ed7eb383a23f4f3f55db713c995031f8ee3
+      weights_distinct_from_b0: true
+    permitted_data_roles:
+      - TRAIN_TEXT_length_multiset_only_after_length_protocol_approval
+      - TRAIN_sequence_identity_only_as_copying_and_novelty_reference
+    prohibited_data_roles:
+      - VALIDATION_for_fitting_or_generation_conditioning
+      - REF
+      - EVAL
+      - ft_train_csv_as_length_multiset
+    neural: true
+    target_conditioned: false
+    generation_status: not_generated
+    comparison_role: primary_generic_model_baseline
+    primary_causal_baseline: true
+    claim_limitations:
+      - B1 is the primary generic model baseline for estimating the effect of MRes aptamer-domain adaptation.
+      - The condition name remains generic released RNAGenesis. Do not rename it to unadapted aptamer RNAGenesis.
+      - B1 has no MRes aptamer-corpus fine-tuning.
+      - No B1 pool exists under this approval. Length matching is not yet approved.
+
+  - canonical_display_name: "B2 — TRAIN-matched empirical RNA null"
+    manifest_label: B2_train_matched_empirical_null
+    scientific_audit_alias: null
+    model_checkpoint_definition:
+      neural: false
+      checkpoint: null
+      existing_statistical_script: scripts/null_model.py
+      script_execution_authorised_by_this_approval: false
+      script_execution_authorised_by_this_draft: false
+      stage_2a: >
+        The sampler may be hardened and tested on synthetic fixtures.
+        That work does not authorise a biological B2 run.
+      definition: >
+        Lengths are sampled with replacement from the 669-core TRAIN empirical
+        length list. Nucleotide identities are sampled independently from the
+        pooled nucleotide frequencies of those same cores. There is no learned
+        structure, motif, positional dependency, or binding information.
+    permitted_data_roles:
+      - TRAIN_TEXT
+    prohibited_data_roles:
+      - TRAIN_csv_identity_rows_as_the_sampling_multiset
+      - VALIDATION
+      - REF
+      - EVAL
+    neural: false
+    target_conditioned: false
+    generation_status: not_generated
+    comparison_role: non_neural_empirical_null
+    primary_causal_baseline: false
+    claim_limitations:
+      - B2 is an empirical i.i.d. RNA null. It is not random aptamers, negative aptamers, or non-binding RNA.
+      - B2 sequences have no experimentally established biological status.
+      - B2 is not a neural baseline and is not the primary causal contrast. That contrast is B1 versus D1.
+
+  - canonical_display_name: "D1 — MRes curated-aptamer diffusion-adapted RNAGenesis"
+    manifest_label: D1_mres_curated_aptamer_diffusion_adapted
+    scientific_audit_alias: null
+    model_checkpoint_definition:
+      neural: true
+      encdec: configs/rnagenesis/autoencoder
+      encdec_trainable: false
+      diffusion_initialisation: configs/rnagenesis/diffusion
+      prohibited_initialisation: checkpoints/Aptamer/diffusion
+      trainable_component: full_latent_diffusion_denoiser
+      fitting_sequences: 669_frozen_TRAIN_cores
+      protein_target_conditioning: false
+    permitted_data_roles:
+      - TRAIN_TEXT_for_fitting_only
+      - VALIDATION_for_fixed_draw_development_evaluation_only
+    prohibited_data_roles:
+      - REF
+      - EVAL
+      - VALIDATION_for_fitting
+      - B0_checkpoint_as_initialisation
+    neural: true
+    target_conditioned: false
+    generation_status: not_trained
+    pilot_executable: false
+    pilot_blocked_until: M5_pass_and_separate_human_authorisation
+    comparison_role: mres_adapted_condition
+    primary_causal_baseline: false
+    claim_limitations:
+      - D1 is unconditional aptamer-domain adaptation. It is not target-specific generation.
+      - D1 is not a KPC-specific, NDM-specific, or OXA-specific generator.
+      - The methods statement required at first use is that RNAGenesis was adapted by fine-tuning its latent diffusion denoiser while keeping the released sequence autoencoder — encoder, Q-Former, latent projection, and ProGen decoder — frozen.
+      - This registry does not authorise the pilot. M5 must pass before the pilot configuration can become executable.

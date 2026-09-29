@@ -1,0 +1,183 @@
+# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+# This file must not be consumed by an executable workflow.
+# The one-epoch/21-update D1 pilot design is approved for implementation only.
+# It remains blocked by M5 and later human authorization. Do not run it.
+
+document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
+human_approval:
+  approving_person: Laura Hardy
+  approval_date: 29 September 2026
+  approval_recorded_timestamp: "2026-09-29T14:57:40+10:00"
+  approval_source: formal human approval in the M4 review chat
+  approval_scope: Stage 1 protocol package for M4 implementation only
+  explicitly_not_approved:
+    - scientific_execution
+    - biological_data_runs
+    - B2_generation
+    - validation_artifact_creation
+    - model_loading
+    - GPU_use
+    - B1_generation
+    - D1_training
+    - staging
+    - committing
+    - pushing
+  m4_complete: false
+  previous_document_status: DRAFT_PENDING_HUMAN_APPROVAL
+schema_version: m4-stage1-draft-1
+experiment_id: D1_diffusion_pilot_draft
+condition_manifest_label: D1_mres_curated_aptamer_diffusion_adapted
+condition_registry_schema_version: m4-stage1-draft-1
+metric_set_schema_version: m4-stage1-draft-1
+created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
+
+execution:
+  authorised: false
+  this_document_is_a_proposed_pilot_only: true
+  blocked_until:
+    - M5_pass
+    - human_approval_of_this_pilot_configuration
+    - separate_explicit_gpu_authorisation
+  evidence_directory_created_by_this_stage: false
+
+model:
+  initialisation: B1_generic_diffusion_checkpoint
+  initialisation_path: configs/rnagenesis/diffusion
+  prohibited_initialisation: checkpoints/Aptamer/diffusion
+  encdec_path: configs/rnagenesis/autoencoder
+  encdec_frozen: complete
+  trainable: full_denoiser
+  target_conditioned: false
+
+data:
+  fitting: TRAIN_TEXT_only
+  development_evaluation: VALIDATION_fixed_draw_only
+  prohibited: [REF, EVAL]
+  train_text_sha256: d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d
+  train_core_count: 669
+  validation_csv_sha256: cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd
+  validation_csv_sha256_does_not_substitute_for_ordering_hashes: true
+  validation_sequence_order_sha256: null
+  validation_sequence_order_sha256_status: PENDING_ARTIFACT_NOT_CREATED
+  validation_order_artifact_sha256: null
+  validation_order_artifact_sha256_status: PENDING_ARTIFACT_NOT_CREATED
+  validation_core_count: 95
+
+optimiser:
+  status: APPROVED_STAGE_1_DESIGN_BLOCKED_BY_M5_AND_LATER_HUMAN_AUTHORIZATION
+  name: AdamW
+  learning_rate: 3.0e-5
+  beta1: 0.95
+  beta2: 0.999
+  weight_decay: 1.0e-6
+  epsilon: 1.0e-8
+  gradient_clip_norm: 1.0
+  automatic_learning_rate_change: false
+  reduction_to_1e-5:
+    permitted_only_after: human_review_of_the_3e-5_evidence
+    automatic: false
+
+schedule:
+  status: APPROVED_STAGE_1_DESIGN_BLOCKED_BY_M5_AND_LATER_HUMAN_AUTHORIZATION
+  name: cosine
+  effective_batch: 32
+  microbatch: UNRESOLVED_UNTIL_M5_MEMORY_EVIDENCE
+  gradient_accumulation: UNRESOLVED_UNTIL_M5_MEMORY_EVIDENCE
+  permitted_pairs_if_later_selected:
+    - {microbatch: 8, accumulation: 4}
+    - {microbatch: 16, accumulation: 2}
+    - {microbatch: 32, accumulation: 1}
+  drop_last: false
+  incomplete_accumulation_window_stepped_at_epoch_boundary: true
+  proposed_pilot_seed: 42
+  validation_draw_seed: 1
+  seeds_must_differ: true
+  proposed_maximum_epochs: 1
+  proposed_maximum_optimizer_updates: 21
+  update_arithmetic: "ceil(669 / 32) = 21 when the final partial batch is retained"
+  warmup_formula: "max(1, round(0.10 * actual_approved_update_count))"
+  proposed_warmup_if_approved_updates_are_21: 2
+  do_not_reuse_the_five_epoch_warmup_of_10: true
+  five_epoch_reference:
+    epochs: 5
+    updates: 105
+    warmup_recorded_at_m0: 10
+    not_the_pilot_budget: true
+
+evaluation_points:
+  status: APPROVED_STAGE_1_DESIGN_BLOCKED_BY_M5_AND_LATER_HUMAN_AUTHORIZATION
+  fixed_draw_validation_at_optimizer_updates: [0, 7, 14, 21]
+  update_0_means: validation_against_the_immutable_released_B1_checkpoint_before_any_optimizer_step
+  update_0_checkpoint:
+    identity: immutable_released_B1_generic_diffusion_checkpoint
+    path: configs/rnagenesis/diffusion
+    recorded_weight_sha256: c268021b6cab37423e3bffd495b139bb69698d8d11c7b96477fbfb239b0cff26
+    copy_or_save_another_initialization_checkpoint: false
+    reason: >
+      Validation at optimizer update 0 references the immutable released B1
+      checkpoint and its recorded hash. It does not require copying or
+      saving another 7.4 GB initialization checkpoint.
+  metric: fixed_draw_VALIDATION_denoising_mse
+  metric_config: config/modelling/validation_metrics_v1.yaml
+
+checkpoints:
+  status: APPROVED_STAGE_1_DESIGN_BLOCKED_BY_M5_AND_LATER_HUMAN_AUTHORIZATION
+  required:
+    - reference_to_the_immutable_released_B1_checkpoint_at_update_0
+    - final_pilot_state_after_update_21
+  initialization_checkpoint_copy_required: false
+  proposed_additional_retention: [7, 14]
+  proposed_additional_retention_role: learning_curve_evidence
+  proposed_additional_retention_status: APPROVED_AS_LEARNING_CURVE_EVIDENCE_ONLY_NOT_SELECTABLE_WITHOUT_GUARDRAIL_EVIDENCE
+  proposed_additional_retention_reason: >
+    Updates 7 and 14 are approved as learning-curve evidence only. Retaining
+    those states lets the evaluated weights be reloaded. They are not
+    eligible for checkpoint selection based on validation loss alone. They
+    cannot become selectable unless the approved generated-sample guardrails
+    are also evaluated for those exact weights. This approval does not
+    authorise training.
+  final_pilot_state_role: technical_and_scientific_pilot_result
+  final_pilot_state_is_the_final_d1_model: false
+  ambiguous_names_prohibited: [final, final2, best, good_run, new_model]
+  naming_pattern: "D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-42__update-<count>__git-<sha>"
+
+diagnostic_generation:
+  status: APPROVED_STAGE_1_DESIGN_BLOCKED_BY_M5_AND_LATER_HUMAN_AUTHORIZATION
+  sample_schedule_status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+  automatic: false
+  only_at_prespecified_checkpoints: true
+  only_after_its_own_authorisation: true
+  proposed_authorization_covers_only:
+    - initialization_or_released_B1
+    - final_pilot_state
+  does_not_cover_updates: [7, 14]
+  length_algorithm_must_already_be_approved: true
+  sample: the_1000_attempt_paired_schedule_in_B1_generic_generation.yaml
+
+unresolved_until_m5:
+  items:
+    - microbatch
+    - gradient_accumulation
+    - mixed_precision
+    - ema_use
+    - whether_generation_uses_raw_or_ema_weights
+  m4_closure:
+    these_items_are_deferred_to_m5: true
+    absence_does_not_by_itself_block_final_m4_closure: true
+    reason: >
+      The implementation plan assigns microbatch, accumulation, mixed
+      precision, and EMA to M5. Final M4 closure is not blocked merely
+      because those M5-dependent hardware results do not yet exist.
+      Comparisons still must not mix raw and EMA weight variants, and the
+      evaluated weight variant must be recorded.
+  mixed_precision_note: >
+    Do not select FP16 because it is available. The plan prefers a
+    conservative smoke mode first and BF16 for a later full run only if
+    M5 evidence supports it. This pilot draft leaves precision unresolved.
+  ema_note: >
+    The M0 preflight recorded EMA false. Plan section 11.8 does not make
+    that a permanent pilot decision. This approval does not choose EMA.
+
+m5_gate:
+  statement: M5 must pass before this pilot becomes executable.
