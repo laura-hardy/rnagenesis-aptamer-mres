@@ -1,18 +1,21 @@
-# APPROVED_FOR_SCIENTIFIC_EXECUTION
-# This configuration authorizes exactly one CPU-only B2 run at the named
-# output directory. scientific_execution_authorisation is the active
-# single-run authorization. Laura Hardy approved that scope on 29 September
-# 2026. The executing implementation commit is
-# 70f950434501964dd179760aa4fc82766df74289. This record does not claim that
-# a run succeeded and does not complete M4. GPU use, model loading, REF
-# access, and EVAL access remain prohibited.
+# REVOKED_AFTER_COMPLETED_SINGLE_INVOCATION
+# The single CPU-only B2 invocation has been consumed. This configuration
+# does not authorize another run. scientific_execution_authorisation is
+# inactive. Laura Hardy approved the consumed scope on 29 September 2026.
+# The executing implementation commit was
+# 70f950434501964dd179760aa4fc82766df74289. This record does not claim
+# scientific acceptance, does not set success_claimed, and does not complete
+# M4. Reuse of this authorization and reuse of the same output directory are
+# prohibited. Another attempt requires a new directory and new explicit
+# human authorization. GPU use, model loading, REF access, and EVAL access
+# remain prohibited.
 
-document_status: APPROVED_FOR_SCIENTIFIC_EXECUTION
-consumable_by_executable_workflow: true
+document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
 # human_approval is the Stage 1 implementation approval. That approval did
-# not approve scientific execution. The active single-run authorization is
-# scientific_execution_authorisation below. It authorizes exactly one
-# CPU-only B2 run at the named output directory.
+# not approve scientific execution. The single scientific invocation has
+# been consumed and the authorization is revoked. It does not claim success
+# and does not complete M4.
 human_approval:
   approving_person: Laura Hardy
   approval_date: 29 September 2026
@@ -52,12 +55,15 @@ stage_2a_correction:
   corrected_implementation: under_review
   note: >
     This Stage 2A correction record is not a success claim and does not
-    complete M4. The active scientific_execution_authorisation block
-    authorizes exactly one CPU-only B2 run at the named output directory.
+    complete M4. The scientific_execution_authorisation block is revoked
+    after the completed single invocation. Another attempt requires a new
+    directory and new explicit human authorization.
 
 execution:
-  authorised: true
-  evidence_directory_created_by_this_stage: false
+  authorised: false
+  # Records that the completed authorized invocation created the evidence
+  # directory. This record does not authorize another run.
+  evidence_directory_created_by_this_stage: true
   overwrite_existing_output: refuse
   overwrite_or_append_existing_evidence_directory: refuse
   runner_gate: >
@@ -67,10 +73,12 @@ execution:
     consumable_by_executable_workflow true, document_status
     APPROVED_FOR_SCIENTIFIC_EXECUTION, execution.authorised true, and an
     active scientific_execution_authorisation block whose output directory
-    is the only accepted output path. This configuration sets those
-    execution signals. It authorizes exactly one CPU-only B2 run at the
-    named output directory. It does not claim success and does not complete
-    M4.
+    is the only accepted output path. Those execution gates are closed.
+    The single invocation has been consumed. This configuration does not
+    authorize another run. evidence_directory_created_by_this_stage records
+    that the completed authorized invocation created the evidence directory.
+    That record does not authorize another run. It does not claim success
+    and does not complete M4.
   manifest_serialization: >
     Deterministic UTF-8 JSON. Declared key order. Compact separators comma
     and colon. ensure_ascii false. No spaces outside strings. No BOM. No
@@ -79,22 +87,26 @@ execution:
     nulls with status UNKNOWN_UNTIL_RUN only when a field is genuinely
     unavailable. A completed run must record observed values for fields it
     can observe. The corrected implementation writes a manifest only after
-    the execution gate passes. This configuration passes that gate and
-    authorizes exactly one CPU-only B2 run at the named output directory.
-    This activation does not write a manifest, does not claim success, and
-    does not complete M4.
+    the execution gate passes. This configuration does not pass that gate.
+    The completed invocation is recorded below without scientific acceptance.
+    This revocation does not rewrite the manifest, does not claim success,
+    and does not complete M4.
 
 scientific_execution_authorisation:
   authorisation_id: m4_b2_empirical_null_2d9ec89_attempt1
-  authorisation_active: true
-  activation_status: active_single_run
+  authorisation_active: false
+  activation_status: revoked_after_completed_single_invocation
   activation_recorded_timestamp: "2026-09-29T18:18:04+10:00"
+  revocation_recorded_timestamp: "2026-09-29T18:40:21+10:00"
+  single_invocation_consumed: true
+  reuse_of_same_authorisation_prohibited: true
+  reuse_of_same_output_directory_prohibited: true
   intended_scope_approval: >
-    Laura Hardy approved this one-run scope on 29 September 2026. This
-    configuration authorizes exactly one CPU-only B2 run at the named
-    output directory. The executing implementation commit is
-    70f950434501964dd179760aa4fc82766df74289. It does not claim that the
-    run succeeded and does not complete M4.
+    Laura Hardy approved this one-run scope on 29 September 2026. That
+    approval authorized the now-consumed CPU-only B2 invocation at the named
+    output directory. The executing implementation commit was
+    70f950434501964dd179760aa4fc82766df74289. The authorization is revoked.
+    It does not claim that the run succeeded and does not complete M4.
   approved_by: Laura Hardy
   approval_date: 29 September 2026
   approval_recorded_timestamp: "2026-09-29T17:29:06+10:00"
@@ -123,6 +135,44 @@ scientific_execution_authorisation:
   second_attempt_requires_new_directory_and_new_human_authorisation: true
   success_claimed: false
   m4_complete: false
+
+completed_invocation:
+  invocation_status: completed_exit_0
+  evidence_acceptance_status: pending_manifest_authorisation_provenance_resolution
+  manifest_review_status: provenance_defect_found
+  success_claimed: false
+  m4_complete: false
+  authorization_commit: cc5d6f612164fb3da717d0f68b9904046614b77f
+  executing_implementation_commit: 70f950434501964dd179760aa4fc82766df74289
+  run_identifier: m4_b2_empirical_null_2d9ec89_attempt1
+  attempt_identifier: invocation-0
+  local_start: "2026-09-29T18:28:53.237801+10:00"
+  local_end: "2026-09-29T18:28:54.416348+10:00"
+  exit_status: 0
+  requested_count: 30000
+  raw_count: 30000
+  retained_count: 30000
+  unique_diagnostic_count: 30000
+  dropped_count: 0
+  raw_evidence_path: /home/laura/rnagenesis-mres-runs/m4_b2_empirical_null_2d9ec89_attempt1/b2_empirical_null_raw.jsonl
+  raw_evidence_byte_count: 6787972
+  raw_evidence_sha256: bbe35f448db0d7fc02ad0156865798382b0b41e9ad047b4e52eddf7cff740c83
+  manifest_path: /home/laura/rnagenesis-mres-runs/m4_b2_empirical_null_2d9ec89_attempt1/manifest.json
+  manifest_byte_count: 9001
+  manifest_sha256: 5c25568a08e2b0b1ec8f30c940755bcad3426115b7d1bb327acc1ce55aa8ccf2
+  device_backend: cpu_numpy
+  gpu_api_invoked: false
+  ref_opened: false
+  eval_opened: false
+  repository_clean_during_execution: true
+  manifest_provenance_defect: >-
+    manifest.json contains the earlier Stage 1 implementation-only
+    human_approval record, whose explicitly_not_approved list includes
+    scientific_execution and B2_generation. It does not serialize the later
+    active scientific_execution_authorisation block. The committed executable
+    configuration and repository provenance show that the run was authorized,
+    but the manifest is internally misleading and must not yet be treated as
+    a complete authorization record.
 
 input:
   authoritative_role: TRAIN_TEXT
@@ -371,9 +421,9 @@ existing_script_gap:
   execution_authorised: false
   execution_authorised_scope: >
     False here records that Stage 2A did not itself authorise the biological
-    run. The scientific_execution_authorisation block is active. This
-    configuration authorizes exactly one CPU-only B2 run at the named
-    output directory. It does not claim success and does not complete M4.
+    run. The scientific_execution_authorisation block is revoked after the
+    completed single invocation. This configuration does not authorize
+    another run. It does not claim success and does not complete M4.
   stage_2a_scope: implementation_and_synthetic_tests_only
   retains_statistical_design:
     - numpy.random.default_rng

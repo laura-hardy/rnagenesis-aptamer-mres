@@ -13,6 +13,7 @@ import inspect
 import io
 import json
 import os
+import re
 import socket
 import tempfile
 import unittest
@@ -464,10 +465,10 @@ ONE_RUN_AUTHORISATION = {
     "activation_recorded_timestamp": "2026-09-29T18:18:04+10:00",
     "intended_scope_approval": (
         "Laura Hardy approved this one-run scope on 29 September 2026. "
-        "This configuration authorizes exactly one CPU-only B2 run at the named "
-        "output directory. The executing implementation commit is "
-        "70f950434501964dd179760aa4fc82766df74289. It does not claim that the "
-        "run succeeded and does not complete M4.\n"
+        "That approval authorized the now-consumed CPU-only B2 invocation at the named "
+        "output directory. The executing implementation commit was "
+        "70f950434501964dd179760aa4fc82766df74289. The authorization is revoked. "
+        "It does not claim that the run succeeded and does not complete M4.\n"
     ),
     "approved_by": "Laura Hardy",
     "approval_date": "29 September 2026",
@@ -498,6 +499,18 @@ ONE_RUN_AUTHORISATION = {
     "success_claimed": False,
     "m4_complete": False,
 }
+REVOCATION_TIMESTAMP_PATTERN = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$"
+)
+MANIFEST_PROVENANCE_DEFECT = (
+    "manifest.json contains the earlier Stage 1 implementation-only "
+    "human_approval record, whose explicitly_not_approved list includes "
+    "scientific_execution and B2_generation. It does not serialize the later "
+    "active scientific_execution_authorisation block. The committed executable "
+    "configuration and repository provenance show that the run was authorized, "
+    "but the manifest is internally misleading and must not yet be treated as "
+    "a complete authorization record."
+)
 
 
 def _repository_b2_config_path():
@@ -552,13 +565,24 @@ def _non_executable_config():
     }
 
 
+def _is_completed_evidence_path(path):
+    """True for the recorded evidence directory or a child. Does not touch it."""
+    text = os.path.normpath(os.fspath(path))
+    root = os.path.normpath(ONE_RUN_OUTPUT_DIRECTORY)
+    return text == root or text.startswith(root + os.sep)
+
+
+def _refuse_completed_evidence_access(path):
+    if _is_completed_evidence_path(path):
+        raise AssertionError("completed evidence path was used")
+
+
 def _refuse_biological_read(path_self, real_read, events):
     text = os.path.normpath(str(path_self))
     events.append(text)
     if text.endswith("corpus_final.txt") or "rnagenesis-mres-data" in text:
         raise AssertionError("biological TRAIN_TEXT was opened")
-    if text == os.path.normpath(ONE_RUN_OUTPUT_DIRECTORY):
-        raise AssertionError("authorised evidence directory was used")
+    _refuse_completed_evidence_access(text)
     return real_read(path_self)
 
 
@@ -617,8 +641,7 @@ def _invoke_guarded_production(output, config, intercept_contract=False):
             raise AssertionError("frozen contract was opened")
         if text.endswith("ref.csv") or text.endswith("eval.csv"):
             raise AssertionError("REF or EVAL was opened")
-        if text == os.path.normpath(ONE_RUN_OUTPUT_DIRECTORY):
-            raise AssertionError("authorised evidence directory was used")
+        _refuse_completed_evidence_access(text)
         return real_read(path_self)
 
     def load_spy(_raw):
@@ -817,7 +840,9 @@ class OutputConfigAndManifestTests(unittest.TestCase):
             return _refuse_biological_read(path_self, real_read, [])
 
         def lstat_spy(path):
-            events.append(("lstat", os.path.normpath(str(path))))
+            text = os.path.normpath(os.fspath(path))
+            events.append(("lstat", text))
+            _refuse_completed_evidence_access(text)
             return real_lstat(path)
 
         def load_spy(raw):
@@ -877,7 +902,6 @@ class OutputConfigAndManifestTests(unittest.TestCase):
         self.assertIs(parsed["saw_repository_bytes"], True)
         self.assertEqual(validated["count"], 0)
         self.assertEqual(created["count"], 0)
-        self.assertFalse(Path(ONE_RUN_OUTPUT_DIRECTORY).exists())
         config_norm = os.path.normpath(str(config_path))
         contract_norm = os.path.normpath(
             str(ROOT / "config" / "modelling" / "frozen_data_contract.json")
@@ -900,22 +924,39 @@ class OutputConfigAndManifestTests(unittest.TestCase):
         self.assertFalse(any("rnagenesis-mres-data" in path for _kind, path in events))
 
     def test_repository_b2_configuration_execution_state_is_consistent(self):
-        """Parse the repository B2 file and check one consistent execution state.
+        """The consumed authorization is closed, revoked, and not a success claim.
 
-        An open gate requires the three execution fields and the complete
-        one-run authorisation block. A later revocation closes those three
-        fields together. If the block remains, authorisation_active must be
-        false. That check does not require a new test structure.
+        Evidence paths, hashes, byte counts, and revocation structure come from the parsed YAML only.
         """
         loaded, text = _load_repository_b2_config()
-        self.assertTrue(_gates_are_open(loaded) or _gates_are_closed(loaded))
+        block = loaded.get("scientific_execution_authorisation")
+        self.assertIsInstance(block, dict)
+        self.assertEqual(
+            _execution_gates(loaded) + (block["authorisation_active"],),
+            (
+                "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+                False,
+                False,
+                False,
+            ),
+        )
+        self.assertTrue(_gates_are_closed(loaded))
+        self.assertFalse(_gates_are_open(loaded))
         self.assertIs(loaded["human_approval"]["m4_complete"], False)
         self.assertIs(loaded["stage_2a_correction"]["success_claimed"], False)
         self.assertIs(loaded["stage_2a_correction"]["m4_complete"], False)
         self.assertIs(loaded["stage_2a_correction"]["execution_authorised"], False)
         self.assertEqual(loaded["stage_2a_correction"]["first_implementation"], "failed_review")
         self.assertEqual(loaded["stage_2a_correction"]["corrected_implementation"], "under_review")
-        self.assertIs(loaded["execution"]["evidence_directory_created_by_this_stage"], False)
+        self.assertIs(loaded["execution"]["evidence_directory_created_by_this_stage"], True)
+        self.assertIn(
+            "records that the completed authorized invocation created the evidence directory",
+            loaded["execution"]["runner_gate"],
+        )
+        self.assertIn(
+            "That record does not authorize another run",
+            loaded["execution"]["runner_gate"],
+        )
         self.assertEqual(loaded["sampler"]["seed"], 42)
         self.assertEqual(loaded["sampler"]["proposed_seed"], 42)
         self.assertEqual(loaded["sampler"]["raw_sequence_count"], 30000)
@@ -931,44 +972,157 @@ class OutputConfigAndManifestTests(unittest.TestCase):
             loaded["condition_manifest_label"],
             "B2_train_matched_empirical_null",
         )
-        self.assertLessEqual(text.count(ONE_RUN_OUTPUT_DIRECTORY), 1)
+        self.assertEqual(text.count(ONE_RUN_OUTPUT_DIRECTORY), 3)
         self.assertNotIn("success_claimed: true", text)
         self.assertNotIn("m4_complete: true", text)
-        block = loaded.get("scientific_execution_authorisation")
-        if _gates_are_open(loaded):
-            self.assertEqual(block, ONE_RUN_AUTHORISATION)
-            self.assertIs(block["authorisation_active"], True)
-            self.assertIs(block["success_claimed"], False)
-            self.assertIs(block["m4_complete"], False)
-            self.assertEqual(block["output_directory"], ONE_RUN_OUTPUT_DIRECTORY)
-            self.assertEqual(text.count(ONE_RUN_OUTPUT_DIRECTORY), 1)
-            self.assertEqual(block["seed"], loaded["sampler"]["seed"])
-            self.assertEqual(block["raw_attempt_count"], loaded["sampler"]["raw_sequence_count"])
-            self.assertEqual(block["train_text_sha256"], loaded["input"]["expected_sha256"])
-            self.assertEqual(block["expected_records"], loaded["input"]["expected_sequence_count"])
-            self.assertEqual(
-                block["expected_unique_records"],
-                loaded["input"]["expected_unique_count"],
+        expected_block = dict(ONE_RUN_AUTHORISATION)
+        expected_block["authorisation_active"] = False
+        expected_block["activation_status"] = "revoked_after_completed_single_invocation"
+        expected_block["revocation_recorded_timestamp"] = "2026-09-29T18:40:21+10:00"
+        expected_block["single_invocation_consumed"] = True
+        expected_block["reuse_of_same_authorisation_prohibited"] = True
+        expected_block["reuse_of_same_output_directory_prohibited"] = True
+        self.assertEqual(block, expected_block)
+        self.assertRegex(
+            block["revocation_recorded_timestamp"],
+            REVOCATION_TIMESTAMP_PATTERN,
+        )
+        self.assertNotEqual(
+            block["revocation_recorded_timestamp"],
+            block["activation_recorded_timestamp"],
+        )
+        self.assertIs(block["single_invocation_consumed"], True)
+        self.assertIs(block["reuse_of_same_authorisation_prohibited"], True)
+        self.assertIs(block["reuse_of_same_output_directory_prohibited"], True)
+        self.assertIs(
+            block["second_attempt_requires_new_directory_and_new_human_authorisation"],
+            True,
+        )
+        self.assertIs(block["success_claimed"], False)
+        self.assertIs(block["m4_complete"], False)
+        invocation = loaded["completed_invocation"]
+        self.assertEqual(
+            invocation,
+            {
+                "invocation_status": "completed_exit_0",
+                "evidence_acceptance_status": (
+                    "pending_manifest_authorisation_provenance_resolution"
+                ),
+                "manifest_review_status": "provenance_defect_found",
+                "success_claimed": False,
+                "m4_complete": False,
+                "authorization_commit": "cc5d6f612164fb3da717d0f68b9904046614b77f",
+                "executing_implementation_commit": (
+                    "70f950434501964dd179760aa4fc82766df74289"
+                ),
+                "run_identifier": "m4_b2_empirical_null_2d9ec89_attempt1",
+                "attempt_identifier": "invocation-0",
+                "local_start": "2026-09-29T18:28:53.237801+10:00",
+                "local_end": "2026-09-29T18:28:54.416348+10:00",
+                "exit_status": 0,
+                "requested_count": 30000,
+                "raw_count": 30000,
+                "retained_count": 30000,
+                "unique_diagnostic_count": 30000,
+                "dropped_count": 0,
+                "raw_evidence_path": (
+                    ONE_RUN_OUTPUT_DIRECTORY + "/b2_empirical_null_raw.jsonl"
+                ),
+                "raw_evidence_byte_count": 6787972,
+                "raw_evidence_sha256": (
+                    "bbe35f448db0d7fc02ad0156865798382b0b41e9ad047b4e52eddf7cff740c83"
+                ),
+                "manifest_path": ONE_RUN_OUTPUT_DIRECTORY + "/manifest.json",
+                "manifest_byte_count": 9001,
+                "manifest_sha256": (
+                    "5c25568a08e2b0b1ec8f30c940755bcad3426115b7d1bb327acc1ce55aa8ccf2"
+                ),
+                "device_backend": "cpu_numpy",
+                "gpu_api_invoked": False,
+                "ref_opened": False,
+                "eval_opened": False,
+                "repository_clean_during_execution": True,
+                "manifest_provenance_defect": MANIFEST_PROVENANCE_DEFECT,
+            },
+        )
+        self.assertIs(invocation["success_claimed"], False)
+        self.assertIs(invocation["m4_complete"], False)
+
+    def test_revoked_repository_config_refuses_before_contract_train_or_output(self):
+        """A later run stops on the closed repository gates before any access."""
+        loaded, _text = _load_repository_b2_config()
+        self.assertTrue(_gates_are_closed(loaded))
+        self.assertIs(
+            loaded["scientific_execution_authorisation"]["authorisation_active"],
+            False,
+        )
+        events = []
+        real_read = Path.read_bytes
+        real_lstat = os.lstat
+        real_mkdir = os.mkdir
+        real_create = null_model.create_output_directory
+        real_write = null_model.exclusive_fsync_write
+        real_build = null_model.build_raw_records
+        real_train = null_model.resolve_fixed_train_text
+
+        def read_spy(path_self):
+            text = os.path.normpath(str(path_self))
+            events.append(("read", text))
+            if text.endswith("corpus_final.txt") or "rnagenesis-mres-data" in text:
+                raise AssertionError("biological TRAIN_TEXT was opened")
+            if text.endswith("frozen_data_contract.json"):
+                raise AssertionError("frozen contract was opened")
+            if text.endswith("ref.csv") or text.endswith("eval.csv"):
+                raise AssertionError("REF or EVAL was opened")
+            _refuse_completed_evidence_access(text)
+            return real_read(path_self)
+
+        def lstat_spy(path):
+            text = os.path.normpath(os.fspath(path))
+            events.append(("lstat", text))
+            _refuse_completed_evidence_access(text)
+            return real_lstat(path)
+
+        def blocked(*_args, **_kwargs):
+            raise AssertionError("execution continued past the closed gate")
+
+        Path.read_bytes = read_spy
+        os.lstat = lstat_spy
+        os.mkdir = blocked
+        null_model.create_output_directory = blocked
+        null_model.exclusive_fsync_write = blocked
+        null_model.build_raw_records = blocked
+        null_model.resolve_fixed_train_text = blocked
+        try:
+            with self.assertRaises(null_model.NullModelError) as ctx:
+                null_model.run_b2_production(AUTHORISATION_TEST_SIBLING)
+            self.assertEqual(ctx.exception.code, "execution_not_authorised")
+            self.assertIn("consumable_by_executable_workflow=False", ctx.exception.detail)
+            self.assertIn(
+                "document_status=APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+                ctx.exception.detail,
             )
-            self.assertEqual(block["alphabet"], loaded["input"]["alphabet"])
-            self.assertEqual(block["rng"], loaded["sampler"]["numpy_generator"])
-            self.assertEqual(block["condition"], loaded["condition_manifest_label"])
-            self.assertEqual(block["train_text_path"], loaded["input"]["expected_development_path"])
-            self.assertEqual(block["device"], "CPU only")
-            self.assertEqual(block["gpu_use"], "prohibited")
-            self.assertEqual(
-                block["executing_implementation_commit"],
-                "70f950434501964dd179760aa4fc82766df74289",
-            )
-        else:
-            self.assertIs(_gates_are_closed(loaded), True)
-            if block is not None:
-                self.assertIs(block.get("authorisation_active"), False)
-                if "success_claimed" in block:
-                    self.assertIs(block["success_claimed"], False)
-                if "m4_complete" in block:
-                    self.assertIs(block["m4_complete"], False)
-        self.assertFalse(Path(ONE_RUN_OUTPUT_DIRECTORY).exists())
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = null_model.main(["--output-dir", AUTHORISATION_TEST_SIBLING])
+            self.assertEqual(code, 1)
+            self.assertFalse(Path(AUTHORISATION_TEST_SIBLING).exists())
+            self.assertFalse(Path(AUTHORISATION_TEST_OUTPUT).exists())
+        finally:
+            Path.read_bytes = real_read
+            os.lstat = real_lstat
+            os.mkdir = real_mkdir
+            null_model.create_output_directory = real_create
+            null_model.exclusive_fsync_write = real_write
+            null_model.build_raw_records = real_build
+            null_model.resolve_fixed_train_text = real_train
+        contract_norm = os.path.normpath(
+            str(ROOT / "config" / "modelling" / "frozen_data_contract.json")
+        )
+        self.assertFalse(any(path == contract_norm and kind == "read" for kind, path in events))
+        self.assertFalse(any(path.endswith("corpus_final.txt") for _kind, path in events))
+        self.assertFalse(any("rnagenesis-mres-data" in path for _kind, path in events))
+        self.assertFalse(any(_is_completed_evidence_path(path) for _kind, path in events))
 
     def _assert_stopped_before_biological_access(self, result):
         self.assertIsNotNone(result["error"])
@@ -979,7 +1133,6 @@ class OutputConfigAndManifestTests(unittest.TestCase):
         self.assertFalse(
             any(path.endswith("ref.csv") or path.endswith("eval.csv") for path in result["events"])
         )
-        self.assertFalse(Path(ONE_RUN_OUTPUT_DIRECTORY).exists())
         self.assertFalse(Path(AUTHORISATION_TEST_OUTPUT).exists())
         self.assertFalse(Path(AUTHORISATION_TEST_SIBLING).exists())
 
@@ -1101,6 +1254,7 @@ class OutputConfigAndManifestTests(unittest.TestCase):
             return real_read(path_self)
 
         def lstat_spy(path):
+            _refuse_completed_evidence_access(path)
             events.append("lstat")
             return real_lstat(path)
 
