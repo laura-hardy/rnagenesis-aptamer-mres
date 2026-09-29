@@ -494,6 +494,15 @@ ATTEMPT2_OUTPUT_DIRECTORY = (
 )
 ATTEMPT2_AUTHORISATION_ID = "m4_b2_empirical_null_6f82878_attempt2"
 ATTEMPT2_IMPLEMENTATION_COMMIT = "6f82878a7bbde78c74f91181c672d2d4df74b5cc"
+ATTEMPT2_AUTHORIZATION_COMMIT = "dab6c7e2453a6e510d87aecc58c56079ffe8e671"
+ATTEMPT2_MANIFEST_SCHEMA = "m4-b2-run-manifest-2"
+ATTEMPT2_MANIFEST_SHA256 = "31c07fb966c462263307569b383b112ecfb39725adb9b1b2fd2f93a95d3d8baa"
+ATTEMPT2_MANIFEST_BYTES = 12496
+ATTEMPT2_RAW_BYTES = 6787972
+ATTEMPT2_LOCAL_START = "2026-09-29T23:09:40.097289+10:00"
+ATTEMPT2_LOCAL_END = "2026-09-29T23:09:41.425559+10:00"
+ATTEMPT2_REVOCATION_TIMESTAMP = "2026-09-29T23:45:10+10:00"
+B2_ACCEPTANCE_TIMESTAMP = "2026-09-29T23:45:10+10:00"
 PRIOR_RAW_SHA256 = "bbe35f448db0d7fc02ad0156865798382b0b41e9ad047b4e52eddf7cff740c83"
 PRIOR_MANIFEST_SHA256 = "5c25568a08e2b0b1ec8f30c940755bcad3426115b7d1bb327acc1ce55aa8ccf2"
 REVOCATION_ONLY_AUTHORISATION_KEYS = (
@@ -600,10 +609,22 @@ def _gates_are_open(loaded):
 def _gates_are_closed(loaded):
     status, consumable, authorised = _execution_gates(loaded)
     return (
-        status != "APPROVED_FOR_SCIENTIFIC_EXECUTION"
+        status == "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION"
         and consumable is False
         and authorised is False
+        and "scientific_execution_authorisation" not in loaded
     )
+
+
+def _assert_every_m4_complete_is_false(test, value):
+    if isinstance(value, dict):
+        if "m4_complete" in value:
+            test.assertIs(value["m4_complete"], False)
+        for child in value.values():
+            _assert_every_m4_complete_is_false(test, child)
+    elif isinstance(value, list):
+        for child in value:
+            _assert_every_m4_complete_is_false(test, child)
 
 
 def _non_executable_config():
@@ -1197,24 +1218,28 @@ class OutputConfigAndManifestTests(unittest.TestCase):
         self.assertFalse(any("rnagenesis-mres-data" in path for _kind, path in events))
 
     def test_repository_b2_configuration_execution_state_is_consistent(self):
-        """Attempt 2 is open. The first authorization stays archived and unaccepted.
+        """Execution is closed. Attempt 2 is the accepted formal B2 evidence.
 
         Evidence paths, hashes, byte counts, and revocation structure come from the parsed YAML only.
+        This test does not inspect either real evidence directory.
         """
         loaded, text = _load_repository_b2_config()
-        block = loaded.get("scientific_execution_authorisation")
-        self.assertIsInstance(block, dict)
+        self.assertNotIn("scientific_execution_authorisation", loaded)
         self.assertEqual(
-            _execution_gates(loaded) + (block["authorisation_active"],),
+            _execution_gates(loaded),
             (
-                "APPROVED_FOR_SCIENTIFIC_EXECUTION",
-                True,
-                True,
-                True,
+                "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+                False,
+                False,
             ),
         )
-        self.assertTrue(_gates_are_open(loaded))
-        self.assertFalse(_gates_are_closed(loaded))
+        self.assertFalse(_gates_are_open(loaded))
+        self.assertTrue(_gates_are_closed(loaded))
+        self.assertNotIn("authorisation_active: true", text)
+        self.assertNotIn("activation_status: active_single_run", text)
+        self.assertNotIn("document_status: APPROVED_FOR_SCIENTIFIC_EXECUTION", text)
+        self.assertNotIn("consumable_by_executable_workflow: true", text)
+        self.assertNotIn("authorised: true", text)
         self.assertIs(loaded["human_approval"]["m4_complete"], False)
         self.assertIs(loaded["stage_2a_correction"]["success_claimed"], False)
         self.assertIs(loaded["stage_2a_correction"]["m4_complete"], False)
@@ -1226,7 +1251,7 @@ class OutputConfigAndManifestTests(unittest.TestCase):
             loaded["execution"]["evidence_directory_created_by_this_stage_refers_to"],
             "completed_first_invocation",
         )
-        self.assertIs(loaded["execution"]["attempt2_output_directory_created"], False)
+        self.assertIs(loaded["execution"]["attempt2_output_directory_created"], True)
         self.assertEqual(
             loaded["execution"]["attempt2_output_directory"],
             ATTEMPT2_OUTPUT_DIRECTORY,
@@ -1235,7 +1260,12 @@ class OutputConfigAndManifestTests(unittest.TestCase):
             "evidence_directory_created_by_this_stage refers to the completed first",
             loaded["execution"]["runner_gate"],
         )
+        self.assertIn("Those execution gates are closed.", loaded["execution"]["runner_gate"])
         self.assertIn(
+            "There is no active scientific_execution_authorisation.",
+            loaded["execution"]["runner_gate"],
+        )
+        self.assertNotIn(
             "The attempt-2 directory has not been created",
             loaded["execution"]["runner_gate"],
         )
@@ -1255,11 +1285,13 @@ class OutputConfigAndManifestTests(unittest.TestCase):
             "B2_train_matched_empirical_null",
         )
         self.assertEqual(text.count(ONE_RUN_OUTPUT_DIRECTORY), 3)
-        self.assertEqual(text.count(ATTEMPT2_OUTPUT_DIRECTORY), 2)
+        self.assertEqual(text.count(ATTEMPT2_OUTPUT_DIRECTORY), 4)
         self.assertNotIn("success_claimed: true", text)
         self.assertNotIn("m4_complete: true", text)
+        self.assertIn("b2_condition_complete: true", text)
+        _assert_every_m4_complete_is_false(self, loaded)
         archived_records = loaded["prior_scientific_execution_authorisations"]
-        self.assertEqual(len(archived_records), 1)
+        self.assertEqual(len(archived_records), 2)
         archived = archived_records[0]
         expected_archived = dict(ONE_RUN_AUTHORISATION)
         expected_archived["authorisation_active"] = False
@@ -1290,70 +1322,92 @@ class OutputConfigAndManifestTests(unittest.TestCase):
         self.assertEqual(archived["seed"], 42)
         self.assertIs(archived["success_claimed"], False)
         self.assertIs(archived["m4_complete"], False)
+        attempt2 = archived_records[1]
+        preserved_attempt2 = {
+            "authorisation_id": ATTEMPT2_AUTHORISATION_ID,
+            "authorisation_active": True,
+            "activation_status": "active_single_run",
+            "activation_recorded_timestamp": "2026-09-29T22:43:52+10:00",
+            "intended_scope_approval": (
+                "Laura Hardy approved this one-run scope on 29 September 2026. "
+                "That approval authorizes one CPU-only corrected-manifest B2 reproducibility "
+                "run at the named output directory. The executing implementation commit "
+                "is 6f82878a7bbde78c74f91181c672d2d4df74b5cc. Seed 42 is deliberately "
+                "reused to test deterministic reproduction of the first run. This is not "
+                "an additional stochastic seed or independent replicate. It does not "
+                "claim that the run succeeded and does not complete M4.\n"
+            ),
+            "approved_by": "Laura Hardy",
+            "approval_date": "29 September 2026",
+            "approval_recorded_timestamp": "2026-09-29T22:43:52+10:00",
+            "approval_source": (
+                "explicit human decision in the M4 review chat to fix the manifest "
+                "and perform a new run"
+            ),
+            "scope": "one CPU-only corrected-manifest B2 reproducibility run",
+            "executing_implementation_commit": ATTEMPT2_IMPLEMENTATION_COMMIT,
+            "branch": "main",
+            "condition": "B2_train_matched_empirical_null",
+            "output_directory": ATTEMPT2_OUTPUT_DIRECTORY,
+            "train_text_path": (
+                "/home/laura/rnagenesis-mres-data/development/corpus_final.txt"
+            ),
+            "train_text_sha256": (
+                "d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d"
+            ),
+            "expected_records": 669,
+            "expected_unique_records": 669,
+            "alphabet": "^[ACGU]+$",
+            "raw_attempt_count": 30000,
+            "seed": 42,
+            "rng": "numpy.random.default_rng",
+            "device": "CPU only",
+            "gpu_use": "prohibited",
+            "model_loading": "prohibited",
+            "ref_access": "prohibited",
+            "eval_access": "prohibited",
+            "overwrite_or_append": "prohibited",
+            "single_run_only": True,
+            "revoke_after_completed_or_failed_invocation": True,
+            "second_attempt_requires_new_directory_and_new_human_authorisation": True,
+            "success_claimed": False,
+            "m4_complete": False,
+        }
+        expected_attempt2 = dict(preserved_attempt2)
+        expected_attempt2["authorisation_active"] = False
+        expected_attempt2["activation_status"] = "revoked_after_completed_single_invocation"
+        expected_attempt2["revocation_recorded_timestamp"] = ATTEMPT2_REVOCATION_TIMESTAMP
+        expected_attempt2["single_invocation_consumed"] = True
+        expected_attempt2["reuse_of_same_authorisation_prohibited"] = True
+        expected_attempt2["reuse_of_same_output_directory_prohibited"] = True
+        self.assertEqual(attempt2, expected_attempt2)
+        for revoked in (archived, attempt2):
+            self.assertIs(revoked["authorisation_active"], False)
+            self.assertEqual(
+                revoked["activation_status"],
+                "revoked_after_completed_single_invocation",
+            )
+            self.assertRegex(revoked["revocation_recorded_timestamp"], REVOCATION_TIMESTAMP_PATTERN)
+            self.assertNotEqual(
+                revoked["revocation_recorded_timestamp"],
+                revoked["activation_recorded_timestamp"],
+            )
+            self.assertIs(revoked["single_invocation_consumed"], True)
+            self.assertIs(revoked["reuse_of_same_authorisation_prohibited"], True)
+            self.assertIs(revoked["reuse_of_same_output_directory_prohibited"], True)
+            self.assertIs(revoked["success_claimed"], False)
+            self.assertIs(revoked["m4_complete"], False)
+            self.assertEqual(revoked["seed"], 42)
+        self.assertNotEqual(attempt2["authorisation_id"], archived["authorisation_id"])
+        self.assertNotEqual(attempt2["output_directory"], archived["output_directory"])
+        self.assertEqual(attempt2["executing_implementation_commit"], ATTEMPT2_IMPLEMENTATION_COMMIT)
+        self.assertEqual(attempt2["approval_recorded_timestamp"], "2026-09-29T22:43:52+10:00")
+        self.assertEqual(attempt2["activation_recorded_timestamp"], "2026-09-29T22:43:52+10:00")
+        executable_keys = set(null_model.SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS)
         self.assertEqual(
-            list(block),
-            list(null_model.SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS),
+            set(attempt2) - executable_keys,
+            set(REVOCATION_ONLY_AUTHORISATION_KEYS),
         )
-        self.assertEqual(set(block), set(null_model.SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS))
-        for key in REVOCATION_ONLY_AUTHORISATION_KEYS:
-            self.assertNotIn(key, block)
-        self.assertEqual(
-            block,
-            {
-                "authorisation_id": ATTEMPT2_AUTHORISATION_ID,
-                "authorisation_active": True,
-                "activation_status": "active_single_run",
-                "activation_recorded_timestamp": "2026-09-29T22:43:52+10:00",
-                "intended_scope_approval": (
-                    "Laura Hardy approved this one-run scope on 29 September 2026. "
-                    "That approval authorizes one CPU-only corrected-manifest B2 reproducibility "
-                    "run at the named output directory. The executing implementation commit "
-                    "is 6f82878a7bbde78c74f91181c672d2d4df74b5cc. Seed 42 is deliberately "
-                    "reused to test deterministic reproduction of the first run. This is not "
-                    "an additional stochastic seed or independent replicate. It does not "
-                    "claim that the run succeeded and does not complete M4.\n"
-                ),
-                "approved_by": "Laura Hardy",
-                "approval_date": "29 September 2026",
-                "approval_recorded_timestamp": "2026-09-29T22:43:52+10:00",
-                "approval_source": (
-                    "explicit human decision in the M4 review chat to fix the manifest "
-                    "and perform a new run"
-                ),
-                "scope": "one CPU-only corrected-manifest B2 reproducibility run",
-                "executing_implementation_commit": ATTEMPT2_IMPLEMENTATION_COMMIT,
-                "branch": "main",
-                "condition": "B2_train_matched_empirical_null",
-                "output_directory": ATTEMPT2_OUTPUT_DIRECTORY,
-                "train_text_path": (
-                    "/home/laura/rnagenesis-mres-data/development/corpus_final.txt"
-                ),
-                "train_text_sha256": (
-                    "d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d"
-                ),
-                "expected_records": 669,
-                "expected_unique_records": 669,
-                "alphabet": "^[ACGU]+$",
-                "raw_attempt_count": 30000,
-                "seed": 42,
-                "rng": "numpy.random.default_rng",
-                "device": "CPU only",
-                "gpu_use": "prohibited",
-                "model_loading": "prohibited",
-                "ref_access": "prohibited",
-                "eval_access": "prohibited",
-                "overwrite_or_append": "prohibited",
-                "single_run_only": True,
-                "revoke_after_completed_or_failed_invocation": True,
-                "second_attempt_requires_new_directory_and_new_human_authorisation": True,
-                "success_claimed": False,
-                "m4_complete": False,
-            },
-        )
-        self.assertNotEqual(block["authorisation_id"], archived["authorisation_id"])
-        self.assertNotEqual(block["output_directory"], archived["output_directory"])
-        self.assertIs(block["success_claimed"], False)
-        self.assertIs(block["m4_complete"], False)
         comparison = loaded["reproducibility_comparison"]
         self.assertEqual(comparison["seed"], 42)
         self.assertIn("deliberately reused", comparison["seed_reuse_meaning"])
@@ -1370,14 +1424,14 @@ class OutputConfigAndManifestTests(unittest.TestCase):
             "schema and authorization provenance are corrected",
             comparison["new_manifest_hash_difference_reason"],
         )
-        self.assertNotIn("expected_prior_raw_sha256", block)
+        self.assertNotIn("expected_prior_raw_sha256", attempt2)
         invocation = loaded["completed_invocation"]
         self.assertEqual(
             invocation,
             {
                 "invocation_status": "completed_exit_0",
                 "evidence_acceptance_status": (
-                    "pending_manifest_authorisation_provenance_resolution"
+                    "superseded_as_evidence_package_raw_output_remains_valid"
                 ),
                 "manifest_review_status": "provenance_defect_found",
                 "success_claimed": False,
@@ -1414,10 +1468,96 @@ class OutputConfigAndManifestTests(unittest.TestCase):
                 "eval_opened": False,
                 "repository_clean_during_execution": True,
                 "manifest_provenance_defect": MANIFEST_PROVENANCE_DEFECT,
+                "evidence_package_disposition": "superseded_by_attempt_2",
+                "supersession_reason": (
+                    "legacy manifest omitted the active scientific-execution "
+                    "authorization and retained misleading Stage 1 approval metadata"
+                ),
+                "raw_scientific_output_remains_valid": True,
+                "raw_scientific_output_byte_identical_to_accepted_attempt2": True,
+                "original_evidence_remains_immutable_and_retained": True,
+                "selected_as_formal_b2_evidence_package": False,
             },
         )
         self.assertIs(invocation["success_claimed"], False)
         self.assertIs(invocation["m4_complete"], False)
+        self.assertIs(invocation["raw_scientific_output_remains_valid"], True)
+        self.assertIs(invocation["selected_as_formal_b2_evidence_package"], False)
+        self.assertNotIn("scientifically invalid", invocation["manifest_provenance_defect"])
+        self.assertNotIn("invalid", invocation["supersession_reason"])
+        attempt2_invocation = loaded["completed_invocation_attempt2"]
+        self.assertEqual(
+            attempt2_invocation,
+            {
+                "invocation_status": "completed_exit_0",
+                "success_claimed": False,
+                "m4_complete": False,
+                "run_identifier": ATTEMPT2_AUTHORISATION_ID,
+                "attempt_identifier": "invocation-0",
+                "local_start": ATTEMPT2_LOCAL_START,
+                "local_end": ATTEMPT2_LOCAL_END,
+                "authorization_commit": ATTEMPT2_AUTHORIZATION_COMMIT,
+                "executing_implementation_commit": ATTEMPT2_IMPLEMENTATION_COMMIT,
+                "manifest_schema_version": ATTEMPT2_MANIFEST_SCHEMA,
+                "exit_status": 0,
+                "requested_count": 30000,
+                "raw_count": 30000,
+                "retained_count": 30000,
+                "unique_diagnostic_count": 30000,
+                "dropped_count": 0,
+                "raw_evidence_path": (
+                    ATTEMPT2_OUTPUT_DIRECTORY + "/b2_empirical_null_raw.jsonl"
+                ),
+                "raw_evidence_byte_count": ATTEMPT2_RAW_BYTES,
+                "raw_evidence_sha256": PRIOR_RAW_SHA256,
+                "manifest_path": ATTEMPT2_OUTPUT_DIRECTORY + "/manifest.json",
+                "manifest_byte_count": ATTEMPT2_MANIFEST_BYTES,
+                "manifest_sha256": ATTEMPT2_MANIFEST_SHA256,
+                "device_backend": "cpu_numpy",
+                "gpu_api_invoked": False,
+                "ref_opened": False,
+                "eval_opened": False,
+                "repository_clean_during_execution": True,
+                "warnings": [],
+                "retries": [],
+                "deviations": [],
+                "raw_byte_identical_to_attempt1": True,
+                "prior_raw_sha256_matched": True,
+            },
+        )
+        self.assertIs(attempt2_invocation["raw_byte_identical_to_attempt1"], True)
+        self.assertIs(attempt2_invocation["prior_raw_sha256_matched"], True)
+        self.assertEqual(attempt2_invocation["raw_evidence_sha256"], invocation["raw_evidence_sha256"])
+        self.assertNotEqual(
+            attempt2_invocation["manifest_sha256"],
+            invocation["manifest_sha256"],
+        )
+        self.assertEqual(attempt2_invocation["manifest_schema_version"], "m4-b2-run-manifest-2")
+        acceptance = loaded["b2_evidence_acceptance"]
+        self.assertEqual(
+            acceptance,
+            {
+                "status": "accepted",
+                "accepted_by": "Laura Hardy",
+                "acceptance_date": "29 September 2026",
+                "acceptance_recorded_timestamp": B2_ACCEPTANCE_TIMESTAMP,
+                "acceptance_source": "explicit human approval in the M4 review chat",
+                "accepted_run": "attempt 2",
+                "accepted_authorisation_id": ATTEMPT2_AUTHORISATION_ID,
+                "accepted_raw_sha256": PRIOR_RAW_SHA256,
+                "accepted_manifest_sha256": ATTEMPT2_MANIFEST_SHA256,
+                "deterministic_reproduction_of_attempt1": "passed",
+                "raw_files_byte_identical": True,
+                "corrected_authorization_provenance": "passed",
+                "b2_condition_complete": True,
+                "m4_complete": False,
+            },
+        )
+        self.assertIs(acceptance["b2_condition_complete"], True)
+        self.assertIs(acceptance["m4_complete"], False)
+        self.assertEqual(acceptance["accepted_run"], "attempt 2")
+        self.assertNotEqual(acceptance["accepted_authorisation_id"], invocation["run_identifier"])
+        self.assertRegex(acceptance["acceptance_recorded_timestamp"], REVOCATION_TIMESTAMP_PATTERN)
 
     def _assert_repository_invocation_avoids_evidence(self, result):
         self.assertIsNotNone(result["error"])
@@ -1440,116 +1580,192 @@ class OutputConfigAndManifestTests(unittest.TestCase):
             )
         )
 
-    def test_repository_attempt2_output_is_exactly_bound(self):
-        """The active block accepts only its own output path, before contract or creation."""
+    def test_closed_repository_refuses_former_output_paths_before_contract(self):
+        """Closed gates refuse both consumed directories before contract or creation."""
         loaded, _text = _load_repository_b2_config()
+        self.assertTrue(_gates_are_closed(loaded))
+        self.assertNotIn("scientific_execution_authorisation", loaded)
+        archived = loaded["prior_scientific_execution_authorisations"]
         self.assertEqual(
-            loaded["scientific_execution_authorisation"]["output_directory"],
-            ATTEMPT2_OUTPUT_DIRECTORY,
+            [record["output_directory"] for record in archived],
+            [ONE_RUN_OUTPUT_DIRECTORY, ATTEMPT2_OUTPUT_DIRECTORY],
         )
-        result = _invoke_guarded_production(
+        for output in (
             ATTEMPT2_OUTPUT_DIRECTORY,
-            loaded,
-            intercept_contract=True,
-            record_containment_only=True,
-        )
-        self.assertEqual(result["error"].code, "intercepted_before_contract")
-        self.assertEqual(result["contract_attempts"], 1)
-        self._assert_repository_invocation_avoids_evidence(result)
-        contained = [path for path, _root in result["containment"]]
-        self.assertEqual(contained, [os.path.normpath(ATTEMPT2_OUTPUT_DIRECTORY)] * 2)
-        self.assertTrue(
-            all(
-                root == os.path.normpath(str(null_model.PRODUCTION_RUN_ROOT))
-                for _path, root in result["containment"]
+            ONE_RUN_OUTPUT_DIRECTORY,
+            AUTHORISATION_TEST_SIBLING,
+        ):
+            result = _invoke_guarded_production(
+                output,
+                loaded,
+                intercept_contract=True,
+                record_containment_only=True,
             )
-        )
-
-    def test_repository_sibling_is_refused_before_contract_train_or_output(self):
-        """A sibling of the authorized directory is refused before contract, TRAIN, or creation."""
-        loaded, _text = _load_repository_b2_config()
-        result = _invoke_guarded_production(
-            AUTHORISATION_TEST_SIBLING,
-            loaded,
-            record_containment_only=True,
-        )
-        self.assertEqual(result["error"].code, "output_not_authorised")
-        self.assertEqual(result["contract_attempts"], 0)
-        self._assert_repository_invocation_avoids_evidence(result)
+            self.assertEqual(result["error"].code, "execution_not_authorised", output)
+            self.assertIn("consumable_by_executable_workflow=False", result["error"].detail)
+            self.assertIn(
+                "document_status=APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+                result["error"].detail,
+            )
+            self.assertEqual(result["contract_attempts"], 0, output)
+            self.assertEqual(result["created"], 0, output)
+            self.assertEqual(result["containment"], [], output)
+            self._assert_repository_invocation_avoids_evidence(result)
         self.assertFalse(Path(AUTHORISATION_TEST_SIBLING).exists())
-        contained = [path for path, _root in result["containment"]]
-        self.assertEqual(
-            contained,
-            [
-                os.path.normpath(ATTEMPT2_OUTPUT_DIRECTORY),
-                os.path.normpath(AUTHORISATION_TEST_SIBLING),
-            ],
-        )
 
-    def test_repository_old_output_directory_cannot_be_reused(self):
-        """The consumed first-run directory is not the active output path."""
+    def test_closed_repository_file_refuses_before_contract_train_evidence_or_writes(self):
+        """The repository file itself stops before contract, TRAIN, evidence, or writes."""
         loaded, _text = _load_repository_b2_config()
-        archived = loaded["prior_scientific_execution_authorisations"][0]
-        self.assertEqual(archived["output_directory"], ONE_RUN_OUTPUT_DIRECTORY)
+        self.assertTrue(_gates_are_closed(loaded))
+        events = []
+        created = {"count": 0}
+        real_read = Path.read_bytes
+        real_mkdir = os.mkdir
+        real_create = null_model.create_output_directory
+        real_write = null_model.exclusive_fsync_write
+        real_open = null_model._open_verified_contract
+        real_resolve = null_model.resolve_fixed_repository_file
+
+        def read_spy(path_self):
+            text = os.path.normpath(str(path_self))
+            events.append(text)
+            if text.endswith("corpus_final.txt") or "rnagenesis-mres-data" in text:
+                raise AssertionError("biological TRAIN_TEXT was opened")
+            if text.endswith("frozen_data_contract.json"):
+                raise AssertionError("frozen contract was opened")
+            if text.endswith("ref.csv") or text.endswith("eval.csv"):
+                raise AssertionError("REF or EVAL was opened")
+            if text.endswith(".pt") or text.endswith(".bin") or text.endswith(".safetensors"):
+                raise AssertionError("model checkpoint was opened")
+            if "checkpoint" in text:
+                raise AssertionError("checkpoint path was opened")
+            _refuse_completed_evidence_access(text)
+            return real_read(path_self)
+
+        def mkdir_spy(path, mode=0o777):
+            created["count"] += 1
+            raise AssertionError("directory creation was attempted")
+
+        def create_spy(_path):
+            created["count"] += 1
+            raise AssertionError("directory creation was attempted")
+
+        def write_spy(*_args, **_kwargs):
+            raise AssertionError("output write was attempted")
+
+        def open_spy(*_args, **_kwargs):
+            raise AssertionError("frozen contract was opened")
+
+        def resolve_spy(root, relative, role):
+            if role == "contract":
+                raise AssertionError("frozen contract resolve was attempted")
+            return real_resolve(root, relative, role)
+
+        Path.read_bytes = read_spy
+        null_model.create_output_directory = create_spy
+        null_model.exclusive_fsync_write = write_spy
+        null_model._open_verified_contract = open_spy
+        null_model.resolve_fixed_repository_file = resolve_spy
+        try:
+            with tempfile.TemporaryDirectory(prefix="m4-stage2a-synthetic-") as directory:
+                os.mkdir = mkdir_spy
+                output = Path(directory) / "would-be-run"
+                try:
+                    for candidate in (
+                        str(output),
+                        ATTEMPT2_OUTPUT_DIRECTORY,
+                        ONE_RUN_OUTPUT_DIRECTORY,
+                        AUTHORISATION_TEST_SIBLING,
+                    ):
+                        with self.assertRaises(null_model.NullModelError) as ctx:
+                            null_model.run_b2_production(candidate)
+                        self.assertEqual(ctx.exception.code, "execution_not_authorised")
+                        self.assertIn(
+                            "consumable_by_executable_workflow=False",
+                            ctx.exception.detail,
+                        )
+                        self.assertFalse(output.exists())
+                finally:
+                    os.mkdir = real_mkdir
+        finally:
+            Path.read_bytes = real_read
+            os.mkdir = real_mkdir
+            null_model.create_output_directory = real_create
+            null_model.exclusive_fsync_write = real_write
+            null_model._open_verified_contract = real_open
+            null_model.resolve_fixed_repository_file = real_resolve
+        self.assertEqual(created["count"], 0)
+        self.assertFalse(any(_is_completed_evidence_path(path) for path in events))
+        self.assertFalse(any(path.endswith("corpus_final.txt") for path in events))
+        self.assertFalse(any("rnagenesis-mres-data" in path for path in events))
+        self.assertFalse(any(path.endswith("frozen_data_contract.json") for path in events))
+        self.assertFalse(Path(AUTHORISATION_TEST_SIBLING).exists())
+
+    def test_revoked_archived_authorisations_cannot_be_executed(self):
+        """Consumed archived blocks stay non-executable, including after an in-memory reopen."""
+        loaded, _text = _load_repository_b2_config()
+        self.assertNotIn("scientific_execution_authorisation", loaded)
+        archived_records = loaded["prior_scientific_execution_authorisations"]
+        self.assertEqual(len(archived_records), 2)
         self.assertNotEqual(
-            loaded["scientific_execution_authorisation"]["output_directory"],
-            ONE_RUN_OUTPUT_DIRECTORY,
+            archived_records[0]["authorisation_id"],
+            archived_records[1]["authorisation_id"],
         )
-        result = _invoke_guarded_production(
-            ONE_RUN_OUTPUT_DIRECTORY,
-            loaded,
-            record_containment_only=True,
+        self.assertNotEqual(
+            archived_records[0]["output_directory"],
+            archived_records[1]["output_directory"],
         )
-        self.assertEqual(result["error"].code, "output_not_authorised")
-        self.assertEqual(result["contract_attempts"], 0)
-        self._assert_repository_invocation_avoids_evidence(result)
-
-    def test_revoked_first_authorisation_cannot_be_executed(self):
-        """The archived consumed authorization is not an executable block."""
-        loaded, _text = _load_repository_b2_config()
-        archived = copy.deepcopy(loaded["prior_scientific_execution_authorisations"][0])
-        consumed = copy.deepcopy(loaded)
-        consumed["scientific_execution_authorisation"] = archived
-        result = _invoke_guarded_production(
-            AUTHORISATION_TEST_SIBLING,
-            consumed,
-            record_containment_only=True,
-        )
-        self.assertEqual(result["error"].code, "execution_not_authorised")
-        self.assertEqual(result["contract_attempts"], 0)
-        self.assertEqual(result["containment"], [])
-        self._assert_repository_invocation_avoids_evidence(result)
-        reactivated = copy.deepcopy(archived)
-        reactivated["authorisation_active"] = True
-        reactivated["activation_status"] = "active_single_run"
-        still_revoked = copy.deepcopy(loaded)
-        still_revoked["scientific_execution_authorisation"] = reactivated
-        schema_result = _invoke_guarded_production(
-            ONE_RUN_OUTPUT_DIRECTORY,
-            still_revoked,
-            record_containment_only=True,
-        )
-        self.assertEqual(schema_result["error"].code, "execution_not_authorised")
-        self.assertIn("executable schema", schema_result["error"].detail)
-        self.assertEqual(schema_result["contract_attempts"], 0)
-        self.assertEqual(schema_result["created"], 0)
-        self._assert_repository_invocation_avoids_evidence(schema_result)
+        for archived in archived_records:
+            consumed = copy.deepcopy(loaded)
+            consumed["scientific_execution_authorisation"] = copy.deepcopy(archived)
+            result = _invoke_guarded_production(
+                archived["output_directory"],
+                consumed,
+                record_containment_only=True,
+            )
+            self.assertEqual(result["error"].code, "execution_not_authorised")
+            self.assertEqual(result["contract_attempts"], 0)
+            self.assertEqual(result["containment"], [])
+            self.assertEqual(result["created"], 0)
+            self._assert_repository_invocation_avoids_evidence(result)
+            reopened = copy.deepcopy(loaded)
+            reopened["document_status"] = "APPROVED_FOR_SCIENTIFIC_EXECUTION"
+            reopened["consumable_by_executable_workflow"] = True
+            reopened["execution"]["authorised"] = True
+            reopened["scientific_execution_authorisation"] = copy.deepcopy(archived)
+            inactive_result = _invoke_guarded_production(
+                AUTHORISATION_TEST_OUTPUT,
+                reopened,
+                record_containment_only=True,
+            )
+            self.assertEqual(inactive_result["error"].code, "execution_not_authorised")
+            self.assertIn("authorisation_active is not true", inactive_result["error"].detail)
+            self.assertEqual(inactive_result["contract_attempts"], 0)
+            self.assertEqual(inactive_result["created"], 0)
+            self._assert_repository_invocation_avoids_evidence(inactive_result)
+            reactivated = copy.deepcopy(archived)
+            reactivated["authorisation_active"] = True
+            reactivated["activation_status"] = "active_single_run"
+            schema_config = copy.deepcopy(reopened)
+            schema_config["scientific_execution_authorisation"] = reactivated
+            schema_result = _invoke_guarded_production(
+                archived["output_directory"],
+                schema_config,
+                record_containment_only=True,
+            )
+            self.assertEqual(schema_result["error"].code, "execution_not_authorised")
+            self.assertIn("executable schema", schema_result["error"].detail)
+            self.assertEqual(schema_result["contract_attempts"], 0)
+            self.assertEqual(schema_result["created"], 0)
+            self._assert_repository_invocation_avoids_evidence(schema_result)
 
     def test_later_revocation_closes_attempt2_without_evidence_directories(self):
-        """Closing the new authorization does not require either evidence directory."""
+        """Revoking an otherwise open authorization does not inspect evidence directories."""
         loaded, _text = _load_repository_b2_config()
-        self.assertTrue(_gates_are_open(loaded))
-        closed = copy.deepcopy(loaded)
-        closed["document_status"] = "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION"
-        closed["consumable_by_executable_workflow"] = False
-        closed["execution"]["authorised"] = False
-        closed["scientific_execution_authorisation"]["authorisation_active"] = False
-        closed["scientific_execution_authorisation"]["activation_status"] = (
-            "revoked_after_completed_single_invocation"
-        )
+        self.assertTrue(_gates_are_closed(loaded))
         closed_result = _invoke_guarded_production(
             ATTEMPT2_OUTPUT_DIRECTORY,
-            closed,
+            loaded,
             record_containment_only=True,
         )
         self.assertEqual(closed_result["error"].code, "execution_not_authorised")
@@ -1557,13 +1773,13 @@ class OutputConfigAndManifestTests(unittest.TestCase):
         self.assertEqual(closed_result["contract_attempts"], 0)
         self.assertEqual(closed_result["containment"], [])
         self._assert_repository_invocation_avoids_evidence(closed_result)
-        inactive = copy.deepcopy(loaded)
+        inactive = _authorised_production_config()
         inactive["scientific_execution_authorisation"]["authorisation_active"] = False
         inactive["scientific_execution_authorisation"]["activation_status"] = (
             "revoked_after_completed_single_invocation"
         )
         inactive_result = _invoke_guarded_production(
-            ATTEMPT2_OUTPUT_DIRECTORY,
+            AUTHORISATION_TEST_OUTPUT,
             inactive,
             record_containment_only=True,
         )
