@@ -1543,6 +1543,10 @@ Confirm chemistry policy and that no model-incompatible sequences are lost silen
 - no optimizer;
 - no REF/EVAL loading.
 
+**Current status: COMPLETE / GO — 29 September 2026.**
+
+The human gate is GO. On 29 September 2026, Laura Hardy gave final human approval. The frozen-input and tokenizer/interface gate is PASS, and the chemistry and no-silent-loss human gate is PASS. The account is [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c` on `mres-d1-diffusion-finetune`. Evidence is `/home/laura/rnagenesis-mres-runs/m3_tokenizer_112a120_f2bdff1_attempt1`: `m3_tokenizer_audit.csv` SHA-256 `063a068187e5b34c598b1ef4a294f924f3167538aec824786d6e9fac01d4eb9f`; `m3_validation_duplicate_audit.csv` SHA-256 `bfc966dbaff60523ebb44a75fa610f83f08724b0277ba4ed6c9b2a9956d39697`; `m3_chemistry_report.json` SHA-256 `8192b0717a7d5791d06c842ea5ba07011a7502dd6c51a5da004e5ae84fedeb50`; `m3_summary.json` SHA-256 `8862ecb066fac12ae80529737a2398322227f8789af07c2de2d375279896638c`. All 669 TRAIN and 95 VALIDATION modelling cores passed, and all 37 repeated VALIDATION identity rows were audited. Chemistry remained report-only. No model-compatible sequence was dropped. M4 is the next formal milestone and has not begun. M5, model loading, GPU work, training, generation, checkpoint selection, and REF/EVAL remain unauthorized.
+
 ---
 
 ### M4 — Baselines and validation protocol freeze
@@ -2042,21 +2046,13 @@ The MRes RNAGenesis modelling implementation is complete when:
 
 ## 22. Immediate next actions
 
-M0 is COMPLETE / GO. Biological fine-tuning is not authorised. M1, released-behaviour and numerical training smoke validation, comes before the substantive D1 fitting run. M2–M4 remain open, so the fitting run is still not authorised.
+M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 2026. M2 is COMPLETE / GO — 28 September 2026. M3 is COMPLETE / GO — 29 September 2026, as recorded in [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c`. M4 is the next formal milestone. Biological fine-tuning is not authorised.
 
 Proceed in this order:
 
-1. commit this approved implementation plan to the private MRes repository;
-2. create the tracked frozen modelling data contract;
-3. integrate the upstream diffusion fine-tuning files into a dedicated RNAGenesis implementation branch after reviewing the diff from `d00899e` to upstream `6bc641a`;
-4. implement explicit frozen TRAIN/VALIDATION loading and remove/bypass the upstream automatic 90/10 split;
-5. implement fixed-draw VALIDATION denoising evaluation;
-6. implement/verify frozen-parameter assertions;
-7. audit and harden the existing `scripts/null_model.py` B2 empirical-null generator;
-8. reconstruct/verify the B0 30,080-sequence manifest;
-9. characterize B1 `max_seq_len` versus cleaned sequence length and freeze the empirical length-matching algorithm;
-10. M0 review is complete; complete the M1–M4 review;
-11. only then run M5 synthetic/training smoke tests on GPU0 by default when adequate memory is available, or on GPU1 only when GPU1 has been explicitly authorised for that session/run.
+1. M4, baselines and validation-protocol freeze;
+2. only then run M5 synthetic/training smoke tests on GPU0 by default when adequate memory is available, or on GPU1 only when GPU1 has been explicitly authorised for that session/run;
+3. M6 and later biological D1 fitting only after those gates pass.
 
 ---
 

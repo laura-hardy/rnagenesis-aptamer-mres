@@ -11280,3 +11280,33 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Boundary:** No D1 training, generation, model selection, REF/EVAL access or unauthorised GPU use occurred. No GPU is currently authorised for later work. Numerical diffusion-training smoke remains formal M5.
 
 **Documentation:** `docs/fine-tuning-implementation-plan.md`, `docs/fine_tuning/model_asset_manifest.md`, `docs/fine_tuning/m2_published_aptamer_comparator_verification.md` and `docs/log.md` are being committed and pushed in the closure commit.
+
+## 2026-09-29 — M3 frozen corpus loader and modelling-interface evidence
+
+**Stage:** Aim 2 / modelling / M3 frozen corpus loader and modelling-interface gates
+
+**Status:** EVIDENCE COMPLETE / PENDING FINAL HUMAN GO — 29 September 2026. The tokenizer gate is PASS and the chemistry/no-silent-loss human gate is PASS. Formal M3 is not closed. Closure still requires exact-diff review, explicit-path staging, commit, push, live-remote confirmation, context-mirror refresh, and final human GO.
+
+**Frozen inputs:** The M0-authorized H200 location is `/home/laura/rnagenesis-mres-data/development`. Repository-local `data/processed` held obsolete pre-correction copies with the wrong hashes and counts (`corpus_final.txt` `6f8c2091706cc28526ae53a1021395cad1b7943745ddffbaea631edc01df3340`, 678 lines; `ft_train.csv` `941fe8783ee8c99a2ce7598dea00ed123e62750026b7f157f28e7bbcc5d14a8f`, 746/678/571; `ft_validation.csv` `03be477e12f7b9ca20f8911e2ac88fde2949af2b6131c2d2aa43eef2ae6d9abc`, 149/117/64). Those copies were deliberately deleted and were not recreated. The authorized files match the frozen contract: corpus `d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d` (37,700 bytes, 669 cores), TRAIN CSV `84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0` (726 identities, 669 cores, 569 clusters), VALIDATION CSV `cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd` (132 identities, 95 cores, 63 clusters).
+
+**Tokenizer audit:** All 669 TRAIN and 95 VALIDATION first-occurrence cores passed `encode_rna_characters` with `U=1`, `G=2`, `C=3`, `A=4`, byte-identical round trips, and no pad, special, or unknown ids. Configured maximum length 2048; observed maxima 123 and 94. All 37 repeated VALIDATION identity rows were audited. Chemistry stayed report-only, including missing and conflicting labels. No model-compatible sequence was dropped. No normalization, truncation, replacement, filtering, or automatic split was applied.
+
+**Tests:** `pytest` is not installed in the pinned `rnagenesis-h200` interpreter. That missing optional runner is not a scientific failure. `python -m unittest -q tests.test_m3_frozen_tokenizer_gate` passed 15 tests.
+
+**Artifacts:** `/home/laura/rnagenesis-mres-runs/m3_tokenizer_112a120_f2bdff1_attempt1`. `m3_tokenizer_audit.csv` `063a068187e5b34c598b1ef4a294f924f3167538aec824786d6e9fac01d4eb9f`; `m3_validation_duplicate_audit.csv` `bfc966dbaff60523ebb44a75fa610f83f08724b0277ba4ed6c9b2a9956d39697`; `m3_chemistry_report.json` `8192b0717a7d5791d06c842ea5ba07011a7502dd6c51a5da004e5ae84fedeb50`; `m3_summary.json` `8862ecb066fac12ae80529737a2398322227f8789af07c2de2d375279896638c`, status `PASS`.
+
+**Boundary:** No GPU command, model or checkpoint load, full-corpus tokenization rerun, optimizer, training, generation, REF, or EVAL. Physical GPU 0 is authorised for 29 September 2026 and was not used. RNAGenesis remained `mres-d1-diffusion-finetune` at `112a120282667c382790031fe74942f89f7b84eb`. MRes remained `main` at `f2bdff1ade9e2aec9f37aaa23477ec40f3f21585`. The untracked gate and tests were not altered by this documentation edit. Nothing was staged, committed, or pushed. The context mirror was not refreshed.
+
+**Documentation:** `docs/fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md`, plus the formal M3 status and the Section 22 milestone order in `docs/fine-tuning-implementation-plan.md`. Documentation only. Not committed. Not pushed.
+
+## 2026-09-29 — Formal M3 closure
+
+**Stage:** Aim 2 / modelling / M3 frozen corpus loader and modelling-interface gates
+
+**Status:** COMPLETE / GO — 29 September 2026. Laura Hardy gave final human approval on 29 September 2026. Formal M3 is closed. M4 is the next formal milestone and has not begun.
+
+**Implementation:** RNAGenesis branch `mres-d1-diffusion-finetune`, commit `e3b855bbf4d1af376f43747643fa30afd662828c`, subject `Add M3 frozen corpus tokenizer gate`.
+
+**Evidence:** `/home/laura/rnagenesis-mres-runs/m3_tokenizer_112a120_f2bdff1_attempt1` remains the preserved evidence location.
+
+**Boundary:** This closure does not start training, GPU work, or M4.
