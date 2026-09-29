@@ -1,21 +1,23 @@
-# REVOKED_AFTER_COMPLETED_SINGLE_INVOCATION
-# The single CPU-only B2 invocation has been consumed. This configuration
-# does not authorize another run. scientific_execution_authorisation is
-# inactive. Laura Hardy approved the consumed scope on 29 September 2026.
-# The executing implementation commit was
-# 70f950434501964dd179760aa4fc82766df74289. This record does not claim
-# scientific acceptance, does not set success_claimed, and does not complete
-# M4. Reuse of this authorization and reuse of the same output directory are
-# prohibited. Another attempt requires a new directory and new explicit
-# human authorization. GPU use, model loading, REF access, and EVAL access
-# remain prohibited.
+# APPROVED_FOR_SCIENTIFIC_EXECUTION
+# One CPU-only corrected-manifest B2 reproducibility run is authorized.
+# The first authorization remains archived, revoked, and consumed under
+# prior_scientific_execution_authorisations. It is not reactivated and it
+# is not repurposed. The active scientific_execution_authorisation block is
+# a new authorization for attempt 2. Laura Hardy approved that scope on
+# 29 September 2026. The executing implementation commit is
+# 6f82878a7bbde78c74f91181c672d2d4df74b5cc. Seed 42 is deliberately reused
+# to test deterministic reproduction of the first run. This is not an
+# additional stochastic seed or independent replicate. This record does not
+# claim scientific acceptance, does not set success_claimed, and does not
+# complete M4. The attempt-2 output directory has not been created. GPU use,
+# model loading, REF access, and EVAL access remain prohibited.
 
-document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
-consumable_by_executable_workflow: false
+document_status: APPROVED_FOR_SCIENTIFIC_EXECUTION
+consumable_by_executable_workflow: true
 # human_approval is the Stage 1 implementation approval. That approval did
-# not approve scientific execution. The single scientific invocation has
-# been consumed and the authorization is revoked. It does not claim success
-# and does not complete M4.
+# not approve scientific execution. The first scientific authorization is
+# archived, revoked, and consumed. The active authorization is the separate
+# attempt-2 block below. It does not claim success and does not complete M4.
 human_approval:
   approving_person: Laura Hardy
   approval_date: 29 September 2026
@@ -55,15 +57,20 @@ stage_2a_correction:
   corrected_implementation: under_review
   note: >
     This Stage 2A correction record is not a success claim and does not
-    complete M4. The scientific_execution_authorisation block is revoked
-    after the completed single invocation. Another attempt requires a new
-    directory and new explicit human authorization.
+    complete M4. The first scientific_execution_authorisation is archived
+    as revoked after its completed single invocation and is not reactivated.
+    Another attempt requires a new directory and new explicit human
+    authorization. That new authorization is recorded separately. Stage 2A
+    correction does not itself authorise the attempt.
 
 execution:
-  authorised: false
-  # Records that the completed authorized invocation created the evidence
-  # directory. This record does not authorize another run.
+  authorised: true
+  # True refers to the completed first invocation. It does not mean the
+  # newly authorized attempt-2 directory has been created.
   evidence_directory_created_by_this_stage: true
+  evidence_directory_created_by_this_stage_refers_to: completed_first_invocation
+  attempt2_output_directory: /home/laura/rnagenesis-mres-runs/m4_b2_empirical_null_6f82878_attempt2
+  attempt2_output_directory_created: false
   overwrite_existing_output: refuse
   overwrite_or_append_existing_evidence_directory: refuse
   runner_gate: >
@@ -73,12 +80,14 @@ execution:
     consumable_by_executable_workflow true, document_status
     APPROVED_FOR_SCIENTIFIC_EXECUTION, execution.authorised true, and an
     active scientific_execution_authorisation block whose output directory
-    is the only accepted output path. Those execution gates are closed.
-    The single invocation has been consumed. This configuration does not
-    authorize another run. evidence_directory_created_by_this_stage records
-    that the completed authorized invocation created the evidence directory.
-    That record does not authorize another run. It does not claim success
-    and does not complete M4.
+    is the only accepted output path. Those execution gates are open for
+    one corrected-manifest reproducibility run. The first authorization is
+    archived, revoked, and consumed. It cannot be executed again.
+    evidence_directory_created_by_this_stage refers to the completed first
+    invocation. That record does not mean the newly authorized attempt-2
+    directory has been created. The attempt-2 directory has not been
+    created. This authorization does not claim success and does not
+    complete M4.
   manifest_serialization: >
     Deterministic UTF-8 JSON. Declared key order. Compact separators comma
     and colon. ensure_ascii false. No spaces outside strings. No BOM. No
@@ -87,35 +96,78 @@ execution:
     nulls with status UNKNOWN_UNTIL_RUN only when a field is genuinely
     unavailable. A completed run must record observed values for fields it
     can observe. The corrected implementation writes a manifest only after
-    the execution gate passes. This configuration does not pass that gate.
-    The completed invocation is recorded below without scientific acceptance.
-    This revocation does not rewrite the manifest, does not claim success,
-    and does not complete M4.
+    the execution gate passes. This configuration passes that gate for one
+    corrected-manifest reproducibility run. The completed first invocation
+    is recorded below without scientific acceptance. This authorization
+    does not rewrite the first-run manifest, does not claim success, and
+    does not complete M4.
+
+prior_scientific_execution_authorisations:
+  - authorisation_id: m4_b2_empirical_null_2d9ec89_attempt1
+    authorisation_active: false
+    activation_status: revoked_after_completed_single_invocation
+    activation_recorded_timestamp: "2026-09-29T18:18:04+10:00"
+    revocation_recorded_timestamp: "2026-09-29T18:40:21+10:00"
+    single_invocation_consumed: true
+    reuse_of_same_authorisation_prohibited: true
+    reuse_of_same_output_directory_prohibited: true
+    intended_scope_approval: >
+      Laura Hardy approved this one-run scope on 29 September 2026. That
+      approval authorized the now-consumed CPU-only B2 invocation at the named
+      output directory. The executing implementation commit was
+      70f950434501964dd179760aa4fc82766df74289. The authorization is revoked.
+      It does not claim that the run succeeded and does not complete M4.
+    approved_by: Laura Hardy
+    approval_date: 29 September 2026
+    approval_recorded_timestamp: "2026-09-29T17:29:06+10:00"
+    approval_source: explicit human approval in the M4 review chat
+    scope: one CPU-only B2 empirical-null run
+    executing_implementation_commit: 70f950434501964dd179760aa4fc82766df74289
+    branch: main
+    condition: B2_train_matched_empirical_null
+    output_directory: /home/laura/rnagenesis-mres-runs/m4_b2_empirical_null_2d9ec89_attempt1
+    train_text_path: /home/laura/rnagenesis-mres-data/development/corpus_final.txt
+    train_text_sha256: d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d
+    expected_records: 669
+    expected_unique_records: 669
+    alphabet: "^[ACGU]+$"
+    raw_attempt_count: 30000
+    seed: 42
+    rng: numpy.random.default_rng
+    device: CPU only
+    gpu_use: prohibited
+    model_loading: prohibited
+    ref_access: prohibited
+    eval_access: prohibited
+    overwrite_or_append: prohibited
+    single_run_only: true
+    revoke_after_completed_or_failed_invocation: true
+    second_attempt_requires_new_directory_and_new_human_authorisation: true
+    success_claimed: false
+    m4_complete: false
 
 scientific_execution_authorisation:
-  authorisation_id: m4_b2_empirical_null_2d9ec89_attempt1
-  authorisation_active: false
-  activation_status: revoked_after_completed_single_invocation
-  activation_recorded_timestamp: "2026-09-29T18:18:04+10:00"
-  revocation_recorded_timestamp: "2026-09-29T18:40:21+10:00"
-  single_invocation_consumed: true
-  reuse_of_same_authorisation_prohibited: true
-  reuse_of_same_output_directory_prohibited: true
+  authorisation_id: m4_b2_empirical_null_6f82878_attempt2
+  authorisation_active: true
+  activation_status: active_single_run
+  activation_recorded_timestamp: "2026-09-29T22:43:52+10:00"
   intended_scope_approval: >
     Laura Hardy approved this one-run scope on 29 September 2026. That
-    approval authorized the now-consumed CPU-only B2 invocation at the named
-    output directory. The executing implementation commit was
-    70f950434501964dd179760aa4fc82766df74289. The authorization is revoked.
-    It does not claim that the run succeeded and does not complete M4.
+    approval authorizes one CPU-only corrected-manifest B2 reproducibility
+    run at the named output directory. The executing implementation commit
+    is 6f82878a7bbde78c74f91181c672d2d4df74b5cc. Seed 42 is deliberately
+    reused to test deterministic reproduction of the first run. This is not
+    an additional stochastic seed or independent replicate. It does not
+    claim that the run succeeded and does not complete M4.
   approved_by: Laura Hardy
   approval_date: 29 September 2026
-  approval_recorded_timestamp: "2026-09-29T17:29:06+10:00"
-  approval_source: explicit human approval in the M4 review chat
-  scope: one CPU-only B2 empirical-null run
-  executing_implementation_commit: 70f950434501964dd179760aa4fc82766df74289
+  approval_recorded_timestamp: "2026-09-29T22:43:52+10:00"
+  approval_source: explicit human decision in the M4 review chat to fix the manifest and perform a new run
+  scope: one CPU-only corrected-manifest B2 reproducibility run
+  executing_implementation_commit: 6f82878a7bbde78c74f91181c672d2d4df74b5cc
   branch: main
   condition: B2_train_matched_empirical_null
-  output_directory: /home/laura/rnagenesis-mres-runs/m4_b2_empirical_null_2d9ec89_attempt1
+  output_directory: /home/laura/rnagenesis-mres-runs/m4_b2_empirical_null_6f82878_attempt2
   train_text_path: /home/laura/rnagenesis-mres-data/development/corpus_final.txt
   train_text_sha256: d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d
   expected_records: 669
@@ -135,6 +187,21 @@ scientific_execution_authorisation:
   second_attempt_requires_new_directory_and_new_human_authorisation: true
   success_claimed: false
   m4_complete: false
+
+reproducibility_comparison:
+  seed: 42
+  seed_reuse_meaning: >
+    Seed 42 is deliberately reused to test deterministic reproduction of
+    the first run. This is not an additional stochastic seed or independent
+    replicate.
+  expected_prior_raw_sha256: bbe35f448db0d7fc02ad0156865798382b0b41e9ad047b4e52eddf7cff740c83
+  decision_rule: >
+    The new raw output must match this hash exactly. Otherwise stop without
+    accepting either run as the corrected final evidence.
+  new_manifest_hash_expected_to_differ: true
+  new_manifest_hash_difference_reason: >
+    The new manifest hash is expected to differ because its schema and
+    authorization provenance are corrected.
 
 completed_invocation:
   invocation_status: completed_exit_0
@@ -421,9 +488,10 @@ existing_script_gap:
   execution_authorised: false
   execution_authorised_scope: >
     False here records that Stage 2A did not itself authorise the biological
-    run. The scientific_execution_authorisation block is revoked after the
-    completed single invocation. This configuration does not authorize
-    another run. It does not claim success and does not complete M4.
+    run. The first scientific_execution_authorisation is archived as revoked
+    after its completed single invocation and is not reactivated. The active
+    authorization is a separate corrected-manifest reproducibility run. It
+    does not claim success and does not complete M4.
   stage_2a_scope: implementation_and_synthetic_tests_only
   retains_statistical_design:
     - numpy.random.default_rng
