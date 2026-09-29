@@ -1,8 +1,8 @@
 # AptaRank + RNAGenesis MRes Thesis Evaluation — Supervisor-Scoped FINAL Plan
 
 **Project:** Towards prediction-guided generative design of RNA aptamers against carbapenemase targets  
-**Document version:** 2.6  
-**Revision date:** 28 September 2026  
+**Document version:** 2.7\
+**Revision date:** 29 September 2026\
 **Status:** FINAL — approved MRes evaluation execution plan incorporating supervisor scope control  
 **Evaluation execution budget:** Approximately one week: five working days, separate from the camera-ready day.  
 **Broader thesis completion:** Approximately six weeks.  
@@ -13,7 +13,9 @@
 
 > **Corrected corpus closure — 2026-09-25.** The S7D corrective pass is complete and frozen. Current authority is the corrected `corpus_report.md` plus `rna_aptamer_corpus_curation_plan.md` v1.6. Corrective closure commit: `10aac629bb0ef0337107c3d628b23e1897962af9`. Documentation handoff commit: `05616cf82c3c7c1adbe87f631590f456c44c946a`. Superseded corpus commit `095236dfb13d1d3b13f11bbb34c2e48319c10184` is historical only and must not be used as the modelling/evaluation contract. Corpus closure does not assert that fine-tuning, deployment verification, calibration or evaluation runs are complete.
 
-> **v2.5 supersession.** This revision supersedes v2.4 where scope differs. It narrows required evaluation to generator-level held-out EVAL plus core Tier 1; makes Tier 2, downstream application, B0 and NDM1-REF contingent; makes NDM-1 the only downstream application target; moves the two related carbapenemases to one optional cross-target stress test; and updates NDM1-REF to the verified 10-record panel already present in `evaluation_references.csv`. All corrected S7D facts, hashes, role separation, leakage safeguards, Tier 1 definitions, generator-EVAL logic, reproducibility requirements and scientific claim boundaries remain in force.
+> **v2.7 seed-contract clarification.** This revision does not alter the M4 implementation or regenerate any pool. It aligns evaluation with the implemented seed roles: D1 training seeds are the independent model-training replicates; B1 Phase A and Phase B seeds are paired protocol/length-control seeds rather than independent replicates; the limited B1/D1 comparison uses a shared, deterministic generation-chunk schedule; B2 is a single-seed null pool; and B0 retains historical provenance only. Seed-aware inference is permitted only where the design supplies genuine training replication or an actual matched B1/D1 chunk comparison.
+
+> **v2.5 supersession.** The v2.5 revision superseded v2.4 where scope differed. It narrowed required evaluation to generator-level held-out EVAL plus core Tier 1; made Tier 2, downstream application, B0 and NDM1-REF contingent; made NDM-1 the only downstream application target; moved the two related carbapenemases to one optional cross-target stress test; and updated NDM1-REF to the verified 10-record panel already present in `evaluation_references.csv`. All corrected S7D facts, hashes, role separation, leakage safeguards, Tier 1 definitions, generator-EVAL logic, reproducibility requirements and scientific claim boundaries remain in force.
 
 ## 1. Governing priority and completion hierarchy
 
@@ -134,10 +136,10 @@ The frozen primary corpus retains E2-E4. The formal E2 > E3 > E4 order is proven
 
 | Analysis | Observation | Dependence preserved |
 |---|---|---|
-| Final generator EVAL | Frozen generated-pool distributions compared with unique EVAL cores | Training/generation-seed blocks; EVAL clusters where the frozen procedure resamples the reference |
+| Final generator EVAL | Frozen generated-pool distributions compared with unique EVAL cores | Independent D1 training-seed blocks where available; actual matched B1/D1 generation-chunk blocks where applicable; length strata; EVAL clusters where the frozen procedure resamples the reference |
 | Tier 1 EVAL | One unique sequence core | Frozen sequence cluster and its paired control |
 | Contingent Tier 2 EVAL | One unique core x canonical-target cognate relation | Sequence cluster, including multiple targets of one core |
-| Generated conditions | Candidate within a frozen generation pool | Training/generation-seed blocks; candidates are not training replicates |
+| Generated conditions | Candidate within a frozen generation pool | D1 training-seed membership and actual matched B1/D1 generation-chunk provenance; candidates, length-specific seeds and batches are not training replicates |
 | NDM1-REF | Frozen D1 candidate x approved reference | Descriptive repeated pairs only; no hypothesis test |
 
 ## 4. M6 scope lock, prerequisites and unlock sequence
@@ -170,15 +172,25 @@ The M6 decision is based on feasibility, never observed EVAL or condition perfor
 
 Three D1 training seeds are preferred, not mandatory. Freeze the achieved/feasible count at M6 and M9A before result inspection. Do not sacrifice thesis completion or writing quality solely to obtain three seeds. With one or two independent D1 training seeds, report that uncertainty is limited and, with one seed, does not include training-run variability.
 
-Keep B1/B2/D1 generation effort reasonably symmetric. A design such as 90,000 D1 outputs versus 30,000 for B1 and B2 requires a strong methodological reason approved before results. Where pool sizes differ, use a fixed equal-size primary analysis sample across B1/B2/D1 and report full-pool attempted/parsed/valid/unique accounting separately. Preserve generation-seed provenance and never choose favourable seeds. Add no further null condition.
+The frozen M4 implementation distinguishes the following seed roles and is not changed by this evaluation plan:
+
+- **B1 Phase A protocol seeds:** `41000`-`41010` (11 seeds). Each seed is reused across the three candidate length caps for one target length. This is a paired protocol comparison. Because seed and target length are coupled, the 11 seeds are not 11 independent generation replicates.
+- **B1 Phase B length-condition seeds:** `42000`-`42088` (89 seeds), one for each distinct TRAIN length. These preserve deterministic empirical-length generation. Seed is confounded with length and must not be used as an independent replicate or as a basis for between-seed uncertainty.
+- **Limited 1,000-sequence B1/D1 comparison:** `43000` samples the 1,000 target lengths and does not directly generate RNA. Generation uses one seed per batch/chunk, starting at `44000`, with batches of at most 16. D1 reuses the exact B1 target-length allocation and generation-seed schedule. The final number of chunk seeds and the complete seed-to-condition/length/attempt mapping are frozen after deterministic batching and before condition results are inspected. Shared chunk IDs may support paired B1-D1 summaries, but chunks are not biological or training replicates.
+- **B2 null generation:** one NumPy sequence-generation seed, `42`. B2 therefore supplies no between-generation-seed variability; its single-seed limitation is reported descriptively.
+- **B0 existing pool:** historical seeds `4201`-`4210`. B0 is not regenerated and its seeds provide provenance only.
+
+Before the limited-pool batch schedule is constructed, M4 therefore has 101 fixed new sequence-generation seeds: 11 Phase A seeds, 89 Phase B seeds and one B2 seed. The length-sampling seed `43000` is separate. Neither the count of 101 nor the later number of `44000+` chunk seeds is a count of independent model or biological replicates. Training, length-sampling, length-condition, generation-chunk and downstream analysis seeds remain separate manifest fields even where numerical values happen to coincide.
+
+Keep B1/B2/D1 generation effort reasonably symmetric. The primary D1 generation budget is 30,000 raw attempts in total across the retained D1 training-seed checkpoints, allocated as evenly as practicable; it is not 30,000 attempts per checkpoint. A design such as 90,000 D1 outputs versus 30,000 for B1 and B2 requires a strong methodological reason approved before results. Where pool sizes differ, use a fixed equal-size primary analysis sample across B1/B2/D1 and report full-pool attempted/parsed/valid/unique accounting separately. Preserve all seed-role provenance and never choose favourable training seeds, generation seeds or chunks. Add no further null condition.
 
 ### 4.3 Required readiness before the five-day clock
 
 - Corrected source files and hashes in Section 3 are available and verified.
 - M6 is signed and identifies every contingent workstream retained or deferred.
 - M9A has frozen checkpoints, feasible D1 seed count, generation settings, cleaning, pool manifests and generator-evaluation code.
-- B1/B2/D1 pools contain attempted/parsed/valid/unique accounting and training/generation-seed provenance. Any B0 pool is separate and optional.
-- The generator suite, `generator_eval_metric_spec`, loaders, synthetic fixtures and seed-aware summaries are implemented and tested without EVAL access.
+- B1/B2/D1 pools contain attempted/parsed/valid/unique accounting and separate training-seed, length-sampling, length-condition and generation-chunk provenance as applicable. Any B0 pool is separate and optional.
+- The generator suite, `generator_eval_metric_spec`, loaders, synthetic fixtures and design-aware summaries are implemented and tested without EVAL access.
 - Tier 1 deployment/preset, REF workflow, export schema, runtime and recovery are verified on non-EVAL inputs.
 - If retained at M6, the small Tier 2 panel rule and direction-known raw-score definition are frozen; no new control-bank engineering is a prerequisite.
 - If retained at M6, one NDM-1 target configuration is frozen from independent structural sources before condition results.
@@ -205,7 +217,7 @@ This is the highest-priority experiment and cannot be replaced by AptaRank. Afte
 
 B0 is external/descriptive and only appears if already available and its length regime permits a meaningful length-aware comparison. B0 is not required for completion and is not pooled with the controlled B1/D1 analysis.
 
-The generator analysis uses its predeclared equal-size primary samples, not the AptaRank N=200 sample or a Tier 1-selected shortlist. Preserve pool/sample policy, metric-specific denominators, length allocation, cleaning, checkpoint hashes and training/generation seeds. Do not regenerate pools, choose seeds or alter representations after unlock.
+The generator analysis uses its predeclared equal-size primary samples, not the AptaRank N=200 sample or a Tier 1-selected shortlist. Preserve pool/sample policy, metric-specific denominators, length allocation, cleaning, checkpoint hashes and the distinct training, length-sampling, length-condition and generation-chunk seed roles. Do not regenerate pools, choose seeds or alter representations after unlock.
 
 ### 5.2 Frozen outputs
 
@@ -216,7 +228,7 @@ The generator analysis uses its predeclared equal-size primary samples, not the 
 | Sequence distributions | Length, nucleotide fractions, GC and any other already implemented core descriptors such as mono-/dinucleotide frequencies |
 | Structure/thermodynamics | Normalized MFE, paired fraction and other predeclared frozen descriptors using pinned settings; more negative MFE is not inherently better or evidence of binding |
 | Diversity/mode collapse | Existing cluster, singleton, largest-cluster, Shannon/effective-cluster and structural-diversity summaries only where already implemented |
-| Seed-level reporting | Per-training/per-generation-seed values, B1-D1 effects and frozen seed-aware uncertainty; B2 as context |
+| Seed/design-level reporting | Per-D1-training-seed values where more than one training run exists; matched B1-D1 generation-chunk effects where applicable; length-stratified summaries; B2 as single-seed context; explicit limits on uncertainty |
 
 Include one frozen-representation distance to EVAL only if already implemented, stable and frozen by M6/M9C. Otherwise record its pre-unlock deferral; it is non-blocking. Build no new representation model or metric during evaluation week.
 
@@ -237,7 +249,9 @@ Report each metric separately. Do not create an aggregate generator-quality scor
 
 ### 5.4 Statistical framing
 
-Use the frozen seed-aware procedure, preserving genuine training/generation blocks and any actual matched-seed design. Do not treat tens of thousands of generated sequences as independent biological replicates or rely on tiny raw-N p-values. Report seed-level values/ranges and interval limitations. With one D1 training seed, state explicitly that training-run variability is not represented. No new hierarchical model is required.
+Use the frozen design-aware procedure, preserving independent D1 training-seed blocks and the actual matched B1/D1 `44000+` generation-chunk design where applicable. Condition on or stratify by target length for length-sensitive metrics. Do not use B1 Phase A seeds, B1 Phase B length-condition seeds, B2's single seed, batch count or individual generated sequences as independent training or biological replicates. Phase A cap comparisons remain paired within target length; Phase B seed summaries remain descriptive because seed and length are coupled; B2 has no between-generation-seed uncertainty. Matched chunk summaries estimate within-schedule B1-D1 differences but do not measure training-run variability.
+
+Do not treat tens of thousands of generated sequences as independent biological replicates or rely on tiny raw-N p-values. Report training-seed values/ranges where available, matched-chunk summaries where applicable and all interval limitations. With one D1 training seed, state explicitly that training-run variability is not represented; with two, report the observed range and limited precision rather than implying a well-estimated training-seed distribution. No new hierarchical model is required.
 
 The permitted conclusion is about generated-distribution movement toward held-out aptamer-domain characteristics. It is not evidence of binding, affinity, selectivity, biological function or carbapenemase-specific generation.
 
@@ -349,9 +363,9 @@ Cross-tier Spearman is optional and exists only if Tier 2 ran. It is a redundanc
 | D1 | Curated-aptamer diffusion-adapted RNAGenesis | Adapted condition |
 | B0 | Released aptamer-adapted RNAGenesis | Optional external comparator; different 37-nt maximum/output regime |
 
-B1 versus D1 is primary; B2 is supporting. Add no null. If generated-condition Tier 1 was retained at M6 and core work is secure, use a blinded combined B1/B2/D1 upload. Default N is 200 valid unique candidates per condition; score-blind runtime fallbacks are 150, then 100. Keep equal N across B1/B2/D1, balance D1 across available training seeds as practicable, preserve generation-seed provenance and use deterministic sampling without replacement from frozen pools.
+B1 versus D1 is primary; B2 is supporting. Add no null. If generated-condition Tier 1 was retained at M6 and core work is secure, use a blinded combined B1/B2/D1 upload. Default N is 200 valid unique candidates per condition; score-blind runtime fallbacks are 150, then 100. Keep equal N across B1/B2/D1, balance D1 across available training seeds as practicable, preserve all generation-chunk and length provenance, and use deterministic sampling without replacement from frozen pools. Balance refers to independent D1 training-seed membership, not to Phase A/Phase B seed IDs; retain matched B1/D1 chunk representation where practicable without overriding equal condition N or score-blind sampling.
 
-Report full Tier 1 distributions, N/exclusions, median/IQR, shuffle-pass n/N, B1-D1 effects, B2 context and seed-level summaries/limitations. This is complementary computational prioritisation evidence, not independent biological confirmation or a substitute for held-out generator EVAL.
+Report full Tier 1 distributions, N/exclusions, median/IQR, shuffle-pass n/N, B1-D1 effects, B2 context and design-appropriate training-seed/matched-chunk summaries and limitations. This is complementary computational prioritisation evidence, not independent biological confirmation or a substitute for held-out generator EVAL.
 
 B0 Tier 1 runs only after generator EVAL and Tier 1 EVAL are secure and time remains. Run and report it separately because of the different length regime. B0 Tier 2 is not required. If deferred, state that it was omitted for scope/time and that B1 versus D1 is the primary controlled comparison.
 
@@ -368,7 +382,7 @@ shuffle filter   = none; shuffle pass remains an annotation
 
 Where possible, combine B1/B2/D1 into one blinded NDM-1 target-batched job. Deduplicate identical sequences only while retaining every condition membership in the private key. B1 versus D1 is primary; B2 is supporting. Use one independently frozen NDM-1 structure/chain/mode/site and the same score basis as any Tier 2 evaluation. If the configuration is invalid or unavailable, report that limitation and do not substitute another target or launch a new configuration search.
 
-Report selected/scored/failed N, score distributions, D1 seed representation, B1-D1 effects and B2 context. Use percentile bands or joint regions only when Section 8.1 permits them; otherwise report raw same-mode scores. Failures remain in the denominators and are not replaced by lower-ranked candidates. Label any D1 output **computationally prioritised candidates for future experimental validation**, not predicted binders.
+Report selected/scored/failed N, score distributions, D1 training-seed representation, B1-D1 effects and B2 context. Use percentile bands or joint regions only when Section 8.1 permits them; otherwise report raw same-mode scores. Failures remain in the denominators and are not replaced by lower-ranked candidates. Label any D1 output **computationally prioritised candidates for future experimental validation**, not predicted binders.
 
 ### 9.3 Optional related-carbapenemase cross-target stress test
 
@@ -459,7 +473,7 @@ Protect writing time throughout, especially Days 3 and 5. The next contingent st
 ## 12. The only thesis-evaluation completion blockers
 
 1. **Frozen role/hash/model/evaluation contract and clean EVAL unlock**, including M6, M9A-M9C and immutable source/derived hashes.
-2. **Final generator-level B1/B2/D1-versus-EVAL evaluation**, with output accounting, validity, TRAIN overlap/novelty, sequence/structure distributions, diversity, predeclared metric directions, seed-aware interpretation and honest reduced-seed limitations.
+2. **Final generator-level B1/B2/D1-versus-EVAL evaluation**, with output accounting, validity, TRAIN overlap/novelty, sequence/structure distributions, diversity, predeclared metric directions, design-aware interpretation and honest reduced-training-seed limitations.
 3. **Final REF-calibrated Tier 1 EVAL**, using 154 unique EVAL cores, 154 exact-length controls, the 308-row blinded input, full distributions, paired effects, descriptive AUROC, shuffle-pass rates, cluster-aware CIs and one secondary paired test.
 4. **Reproducible code/manifests/outputs plus thesis-ready analysis and interpretation** of those core results.
 
@@ -477,13 +491,13 @@ Technical failure or unavailable evidence is reported as a limitation or uncompl
 
 ### 13.1 Canonical checks
 
-Retain condition/pool/checkpoint identity, attempted/parsed/valid/unique accounting, training/generation seeds, metric denominators, EVAL/reference hashes and frozen code/configuration for generator results. Check every result against its `generator_eval_metric_spec` row.
+Retain condition/pool/checkpoint identity, attempted/parsed/valid/unique accounting, separate training/length-sampling/length-condition/generation-chunk seed fields, metric denominators, EVAL/reference hashes and frozen code/configuration for generator results. Check every result against its `generator_eval_metric_spec` row.
 
 Minimum Tier 1 fields are opaque ID/run, local pair/group/core/cluster/length, accepted/rejected and reason, five raw/component scores, Tier 1 score, shuffle count/exceedance/p-value/pass, preset/seed, reference artefact hash and deployment.
 
 For any contingent Tier 2 run, retain opaque ID/run, core/cluster/cognate relation, target/configuration/mode, raw score, optional percentile/band, score-basis status, bank evidence, target/reference hashes, accepted/failed status and reason.
 
-Before unblinding, synthetic fixtures must verify shuffled-row joins, duplicates, missing/failed rows, paired controls, multi-core clusters, effect/AUROC direction, zero/all shuffle-pass cases, seeded cluster resampling, seed-balanced sampling, runtime-cap determinism and conditional absence of percentiles. For Tier 2 only if run, also verify variable-K concordance/rank/ties and mode separation. Validate schemas/ranges/keys automatically, spot-check at least five representative rows against UI artefacts, and execute the final analysis cleanly from immutable inputs.
+Before unblinding, synthetic fixtures must verify shuffled-row joins, duplicates, missing/failed rows, paired controls, multi-core clusters, effect/AUROC direction, zero/all shuffle-pass cases, seeded cluster resampling, D1-training-seed-balanced sampling, matched B1/D1 chunk handling, runtime-cap determinism and conditional absence of percentiles. For Tier 2 only if run, also verify variable-K concordance/rank/ties and mode separation. Validate schemas/ranges/keys automatically, spot-check at least five representative rows against UI artefacts, and execute the final analysis cleanly from immutable inputs.
 
 For NDM1-REF if run, verify the exact 10 source IDs, analysis roles, molecule types, lengths, N x 10 accounting, shortlist order/hash, original-sequence preservation and exclusion of the four named controls.
 
@@ -503,17 +517,17 @@ Never overwrite exports. A rerun receives a new ID and retains the failed/origin
 
 ### 13.3 Statistics and provenance
 
-Use effect sizes and 95% intervals before p-values. Do not treat generated sequences or target-score cells as independent experimental replicates. Freeze analysis seeds and explicit denominators; report undefined or unstable intervals honestly.
+Use effect sizes and 95% intervals before p-values. Do not treat generated sequences, target-score cells, length-condition seeds or generation chunks as independent model-training or biological replicates. Freeze analysis seeds and explicit denominators; report undefined or unstable intervals honestly. Use D1 training seeds for training-run variation, matched B1/D1 chunks only for paired within-schedule summaries, and EVAL clusters where the frozen reference-resampling procedure requires them.
 
 Every final number maps to normalized-input hashes, source run/raw hashes or local-analysis hashes, inclusion filter, statistic/CI method, code/environment revision and output hash. Preserve role, checkpoint, pool/sample, calibration, target, scoring-basis, shortlist and NDM1-REF view/freeze/access/result manifests as applicable.
 
-Three D1 training seeds are preferred but not mandatory. Seed count is frozen before results; reduced-seed limitations are explicit. Primary B1/B2/D1 samples are equal-size where possible, and asymmetric full pools are separately accounted for with pre-result justification.
+Three D1 training seeds are preferred but not mandatory. Training-seed count is frozen before results; reduced-training-seed limitations are explicit. The M4 generation schedule remains fixed and its seed counts are not presented as replicate counts. Primary B1/B2/D1 samples are equal-size where possible, D1's 30,000-attempt budget is aggregate across its retained training checkpoints, and asymmetric full pools are separately accounted for with pre-result justification.
 
 ## 14. Thesis write-up
 
 ### 14.1 Guaranteed Results subsections
 
-1. **Final generator-level held-out evaluation.** Report B1-D1 comparisons with EVAL, B2 context, output accounting, TRAIN overlap/novelty, sequence and structure distributions, diversity, seed-level results and uncertainty limitations. Report closeness metrics individually, mixed results as mixed, and validity/novelty/diversity as separate guardrails/outcomes. Include B0 only as optional external length-aware context if executed.
+1. **Final generator-level held-out evaluation.** Report B1-D1 comparisons with EVAL, B2 context, output accounting, TRAIN overlap/novelty, sequence and structure distributions, diversity, design-appropriate training-seed/matched-chunk results and uncertainty limitations. Report closeness metrics individually, mixed results as mixed, and validity/novelty/diversity as separate guardrails/outcomes. Include B0 only as optional external length-aware context if executed.
 2. **AptaRank Tier 1 held-out evaluation.** Report the corrected REF calibration, blinded EVAL/control flow, full distributions, paired effect, descriptive AUROC, shuffle-pass rates, cluster-aware CIs, secondary paired test and compact component summary.
 
 ### 14.2 Conditional subsections only when executed
@@ -538,12 +552,14 @@ For NDM1-REF, state that the 10 references are small and heterogeneous; RNA simi
 
 ## 15. Source basis and finality
 
-This v2.6 FINAL revision uses the supervisor-scoped v2.5 plan as its authoritative base. Current corpus authority remains corrected S7D `corpus_report.md` (closure state 2026-09-25) plus `rna_aptamer_corpus_curation_plan.md` v1.6, with closure `10aac629bb0ef0337107c3d628b23e1897962af9` and documentation handoff `05616cf82c3c7c1adbe87f631590f456c44c946a`. Historical values in earlier plans are not execution authority.
+This v2.7 FINAL revision uses the supervisor-scoped v2.6 plan as its authoritative base. Current corpus authority remains corrected S7D `corpus_report.md` (closure state 2026-09-25) plus `rna_aptamer_corpus_curation_plan.md` v1.6, with closure `10aac629bb0ef0337107c3d628b23e1897962af9` and documentation handoff `05616cf82c3c7c1adbe87f631590f456c44c946a`. Historical values in earlier plans are not execution authority.
 
 The 10 NDM-1 reference records are selected from the frozen **35-row** `evaluation_references.csv` identified by SHA-256 `b6ba6b2cde4a18c04130ecdc457626c5e60b8b90d3ad5b9bae6cb1bfd1f77dad`. The approved view replaces the obsolete separate three-ssDNA scientific dataset concept; it does not duplicate or alter the source rows. Dedicated provenance about the three ssDNA records, including the accepted CN102 88-nt listing and APNV cross-reactivity, remains applicable. The RNA panel adds D902, D907, D909, D913, D914, D918 and D920 under the analysis roles and evidence cautions in Section 10.
 
 The established five-component Tier 1 score, candidate-specific dinucleotide shuffle check, REF-to-EVAL separation, similarity-cluster dependence, immutable exports, leakage firewall and Tier 1 ranking with optional Tier 2 annotation are preserved. The companion FINAL v2.4 camera-ready workflow continues to govern its separate one-day publication analysis.
 
 **v2.6 finality note.** This revision makes only two approved clarifications to v2.5: it orders generated-condition Tier 1 before the dependent NDM-1 downstream application in Priority 2, and it records an explicit M6 feasibility decision for the 2 October modelling/evaluation target so scope is reduced before EVAL access rather than by compressing thesis writing.
+
+**v2.7 finality note.** This revision leaves the M4 implementation unchanged and aligns evaluation with its fixed seed behaviour. It separates D1 training seeds from protocol, length-sampling, length-condition, generation-chunk, B2 and historical B0 seeds; confines seed-aware inference to genuine training replication and actual matched B1/D1 chunks; records that the fixed M4 seed counts are not replicate counts; and makes the symmetric 30,000-attempt D1 budget aggregate across retained training checkpoints.
 
 This document is the FINAL governing MRes evaluation execution plan. It defines what must be completed, what may be added, and what is cut first. Neither corpus closure nor this documentation revision asserts that fine-tuning, deployment verification, calibration or evaluation runs have been completed.
