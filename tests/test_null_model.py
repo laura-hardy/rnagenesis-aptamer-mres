@@ -460,12 +460,21 @@ AUTHORISATION_TEST_SIBLING = (
 ONE_RUN_AUTHORISATION = {
     "authorisation_id": "m4_b2_empirical_null_2d9ec89_attempt1",
     "authorisation_active": True,
+    "activation_status": "active_single_run",
+    "activation_recorded_timestamp": "2026-09-29T18:18:04+10:00",
+    "intended_scope_approval": (
+        "Laura Hardy approved this one-run scope on 29 September 2026. "
+        "This configuration authorizes exactly one CPU-only B2 run at the named "
+        "output directory. The executing implementation commit is "
+        "70f950434501964dd179760aa4fc82766df74289. It does not claim that the "
+        "run succeeded and does not complete M4.\n"
+    ),
     "approved_by": "Laura Hardy",
     "approval_date": "29 September 2026",
     "approval_recorded_timestamp": "2026-09-29T17:29:06+10:00",
     "approval_source": "explicit human approval in the M4 review chat",
     "scope": "one CPU-only B2 empirical-null run",
-    "executing_implementation_commit": "2d9ec8985cf6c21617a771f3df89dcbb345f2e2f",
+    "executing_implementation_commit": "70f950434501964dd179760aa4fc82766df74289",
     "branch": "main",
     "condition": "B2_train_matched_empirical_null",
     "output_directory": ONE_RUN_OUTPUT_DIRECTORY,
@@ -949,7 +958,7 @@ class OutputConfigAndManifestTests(unittest.TestCase):
             self.assertEqual(block["gpu_use"], "prohibited")
             self.assertEqual(
                 block["executing_implementation_commit"],
-                "2d9ec8985cf6c21617a771f3df89dcbb345f2e2f",
+                "70f950434501964dd179760aa4fc82766df74289",
             )
         else:
             self.assertIs(_gates_are_closed(loaded), True)

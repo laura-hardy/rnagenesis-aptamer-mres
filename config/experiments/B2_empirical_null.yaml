@@ -1,18 +1,18 @@
-# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
-# This file must not be consumed by an executable workflow.
-# Stage 2A may harden scripts/null_model.py. Do not run it on biological data.
-# scientific_execution_authorisation records the intended one-run scope only.
-# Laura Hardy approved that intended scope. Activation is deferred until the
-# corrected implementation is committed, pushed, reviewed, and bound to its
-# resulting commit. This record does not authorise execution, does not claim
-# that a run succeeded, and does not complete M4. Do not load a model, use a
-# GPU, or open REF or EVAL.
+# APPROVED_FOR_SCIENTIFIC_EXECUTION
+# This configuration authorizes exactly one CPU-only B2 run at the named
+# output directory. scientific_execution_authorisation is the active
+# single-run authorization. Laura Hardy approved that scope on 29 September
+# 2026. The executing implementation commit is
+# 70f950434501964dd179760aa4fc82766df74289. This record does not claim that
+# a run succeeded and does not complete M4. GPU use, model loading, REF
+# access, and EVAL access remain prohibited.
 
-document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
-consumable_by_executable_workflow: false
+document_status: APPROVED_FOR_SCIENTIFIC_EXECUTION
+consumable_by_executable_workflow: true
 # human_approval is the Stage 1 implementation approval. That approval did
-# not approve scientific execution. scientific_execution_authorisation below
-# is an inactive record of the intended one-run scope.
+# not approve scientific execution. The active single-run authorization is
+# scientific_execution_authorisation below. It authorizes exactly one
+# CPU-only B2 run at the named output directory.
 human_approval:
   approving_person: Laura Hardy
   approval_date: 29 September 2026
@@ -51,25 +51,26 @@ stage_2a_correction:
     arguments could replace the repository configuration authority.
   corrected_implementation: under_review
   note: >
-    A corrected implementation is under review. This record is not a
-    success claim and does not authorise a biological run.
+    This Stage 2A correction record is not a success claim and does not
+    complete M4. The active scientific_execution_authorisation block
+    authorizes exactly one CPU-only B2 run at the named output directory.
 
 execution:
-  authorised: false
+  authorised: true
   evidence_directory_created_by_this_stage: false
   overwrite_existing_output: refuse
   overwrite_or_append_existing_evidence_directory: refuse
   runner_gate: >
-    scripts/null_model.py must refuse execution while
-    consumable_by_executable_workflow is false. It must also refuse while
-    document_status is APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION.
-    A future scientific run requires consumable_by_executable_workflow true,
-    document_status APPROVED_FOR_SCIENTIFIC_EXECUTION, execution.authorised
-    true, and an active scientific_execution_authorisation block whose
-    output directory is the only accepted output path. This configuration
-    sets none of those execution signals. The authorisation block is
-    inactive pending the corrected implementation. It does not authorise
-    execution, does not claim success, and does not complete M4.
+    scripts/null_model.py refuses execution while
+    consumable_by_executable_workflow is false or while document_status is
+    APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION. A scientific run requires
+    consumable_by_executable_workflow true, document_status
+    APPROVED_FOR_SCIENTIFIC_EXECUTION, execution.authorised true, and an
+    active scientific_execution_authorisation block whose output directory
+    is the only accepted output path. This configuration sets those
+    execution signals. It authorizes exactly one CPU-only B2 run at the
+    named output directory. It does not claim success and does not complete
+    M4.
   manifest_serialization: >
     Deterministic UTF-8 JSON. Declared key order. Compact separators comma
     and colon. ensure_ascii false. No spaces outside strings. No BOM. No
@@ -78,25 +79,28 @@ execution:
     nulls with status UNKNOWN_UNTIL_RUN only when a field is genuinely
     unavailable. A completed run must record observed values for fields it
     can observe. The corrected implementation writes a manifest only after
-    the execution gate passes. This configuration does not pass that gate,
-    this review does not write a manifest, and this review does not
-    authorise a run.
+    the execution gate passes. This configuration passes that gate and
+    authorizes exactly one CPU-only B2 run at the named output directory.
+    This activation does not write a manifest, does not claim success, and
+    does not complete M4.
 
 scientific_execution_authorisation:
   authorisation_id: m4_b2_empirical_null_2d9ec89_attempt1
-  authorisation_active: false
-  activation_status: inactive_pending_corrected_implementation
+  authorisation_active: true
+  activation_status: active_single_run
+  activation_recorded_timestamp: "2026-09-29T18:18:04+10:00"
   intended_scope_approval: >
-    Laura Hardy approved the intended one-run scope. Activation is deferred
-    until the corrected implementation is committed, pushed, reviewed, and
-    bound to its resulting commit. This inactive record does not authorise
-    execution, does not claim that the run succeeded, and does not complete M4.
+    Laura Hardy approved this one-run scope on 29 September 2026. This
+    configuration authorizes exactly one CPU-only B2 run at the named
+    output directory. The executing implementation commit is
+    70f950434501964dd179760aa4fc82766df74289. It does not claim that the
+    run succeeded and does not complete M4.
   approved_by: Laura Hardy
   approval_date: 29 September 2026
   approval_recorded_timestamp: "2026-09-29T17:29:06+10:00"
   approval_source: explicit human approval in the M4 review chat
   scope: one CPU-only B2 empirical-null run
-  executing_implementation_commit: 2d9ec8985cf6c21617a771f3df89dcbb345f2e2f
+  executing_implementation_commit: 70f950434501964dd179760aa4fc82766df74289
   branch: main
   condition: B2_train_matched_empirical_null
   output_directory: /home/laura/rnagenesis-mres-runs/m4_b2_empirical_null_2d9ec89_attempt1
@@ -366,16 +370,16 @@ existing_script_gap:
   modified_by_stage_2a: true
   execution_authorised: false
   execution_authorised_scope: >
-    False here means Stage 2A did not authorise a biological run. The
-    scientific_execution_authorisation block is inactive until a corrected
-    implementation is committed, pushed, reviewed, and bound to its
-    resulting commit. It is not a current execution authorisation.
+    False here records that Stage 2A did not itself authorise the biological
+    run. The scientific_execution_authorisation block is active. This
+    configuration authorizes exactly one CPU-only B2 run at the named
+    output directory. It does not claim success and does not complete M4.
   stage_2a_scope: implementation_and_synthetic_tests_only
   retains_statistical_design:
     - numpy.random.default_rng
     - lengths_sampled_with_replacement
     - independent_nucleotide_draws
-  implemented_for_a_future_authorised_run:
+  implemented_for_the_authorised_run:
     - frozen_hash_check
     - explicit_probability_order
     - float64_probability_validation
