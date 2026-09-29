@@ -448,6 +448,236 @@ def _materialize(root, sequences, attempt_count, seed, mutate_contract=None, exp
     return fixture, payload, digest, run_root
 
 
+ONE_RUN_OUTPUT_DIRECTORY = (
+    "/home/laura/rnagenesis-mres-runs/m4_b2_empirical_null_2d9ec89_attempt1"
+)
+AUTHORISATION_TEST_OUTPUT = (
+    "/home/laura/rnagenesis-mres-runs/m4_b2_authorisation_test_exact_must_not_exist"
+)
+AUTHORISATION_TEST_SIBLING = (
+    "/home/laura/rnagenesis-mres-runs/m4_b2_authorisation_test_sibling_must_not_exist"
+)
+ONE_RUN_AUTHORISATION = {
+    "authorisation_id": "m4_b2_empirical_null_2d9ec89_attempt1",
+    "authorisation_active": True,
+    "approved_by": "Laura Hardy",
+    "approval_date": "29 September 2026",
+    "approval_recorded_timestamp": "2026-09-29T17:29:06+10:00",
+    "approval_source": "explicit human approval in the M4 review chat",
+    "scope": "one CPU-only B2 empirical-null run",
+    "executing_implementation_commit": "2d9ec8985cf6c21617a771f3df89dcbb345f2e2f",
+    "branch": "main",
+    "condition": "B2_train_matched_empirical_null",
+    "output_directory": ONE_RUN_OUTPUT_DIRECTORY,
+    "train_text_path": "/home/laura/rnagenesis-mres-data/development/corpus_final.txt",
+    "train_text_sha256": "d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d",
+    "expected_records": 669,
+    "expected_unique_records": 669,
+    "alphabet": "^[ACGU]+$",
+    "raw_attempt_count": 30000,
+    "seed": 42,
+    "rng": "numpy.random.default_rng",
+    "device": "CPU only",
+    "gpu_use": "prohibited",
+    "model_loading": "prohibited",
+    "ref_access": "prohibited",
+    "eval_access": "prohibited",
+    "overwrite_or_append": "prohibited",
+    "single_run_only": True,
+    "revoke_after_completed_or_failed_invocation": True,
+    "second_attempt_requires_new_directory_and_new_human_authorisation": True,
+    "success_claimed": False,
+    "m4_complete": False,
+}
+
+
+def _repository_b2_config_path():
+    return ROOT / "config" / "experiments" / "B2_empirical_null.yaml"
+
+
+def _load_repository_b2_config():
+    import yaml
+
+    text = _repository_b2_config_path().read_text(encoding="utf-8")
+    loaded = yaml.safe_load(text)
+    if not isinstance(loaded, dict):
+        raise AssertionError("repository B2 configuration root must be a mapping")
+    return loaded, text
+
+
+def _execution_gates(loaded):
+    execution = loaded.get("execution")
+    if not isinstance(execution, dict):
+        return (loaded.get("document_status"), loaded.get("consumable_by_executable_workflow"), None)
+    return (
+        loaded.get("document_status"),
+        loaded.get("consumable_by_executable_workflow"),
+        execution.get("authorised"),
+    )
+
+
+def _gates_are_open(loaded):
+    status, consumable, authorised = _execution_gates(loaded)
+    return (
+        status == "APPROVED_FOR_SCIENTIFIC_EXECUTION"
+        and consumable is True
+        and authorised is True
+    )
+
+
+def _gates_are_closed(loaded):
+    status, consumable, authorised = _execution_gates(loaded)
+    return (
+        status != "APPROVED_FOR_SCIENTIFIC_EXECUTION"
+        and consumable is False
+        and authorised is False
+    )
+
+
+def _non_executable_config():
+    """In-memory configuration that must fail the execution gate."""
+    return {
+        "document_status": "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+        "consumable_by_executable_workflow": False,
+        "execution": {"authorised": False},
+    }
+
+
+def _refuse_biological_read(path_self, real_read, events):
+    text = os.path.normpath(str(path_self))
+    events.append(text)
+    if text.endswith("corpus_final.txt") or "rnagenesis-mres-data" in text:
+        raise AssertionError("biological TRAIN_TEXT was opened")
+    if text == os.path.normpath(ONE_RUN_OUTPUT_DIRECTORY):
+        raise AssertionError("authorised evidence directory was used")
+    return real_read(path_self)
+
+
+def _authorised_production_config(output_directory=AUTHORISATION_TEST_OUTPUT):
+    """In-memory open gate. Independent of the repository B2 file."""
+    block = dict(ONE_RUN_AUTHORISATION)
+    block["authorisation_active"] = True
+    block["output_directory"] = output_directory
+    block["success_claimed"] = False
+    block["m4_complete"] = False
+    return {
+        "document_status": "APPROVED_FOR_SCIENTIFIC_EXECUTION",
+        "consumable_by_executable_workflow": True,
+        "execution": {"authorised": True},
+        "condition_manifest_label": block["condition"],
+        "schema_version": "m4-stage1-draft-1",
+        "experiment_id": "B2_empirical_null_draft",
+        "input": {
+            "expected_development_path": block["train_text_path"],
+            "expected_sha256": block["train_text_sha256"],
+            "expected_sequence_count": block["expected_records"],
+            "expected_unique_count": block["expected_unique_records"],
+            "alphabet": block["alphabet"],
+        },
+        "sampler": {
+            "seed": block["seed"],
+            "proposed_seed": block["seed"],
+            "raw_sequence_count": block["raw_attempt_count"],
+            "numpy_generator": block["rng"],
+        },
+        "scientific_execution_authorisation": block,
+    }
+
+
+def _invoke_guarded_production(output, config, intercept_contract=False):
+    """Run production with an injected config and refuse biological access."""
+    events = []
+    created = {"count": 0}
+    contract_attempts = {"count": 0}
+    containment = []
+    real_read = Path.read_bytes
+    real_load = null_model.load_b2_config_bytes
+    real_mkdir = os.mkdir
+    real_resolve = null_model.resolve_fixed_repository_file
+    real_open = null_model._open_verified_contract
+    real_create = null_model.create_output_directory
+    real_write = null_model.exclusive_fsync_write
+    real_validate = null_model.validate_output_containment
+
+    def read_spy(path_self):
+        text = os.path.normpath(str(path_self))
+        events.append(text)
+        if text.endswith("corpus_final.txt") or "rnagenesis-mres-data" in text:
+            raise AssertionError("biological TRAIN_TEXT was opened")
+        if text.endswith("frozen_data_contract.json"):
+            raise AssertionError("frozen contract was opened")
+        if text.endswith("ref.csv") or text.endswith("eval.csv"):
+            raise AssertionError("REF or EVAL was opened")
+        if text == os.path.normpath(ONE_RUN_OUTPUT_DIRECTORY):
+            raise AssertionError("authorised evidence directory was used")
+        return real_read(path_self)
+
+    def load_spy(_raw):
+        return config
+
+    def mkdir_spy(path, mode=0o777):
+        created["count"] += 1
+        raise AssertionError("directory creation was attempted")
+
+    def resolve_spy(root, relative, role):
+        if role == "contract":
+            contract_attempts["count"] += 1
+            if intercept_contract:
+                raise null_model.NullModelError(
+                    "intercepted_before_contract",
+                    "authorisation checks passed; contract open was intercepted",
+                )
+            raise AssertionError("frozen contract resolve was attempted")
+        return real_resolve(root, relative, role)
+
+    def open_spy(*_args, **_kwargs):
+        raise AssertionError("frozen contract was opened")
+
+    def create_spy(_path):
+        created["count"] += 1
+        raise AssertionError("directory creation was attempted")
+
+    def write_spy(*_args, **_kwargs):
+        raise AssertionError("output write was attempted")
+
+    def validate_spy(path, run_root):
+        containment.append(
+            (os.path.normpath(str(path)), os.path.normpath(str(run_root)))
+        )
+        return real_validate(path, run_root)
+
+    Path.read_bytes = read_spy
+    null_model.load_b2_config_bytes = load_spy
+    os.mkdir = mkdir_spy
+    null_model.resolve_fixed_repository_file = resolve_spy
+    null_model._open_verified_contract = open_spy
+    null_model.create_output_directory = create_spy
+    null_model.exclusive_fsync_write = write_spy
+    null_model.validate_output_containment = validate_spy
+    try:
+        try:
+            null_model.run_b2_production(str(output))
+            error = None
+        except null_model.NullModelError as exc:
+            error = exc
+    finally:
+        Path.read_bytes = real_read
+        null_model.load_b2_config_bytes = real_load
+        os.mkdir = real_mkdir
+        null_model.resolve_fixed_repository_file = real_resolve
+        null_model._open_verified_contract = real_open
+        null_model.create_output_directory = real_create
+        null_model.exclusive_fsync_write = real_write
+        null_model.validate_output_containment = real_validate
+    return {
+        "error": error,
+        "events": events,
+        "created": created["count"],
+        "contract_attempts": contract_attempts["count"],
+        "containment": containment,
+    }
+
+
 class OutputConfigAndManifestTests(unittest.TestCase):
     def tearDown(self):
         self.assertFalse(PROBE.exists())
@@ -514,6 +744,8 @@ class OutputConfigAndManifestTests(unittest.TestCase):
         self.assertNotIn("--repo-root", help_text)
         self.assertNotIn("--config", help_text)
         self.assertNotIn("--input", help_text)
+        self.assertNotIn("--authoris", help_text)
+        self.assertNotIn("--authoriz", help_text)
         signature = inspect.signature(null_model.run_b2_production)
         self.assertEqual(list(signature.parameters), ["output_dir", "command"])
         source = inspect.getsource(null_model.main)
@@ -548,70 +780,95 @@ class OutputConfigAndManifestTests(unittest.TestCase):
         self.assertEqual(opened, [])
 
     def test_repository_config_fails_before_contract_train_or_output(self):
-        config_path = ROOT / "config" / "experiments" / "B2_empirical_null.yaml"
-        text = config_path.read_text(encoding="utf-8")
-        self.assertIn("consumable_by_executable_workflow: false", text)
-        self.assertIn("document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION", text)
-        self.assertIn("m4_complete: false", text)
-        import yaml
+        """A non-executable config stops before contract, TRAIN, or output work.
 
-        loaded = yaml.safe_load(text)
-        self.assertIs(loaded["consumable_by_executable_workflow"], False)
+        The refusal uses an explicit in-memory configuration. It does not
+        assume the repository B2 file is non-executable.
+        """
+        config_path = _repository_b2_config_path()
+        non_executable = _non_executable_config()
+        self.assertIs(non_executable["consumable_by_executable_workflow"], False)
         self.assertEqual(
-            loaded["document_status"],
+            non_executable["document_status"],
             "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
         )
-        self.assertIs(loaded["human_approval"]["m4_complete"], False)
-        self.assertEqual(loaded["stage_2a_correction"]["first_implementation"], "failed_review")
-        self.assertEqual(loaded["stage_2a_correction"]["corrected_implementation"], "under_review")
-        self.assertIs(loaded["stage_2a_correction"]["execution_authorised"], False)
-        self.assertIs(loaded["stage_2a_correction"]["success_claimed"], False)
+        self.assertIs(non_executable["execution"]["authorised"], False)
         events = []
+        parsed = {"count": 0}
         real_read = Path.read_bytes
         real_lstat = os.lstat
+        real_load = null_model.load_b2_config_bytes
         real_validate = null_model.validate_output_containment
+        real_mkdir = os.mkdir
         validated = {"count": 0}
+        created = {"count": 0}
 
         def read_spy(path_self):
             events.append(("read", os.path.normpath(str(path_self))))
-            return real_read(path_self)
+            return _refuse_biological_read(path_self, real_read, [])
 
         def lstat_spy(path):
             events.append(("lstat", os.path.normpath(str(path))))
             return real_lstat(path)
 
+        def load_spy(raw):
+            parsed["count"] += 1
+            parsed["saw_repository_bytes"] = raw == config_path.read_bytes()
+            return non_executable
+
         def validate_spy(path, run_root):
             validated["count"] += 1
             return real_validate(path, run_root)
 
+        def mkdir_spy(path, mode=0o777):
+            created["count"] += 1
+            raise AssertionError("directory creation was attempted")
+
         Path.read_bytes = read_spy
         os.lstat = lstat_spy
+        null_model.load_b2_config_bytes = load_spy
         null_model.validate_output_containment = validate_spy
         previous = os.environ.get("M4_STAGE2A_TEST_ONLY")
         os.environ["M4_STAGE2A_TEST_ONLY"] = "1"
         try:
             with tempfile.TemporaryDirectory(prefix="m4-stage2a-synthetic-") as directory:
+                os.mkdir = mkdir_spy
                 output = Path(directory) / "would-be-run"
                 stderr = io.StringIO()
                 with self.assertRaises(null_model.NullModelError) as ctx:
                     null_model.run_b2_production(str(output))
                 self.assertEqual(ctx.exception.code, "execution_not_authorised")
                 self.assertIn("consumable_by_executable_workflow=False", ctx.exception.detail)
+                self.assertIn(
+                    "document_status=APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+                    ctx.exception.detail,
+                )
                 self.assertFalse(output.exists())
                 with contextlib.redirect_stderr(stderr):
                     code = null_model.main(["--output-dir", str(output)])
                 self.assertEqual(code, 1)
                 self.assertFalse(output.exists())
                 self.assertNotIn(SECRET, stderr.getvalue())
+                self.assertFalse(Path(AUTHORISATION_TEST_SIBLING).exists())
+                with self.assertRaises(null_model.NullModelError) as sibling_ctx:
+                    null_model.run_b2_production(AUTHORISATION_TEST_SIBLING)
+                self.assertEqual(sibling_ctx.exception.code, "execution_not_authorised")
+                self.assertFalse(Path(AUTHORISATION_TEST_SIBLING).exists())
         finally:
             Path.read_bytes = real_read
             os.lstat = real_lstat
+            null_model.load_b2_config_bytes = real_load
             null_model.validate_output_containment = real_validate
+            os.mkdir = real_mkdir
             if previous is None:
                 os.environ.pop("M4_STAGE2A_TEST_ONLY", None)
             else:
                 os.environ["M4_STAGE2A_TEST_ONLY"] = previous
+        self.assertGreaterEqual(parsed["count"], 1)
+        self.assertIs(parsed["saw_repository_bytes"], True)
         self.assertEqual(validated["count"], 0)
+        self.assertEqual(created["count"], 0)
+        self.assertFalse(Path(ONE_RUN_OUTPUT_DIRECTORY).exists())
         config_norm = os.path.normpath(str(config_path))
         contract_norm = os.path.normpath(
             str(ROOT / "config" / "modelling" / "frozen_data_contract.json")
@@ -632,6 +889,198 @@ class OutputConfigAndManifestTests(unittest.TestCase):
         self.assertFalse(any(path == contract_norm and kind == "read" for kind, path in events))
         self.assertFalse(any(path.endswith("corpus_final.txt") for _kind, path in events))
         self.assertFalse(any("rnagenesis-mres-data" in path for _kind, path in events))
+
+    def test_repository_b2_configuration_execution_state_is_consistent(self):
+        """Parse the repository B2 file and check one consistent execution state.
+
+        An open gate requires the three execution fields and the complete
+        one-run authorisation block. A later revocation closes those three
+        fields together. If the block remains, authorisation_active must be
+        false. That check does not require a new test structure.
+        """
+        loaded, text = _load_repository_b2_config()
+        self.assertTrue(_gates_are_open(loaded) or _gates_are_closed(loaded))
+        self.assertIs(loaded["human_approval"]["m4_complete"], False)
+        self.assertIs(loaded["stage_2a_correction"]["success_claimed"], False)
+        self.assertIs(loaded["stage_2a_correction"]["m4_complete"], False)
+        self.assertIs(loaded["stage_2a_correction"]["execution_authorised"], False)
+        self.assertEqual(loaded["stage_2a_correction"]["first_implementation"], "failed_review")
+        self.assertEqual(loaded["stage_2a_correction"]["corrected_implementation"], "under_review")
+        self.assertIs(loaded["execution"]["evidence_directory_created_by_this_stage"], False)
+        self.assertEqual(loaded["sampler"]["seed"], 42)
+        self.assertEqual(loaded["sampler"]["proposed_seed"], 42)
+        self.assertEqual(loaded["sampler"]["raw_sequence_count"], 30000)
+        self.assertEqual(loaded["sampler"]["numpy_generator"], "numpy.random.default_rng")
+        self.assertEqual(
+            loaded["input"]["expected_sha256"],
+            "d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d",
+        )
+        self.assertEqual(loaded["input"]["expected_sequence_count"], 669)
+        self.assertEqual(loaded["input"]["expected_unique_count"], 669)
+        self.assertEqual(loaded["input"]["alphabet"], "^[ACGU]+$")
+        self.assertEqual(
+            loaded["condition_manifest_label"],
+            "B2_train_matched_empirical_null",
+        )
+        self.assertLessEqual(text.count(ONE_RUN_OUTPUT_DIRECTORY), 1)
+        self.assertNotIn("success_claimed: true", text)
+        self.assertNotIn("m4_complete: true", text)
+        block = loaded.get("scientific_execution_authorisation")
+        if _gates_are_open(loaded):
+            self.assertEqual(block, ONE_RUN_AUTHORISATION)
+            self.assertIs(block["authorisation_active"], True)
+            self.assertIs(block["success_claimed"], False)
+            self.assertIs(block["m4_complete"], False)
+            self.assertEqual(block["output_directory"], ONE_RUN_OUTPUT_DIRECTORY)
+            self.assertEqual(text.count(ONE_RUN_OUTPUT_DIRECTORY), 1)
+            self.assertEqual(block["seed"], loaded["sampler"]["seed"])
+            self.assertEqual(block["raw_attempt_count"], loaded["sampler"]["raw_sequence_count"])
+            self.assertEqual(block["train_text_sha256"], loaded["input"]["expected_sha256"])
+            self.assertEqual(block["expected_records"], loaded["input"]["expected_sequence_count"])
+            self.assertEqual(
+                block["expected_unique_records"],
+                loaded["input"]["expected_unique_count"],
+            )
+            self.assertEqual(block["alphabet"], loaded["input"]["alphabet"])
+            self.assertEqual(block["rng"], loaded["sampler"]["numpy_generator"])
+            self.assertEqual(block["condition"], loaded["condition_manifest_label"])
+            self.assertEqual(block["train_text_path"], loaded["input"]["expected_development_path"])
+            self.assertEqual(block["device"], "CPU only")
+            self.assertEqual(block["gpu_use"], "prohibited")
+            self.assertEqual(
+                block["executing_implementation_commit"],
+                "2d9ec8985cf6c21617a771f3df89dcbb345f2e2f",
+            )
+        else:
+            self.assertIs(_gates_are_closed(loaded), True)
+            if block is not None:
+                self.assertIs(block.get("authorisation_active"), False)
+                if "success_claimed" in block:
+                    self.assertIs(block["success_claimed"], False)
+                if "m4_complete" in block:
+                    self.assertIs(block["m4_complete"], False)
+        self.assertFalse(Path(ONE_RUN_OUTPUT_DIRECTORY).exists())
+
+    def _assert_stopped_before_biological_access(self, result):
+        self.assertIsNotNone(result["error"])
+        self.assertEqual(result["created"], 0)
+        self.assertFalse(any(path.endswith("corpus_final.txt") for path in result["events"]))
+        self.assertFalse(any("rnagenesis-mres-data" in path for path in result["events"]))
+        self.assertFalse(any(path.endswith("frozen_data_contract.json") for path in result["events"]))
+        self.assertFalse(
+            any(path.endswith("ref.csv") or path.endswith("eval.csv") for path in result["events"])
+        )
+        self.assertFalse(Path(ONE_RUN_OUTPUT_DIRECTORY).exists())
+        self.assertFalse(Path(AUTHORISATION_TEST_OUTPUT).exists())
+        self.assertFalse(Path(AUTHORISATION_TEST_SIBLING).exists())
+
+    def test_authorised_config_rejects_sibling_before_biological_access(self):
+        """A different run-root child is output_not_authorised before any write."""
+        self.assertFalse(Path(AUTHORISATION_TEST_SIBLING).exists())
+        self.assertFalse(Path(AUTHORISATION_TEST_OUTPUT).exists())
+        result = _invoke_guarded_production(
+            AUTHORISATION_TEST_SIBLING,
+            _authorised_production_config(),
+        )
+        self.assertEqual(result["error"].code, "output_not_authorised")
+        self.assertEqual(result["contract_attempts"], 0)
+        self._assert_stopped_before_biological_access(result)
+        roots = {root for _path, root in result["containment"]}
+        self.assertEqual(roots, {os.path.normpath(str(null_model.PRODUCTION_RUN_ROOT))})
+        contained = [path for path, _root in result["containment"]]
+        self.assertIn(os.path.normpath(AUTHORISATION_TEST_OUTPUT), contained)
+        self.assertIn(os.path.normpath(AUTHORISATION_TEST_SIBLING), contained)
+
+    def test_authorised_config_rejects_output_outside_run_root_before_biological_access(self):
+        outside = "/tmp/m4-b2-authorisation-outside-must-not-exist"
+        self.assertFalse(Path(outside).exists())
+        self.assertFalse(null_model._is_relative_to(Path(outside), RUNS_ROOT))
+        result = _invoke_guarded_production(outside, _authorised_production_config())
+        self.assertEqual(result["error"].code, "output_not_a_child")
+        self.assertEqual(result["contract_attempts"], 0)
+        self._assert_stopped_before_biological_access(result)
+        self.assertFalse(Path(outside).exists())
+        roots = {root for _path, root in result["containment"]}
+        self.assertEqual(roots, {os.path.normpath(str(null_model.PRODUCTION_RUN_ROOT))})
+
+    def test_exact_authorised_output_stops_before_contract_train_or_creation(self):
+        result = _invoke_guarded_production(
+            AUTHORISATION_TEST_OUTPUT,
+            _authorised_production_config(),
+            intercept_contract=True,
+        )
+        self.assertEqual(result["error"].code, "intercepted_before_contract")
+        self.assertEqual(result["contract_attempts"], 1)
+        self._assert_stopped_before_biological_access(result)
+        contained = [path for path, _root in result["containment"]]
+        self.assertIn(os.path.normpath(AUTHORISATION_TEST_OUTPUT), contained)
+        self.assertTrue(
+            all(
+                root == os.path.normpath(str(null_model.PRODUCTION_RUN_ROOT))
+                for _path, root in result["containment"]
+            )
+        )
+
+    def test_authorisation_mismatches_fail_before_biological_access(self):
+        block_cases = (
+            ("seed", 43),
+            ("raw_attempt_count", 29999),
+            ("train_text_sha256", "0" * 64),
+            ("train_text_path", "/tmp/not-train-text.txt"),
+            ("condition", "other_condition"),
+            ("gpu_use", "allowed"),
+            ("model_loading", "allowed"),
+            ("ref_access", "allowed"),
+            ("eval_access", "allowed"),
+            ("device", "GPU"),
+            ("overwrite_or_append", "allowed"),
+            ("single_run_only", False),
+            ("authorisation_active", False),
+            ("success_claimed", True),
+            ("m4_complete", True),
+            ("rng", "random.Random"),
+            ("alphabet", "^[ACGT]+$"),
+            ("expected_records", 670),
+            ("expected_unique_records", 668),
+        )
+        for key, value in block_cases:
+            config = _authorised_production_config()
+            config["scientific_execution_authorisation"][key] = value
+            result = _invoke_guarded_production(AUTHORISATION_TEST_OUTPUT, config)
+            self.assertEqual(result["error"].code, "execution_not_authorised", key)
+            self.assertEqual(result["contract_attempts"], 0, key)
+            self._assert_stopped_before_biological_access(result)
+        config_cases = (
+            ("sampler", "seed", 43, "production_parameters"),
+            ("sampler", "raw_sequence_count", 10, "production_parameters"),
+            ("input", "expected_sha256", "ab" * 32, "production_input_contract"),
+            ("input", "expected_development_path", "/tmp/not-train-text.txt", "execution_not_authorised"),
+            (None, "condition_manifest_label", "other_condition", "execution_not_authorised"),
+        )
+        for parent, key, value, code in config_cases:
+            config = _authorised_production_config()
+            if parent is None:
+                config[key] = value
+            else:
+                config[parent][key] = value
+            result = _invoke_guarded_production(AUTHORISATION_TEST_OUTPUT, config)
+            self.assertEqual(result["error"].code, code, parent or key)
+            self.assertEqual(result["contract_attempts"], 0, parent or key)
+            self._assert_stopped_before_biological_access(result)
+
+    def test_noncanonical_authorised_output_is_refused_before_biological_access(self):
+        for output_directory in (
+            AUTHORISATION_TEST_OUTPUT + "/",
+            "m4_b2_authorisation_test_exact_must_not_exist",
+            "/home/laura/rnagenesis-mres-runs/./m4_b2_authorisation_test_exact_must_not_exist",
+        ):
+            result = _invoke_guarded_production(
+                AUTHORISATION_TEST_OUTPUT,
+                _authorised_production_config(output_directory=output_directory),
+            )
+            self.assertEqual(result["error"].code, "output_not_authorised", output_directory)
+            self.assertEqual(result["contract_attempts"], 0, output_directory)
+            self._assert_stopped_before_biological_access(result)
 
     def test_fixed_config_identity_is_checked_before_open(self):
         events = []
@@ -1149,45 +1598,26 @@ class OutputConfigAndManifestTests(unittest.TestCase):
         for record in records:
             self.assertEqual(record["sampled_length"], len(record["sequence"]))
 
-    def test_production_output_root_is_pinned_after_the_contract(self):
-        opened = []
-        real_read = Path.read_bytes
+    def test_bypassing_execution_gate_does_not_skip_output_binding(self):
+        """Replacing the old gate does not authorise a different run-root child."""
         real_gate = null_model.assert_execution_authorised
-        seen = {}
-
-        def read_spy(path_self):
-            text = os.path.normpath(str(path_self))
-            if text.endswith("corpus_final.txt") or "rnagenesis-mres-data" in text:
-                raise AssertionError("biological data was opened")
-            opened.append(text)
-            return real_read(path_self)
 
         def allow(_config):
             return None
 
-        real_validate = null_model.validate_output_containment
-
-        def validate_spy(path, run_root):
-            seen["run_root"] = run_root
-            return real_validate(path, run_root)
-
-        Path.read_bytes = read_spy
         null_model.assert_execution_authorised = allow
-        null_model.validate_output_containment = validate_spy
         try:
-            with tempfile.TemporaryDirectory(prefix="m4-stage2a-synthetic-") as directory:
-                output = Path(directory) / "outside-run"
-                with self.assertRaises(null_model.NullModelError) as ctx:
-                    null_model.run_b2_production(str(output))
-                self.assertEqual(ctx.exception.code, "output_not_a_child")
-                self.assertEqual(Path(seen["run_root"]), null_model.PRODUCTION_RUN_ROOT)
-                self.assertFalse(output.exists())
+            result = _invoke_guarded_production(
+                AUTHORISATION_TEST_SIBLING,
+                _authorised_production_config(),
+            )
         finally:
-            Path.read_bytes = real_read
             null_model.assert_execution_authorised = real_gate
-            null_model.validate_output_containment = real_validate
-        self.assertTrue(any(path.endswith("frozen_data_contract.json") for path in opened))
-        self.assertTrue(any(path.endswith("B2_empirical_null.yaml") for path in opened))
+        self.assertEqual(result["error"].code, "output_not_authorised")
+        self.assertEqual(result["contract_attempts"], 0)
+        self._assert_stopped_before_biological_access(result)
+        roots = {root for _path, root in result["containment"]}
+        self.assertEqual(roots, {os.path.normpath(str(null_model.PRODUCTION_RUN_ROOT))})
 
     def test_removed_old_runner_entrypoint_is_not_used(self):
         parameters = inspect.signature(null_model.run_b2_production).parameters

@@ -2,8 +2,10 @@
 # Statistical design preserved from the original sampler.
 # Stage 2A authorises implementation and synthetic tests only.
 # The repository configuration remains non-executable. Production paths are
-# pinned in this file. The CLI cannot select a repository root, config,
-# contract, TRAIN_TEXT path, seed, count, or run root.
+# pinned in this file. When the execution gates are later opened, production
+# also requires the scientific_execution_authorisation block to name exactly
+# one output directory. The CLI cannot select a repository root, config,
+# contract, TRAIN_TEXT path, seed, count, run root, or authorisation override.
 
 from __future__ import annotations
 
@@ -75,6 +77,7 @@ RNG_CONSUMPTION_ORDER = (
 )
 TEST_ONLY_TOKEN = "M4_STAGE2A_TEST_ONLY_SYNTHETIC_FIXTURE_NOT_A_BIOLOGICAL_RUN"
 ACGU_PATTERN = "^[ACGU]+$"
+AUTHORISED_CONDITION = "B2_train_matched_empirical_null"
 _AMBIGUITY = frozenset("NRYSWKMBDHVnryswkmbdhv")
 
 # Manifest serialization, documented and deterministic:
@@ -934,6 +937,180 @@ def assert_execution_authorised(config):
         )
 
 
+def _absolute_canonical_output_text(path):
+    """Return path when it is already an absolute lexical canonical string."""
+    if not isinstance(path, str) or path == "":
+        return None
+    if not Path(path).is_absolute():
+        return None
+    if os.path.normpath(path) != path:
+        return None
+    if any(part in (".", "..") for part in Path(path).parts):
+        return None
+    return path
+
+
+def _require_authorisation_agreement(actual, expected, label):
+    if actual != expected:
+        raise NullModelError(
+            "execution_not_authorised",
+            "authorisation {} does not match the canonical B2 configuration".format(
+                label
+            ),
+        )
+
+
+def assert_scientific_execution_authorisation(config, output_dir):
+    """Validate the one-run authorisation block before any biological access.
+
+    Called only for production, and only after the execution gate has passed.
+    Containment uses validate_output_containment. A different child of the
+    production run root is output_not_authorised. This function does not open
+    the frozen contract or TRAIN_TEXT and does not create a directory.
+    """
+    execution = config.get("execution")
+    if not isinstance(execution, dict) or execution.get("authorised") is not True:
+        raise NullModelError(
+            "execution_not_authorised",
+            "execution.authorised is not true",
+        )
+    block = config.get("scientific_execution_authorisation")
+    if not isinstance(block, dict):
+        raise NullModelError(
+            "execution_not_authorised",
+            "scientific_execution_authorisation block is missing",
+        )
+    if block.get("authorisation_active") is not True:
+        raise NullModelError(
+            "execution_not_authorised",
+            "authorisation_active is not true",
+        )
+    if block.get("single_run_only") is not True:
+        raise NullModelError(
+            "execution_not_authorised",
+            "single_run_only is not true",
+        )
+    if block.get("success_claimed") is not False:
+        raise NullModelError(
+            "execution_not_authorised",
+            "success_claimed must be false before execution",
+        )
+    if block.get("m4_complete") is not False:
+        raise NullModelError(
+            "execution_not_authorised",
+            "m4_complete must be false before execution",
+        )
+    required_text = (
+        ("condition", AUTHORISED_CONDITION),
+        ("overwrite_or_append", "prohibited"),
+        ("device", "CPU only"),
+        ("gpu_use", "prohibited"),
+        ("model_loading", "prohibited"),
+        ("ref_access", "prohibited"),
+        ("eval_access", "prohibited"),
+        ("rng", "numpy.random.default_rng"),
+        ("alphabet", ACGU_PATTERN),
+    )
+    for key, expected in required_text:
+        if block.get(key) != expected:
+            raise NullModelError(
+                "execution_not_authorised",
+                "authorisation {} is not the required value".format(key),
+            )
+    sampler = config.get("sampler") if isinstance(config.get("sampler"), dict) else {}
+    input_block = config.get("input") if isinstance(config.get("input"), dict) else {}
+    _require_authorisation_agreement(
+        block.get("condition"),
+        config.get("condition_manifest_label"),
+        "condition",
+    )
+    _require_authorisation_agreement(block.get("seed"), sampler.get("seed"), "seed")
+    _require_authorisation_agreement(
+        block.get("raw_attempt_count"),
+        sampler.get("raw_sequence_count"),
+        "attempt count",
+    )
+    _require_authorisation_agreement(
+        block.get("rng"),
+        sampler.get("numpy_generator"),
+        "rng",
+    )
+    _require_authorisation_agreement(
+        block.get("train_text_path"),
+        input_block.get("expected_development_path"),
+        "TRAIN path",
+    )
+    _require_authorisation_agreement(
+        block.get("train_text_sha256"),
+        input_block.get("expected_sha256"),
+        "TRAIN hash",
+    )
+    _require_authorisation_agreement(
+        block.get("expected_records"),
+        input_block.get("expected_sequence_count"),
+        "record count",
+    )
+    _require_authorisation_agreement(
+        block.get("expected_unique_records"),
+        input_block.get("expected_unique_count"),
+        "unique record count",
+    )
+    _require_authorisation_agreement(
+        block.get("alphabet"),
+        input_block.get("alphabet"),
+        "alphabet",
+    )
+    pinned_train = str(_lexical_absolute(AUTHORIZED_TRAIN_TEXT_PATH))
+    _require_authorisation_agreement(
+        block.get("train_text_path"),
+        pinned_train,
+        "TRAIN path",
+    )
+    _require_authorisation_agreement(
+        block.get("train_text_sha256"),
+        TRAIN_TEXT_SHA256,
+        "TRAIN hash",
+    )
+    _require_authorisation_agreement(block.get("seed"), DEFAULT_SEED, "seed")
+    _require_authorisation_agreement(
+        block.get("raw_attempt_count"),
+        DEFAULT_ATTEMPT_COUNT,
+        "attempt count",
+    )
+    _require_authorisation_agreement(
+        block.get("expected_records"),
+        EXPECTED_SEQUENCE_COUNT,
+        "record count",
+    )
+    _require_authorisation_agreement(
+        block.get("expected_unique_records"),
+        EXPECTED_UNIQUE_COUNT,
+        "unique record count",
+    )
+    authorised_text = _absolute_canonical_output_text(block.get("output_directory"))
+    if authorised_text is None:
+        raise NullModelError(
+            "output_not_authorised",
+            "authorised output directory is not an absolute canonical path",
+        )
+    authorised_resolved = validate_output_containment(
+        authorised_text,
+        PRODUCTION_RUN_ROOT,
+    )
+    if str(authorised_resolved) != authorised_text:
+        raise NullModelError(
+            "output_not_authorised",
+            "authorised output directory is not an absolute canonical path",
+        )
+    cli_resolved = validate_output_containment(output_dir, PRODUCTION_RUN_ROOT)
+    if str(cli_resolved) != authorised_text:
+        raise NullModelError(
+            "output_not_authorised",
+            "output directory is not the single authorised output directory",
+        )
+    return cli_resolved
+
+
 AUTHORISED_REPOSITORY_FILES = {
     "config": "config/experiments/B2_empirical_null.yaml",
     "contract": "config/modelling/frozen_data_contract.json",
@@ -1533,8 +1710,13 @@ def _execute_b2(output_dir, command, test_only):
                 "test-only fixture is missing the expected contract hash",
             )
         contract_path = _lexical_absolute(test_only.contract_path)
+        resolved_output = None
     else:
         _assert_production_config_contract(config)
+        resolved_output = assert_scientific_execution_authorisation(
+            config,
+            output_dir,
+        )
         expected_sha = TRAIN_TEXT_SHA256
         expected_count = EXPECTED_SEQUENCE_COUNT
         expected_unique = EXPECTED_UNIQUE_COUNT
@@ -1558,7 +1740,8 @@ def _execute_b2(output_dir, command, test_only):
         refuse_test_only_train_hash(recorded_train_sha)
         refuse_test_only_train_hash(expected_sha)
 
-    resolved_output = validate_output_containment(output_dir, run_root)
+    if resolved_output is None:
+        resolved_output = validate_output_containment(output_dir, run_root)
 
     if synthetic:
         train_path = _lexical_absolute(test_only.input_path)
