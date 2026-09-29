@@ -78,6 +78,131 @@ RNG_CONSUMPTION_ORDER = (
 TEST_ONLY_TOKEN = "M4_STAGE2A_TEST_ONLY_SYNTHETIC_FIXTURE_NOT_A_BIOLOGICAL_RUN"
 ACGU_PATTERN = "^[ACGU]+$"
 AUTHORISED_CONDITION = "B2_train_matched_empirical_null"
+ACTIVE_ACTIVATION_STATUS = "active_single_run"
+SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS = (
+    "authorisation_id",
+    "authorisation_active",
+    "activation_status",
+    "activation_recorded_timestamp",
+    "intended_scope_approval",
+    "approved_by",
+    "approval_date",
+    "approval_recorded_timestamp",
+    "approval_source",
+    "scope",
+    "executing_implementation_commit",
+    "branch",
+    "condition",
+    "output_directory",
+    "train_text_path",
+    "train_text_sha256",
+    "expected_records",
+    "expected_unique_records",
+    "alphabet",
+    "raw_attempt_count",
+    "seed",
+    "rng",
+    "device",
+    "gpu_use",
+    "model_loading",
+    "ref_access",
+    "eval_access",
+    "overwrite_or_append",
+    "single_run_only",
+    "revoke_after_completed_or_failed_invocation",
+    "second_attempt_requires_new_directory_and_new_human_authorisation",
+    "success_claimed",
+    "m4_complete",
+)
+PROTOCOL_IMPLEMENTATION_APPROVAL_KEYS = (
+    "record_role",
+    "authorizes_scientific_execution",
+    "authorizes_this_invocation",
+    "authorizes_this_invocation_meaning",
+    "approving_person",
+    "approval_date",
+    "approval_recorded_timestamp",
+    "approval_source",
+    "approval_scope",
+    "explicitly_not_approved",
+    "explicitly_not_approved_scope",
+    "m4_complete",
+    "configuration_document_status_at_invocation",
+    "configuration_consumable_by_executable_workflow_at_invocation",
+    "source_configuration_sha256",
+)
+AUTHORISATION_RELATIONSHIP_KEYS = (
+    "protocol_record",
+    "scientific_execution_record",
+    "protocol_record_scope",
+    "scientific_execution_record_scope",
+    "protocol_record_authorized_scientific_execution",
+    "scientific_execution_record_authorized_this_invocation",
+    "explicitly_not_approved_applies_to",
+    "explicitly_not_approved_does_not_revoke_scientific_execution_authorisation",
+    "statement",
+)
+AUTHORISATION_RELATIONSHIP_STATEMENT = (
+    "This invocation was authorized by scientific_execution_authorisation. "
+    "protocol_implementation_approval is a separate Stage 1 record that "
+    "approved protocol implementation only and did not authorize scientific "
+    "execution. Its explicitly_not_approved list does not revoke "
+    "scientific_execution_authorisation."
+)
+EXPLICITLY_NOT_APPROVED_SCOPE = (
+    "This list is scoped to the Stage 1 protocol implementation approval only. "
+    "It does not revoke scientific_execution_authorisation and it does not "
+    "mean this invocation lacked scientific-execution approval."
+)
+AUTHORIZES_THIS_INVOCATION_MEANING = (
+    "False means this Stage 1 record did not itself authorize the invocation. "
+    "scientific_execution_authorisation did authorize this invocation."
+)
+MANIFEST_SCHEMA_VERSION = "m4-b2-run-manifest-2"
+MANIFEST_TOP_LEVEL_KEYS = (
+    "manifest_schema_version",
+    "schema_version",
+    "approval_status",
+    "consumable_by_executable_workflow",
+    "experiment_id",
+    "condition_identifier",
+    "run_identifier",
+    "attempt_identifier",
+    "timestamps",
+    "hostname",
+    "repository_provenance",
+    "configuration",
+    "frozen_contract",
+    "input",
+    "access_log",
+    "ref_opened_expected",
+    "ref_opened_actual",
+    "eval_opened_expected",
+    "eval_opened_actual",
+    "ref_non_access",
+    "eval_non_access",
+    "corpus_statistics",
+    "rng",
+    "generation_accounting",
+    "command",
+    "exit_status",
+    "raw_output",
+    "warnings",
+    "retries",
+    "deviations",
+    "stopping_reason",
+    "overwrite_refusal_check",
+    "protocol_implementation_approval",
+    "scientific_execution_authorisation",
+    "authorisation_relationship",
+    "gpu_used_expected",
+    "device_backend_actual",
+    "gpu_api_invoked_actual",
+    "device",
+    "interpreter",
+    "not_applicable_model_fields",
+    "serialization",
+)
 _AMBIGUITY = frozenset("NRYSWKMBDHVnryswkmbdhv")
 
 # Manifest serialization, documented and deterministic:
@@ -629,12 +754,18 @@ def _lexical_absolute(path):
 
 
 def approval_from_config(config, config_sha256):
-    """Read approval metadata from the config object that passed the gate."""
+    """Stage 1 protocol-implementation approval. It does not authorize a run.
+
+    The configuration key remains human_approval. The manifest records this
+    object only as protocol_implementation_approval. The three configuration
+    fields recorded here describe the configuration at invocation time. They
+    are not assertions made by the Stage 1 approval.
+    """
     block = config.get("human_approval")
     if not isinstance(block, dict):
         raise NullModelError(
             "approval_metadata_missing",
-            "human approval metadata is missing from configuration",
+            "protocol implementation approval metadata is missing from configuration",
         )
     required = (
         "approving_person",
@@ -649,48 +780,96 @@ def approval_from_config(config, config_sha256):
         if key not in block:
             raise NullModelError(
                 "approval_metadata_missing",
-                "human approval metadata is incomplete",
+                "protocol implementation approval metadata is incomplete",
             )
     if not isinstance(block["explicitly_not_approved"], list):
         raise NullModelError(
             "approval_metadata_missing",
-            "human approval metadata is incomplete",
+            "protocol implementation approval metadata is incomplete",
         )
-    return {
+    record = {
+        "record_role": "stage_1_protocol_implementation_approval",
+        "authorizes_scientific_execution": False,
+        "authorizes_this_invocation": False,
+        "authorizes_this_invocation_meaning": AUTHORIZES_THIS_INVOCATION_MEANING,
         "approving_person": block["approving_person"],
         "approval_date": block["approval_date"],
         "approval_recorded_timestamp": block["approval_recorded_timestamp"],
         "approval_source": block["approval_source"],
         "approval_scope": block["approval_scope"],
         "explicitly_not_approved": list(block["explicitly_not_approved"]),
+        "explicitly_not_approved_scope": EXPLICITLY_NOT_APPROVED_SCOPE,
         "m4_complete": block["m4_complete"],
-        "document_status": config.get("document_status"),
-        "consumable_by_executable_workflow": config.get(
+        "configuration_document_status_at_invocation": config.get("document_status"),
+        "configuration_consumable_by_executable_workflow_at_invocation": config.get(
             "consumable_by_executable_workflow"
         ),
-        "configuration_sha256": config_sha256,
+        "source_configuration_sha256": config_sha256,
     }
+    if tuple(record) != PROTOCOL_IMPLEMENTATION_APPROVAL_KEYS:
+        raise NullModelError(
+            "approval_metadata_missing",
+            "protocol implementation approval key order drifted",
+        )
+    return record
+
+
+def authorisation_relationship_record():
+    """Fixed relationship between the two approval records."""
+    record = {
+        "protocol_record": "protocol_implementation_approval",
+        "scientific_execution_record": "scientific_execution_authorisation",
+        "protocol_record_scope": "stage_1_protocol_implementation_only",
+        "scientific_execution_record_scope": (
+            "single_run_scientific_execution_of_this_invocation"
+        ),
+        "protocol_record_authorized_scientific_execution": False,
+        "scientific_execution_record_authorized_this_invocation": True,
+        "explicitly_not_approved_applies_to": (
+            "protocol_implementation_approval_only"
+        ),
+        "explicitly_not_approved_does_not_revoke_scientific_execution_authorisation": (
+            True
+        ),
+        "statement": AUTHORISATION_RELATIONSHIP_STATEMENT,
+    }
+    if tuple(record) != AUTHORISATION_RELATIONSHIP_KEYS:
+        raise NullModelError(
+            "authorisation_relationship_invalid",
+            "authorisation relationship key order drifted",
+        )
+    return record
 
 
 def build_observed_success_manifest(observed):
     """Success manifest built only from values this completed run observed.
 
-    Approval fields come from observed["approval"], which was read from the
-    configuration bytes that passed the execution gate. Protocol requirements
-    use *_expected keys. Runtime results use *_actual or plain observed values.
+    protocol_implementation_approval is the Stage 1 record. The scientific
+    execution snapshot is observed["scientific_execution_authorisation"], the
+    object returned by the execution gate. This function does not rebuild that
+    authority from other configuration fields. Protocol requirements use
+    *_expected keys. Runtime results use *_actual or plain observed values.
     """
     approval = observed["approval"]
+    scientific = observed["scientific_execution_authorisation"]
+    if tuple(scientific) != SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS:
+        raise NullModelError(
+            "authorisation_snapshot_invalid",
+            "manifest authorisation snapshot is not the validated record",
+        )
+    relationship = authorisation_relationship_record()
     git_info = observed["git"]
     stats = observed["stats"]
     access_log = observed["access_log"]
     ref_opened_actual = any(entry.get("role") == "REF" for entry in access_log)
     eval_opened_actual = any(entry.get("role") == "EVAL" for entry in access_log)
     rows_dropped_actual = int(observed["attempt_count"]) - int(observed["retained_count"])
-    return {
+    manifest = {
+        "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
         "schema_version": observed["schema_version"],
-        "approval_status": approval["document_status"],
+        "approval_status": approval["configuration_document_status_at_invocation"],
         "consumable_by_executable_workflow": approval[
-            "consumable_by_executable_workflow"
+            "configuration_consumable_by_executable_workflow_at_invocation"
         ],
         "experiment_id": observed["experiment_id"],
         "condition_identifier": observed["condition_identifier"],
@@ -717,7 +896,7 @@ def build_observed_success_manifest(observed):
         "configuration": {
             "path": observed["config_path"],
             "sha256": observed["config_sha256"],
-            "approval_status": approval["document_status"],
+            "approval_status": approval["configuration_document_status_at_invocation"],
         },
         "frozen_contract": {
             "path": observed["contract_path"],
@@ -798,7 +977,9 @@ def build_observed_success_manifest(observed):
             "creation_primitive": "os.mkdir",
             "exist_ok": False,
         },
-        "human_approval": approval,
+        "protocol_implementation_approval": approval,
+        "scientific_execution_authorisation": scientific,
+        "authorisation_relationship": relationship,
         "gpu_used_expected": False,
         "device_backend_actual": "cpu_numpy",
         "gpu_api_invoked_actual": bool(observed["gpu_api_invoked"]),
@@ -845,6 +1026,17 @@ def build_observed_success_manifest(observed):
             "float64_format": ".17g",
         },
     }
+    if tuple(manifest) != MANIFEST_TOP_LEVEL_KEYS:
+        raise NullModelError(
+            "manifest_key_order",
+            "manifest key order drifted from the declared field order",
+        )
+    if "human_approval" in manifest:
+        raise NullModelError(
+            "manifest_key_order",
+            "human_approval is not a manifest field",
+        )
+    return manifest
 
 
 def serialize_manifest(manifest):
@@ -960,6 +1152,187 @@ def _require_authorisation_agreement(actual, expected, label):
         )
 
 
+def _required_authorisation_text(block, key):
+    value = block.get(key)
+    if not isinstance(value, str) or value.strip() == "":
+        raise NullModelError(
+            "execution_not_authorised",
+            "scientific_execution_authorisation is incomplete",
+        )
+    return value
+
+
+def _required_authorisation_int(block, key):
+    value = block.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise NullModelError(
+            "execution_not_authorised",
+            "scientific_execution_authorisation is incomplete",
+        )
+    return value
+
+
+def _copy_authorisation_scalar(value):
+    """Return an immutable scalar. Reject mappings, sequences, and other objects."""
+    if type(value) in (str, int, bool):
+        return value
+    raise NullModelError(
+        "execution_not_authorised",
+        "scientific_execution_authorisation is incomplete",
+    )
+
+
+def snapshot_validated_scientific_execution_authorisation(block):
+    """Copy every field of the validated active block.
+
+    The source mapping may use any key order. It must contain exactly the
+    declared executable keys: a missing key and an unexpected key are both
+    rejected. The snapshot is then built in the declared order and contains
+    every field from that validated block, reordered only for deterministic
+    serialization. Values are immutable scalars copied from this block.
+    They are not rebuilt from sampler, input, or other configuration fields.
+    """
+    if not isinstance(block, dict):
+        raise NullModelError(
+            "execution_not_authorised",
+            "scientific_execution_authorisation block is missing",
+        )
+    if set(block) != set(SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS):
+        raise NullModelError(
+            "execution_not_authorised",
+            "scientific_execution_authorisation does not match the executable schema",
+        )
+    if block.get("authorisation_active") is not True:
+        raise NullModelError(
+            "execution_not_authorised",
+            "authorisation_active is not true",
+        )
+    if block.get("activation_status") != ACTIVE_ACTIVATION_STATUS:
+        raise NullModelError(
+            "execution_not_authorised",
+            "activation_status is not active",
+        )
+    for key in (
+        "authorisation_id",
+        "activation_recorded_timestamp",
+        "intended_scope_approval",
+        "approved_by",
+        "approval_date",
+        "approval_recorded_timestamp",
+        "approval_source",
+        "scope",
+        "executing_implementation_commit",
+        "branch",
+        "condition",
+        "output_directory",
+        "train_text_path",
+    ):
+        _required_authorisation_text(block, key)
+    train_hash = _required_authorisation_text(block, "train_text_sha256")
+    if len(train_hash) != 64 or any(char not in "0123456789abcdef" for char in train_hash):
+        raise NullModelError(
+            "execution_not_authorised",
+            "scientific_execution_authorisation is incomplete",
+        )
+    for key in (
+        "expected_records",
+        "expected_unique_records",
+        "raw_attempt_count",
+        "seed",
+    ):
+        _required_authorisation_int(block, key)
+    if block.get("alphabet") != ACGU_PATTERN:
+        raise NullModelError(
+            "execution_not_authorised",
+            "authorisation alphabet is not the required value",
+        )
+    if block.get("rng") != "numpy.random.default_rng":
+        raise NullModelError(
+            "execution_not_authorised",
+            "authorisation rng is not the required value",
+        )
+    if block.get("device") != "CPU only":
+        raise NullModelError(
+            "execution_not_authorised",
+            "authorisation device is not the required value",
+        )
+    for key in ("gpu_use", "model_loading", "ref_access", "eval_access"):
+        if block.get(key) != "prohibited":
+            raise NullModelError(
+                "execution_not_authorised",
+                "authorisation {} is not the required value".format(key),
+            )
+    if block.get("overwrite_or_append") != "prohibited":
+        raise NullModelError(
+            "execution_not_authorised",
+            "authorisation overwrite_or_append is not the required value",
+        )
+    if block.get("single_run_only") is not True:
+        raise NullModelError(
+            "execution_not_authorised",
+            "single_run_only is not true",
+        )
+    if block.get("revoke_after_completed_or_failed_invocation") is not True:
+        raise NullModelError(
+            "execution_not_authorised",
+            "revoke_after_completed_or_failed_invocation is not true",
+        )
+    if (
+        block.get("second_attempt_requires_new_directory_and_new_human_authorisation")
+        is not True
+    ):
+        raise NullModelError(
+            "execution_not_authorised",
+            "second_attempt_requires_new_directory_and_new_human_authorisation is not true",
+        )
+    if block.get("success_claimed") is not False:
+        raise NullModelError(
+            "execution_not_authorised",
+            "success_claimed must be false before execution",
+        )
+    if block.get("m4_complete") is not False:
+        raise NullModelError(
+            "execution_not_authorised",
+            "m4_complete must be false before execution",
+        )
+    snapshot = {}
+    for key in SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS:
+        snapshot[key] = _copy_authorisation_scalar(block[key])
+    return snapshot
+
+
+def _require_synthetic_authorisation_matches_config(config, snapshot):
+    """Synthetic consistency check. Values are read from the validated snapshot."""
+    sampler = config.get("sampler") if isinstance(config.get("sampler"), dict) else {}
+    input_block = config.get("input") if isinstance(config.get("input"), dict) else {}
+    _require_authorisation_agreement(snapshot.get("seed"), sampler.get("seed"), "seed")
+    _require_authorisation_agreement(
+        snapshot.get("raw_attempt_count"),
+        sampler.get("raw_sequence_count"),
+        "attempt count",
+    )
+    _require_authorisation_agreement(
+        snapshot.get("train_text_sha256"),
+        input_block.get("expected_sha256"),
+        "TRAIN hash",
+    )
+    _require_authorisation_agreement(
+        snapshot.get("expected_records"),
+        input_block.get("expected_sequence_count"),
+        "record count",
+    )
+    _require_authorisation_agreement(
+        snapshot.get("expected_unique_records"),
+        input_block.get("expected_unique_count"),
+        "unique record count",
+    )
+    _require_authorisation_agreement(
+        snapshot.get("condition"),
+        config.get("condition_manifest_label"),
+        "condition",
+    )
+
+
 def assert_scientific_execution_authorisation(config, output_dir):
     """Validate the one-run authorisation block before any biological access.
 
@@ -967,6 +1340,8 @@ def assert_scientific_execution_authorisation(config, output_dir):
     Containment uses validate_output_containment. A different child of the
     production run root is output_not_authorised. This function does not open
     the frozen contract or TRAIN_TEXT and does not create a directory.
+    The returned snapshot contains every field of the validated active block,
+    in declared key order. Source key order is not significant.
     """
     execution = config.get("execution")
     if not isinstance(execution, dict) or execution.get("authorised") is not True:
@@ -1108,7 +1483,8 @@ def assert_scientific_execution_authorisation(config, output_dir):
             "output_not_authorised",
             "output directory is not the single authorised output directory",
         )
-    return cli_resolved
+    snapshot = snapshot_validated_scientific_execution_authorisation(block)
+    return cli_resolved, snapshot
 
 
 AUTHORISED_REPOSITORY_FILES = {
@@ -1703,6 +2079,13 @@ def _execute_b2(output_dir, command, test_only):
             attempt_count,
             seed,
         ) = _synthetic_parameters(config, test_only)
+        scientific_authorisation = snapshot_validated_scientific_execution_authorisation(
+            config.get("scientific_execution_authorisation")
+        )
+        _require_synthetic_authorisation_matches_config(
+            config,
+            scientific_authorisation,
+        )
         expected_contract_sha = test_only.expected_contract_sha256
         if not isinstance(expected_contract_sha, str) or expected_contract_sha == "":
             raise NullModelError(
@@ -1713,7 +2096,7 @@ def _execute_b2(output_dir, command, test_only):
         resolved_output = None
     else:
         _assert_production_config_contract(config)
-        resolved_output = assert_scientific_execution_authorisation(
+        resolved_output, scientific_authorisation = assert_scientific_execution_authorisation(
             config,
             output_dir,
         )
@@ -1827,6 +2210,7 @@ def _execute_b2(output_dir, command, test_only):
                 "deviations": deviations,
                 "stopping_reason": "completed_sampling_and_wrote_closed_output",
                 "gpu_api_invoked": gpu_api_invoked,
+                "scientific_execution_authorisation": scientific_authorisation,
             }
         )
         manifest_bytes = serialize_manifest(manifest)

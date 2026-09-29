@@ -373,7 +373,43 @@ def _synthetic_config(digest, sequence_count, attempt_count, seed):
             "  approval_source: unit test fixture",
             "  approval_scope: synthetic test only",
             "  explicitly_not_approved:",
+            "    - scientific_execution",
+            "    - B2_generation",
             "    - biological_data_runs",
+            "  m4_complete: false",
+            "scientific_execution_authorisation:",
+            "  authorisation_id: synthetic_not_a_biological_run",
+            "  authorisation_active: true",
+            "  activation_status: active_single_run",
+            '  activation_recorded_timestamp: "2000-01-01T00:00:00+00:00"',
+            "  intended_scope_approval: synthetic fixture authorization for this test invocation only",
+            "  approved_by: Synthetic Approver",
+            "  approval_date: 1 January 2000",
+            '  approval_recorded_timestamp: "2000-01-01T00:00:00+00:00"',
+            "  approval_source: unit test fixture",
+            "  scope: synthetic test invocation only",
+            "  executing_implementation_commit: synthetic",
+            "  branch: synthetic",
+            "  condition: synthetic_condition",
+            "  output_directory: synthetic-output-not-a-production-run",
+            "  train_text_path: synthetic/corpus.txt",
+            '  train_text_sha256: "{}"'.format(digest),
+            "  expected_records: {}".format(sequence_count),
+            "  expected_unique_records: {}".format(sequence_count),
+            '  alphabet: "^[ACGU]+$"',
+            "  raw_attempt_count: {}".format(attempt_count),
+            "  seed: {}".format(seed),
+            "  rng: numpy.random.default_rng",
+            "  device: CPU only",
+            "  gpu_use: prohibited",
+            "  model_loading: prohibited",
+            "  ref_access: prohibited",
+            "  eval_access: prohibited",
+            "  overwrite_or_append: prohibited",
+            "  single_run_only: true",
+            "  revoke_after_completed_or_failed_invocation: true",
+            "  second_attempt_requires_new_directory_and_new_human_authorisation: true",
+            "  success_claimed: false",
             "  m4_complete: false",
             "input:",
             "  expected_sha256: {}".format(digest),
@@ -584,6 +620,74 @@ def _refuse_biological_read(path_self, real_read, events):
         raise AssertionError("biological TRAIN_TEXT was opened")
     _refuse_completed_evidence_access(text)
     return real_read(path_self)
+
+
+def _stage1_protocol_approval():
+    """Stage 1 list that must not be readable as the invocation authority."""
+    return {
+        "approving_person": "Stage One Approver",
+        "approval_date": "29 September 2026",
+        "approval_recorded_timestamp": "2026-09-29T14:57:40+10:00",
+        "approval_source": "formal human approval in the M4 review chat",
+        "approval_scope": "Stage 1 protocol package for M4 implementation only",
+        "explicitly_not_approved": [
+            "scientific_execution",
+            "biological_data_runs",
+            "B2_generation",
+        ],
+        "m4_complete": False,
+    }
+
+
+def _observed_manifest_inputs(approval, scientific):
+    stats = null_model.compute_corpus_statistics(PINNED_SMALL_SEQUENCES)
+    return {
+        "approval": approval,
+        "scientific_execution_authorisation": scientific,
+        "git": {
+            "mres_commit": "a" * 40,
+            "mres_upstream_sha": "b" * 40,
+            "branch": "main",
+            "dirty": False,
+            "patch_sha256": None,
+            "patch_sha256_reason": "working tree clean; patch hash is not applicable",
+        },
+        "stats": stats,
+        "access_log": [],
+        "attempt_count": 4,
+        "retained_count": 4,
+        "schema_version": "m4-stage1-draft-1",
+        "experiment_id": "B2_empirical_null_draft",
+        "condition_identifier": "B2_train_matched_empirical_null",
+        "run_identifier": "authorisation-test-not-evidence",
+        "attempt_identifier": "invocation-0",
+        "started_at": "2026-09-29T00:00:00+10:00",
+        "ended_at": "2026-09-29T00:00:01+10:00",
+        "hostname": "synthetic-host",
+        "frozen_corpus_commit": "synthetic-corpus-not-biological",
+        "config_path": "synthetic-config-not-a-file",
+        "config_sha256": "c" * 64,
+        "contract_path": "synthetic-contract-not-a-file",
+        "contract_sha256": "d" * 64,
+        "input_path": "synthetic-train-not-biological",
+        "expected_input_sha256": "e" * 64,
+        "actual_input_sha256": "e" * 64,
+        "expected_sequence_count": 4,
+        "actual_sequence_count": 4,
+        "expected_unique_count": 4,
+        "actual_unique_count": 4,
+        "seed": 42,
+        "unique_count_diagnostic": 4,
+        "command": "synthetic-manifest-test",
+        "output_path": AUTHORISATION_TEST_OUTPUT + "/" + null_model.RAW_JSONL_FILENAME,
+        "output_byte_count": len(PINNED_SMALL_FIXTURE_JSONL),
+        "output_sha256": hashlib.sha256(PINNED_SMALL_FIXTURE_JSONL).hexdigest(),
+        "warnings": [],
+        "retries": [],
+        "deviations": [],
+        "stopping_reason": "completed_sampling_and_wrote_closed_output",
+        "gpu_api_invoked": False,
+    }
 
 
 def _authorised_production_config(output_directory=AUTHORISATION_TEST_OUTPUT):
@@ -1515,8 +1619,103 @@ class OutputConfigAndManifestTests(unittest.TestCase):
             self.assertIs(manifest["overwrite_refusal_check"]["exist_ok"], False)
             self.assertEqual(manifest["overwrite_refusal_check"]["creation_primitive"], "os.mkdir")
             self.assertNotIn("UNKNOWN_UNTIL_RUN", manifest_bytes.decode("utf-8"))
-            self.assertEqual(manifest["human_approval"]["approving_person"], "Synthetic Approver")
-            self.assertIs(manifest["human_approval"]["m4_complete"], False)
+            self.assertNotIn('"human_approval"', manifest_bytes.decode("utf-8"))
+            self.assertEqual(
+                list(manifest),
+                list(null_model.MANIFEST_TOP_LEVEL_KEYS),
+            )
+            self.assertEqual(list(manifest)[0], "manifest_schema_version")
+            self.assertEqual(
+                manifest["manifest_schema_version"],
+                "m4-b2-run-manifest-2",
+            )
+            self.assertEqual(manifest["schema_version"], "m4-stage1-draft-1")
+            self.assertTrue(
+                manifest_bytes.startswith(
+                    b'{"manifest_schema_version":"m4-b2-run-manifest-2",'
+                )
+            )
+            protocol = manifest["protocol_implementation_approval"]
+            self.assertEqual(
+                list(protocol),
+                list(null_model.PROTOCOL_IMPLEMENTATION_APPROVAL_KEYS),
+            )
+            self.assertNotIn("document_status", protocol)
+            self.assertNotIn("consumable_by_executable_workflow", protocol)
+            self.assertNotIn("configuration_sha256", protocol)
+            self.assertEqual(
+                protocol["configuration_document_status_at_invocation"],
+                "APPROVED_FOR_SCIENTIFIC_EXECUTION",
+            )
+            self.assertIs(
+                protocol["configuration_consumable_by_executable_workflow_at_invocation"],
+                True,
+            )
+            self.assertEqual(
+                protocol["source_configuration_sha256"],
+                manifest["configuration"]["sha256"],
+            )
+            self.assertEqual(
+                manifest["approval_status"],
+                protocol["configuration_document_status_at_invocation"],
+            )
+            self.assertIs(
+                manifest["consumable_by_executable_workflow"],
+                protocol[
+                    "configuration_consumable_by_executable_workflow_at_invocation"
+                ],
+            )
+            self.assertEqual(protocol["approving_person"], "Synthetic Approver")
+            self.assertIs(protocol["m4_complete"], False)
+            self.assertIs(protocol["authorizes_scientific_execution"], False)
+            self.assertIs(protocol["authorizes_this_invocation"], False)
+            self.assertEqual(
+                protocol["explicitly_not_approved"],
+                ["scientific_execution", "B2_generation", "biological_data_runs"],
+            )
+            self.assertIn(
+                "does not revoke scientific_execution_authorisation",
+                protocol["explicitly_not_approved_scope"],
+            )
+            self.assertIn(
+                "does not mean this invocation lacked scientific-execution approval",
+                protocol["explicitly_not_approved_scope"],
+            )
+            import yaml
+
+            synthetic_block = yaml.safe_load(config_bytes.decode("utf-8"))[
+                "scientific_execution_authorisation"
+            ]
+            scientific = manifest["scientific_execution_authorisation"]
+            self.assertEqual(
+                list(scientific),
+                list(null_model.SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS),
+            )
+            for key in null_model.SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS:
+                self.assertEqual(scientific[key], synthetic_block[key])
+            self.assertNotEqual(
+                scientific["output_directory"],
+                ONE_RUN_OUTPUT_DIRECTORY,
+            )
+            relationship = manifest["authorisation_relationship"]
+            self.assertIs(
+                relationship["scientific_execution_record_authorized_this_invocation"],
+                True,
+            )
+            self.assertIs(
+                relationship[
+                    "explicitly_not_approved_does_not_revoke_scientific_execution_authorisation"
+                ],
+                True,
+            )
+            self.assertIn(
+                "This invocation was authorized by scientific_execution_authorisation.",
+                relationship["statement"],
+            )
+            self.assertEqual(
+                null_model.serialize_manifest(manifest),
+                manifest_bytes,
+            )
             self.assertEqual(manifest["exit_status"], 0)
             self.assertEqual(manifest["rng"]["numpy_version"], __import__("numpy").__version__)
             self.assertEqual(manifest["interpreter"]["python_version"], __import__("sys").version)
@@ -1752,6 +1951,238 @@ class OutputConfigAndManifestTests(unittest.TestCase):
                 null_model.create_output_directory(missing)
             self.assertEqual(ctx.exception.code, "output_parent_missing")
             self.assertFalse(missing.exists())
+
+    def test_future_authorised_manifest_records_distinct_approval_records(self):
+        """A future authorized manifest uses the gate's snapshot, not human_approval."""
+        events = []
+        real_read = Path.read_bytes
+
+        def read_spy(path_self):
+            text = os.path.normpath(str(path_self))
+            events.append(text)
+            if text.endswith("corpus_final.txt") or "rnagenesis-mres-data" in text:
+                raise AssertionError("biological TRAIN_TEXT was opened")
+            if text.endswith("frozen_data_contract.json"):
+                raise AssertionError("frozen contract was opened")
+            _refuse_completed_evidence_access(text)
+            return real_read(path_self)
+
+        config = _authorised_production_config()
+        config["human_approval"] = _stage1_protocol_approval()
+        source_block = config["scientific_execution_authorisation"]
+        expected_snapshot = {
+            key: source_block[key]
+            for key in null_model.SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS
+        }
+        block = {
+            key: source_block[key]
+            for key in reversed(null_model.SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS)
+        }
+        self.assertNotEqual(
+            list(block),
+            list(null_model.SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS),
+        )
+        config["scientific_execution_authorisation"] = block
+        Path.read_bytes = read_spy
+        try:
+            resolved, snapshot = null_model.assert_scientific_execution_authorisation(
+                config,
+                AUTHORISATION_TEST_OUTPUT,
+            )
+            block["seed"] = 99
+            block["approved_by"] = "Reconstructed Approver"
+            config["sampler"]["seed"] = 99
+            config["input"]["expected_sha256"] = "f" * 64
+            approval = null_model.approval_from_config(config, "c" * 64)
+            manifest = null_model.build_observed_success_manifest(
+                _observed_manifest_inputs(approval, snapshot)
+            )
+        finally:
+            Path.read_bytes = real_read
+        self.assertEqual(str(resolved), AUTHORISATION_TEST_OUTPUT)
+        self.assertEqual(snapshot["output_directory"], AUTHORISATION_TEST_OUTPUT)
+        self.assertEqual(snapshot["seed"], 42)
+        self.assertEqual(snapshot["approved_by"], "Laura Hardy")
+        for key in null_model.SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS:
+            self.assertEqual(snapshot[key], expected_snapshot[key], key)
+        self.assertIs(manifest["scientific_execution_authorisation"], snapshot)
+        self.assertEqual(list(manifest)[0], "manifest_schema_version")
+        self.assertEqual(manifest["manifest_schema_version"], "m4-b2-run-manifest-2")
+        self.assertEqual(manifest["schema_version"], "m4-stage1-draft-1")
+        self.assertNotIn("human_approval", manifest)
+        self.assertEqual(list(manifest), list(null_model.MANIFEST_TOP_LEVEL_KEYS))
+        protocol = manifest["protocol_implementation_approval"]
+        self.assertNotIn("document_status", protocol)
+        self.assertNotIn("consumable_by_executable_workflow", protocol)
+        self.assertNotIn("configuration_sha256", protocol)
+        self.assertEqual(
+            protocol["configuration_document_status_at_invocation"],
+            config["document_status"],
+        )
+        self.assertIs(
+            protocol["configuration_consumable_by_executable_workflow_at_invocation"],
+            config["consumable_by_executable_workflow"],
+        )
+        self.assertEqual(protocol["source_configuration_sha256"], "c" * 64)
+        self.assertEqual(
+            manifest["approval_status"],
+            protocol["configuration_document_status_at_invocation"],
+        )
+        self.assertIs(
+            manifest["consumable_by_executable_workflow"],
+            protocol["configuration_consumable_by_executable_workflow_at_invocation"],
+        )
+        self.assertEqual(
+            list(protocol),
+            list(null_model.PROTOCOL_IMPLEMENTATION_APPROVAL_KEYS),
+        )
+        self.assertEqual(protocol["record_role"], "stage_1_protocol_implementation_approval")
+        self.assertIs(protocol["authorizes_scientific_execution"], False)
+        self.assertIs(protocol["authorizes_this_invocation"], False)
+        self.assertIn("scientific_execution", protocol["explicitly_not_approved"])
+        self.assertIn("B2_generation", protocol["explicitly_not_approved"])
+        self.assertIn(
+            "does not revoke scientific_execution_authorisation",
+            protocol["explicitly_not_approved_scope"],
+        )
+        self.assertIn(
+            "does not mean this invocation lacked scientific-execution approval",
+            protocol["explicitly_not_approved_scope"],
+        )
+        self.assertIn(
+            "scientific_execution_authorisation did authorize this invocation",
+            protocol["authorizes_this_invocation_meaning"],
+        )
+        relationship = manifest["authorisation_relationship"]
+        self.assertEqual(
+            list(relationship),
+            list(null_model.AUTHORISATION_RELATIONSHIP_KEYS),
+        )
+        self.assertIs(
+            relationship["scientific_execution_record_authorized_this_invocation"],
+            True,
+        )
+        self.assertIs(relationship["protocol_record_authorized_scientific_execution"], False)
+        self.assertIs(
+            relationship[
+                "explicitly_not_approved_does_not_revoke_scientific_execution_authorisation"
+            ],
+            True,
+        )
+        self.assertEqual(
+            relationship["statement"],
+            null_model.AUTHORISATION_RELATIONSHIP_STATEMENT,
+        )
+        self.assertTrue(
+            relationship["statement"].startswith(
+                "This invocation was authorized by scientific_execution_authorisation."
+            )
+        )
+        self.assertIn("protocol implementation only", relationship["statement"])
+        self.assertIn("does not revoke", relationship["statement"])
+        builder_source = inspect.getsource(null_model.build_observed_success_manifest)
+        self.assertNotIn('"human_approval":', builder_source)
+        self.assertNotIn("'human_approval':", builder_source)
+        self.assertNotIn("config.get", builder_source)
+        first = null_model.serialize_manifest(manifest)
+        second = null_model.serialize_manifest(manifest)
+        self.assertEqual(first, second)
+        self.assertTrue(first.endswith(b"\n"))
+        self.assertEqual(first.count(b"\n"), 1)
+        self.assertNotIn(b"\r", first)
+        self.assertFalse(first.startswith(b"\xef\xbb\xbf"))
+        self.assertNotIn(b'"human_approval"', first)
+        parsed_pairs = json.loads(first.decode("utf-8"), object_pairs_hook=list)
+        serialized_keys = [key for key, _value in parsed_pairs]
+        self.assertEqual(serialized_keys, list(null_model.MANIFEST_TOP_LEVEL_KEYS))
+        self.assertEqual(serialized_keys[0], "manifest_schema_version")
+        self.assertEqual(
+            parsed_pairs[0][1],
+            "m4-b2-run-manifest-2",
+        )
+        self.assertNotIn("human_approval", serialized_keys)
+        parsed = json.loads(first.decode("utf-8"))
+        self.assertEqual(
+            list(parsed["scientific_execution_authorisation"]),
+            list(null_model.SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS),
+        )
+        self.assertEqual(
+            null_model.serialize_manifest(parsed),
+            first,
+        )
+        self.assertFalse(any(_is_completed_evidence_path(path) for path in events))
+        self.assertFalse(Path(AUTHORISATION_TEST_OUTPUT).exists())
+        self.assertFalse(_is_completed_evidence_path(AUTHORISATION_TEST_OUTPUT))
+
+    def test_unexpected_authorisation_key_fails_before_access(self):
+        """An extra active-block key is rejected before contract, data, or output."""
+        config = _authorised_production_config()
+        config["scientific_execution_authorisation"]["revocation_recorded_timestamp"] = (
+            "2026-09-29T18:40:21+10:00"
+        )
+        result = _invoke_guarded_production(AUTHORISATION_TEST_OUTPUT, config)
+        self.assertEqual(result["error"].code, "execution_not_authorised")
+        self.assertEqual(result["contract_attempts"], 0)
+        self.assertEqual(result["created"], 0)
+        self._assert_stopped_before_biological_access(result)
+        self.assertFalse(
+            any(_is_completed_evidence_path(path) for path in result["events"])
+        )
+        self.assertFalse(
+            any(
+                path.endswith(".pt")
+                or path.endswith(".bin")
+                or path.endswith(".safetensors")
+                or "checkpoint" in path
+                for path in result["events"]
+            )
+        )
+
+    def test_missing_inactive_or_incomplete_authorisation_fails_before_access(self):
+        """Scientific authorization defects stop before contract, data, or output."""
+        cases = []
+        missing = _authorised_production_config()
+        missing.pop("scientific_execution_authorisation")
+        cases.append(("missing", missing))
+        inactive = _authorised_production_config()
+        inactive["scientific_execution_authorisation"]["authorisation_active"] = False
+        cases.append(("inactive", inactive))
+        revoked = _authorised_production_config()
+        revoked["scientific_execution_authorisation"]["activation_status"] = (
+            "revoked_after_completed_single_invocation"
+        )
+        cases.append(("revoked_status", revoked))
+        inconsistent = _authorised_production_config()
+        inconsistent["scientific_execution_authorisation"]["train_text_sha256"] = "ab" * 32
+        cases.append(("inconsistent_hash", inconsistent))
+        for key in null_model.SCIENTIFIC_EXECUTION_AUTHORISATION_KEYS:
+            incomplete = _authorised_production_config()
+            del incomplete["scientific_execution_authorisation"][key]
+            cases.append(("incomplete_" + key, incomplete))
+        for name, config in cases:
+            result = _invoke_guarded_production(AUTHORISATION_TEST_OUTPUT, config)
+            self.assertIn(
+                result["error"].code,
+                ("execution_not_authorised", "output_not_authorised"),
+                name,
+            )
+            self.assertEqual(result["contract_attempts"], 0, name)
+            self.assertEqual(result["created"], 0, name)
+            self._assert_stopped_before_biological_access(result)
+            self.assertFalse(
+                any(_is_completed_evidence_path(path) for path in result["events"]),
+                name,
+            )
+            self.assertFalse(
+                any(
+                    path.endswith(".pt")
+                    or path.endswith(".bin")
+                    or path.endswith(".safetensors")
+                    or "checkpoint" in path
+                    for path in result["events"]
+                ),
+                name,
+            )
 
     def test_pinned_small_fixture_jsonl_bytes(self):
         stats = null_model.compute_corpus_statistics(PINNED_SMALL_SEQUENCES)
