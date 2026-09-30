@@ -4,9 +4,10 @@ These tests do not load a model, initialise CUDA, query a GPU, open
 biological sequence data, execute RNAGenesis generation, or create the
 Phase A evidence directory. External operations are injected. Cleaning
 tests call the approved pure-Python audit functions on synthetic strings.
-The checked-in configuration preserves one revoked, unconsumed GPU 0
-Phase A authorisation and is not executable. Synthetic future
-authorisations name physical GPU 1. Closed-gate cases use synthetic copies.
+The checked-in configuration carries one active, unconsumed physical
+GPU 1 Phase A authorisation. The revoked, unconsumed GPU 0 authorisation
+is retained as historical provenance and is not executable. Closed-gate
+cases use synthetic copies.
 """
 
 from __future__ import annotations
@@ -66,23 +67,34 @@ runner = load_source_module(
 )
 
 COMMIT = "a" * 40
-IMPLEMENTATION_COMMIT = "bdb3dbda1650a3bd65407e1deadcf0862249f972"
-AUTHORISATION_ID = "m4_b1_phase_a_bdb3dbda1650_gpu0_attempt1"
+IMPLEMENTATION_COMMIT = "de60793a66d134e1d4b48bfe9ac9c5abe3874758"
+AUTHORISATION_ID = "m4_b1_phase_a_de60793a66d1_gpu1_attempt1"
 REAL_EVIDENCE = Path(
+    "/home/laura/rnagenesis-mres-runs/"
+    "m4_b1_generic_generation_B1_generic_released_rnagenesis_de60793a66d1_phaseA"
+)
+HISTORICAL_IMPLEMENTATION_COMMIT = "bdb3dbda1650a3bd65407e1deadcf0862249f972"
+HISTORICAL_AUTHORISATION_ID = "m4_b1_phase_a_bdb3dbda1650_gpu0_attempt1"
+HISTORICAL_EVIDENCE = Path(
     "/home/laura/rnagenesis-mres-runs/"
     "m4_b1_generic_generation_B1_generic_released_rnagenesis_bdb3dbda1650_phaseA"
 )
+PROTECTED_EVIDENCE = (REAL_EVIDENCE, HISTORICAL_EVIDENCE)
 WEIGHT_SUFFIXES = (".bin", ".safetensors")
 
 
+def assert_protected_evidence_absent(message):
+    for path in PROTECTED_EVIDENCE:
+        if path.exists() or path.is_symlink():
+            raise AssertionError("{}: {}".format(message, path))
+
+
 def setUpModule():
-    if REAL_EVIDENCE.exists() or REAL_EVIDENCE.is_symlink():
-        raise AssertionError("real Phase A evidence path already exists")
+    assert_protected_evidence_absent("real Phase A evidence path already exists")
 
 
 def tearDownModule():
-    if REAL_EVIDENCE.exists() or REAL_EVIDENCE.is_symlink():
-        raise AssertionError("real Phase A evidence path was created")
+    assert_protected_evidence_absent("real Phase A evidence path was created")
     loaded = [name for name in FORBIDDEN_RUNTIME_MODULES if name in sys.modules]
     if loaded:
         raise AssertionError(
@@ -243,22 +255,26 @@ def assign_path(config, path, value):
 
 
 class ClosedGateTests(unittest.TestCase):
-    def test_checked_in_configuration_is_revoked_unconsumed_gpu0(self):
+    def test_checked_in_configuration_is_active_unconsumed_gpu1(self):
         config = real_config()
         text = real_config_bytes().decode("utf-8")
         block = config["scientific_execution_authorisation"]
         self.assertEqual(set(block), set(runner.SCIENTIFIC_AUTHORISATION_KEYS))
         self.assertEqual(list(block), list(runner.SCIENTIFIC_AUTHORISATION_KEYS))
+        self.assertEqual(len(block), 18)
+        snapshot = runner.assert_document_gates(config)
+        self.assertEqual(snapshot, block)
         self.assertEqual(block["authorisation_id"], AUTHORISATION_ID)
-        self.assertIs(block["authorisation_active"], False)
-        self.assertEqual(block["activation_status"], "revoked_unconsumed")
-        self.assertNotEqual(block["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
+        self.assertIs(block["authorisation_active"], True)
+        self.assertEqual(block["activation_status"], "active_unconsumed")
+        self.assertEqual(block["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
         self.assertIs(block["consumed"], False)
         self.assertIs(block["authorises_b1_phase_a"], True)
         self.assertIs(block["gpu_use_authorised"], True)
         self.assertIs(type(block["physical_gpu"]), int)
-        self.assertEqual(block["physical_gpu"], 0)
-        self.assertNotEqual(block["physical_gpu"], runner.PHYSICAL_GPU)
+        self.assertEqual(block["physical_gpu"], 1)
+        self.assertEqual(block["physical_gpu"], runner.PHYSICAL_GPU)
+        self.assertNotEqual(block["physical_gpu"], "1")
         self.assertEqual(block["executing_implementation_commit"], IMPLEMENTATION_COMMIT)
         self.assertEqual(block["mres_branch"], "main")
         self.assertEqual(block["condition"], "B1_generic_released_rnagenesis")
@@ -274,36 +290,79 @@ class ClosedGateTests(unittest.TestCase):
             block["evidence_directory"],
             runner.evidence_directory_for_commit(IMPLEMENTATION_COMMIT),
         )
-        self.assertEqual(
-            [line.strip() for line in text.splitlines() if "rnagenesis-mres-runs" in line],
-            [
-                "output_directory: {}".format(REAL_EVIDENCE),
-                "evidence_directory: {}".format(REAL_EVIDENCE),
-            ],
-        )
         self.assertIs(block["success_claimed"], False)
         self.assertIs(block["m4_complete"], False)
         self.assertIs(block["b1_eligible"], False)
         self.assertIs(block["phase_b_authorised"], False)
         self.assertIs(block["development_pool_authorised"], False)
-        self.assertIs(config["consumable_by_executable_workflow"], False)
+        historical_records = config["historical_scientific_execution_authorisations"]
+        self.assertEqual(len(historical_records), 1)
+        historical = historical_records[0]
+        self.assertEqual(set(historical), set(runner.SCIENTIFIC_AUTHORISATION_KEYS))
+        self.assertEqual(list(historical), list(runner.SCIENTIFIC_AUTHORISATION_KEYS))
+        self.assertEqual(len(historical), 18)
+        self.assertEqual(historical["authorisation_id"], HISTORICAL_AUTHORISATION_ID)
+        self.assertNotEqual(historical["authorisation_id"], block["authorisation_id"])
+        self.assertIs(historical["authorisation_active"], False)
+        self.assertEqual(historical["activation_status"], "revoked_unconsumed")
+        self.assertNotEqual(historical["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
+        self.assertIs(historical["consumed"], False)
+        self.assertIs(type(historical["physical_gpu"]), int)
+        self.assertEqual(historical["physical_gpu"], 0)
+        self.assertNotEqual(historical["physical_gpu"], block["physical_gpu"])
         self.assertEqual(
-            config["document_status"],
-            "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+            historical["executing_implementation_commit"],
+            HISTORICAL_IMPLEMENTATION_COMMIT,
         )
-        self.assertNotEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
-        self.assertIs(config["phase_a"]["executable_now"], False)
+        self.assertNotEqual(
+            historical["executing_implementation_commit"],
+            block["executing_implementation_commit"],
+        )
+        self.assertEqual(historical["mres_branch"], "main")
+        self.assertEqual(historical["condition"], runner.CONDITION_LABEL)
+        self.assertEqual(historical["phase"], "A")
+        self.assertEqual(historical["output_directory"], str(HISTORICAL_EVIDENCE))
+        self.assertEqual(historical["evidence_directory"], str(HISTORICAL_EVIDENCE))
         self.assertEqual(
-            config["phase_a"]["status"],
-            "APPROVED_DESIGN_NOT_APPROVED_FOR_GPU_EXECUTION",
+            historical["output_directory"],
+            runner.evidence_directory_for_commit(HISTORICAL_IMPLEMENTATION_COMMIT),
         )
-        self.assertNotEqual(config["phase_a"]["status"], runner.PHASE_A_EXECUTION_STATUS)
+        self.assertEqual(
+            historical["evidence_directory"],
+            runner.evidence_directory_for_commit(HISTORICAL_IMPLEMENTATION_COMMIT),
+        )
+        self.assertNotEqual(historical["output_directory"], block["output_directory"])
+        self.assertNotEqual(historical["evidence_directory"], block["evidence_directory"])
+        self.assertIs(historical["success_claimed"], False)
+        self.assertIs(historical["m4_complete"], False)
+        self.assertIs(historical["b1_eligible"], False)
+        self.assertIs(historical["phase_b_authorised"], False)
+        self.assertIs(historical["development_pool_authorised"], False)
+        self.assertNotEqual(historical, block)
+        self.assertEqual(
+            [line.strip() for line in text.splitlines() if "rnagenesis-mres-runs" in line],
+            [
+                "output_directory: {}".format(REAL_EVIDENCE),
+                "evidence_directory: {}".format(REAL_EVIDENCE),
+                "output_directory: {}".format(HISTORICAL_EVIDENCE),
+                "evidence_directory: {}".format(HISTORICAL_EVIDENCE),
+            ],
+        )
+        refused = opened_config()
+        refused["scientific_execution_authorisation"] = copy.deepcopy(historical)
+        with self.assertRaises(runner.B1RunnerError) as caught:
+            runner.assert_document_gates(refused)
+        self.assertEqual(caught.exception.code, "scientific_authorisation_inactive")
+        self.assertIs(config["consumable_by_executable_workflow"], True)
+        self.assertEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
+        self.assertIs(config["phase_a"]["executable_now"], True)
+        self.assertEqual(config["phase_a"]["status"], runner.PHASE_A_EXECUTION_STATUS)
         self.assertEqual(
             config["phase_a"]["blocked_until"],
             "separate_explicit_physical_gpu_1_authorisation",
         )
-        self.assertIs(config["execution"]["authorised"], False)
-        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], False)
+        self.assertIs(config["execution"]["authorised"], True)
+        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], True)
         self.assertIs(config["phase_b"]["executable_now"], False)
         self.assertIs(config["execution"]["gpu_authorised_by_this_draft"], False)
         shared = config["shared_generation_settings"]
@@ -311,6 +370,7 @@ class ClosedGateTests(unittest.TestCase):
         self.assertEqual(shared["physical_gpu"], 1)
         self.assertEqual(shared["physical_gpu"], runner.PHYSICAL_GPU)
         self.assertEqual(shared["cuda_visible_devices"], "1")
+        self.assertIs(type(shared["cuda_visible_devices"]), str)
         self.assertEqual(shared["cuda_visible_devices"], str(runner.PHYSICAL_GPU))
         self.assertEqual(shared["cuda_device_order"], "PCI_BUS_ID")
         self.assertEqual(shared["cuda_device_order"], runner.CUDA_DEVICE_ORDER)
@@ -334,16 +394,7 @@ class ClosedGateTests(unittest.TestCase):
         plan = runner.build_phase_a_plan(config)
         self.assertEqual(len(plan), 33)
         self.assertEqual(len(plan) * 16, 528)
-        with self.assertRaises(runner.B1RunnerError) as caught:
-            runner.assert_document_gates(config)
-        self.assertEqual(caught.exception.code, "configuration_not_consumable")
-        for environ in ({}, open_environ()):
-            recorder = RecordingDeps(real_config_bytes(), environ)
-            code, stderr = run_main(recorder.build(), str(REAL_EVIDENCE))
-            assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
-            self.assertNotIn("nvidia-smi", stderr)
-        self.assertFalse(REAL_EVIDENCE.exists())
-        self.assertFalse(REAL_EVIDENCE.is_symlink())
+        assert_protected_evidence_absent("real Phase A evidence path was created")
 
     def test_synthetic_closed_configuration_refuses_before_side_effects(self):
         recorder = RecordingDeps(
@@ -513,7 +564,7 @@ class ClosedGateTests(unittest.TestCase):
             runner.assert_document_gates(missing_gpu)
         self.assertEqual(caught.exception.code, "scientific_authorisation_incomplete")
         self.assertIn("physical_gpu", caught.exception.detail)
-        self.assertFalse(REAL_EVIDENCE.exists())
+        assert_protected_evidence_absent("real Phase A evidence path was created")
 
 
 class AuthorisationTests(unittest.TestCase):
@@ -619,12 +670,54 @@ class AuthorisationTests(unittest.TestCase):
             runner.evidence_directory_for_commit(commit),
             str(REAL_EVIDENCE),
         )
+        self.assertEqual(
+            runner.evidence_directory_for_commit(HISTORICAL_IMPLEMENTATION_COMMIT),
+            str(HISTORICAL_EVIDENCE),
+        )
+        self.assertNotEqual(str(REAL_EVIDENCE), str(HISTORICAL_EVIDENCE))
         config = opened_config(commit)
+        config["scientific_execution_authorisation"]["authorisation_id"] = AUTHORISATION_ID
+        self.assertEqual(
+            config["scientific_execution_authorisation"]["physical_gpu"],
+            1,
+        )
+        self.assertIs(
+            type(config["scientific_execution_authorisation"]["physical_gpu"]),
+            int,
+        )
         config["scientific_execution_authorisation"]["output_directory"] = "/tmp/other"
         with self.assertRaises(runner.B1RunnerError) as caught:
             runner.assert_document_gates(config)
         self.assertEqual(caught.exception.code, "authorisation_evidence_mismatch")
-        self.assertFalse(REAL_EVIDENCE.exists())
+        historical_path = opened_config(commit)
+        historical_path["scientific_execution_authorisation"]["output_directory"] = str(
+            HISTORICAL_EVIDENCE
+        )
+        historical_path["scientific_execution_authorisation"]["evidence_directory"] = str(
+            HISTORICAL_EVIDENCE
+        )
+        with self.assertRaises(runner.B1RunnerError) as caught:
+            runner.assert_document_gates(historical_path)
+        self.assertEqual(caught.exception.code, "authorisation_evidence_mismatch")
+        wrong_commit = opened_config(HISTORICAL_IMPLEMENTATION_COMMIT)
+        self.assertEqual(
+            wrong_commit["scientific_execution_authorisation"]["executing_implementation_commit"],
+            HISTORICAL_IMPLEMENTATION_COMMIT,
+        )
+        self.assertNotEqual(
+            wrong_commit["scientific_execution_authorisation"]["evidence_directory"],
+            str(REAL_EVIDENCE),
+        )
+        wrong_commit["scientific_execution_authorisation"]["output_directory"] = str(
+            REAL_EVIDENCE
+        )
+        wrong_commit["scientific_execution_authorisation"]["evidence_directory"] = str(
+            REAL_EVIDENCE
+        )
+        with self.assertRaises(runner.B1RunnerError) as caught:
+            runner.assert_document_gates(wrong_commit)
+        self.assertEqual(caught.exception.code, "authorisation_evidence_mismatch")
+        assert_protected_evidence_absent("real Phase A evidence path was created")
 
 
 class CudaAndOutputTests(unittest.TestCase):
@@ -680,10 +773,9 @@ class CudaAndOutputTests(unittest.TestCase):
             {"CUDA_VISIBLE_DEVICES": "", "CUDA_DEVICE_ORDER": ""},
         )
         code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
-        assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
+        assert_closed(self, code, stderr, recorder, "cuda_visible_devices_refused")
         self.assertNotIn("nvidia-smi", stderr)
-        self.assertFalse(REAL_EVIDENCE.exists())
-        self.assertFalse(REAL_EVIDENCE.is_symlink())
+        assert_protected_evidence_absent("real Phase A evidence path was created")
 
     def test_real_evidence_aliases_refuse_before_lstat(self):
         expected = str(REAL_EVIDENCE)
@@ -693,13 +785,14 @@ class CudaAndOutputTests(unittest.TestCase):
             "/home/laura/rnagenesis-mres-runs/../rnagenesis-mres-runs/"
             + REAL_EVIDENCE.name,
             "/tmp/b1-not-the-evidence-path",
+            str(HISTORICAL_EVIDENCE),
         ]
         for output_dir in supplied:
             recorder = RecordingDeps(real_config_bytes(), open_environ())
             code, stderr = run_main(recorder.build(), output_dir)
-            assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
-        self.assertFalse(REAL_EVIDENCE.exists())
-        self.assertFalse(REAL_EVIDENCE.is_symlink())
+            assert_closed(self, code, stderr, recorder, "output_path_mismatch")
+            self.assertNotIn("nvidia-smi", stderr)
+        assert_protected_evidence_absent("real Phase A evidence path was created")
 
     def test_output_mismatch_relative_and_alias_refuse_before_lstat(self):
         expected = runner.evidence_directory_for_commit(COMMIT)

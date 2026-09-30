@@ -1,13 +1,13 @@
-# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
-# The physical GPU 0 Phase A authorisation is revoked and was not consumed.
-# No Phase A evidence was produced. This file does not authorise execution.
-# Generation settings name physical GPU 1 for a future authorisation.
-# That authorisation is not active. Phase B, B1 eligibility, and the
+# APPROVED_FOR_SCIENTIFIC_EXECUTION
+# One unconsumed physical GPU 1 Phase A authorisation may be consumed by
+# the executable workflow. The physical GPU 0 Phase A authorisation is
+# revoked, was not consumed, and is retained as historical provenance.
+# No Phase A evidence was produced. Phase B, B1 eligibility, and the
 # development pool are not authorised.
 # This file does not declare a final length-matching algorithm.
 
-document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
-consumable_by_executable_workflow: false
+document_status: APPROVED_FOR_SCIENTIFIC_EXECUTION
+consumable_by_executable_workflow: true
 human_approval:
   approving_person: Laura Hardy
   approval_date: 29 September 2026
@@ -36,32 +36,54 @@ metric_set_schema_version: m4-stage1-draft-1
 created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
 
 execution:
-  authorised: false
+  authorised: true
   gpu_authorised_by_this_draft: false
-  gpu_authorised_by_this_approval: false
+  gpu_authorised_by_this_approval: true
   evidence_directory_created_by_this_stage: false
   overwrite_existing_output: refuse
   silent_truncation: false
 
 scientific_execution_authorisation:
-  authorisation_id: m4_b1_phase_a_bdb3dbda1650_gpu0_attempt1
-  authorisation_active: false
-  activation_status: revoked_unconsumed
+  authorisation_id: m4_b1_phase_a_de60793a66d1_gpu1_attempt1
+  authorisation_active: true
+  activation_status: active_unconsumed
   consumed: false
   authorises_b1_phase_a: true
   gpu_use_authorised: true
-  physical_gpu: 0
-  executing_implementation_commit: bdb3dbda1650a3bd65407e1deadcf0862249f972
+  physical_gpu: 1
+  executing_implementation_commit: de60793a66d134e1d4b48bfe9ac9c5abe3874758
   mres_branch: main
   condition: B1_generic_released_rnagenesis
   phase: A
-  output_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_bdb3dbda1650_phaseA
-  evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_bdb3dbda1650_phaseA
+  output_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_de60793a66d1_phaseA
+  evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_de60793a66d1_phaseA
   success_claimed: false
   m4_complete: false
   b1_eligible: false
   phase_b_authorised: false
   development_pool_authorised: false
+
+# Historical provenance only. This GPU 0 record is revoked and unconsumed.
+# It does not authorise execution.
+historical_scientific_execution_authorisations:
+  - authorisation_id: m4_b1_phase_a_bdb3dbda1650_gpu0_attempt1
+    authorisation_active: false
+    activation_status: revoked_unconsumed
+    consumed: false
+    authorises_b1_phase_a: true
+    gpu_use_authorised: true
+    physical_gpu: 0
+    executing_implementation_commit: bdb3dbda1650a3bd65407e1deadcf0862249f972
+    mres_branch: main
+    condition: B1_generic_released_rnagenesis
+    phase: A
+    output_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_bdb3dbda1650_phaseA
+    evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_bdb3dbda1650_phaseA
+    success_claimed: false
+    m4_complete: false
+    b1_eligible: false
+    phase_b_authorised: false
+    development_pool_authorised: false
 
 immutable_model_selection:
   encdec: configs/rnagenesis/autoencoder
@@ -126,9 +148,9 @@ cleaner_rule:
     limitation: five_step_two_sequence_smoke_not_a_50_step_length_law
 
 phase_a:
-  status: APPROVED_DESIGN_NOT_APPROVED_FOR_GPU_EXECUTION
+  status: AUTHORISED_FOR_EXECUTION
   blocked_until: separate_explicit_physical_gpu_1_authorisation
-  executable_now: false
+  executable_now: true
   purpose: characterize_max_seq_len_versus_cleaned_length
   does_not_select_a_mapping: true
   target_biological_lengths: [20, 30, 40, 50, 60, 70, 80, 90, 100, 112, 123]
