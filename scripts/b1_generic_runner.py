@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """Non-executable M4 B1 Phase A runner.
 
-The checked-in B1 configuration is approved for implementation only.
-This module constructs the Phase A plan, the future generation commands,
-and the evidence writers. It does not import a model stack or Torch. The
+The checked-in B1 configuration revokes an unconsumed physical GPU 0
+Phase A authorisation. That authorisation produced no evidence. This
+module constructs the Phase A plan, the future generation commands, and
+the evidence writers. It does not import a model stack or Torch. The
 current document fails closed before a directory is created, a GPU is
 queried, a multi-gigabyte weight is hashed, the approved cleaner is
 imported, or another Python process is started.
 
-A future authorised preflight queries physical GPU 0 and then confirms
-logical cuda:0 inside a child process. That child is the only place Torch
-is imported. This process never treats CUDA_VISIBLE_DEVICES or nvidia-smi
-as confirmation that logical device 0 is usable.
+A future authorised preflight may name only physical GPU 1. It queries
+that device and then confirms logical cuda:0 inside a child process.
+That child is the only place Torch is imported. This process never treats
+CUDA_VISIBLE_DEVICES, CUDA_DEVICE_ORDER, or nvidia-smi as confirmation
+that logical device 0 is usable.
 
 Phase A is a response-mapping experiment. It does not declare B1 eligible,
 infer a Phase B length mapping, sample the development pool, or evaluate
@@ -21,6 +23,7 @@ corpus-dependent guardrails.
 from __future__ import annotations
 
 import argparse
+import collections.abc
 import hashlib
 import json
 import os
@@ -94,6 +97,10 @@ NON_EXECUTABLE_DOCUMENT_STATUSES = frozenset(
 )
 PHASE_A_EXECUTION_STATUS = "AUTHORISED_FOR_EXECUTION"
 ACTIVE_UNCONSUMED_STATUS = "active_unconsumed"
+# The next executable authorisation may name only this physical device.
+# Logical cuda:0 is that device after visibility remapping.
+PHYSICAL_GPU = 1
+CUDA_DEVICE_ORDER = "PCI_BUS_ID"
 MANIFEST_SCHEMA_VERSION = "m4-b1-phase-a-manifest-1"
 
 REQUESTED_LENGTHS = (20, 30, 40, 50, 60, 70, 80, 90, 100, 112, 123)
@@ -262,6 +269,7 @@ CUDA_PROBE_KEYS = (
     "allocation_ok",
     "packages",
     "cuda_visible_devices",
+    "cuda_device_order",
 )
 
 
@@ -285,6 +293,7 @@ def _cuda_probe_lines():
         '    "allocation_ok": False,',
         '    "packages": {},',
         '    "cuda_visible_devices": __import__("os").environ.get("CUDA_VISIBLE_DEVICES"),',
+        '    "cuda_device_order": __import__("os").environ.get("CUDA_DEVICE_ORDER"),',
         "}",
         "def package_version(distribution, module_name):",
         "    try:",
@@ -694,10 +703,10 @@ def _validate_scientific_authorisation(block, config):
             "gpu_not_authorised",
             "gpu_use_authorised is not true",
         )
-    if type(block["physical_gpu"]) is not int or block["physical_gpu"] != 0:
+    if type(block["physical_gpu"]) is not int or block["physical_gpu"] != PHYSICAL_GPU:
         raise B1RunnerError(
             "gpu_not_authorised",
-            "authorisation does not name physical GPU 0",
+            "authorisation does not name physical GPU {}".format(PHYSICAL_GPU),
         )
     commit = _require_text(block, "executing_implementation_commit")
     if not _is_sha40(commit):
@@ -877,9 +886,26 @@ def build_phase_a_plan(config):
         ("cpu_fallback", False, "cpu fallback is enabled"),
         ("other_gpu_fallback", False, "other GPU fallback is enabled"),
         ("visible_python_device", "cuda:0", "visible device is not cuda:0"),
-        ("cuda_visible_devices", "0", "configured CUDA_VISIBLE_DEVICES is not 0"),
-        ("physical_gpu", 0, "configured physical GPU is not 0"),
+        (
+            "cuda_visible_devices",
+            str(PHYSICAL_GPU),
+            "configured CUDA_VISIBLE_DEVICES is not {}".format(PHYSICAL_GPU),
+        ),
+        (
+            "cuda_device_order",
+            CUDA_DEVICE_ORDER,
+            "configured CUDA_DEVICE_ORDER is not {}".format(CUDA_DEVICE_ORDER),
+        ),
     )
+    if (
+        "physical_gpu" not in shared
+        or type(shared["physical_gpu"]) is not int
+        or shared["physical_gpu"] != PHYSICAL_GPU
+    ):
+        raise B1RunnerError(
+            "phase_a_plan_invalid",
+            "configured physical GPU is not {}".format(PHYSICAL_GPU),
+        )
     for key, expected, detail in checks:
         if key not in shared or shared[key] != expected:
             code = (
@@ -916,17 +942,32 @@ def build_phase_a_plan(config):
     return invocations
 
 
-def assert_cuda_visible_devices(environ):
-    if "CUDA_VISIBLE_DEVICES" not in environ:
+def assert_cuda_environment(environ):
+    """Refuse any parent or child environment that is not physical GPU 1.
+
+    Both variables must match exactly. This runs before GPU preflight.
+    """
+    if not isinstance(environ, collections.abc.Mapping) or "CUDA_VISIBLE_DEVICES" not in environ:
         raise B1RunnerError(
             "cuda_visible_devices_missing",
             "CUDA_VISIBLE_DEVICES is not set",
         )
-    value = environ["CUDA_VISIBLE_DEVICES"]
-    if value != "0":
+    visible = environ["CUDA_VISIBLE_DEVICES"]
+    if type(visible) is not str or visible != str(PHYSICAL_GPU):
         raise B1RunnerError(
             "cuda_visible_devices_refused",
-            'CUDA_VISIBLE_DEVICES must be exactly "0"',
+            'CUDA_VISIBLE_DEVICES must be exactly "{}"'.format(PHYSICAL_GPU),
+        )
+    if "CUDA_DEVICE_ORDER" not in environ:
+        raise B1RunnerError(
+            "cuda_device_order_missing",
+            "CUDA_DEVICE_ORDER is not set",
+        )
+    order = environ["CUDA_DEVICE_ORDER"]
+    if type(order) is not str or order != CUDA_DEVICE_ORDER:
+        raise B1RunnerError(
+            "cuda_device_order_refused",
+            'CUDA_DEVICE_ORDER must be exactly "{}"'.format(CUDA_DEVICE_ORDER),
         )
 
 
@@ -1427,11 +1468,7 @@ def assert_runtime_isolation(evidence_dir, realpath=None):
 
 
 def build_child_environment(parent, evidence_dir, realpath=None):
-    if "CUDA_VISIBLE_DEVICES" not in parent or parent["CUDA_VISIBLE_DEVICES"] != "0":
-        raise B1RunnerError(
-            "cuda_visible_devices_refused",
-            'child environment requires CUDA_VISIBLE_DEVICES exactly "0"',
-        )
+    assert_cuda_environment(parent)
     original_items = list(parent.items())
     child = dict(parent)
     child.update(OFFLINE_CONTROLS)
@@ -1442,11 +1479,7 @@ def build_child_environment(parent, evidence_dir, realpath=None):
             "parent_environment_mutated",
             "parent environment was modified",
         )
-    if child["CUDA_VISIBLE_DEVICES"] != "0":
-        raise B1RunnerError(
-            "cuda_visible_devices_refused",
-            "child CUDA_VISIBLE_DEVICES drifted",
-        )
+    assert_cuda_environment(child)
     if child.get("PYTHONDONTWRITEBYTECODE") != "1":
         raise B1RunnerError(
             "runtime_cache_not_isolated",
@@ -1472,10 +1505,10 @@ def build_subprocess_invocation(invocation, evidence_dir, parent_env, realpath=N
 def physical_gpu_query_argv():
     return [
         "nvidia-smi",
-        "--query-gpu=index,uuid,name,memory.total,compute_mode",
+        "--query-gpu=index,uuid,pci.bus_id,name,memory.total,compute_mode",
         "--format=csv,noheader,nounits",
         "-i",
-        "0",
+        str(PHYSICAL_GPU),
     ]
 
 
@@ -1490,11 +1523,7 @@ def cuda_probe_argv():
 
 def build_cuda_probe_command(child_env):
     """Probe command. Uses the same interpreter and child environment as generation."""
-    if child_env.get("CUDA_VISIBLE_DEVICES") != "0":
-        raise B1RunnerError(
-            "cuda_visible_devices_refused",
-            'child environment requires CUDA_VISIBLE_DEVICES exactly "0"',
-        )
+    assert_cuda_environment(child_env)
     return {
         "argv": cuda_probe_argv(),
         "cwd": GENERATION_CWD,
@@ -1508,31 +1537,39 @@ def parse_gpu_identity(text):
     if len(lines) != 1:
         raise B1RunnerError(
             "cpu_fallback_prohibited",
-            "physical GPU 0 query did not return one device",
+            "physical GPU {} query did not return one device".format(PHYSICAL_GPU),
         )
     parts = [part.strip() for part in lines[0].split(",")]
-    if len(parts) != 5:
+    if len(parts) != 6:
         raise B1RunnerError(
             "cpu_fallback_prohibited",
-            "physical GPU 0 query was incomplete",
+            "physical GPU {} query was incomplete".format(PHYSICAL_GPU),
         )
-    index_text, uuid, name, memory, compute_mode = parts
-    if index_text != "0" or uuid == "" or uuid.upper() == "N/A":
+    index_text, uuid, pci_bus_id, name, memory, compute_mode = parts
+    if index_text != str(PHYSICAL_GPU) or uuid == "" or uuid.upper() == "N/A":
         raise B1RunnerError(
             "cpu_fallback_prohibited",
-            "physical GPU 0 did not report a usable identity",
+            "physical GPU {} did not report a usable identity".format(PHYSICAL_GPU),
         )
-    if name == "" or memory == "" or compute_mode == "":
+    if (
+        pci_bus_id == ""
+        or pci_bus_id.upper() == "N/A"
+        or name == ""
+        or memory == ""
+        or compute_mode == ""
+    ):
         raise B1RunnerError(
             "cpu_fallback_prohibited",
-            "physical GPU 0 identity was incomplete",
+            "physical GPU {} identity was incomplete".format(PHYSICAL_GPU),
         )
     return {
-        "index": 0,
+        "index": PHYSICAL_GPU,
         "uuid": uuid,
+        "pci_bus_id": pci_bus_id,
         "name": name,
         "memory": memory,
         "compute_mode": compute_mode,
+        "physical_gpu": PHYSICAL_GPU,
         "cpu_fallback": False,
     }
 
@@ -1611,10 +1648,39 @@ def validate_cuda_probe(payload, physical_identity, resolve_python=None):
             "cuda_probe_mismatch",
             "logical CUDA device 0 was not confirmed",
         )
-    if payload.get("cuda_visible_devices") != "0":
+    if payload.get("cuda_visible_devices") != str(PHYSICAL_GPU):
         raise B1RunnerError(
             "cuda_probe_mismatch",
-            "CUDA probe did not observe CUDA_VISIBLE_DEVICES=0",
+            "CUDA probe did not observe CUDA_VISIBLE_DEVICES={}".format(PHYSICAL_GPU),
+        )
+    if payload.get("cuda_device_order") != CUDA_DEVICE_ORDER:
+        raise B1RunnerError(
+            "cuda_probe_mismatch",
+            "CUDA probe did not observe CUDA_DEVICE_ORDER={}".format(CUDA_DEVICE_ORDER),
+        )
+    if (
+        type(physical_identity.get("index")) is not int
+        or physical_identity.get("index") != PHYSICAL_GPU
+        or physical_identity.get("physical_gpu") != PHYSICAL_GPU
+        or physical_identity.get("cpu_fallback") is not False
+    ):
+        raise B1RunnerError(
+            "cpu_fallback_prohibited",
+            "physical GPU {} identity was not confirmed".format(PHYSICAL_GPU),
+        )
+    pci_bus_id = physical_identity.get("pci_bus_id")
+    uuid = physical_identity.get("uuid")
+    if (
+        not isinstance(pci_bus_id, str)
+        or pci_bus_id.strip() == ""
+        or pci_bus_id.upper() == "N/A"
+        or not isinstance(uuid, str)
+        or uuid.strip() == ""
+        or uuid.upper() == "N/A"
+    ):
+        raise B1RunnerError(
+            "cpu_fallback_prohibited",
+            "physical GPU {} identity was incomplete".format(PHYSICAL_GPU),
         )
     device_name = payload.get("device_name")
     if not isinstance(device_name, str) or device_name.strip() == "":
@@ -1622,7 +1688,7 @@ def validate_cuda_probe(payload, physical_identity, resolve_python=None):
     if device_name != physical_identity["name"]:
         raise B1RunnerError(
             "cuda_probe_mismatch",
-            "Torch device name did not match physical GPU 0",
+            "Torch device name did not match physical GPU {}".format(PHYSICAL_GPU),
         )
     pinned_resolved = _resolved_python(PINNED_PYTHON, resolve_python)
     observed_resolved = _resolved_python(payload.get("python_executable"), resolve_python)
@@ -1651,6 +1717,10 @@ def validate_cuda_probe(payload, physical_identity, resolve_python=None):
     if recorded["torch"] != torch_version:
         raise B1RunnerError("cuda_probe_malformed", "package versions were missing")
     return {
+        "index": PHYSICAL_GPU,
+        "physical_gpu": PHYSICAL_GPU,
+        "uuid": uuid,
+        "pci_bus_id": pci_bus_id,
         "logical_device": "cuda:0",
         "logical_device_index": 0,
         "logical_device_confirmed": True,
@@ -1663,22 +1733,20 @@ def validate_cuda_probe(payload, physical_identity, resolve_python=None):
         "cuda_version": payload.get("cuda_version"),
         "packages": recorded,
         "cpu_fallback": False,
-        "cuda_visible_devices": "0",
+        "cuda_visible_devices": str(PHYSICAL_GPU),
+        "cuda_device_order": CUDA_DEVICE_ORDER,
     }
 
 
 def preflight_gpu(child_env, query_text, probe_text, resolve_python=None):
-    """Query physical GPU 0, then confirm logical cuda:0 in the child probe.
+    """Query physical GPU 1, then confirm logical cuda:0 in the child probe.
 
     query_text and probe_text run only after the child environment is already
-    CUDA_VISIBLE_DEVICES=0. Neither callback is Torch. logical_device_confirmed
-    is taken only from a probe that allocated and synchronized a tensor.
+    CUDA_VISIBLE_DEVICES=1 and CUDA_DEVICE_ORDER=PCI_BUS_ID. Neither callback
+    is Torch. logical_device_confirmed is taken only from a probe that
+    allocated and synchronized a tensor on cuda:0.
     """
-    if child_env.get("CUDA_VISIBLE_DEVICES") != "0":
-        raise B1RunnerError(
-            "cpu_fallback_prohibited",
-            "child would not see physical GPU 0 as cuda:0",
-        )
+    assert_cuda_environment(child_env)
     identity = parse_gpu_identity(query_text())
     if identity.get("logical_device_confirmed") is True:
         raise B1RunnerError(
@@ -1702,7 +1770,7 @@ def default_query_gpu_text():
     if completed.returncode != 0 or completed.stdout.strip() == "":
         raise B1RunnerError(
             "cpu_fallback_prohibited",
-            "physical GPU 0 query failed",
+            "physical GPU {} query failed".format(PHYSICAL_GPU),
         )
     return completed.stdout
 
@@ -2179,7 +2247,9 @@ def _authorization_view(snapshot):
 
 def _child_environment_controls(evidence_dir):
     controls = {
-        "CUDA_VISIBLE_DEVICES": "0",
+        "CUDA_VISIBLE_DEVICES": str(PHYSICAL_GPU),
+        "CUDA_DEVICE_ORDER": CUDA_DEVICE_ORDER,
+        "physical_gpu": PHYSICAL_GPU,
         "HF_HUB_OFFLINE": "1",
         "TRANSFORMERS_OFFLINE": "1",
         "HF_DATASETS_OFFLINE": "1",
@@ -3005,16 +3075,17 @@ def run(output_dir, deps):
     """Execute only after every cheap gate has passed.
 
     Gate order is deliberate: document and authorisation fields, the Phase A
-    plan, CUDA_VISIBLE_DEVICES, the output path, repository pins, small file
-    pins, then multi-gigabyte weights, the runner bytes, the physical GPU 0
-    query, and the pinned-interpreter CUDA probe. Directory creation happens
-    only after those gates. The CUDA probe is the last gate before mkdir.
+    plan, CUDA_VISIBLE_DEVICES and CUDA_DEVICE_ORDER, the output path,
+    repository pins, small file pins, then multi-gigabyte weights, the runner
+    bytes, the physical GPU query, and the pinned-interpreter CUDA probe.
+    Directory creation happens only after those gates. The CUDA probe is the
+    last gate before mkdir.
     """
     config_bytes = deps.read_bytes(B1_CONFIG_PATH)
     config = load_config_bytes(config_bytes)
     snapshot = assert_document_gates(config)
     plan = build_phase_a_plan(config)
-    assert_cuda_visible_devices(deps.environ)
+    assert_cuda_environment(deps.environ)
     assert_output_directory(output_dir, snapshot, deps.lstat, deps.realpath)
     provenance = assert_repository_pins(snapshot, deps.git)
     assert_cleaner_allowed(APPROVED_CLEANER)

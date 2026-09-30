@@ -4,13 +4,16 @@ These tests do not load a model, initialise CUDA, query a GPU, open
 biological sequence data, execute RNAGenesis generation, or create the
 Phase A evidence directory. External operations are injected. Cleaning
 tests call the approved pure-Python audit functions on synthetic strings.
-The checked-in configuration carries one active, unconsumed Phase A
-authorisation. Closed-gate cases use synthetic copies.
+The checked-in configuration preserves one revoked, unconsumed GPU 0
+Phase A authorisation and is not executable. Synthetic future
+authorisations name physical GPU 1. Closed-gate cases use synthetic copies.
 """
 
 from __future__ import annotations
 
 import ast
+import collections
+import collections.abc
 import contextlib
 import copy
 import hashlib
@@ -24,6 +27,7 @@ import sys
 import tempfile
 import types
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import yaml
@@ -109,7 +113,7 @@ def authorisation(commit=COMMIT, **overrides):
         "consumed": False,
         "authorises_b1_phase_a": True,
         "gpu_use_authorised": True,
-        "physical_gpu": 0,
+        "physical_gpu": runner.PHYSICAL_GPU,
         "executing_implementation_commit": commit,
         "mres_branch": "main",
         "condition": runner.CONDITION_LABEL,
@@ -138,6 +142,15 @@ def opened_config(commit=COMMIT, **auth_overrides):
         commit, **auth_overrides
     )
     return config
+
+
+def open_environ(**extra):
+    environ = {
+        "CUDA_VISIBLE_DEVICES": str(runner.PHYSICAL_GPU),
+        "CUDA_DEVICE_ORDER": runner.CUDA_DEVICE_ORDER,
+    }
+    environ.update(extra)
+    return environ
 
 
 def dumped(config):
@@ -230,22 +243,22 @@ def assign_path(config, path, value):
 
 
 class ClosedGateTests(unittest.TestCase):
-    def test_checked_in_configuration_is_one_unconsumed_phase_a_run(self):
+    def test_checked_in_configuration_is_revoked_unconsumed_gpu0(self):
         config = real_config()
+        text = real_config_bytes().decode("utf-8")
         block = config["scientific_execution_authorisation"]
         self.assertEqual(set(block), set(runner.SCIENTIFIC_AUTHORISATION_KEYS))
         self.assertEqual(list(block), list(runner.SCIENTIFIC_AUTHORISATION_KEYS))
-        snapshot = runner.assert_document_gates(config)
-        self.assertEqual(snapshot, block)
         self.assertEqual(block["authorisation_id"], AUTHORISATION_ID)
-        self.assertIs(block["authorisation_active"], True)
-        self.assertEqual(block["activation_status"], "active_unconsumed")
-        self.assertEqual(block["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
+        self.assertIs(block["authorisation_active"], False)
+        self.assertEqual(block["activation_status"], "revoked_unconsumed")
+        self.assertNotEqual(block["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
         self.assertIs(block["consumed"], False)
         self.assertIs(block["authorises_b1_phase_a"], True)
         self.assertIs(block["gpu_use_authorised"], True)
         self.assertIs(type(block["physical_gpu"]), int)
         self.assertEqual(block["physical_gpu"], 0)
+        self.assertNotEqual(block["physical_gpu"], runner.PHYSICAL_GPU)
         self.assertEqual(block["executing_implementation_commit"], IMPLEMENTATION_COMMIT)
         self.assertEqual(block["mres_branch"], "main")
         self.assertEqual(block["condition"], "B1_generic_released_rnagenesis")
@@ -261,19 +274,49 @@ class ClosedGateTests(unittest.TestCase):
             block["evidence_directory"],
             runner.evidence_directory_for_commit(IMPLEMENTATION_COMMIT),
         )
+        self.assertEqual(
+            [line.strip() for line in text.splitlines() if "rnagenesis-mres-runs" in line],
+            [
+                "output_directory: {}".format(REAL_EVIDENCE),
+                "evidence_directory: {}".format(REAL_EVIDENCE),
+            ],
+        )
         self.assertIs(block["success_claimed"], False)
         self.assertIs(block["m4_complete"], False)
         self.assertIs(block["b1_eligible"], False)
         self.assertIs(block["phase_b_authorised"], False)
         self.assertIs(block["development_pool_authorised"], False)
-        self.assertIs(config["consumable_by_executable_workflow"], True)
-        self.assertEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
-        self.assertIs(config["phase_a"]["executable_now"], True)
-        self.assertEqual(config["phase_a"]["status"], runner.PHASE_A_EXECUTION_STATUS)
-        self.assertIs(config["execution"]["authorised"], True)
-        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], True)
+        self.assertIs(config["consumable_by_executable_workflow"], False)
+        self.assertEqual(
+            config["document_status"],
+            "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+        )
+        self.assertNotEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
+        self.assertIs(config["phase_a"]["executable_now"], False)
+        self.assertEqual(
+            config["phase_a"]["status"],
+            "APPROVED_DESIGN_NOT_APPROVED_FOR_GPU_EXECUTION",
+        )
+        self.assertNotEqual(config["phase_a"]["status"], runner.PHASE_A_EXECUTION_STATUS)
+        self.assertEqual(
+            config["phase_a"]["blocked_until"],
+            "separate_explicit_physical_gpu_1_authorisation",
+        )
+        self.assertIs(config["execution"]["authorised"], False)
+        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], False)
         self.assertIs(config["phase_b"]["executable_now"], False)
         self.assertIs(config["execution"]["gpu_authorised_by_this_draft"], False)
+        shared = config["shared_generation_settings"]
+        self.assertIs(type(shared["physical_gpu"]), int)
+        self.assertEqual(shared["physical_gpu"], 1)
+        self.assertEqual(shared["physical_gpu"], runner.PHYSICAL_GPU)
+        self.assertEqual(shared["cuda_visible_devices"], "1")
+        self.assertEqual(shared["cuda_visible_devices"], str(runner.PHYSICAL_GPU))
+        self.assertEqual(shared["cuda_device_order"], "PCI_BUS_ID")
+        self.assertEqual(shared["cuda_device_order"], runner.CUDA_DEVICE_ORDER)
+        self.assertEqual(shared["visible_python_device"], "cuda:0")
+        self.assertIs(shared["cpu_fallback"], False)
+        self.assertIs(shared["other_gpu_fallback"], False)
         self.assertEqual(config["phase_a"]["invocations"], 33)
         self.assertEqual(config["phase_a"]["total_raw_attempts"], 528)
         self.assertEqual(config["phase_a"]["raw_attempts_per_candidate"], 16)
@@ -291,6 +334,14 @@ class ClosedGateTests(unittest.TestCase):
         plan = runner.build_phase_a_plan(config)
         self.assertEqual(len(plan), 33)
         self.assertEqual(len(plan) * 16, 528)
+        with self.assertRaises(runner.B1RunnerError) as caught:
+            runner.assert_document_gates(config)
+        self.assertEqual(caught.exception.code, "configuration_not_consumable")
+        for environ in ({}, open_environ()):
+            recorder = RecordingDeps(real_config_bytes(), environ)
+            code, stderr = run_main(recorder.build(), str(REAL_EVIDENCE))
+            assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
+            self.assertNotIn("nvidia-smi", stderr)
         self.assertFalse(REAL_EVIDENCE.exists())
         self.assertFalse(REAL_EVIDENCE.is_symlink())
 
@@ -370,11 +421,21 @@ class ClosedGateTests(unittest.TestCase):
                 "gpu_not_authorised",
             ),
             (
+                ("scientific_execution_authorisation", "activation_status"),
+                "revoked_unconsumed",
+                "scientific_authorisation_inactive",
+            ),
+            (
+                ("scientific_execution_authorisation", "physical_gpu"),
+                "1",
+                "gpu_not_authorised",
+            ),
+            (
                 ("scientific_execution_authorisation", "physical_gpu"),
                 "0",
                 "gpu_not_authorised",
             ),
-            (("scientific_execution_authorisation", "physical_gpu"), 1, "gpu_not_authorised"),
+            (("scientific_execution_authorisation", "physical_gpu"), 0, "gpu_not_authorised"),
             (("scientific_execution_authorisation", "physical_gpu"), 2, "gpu_not_authorised"),
             (("scientific_execution_authorisation", "physical_gpu"), None, "gpu_not_authorised"),
             (
@@ -441,12 +502,12 @@ class ClosedGateTests(unittest.TestCase):
             ),
         ]
         for path, value, code in specs:
-            config = copy.deepcopy(real_config())
+            config = opened_config()
             assign_path(config, path, value)
             with self.assertRaises(runner.B1RunnerError) as caught:
                 runner.assert_document_gates(config)
             self.assertEqual(caught.exception.code, code, path)
-        missing_gpu = copy.deepcopy(real_config())
+        missing_gpu = opened_config()
         del missing_gpu["scientific_execution_authorisation"]["physical_gpu"]
         with self.assertRaises(runner.B1RunnerError) as caught:
             runner.assert_document_gates(missing_gpu)
@@ -458,7 +519,9 @@ class ClosedGateTests(unittest.TestCase):
 class AuthorisationTests(unittest.TestCase):
     def test_opened_authorisation_passes_document_gates(self):
         snapshot = runner.assert_document_gates(opened_config())
-        self.assertEqual(snapshot["physical_gpu"], 0)
+        self.assertIs(type(snapshot["physical_gpu"]), int)
+        self.assertEqual(snapshot["physical_gpu"], 1)
+        self.assertEqual(snapshot["physical_gpu"], runner.PHYSICAL_GPU)
         self.assertEqual(snapshot["phase"], "A")
         self.assertFalse(snapshot["consumed"])
         self.assertFalse(snapshot["b1_eligible"])
@@ -511,13 +574,18 @@ class AuthorisationTests(unittest.TestCase):
             runner.assert_document_gates(string_false)
         self.assertEqual(caught.exception.code, "scientific_authorisation_consumed")
 
-    def test_gpu_must_be_integer_zero(self):
-        for value in ("0", True, 1, 2, -1, 0.0, None, False):
+    def test_gpu_must_be_integer_one(self):
+        self.assertIs(type(runner.PHYSICAL_GPU), int)
+        self.assertEqual(runner.PHYSICAL_GPU, 1)
+        for value in ("1", "0", True, 0, 2, -1, 0.0, None, False):
             config = opened_config()
             config["scientific_execution_authorisation"]["physical_gpu"] = value
             with self.assertRaises(runner.B1RunnerError) as caught:
                 runner.assert_document_gates(config)
             self.assertEqual(caught.exception.code, "gpu_not_authorised")
+            self.assertIn("physical GPU 1", caught.exception.detail)
+        accepted = runner.assert_document_gates(opened_config())
+        self.assertEqual(accepted["physical_gpu"], runner.PHYSICAL_GPU)
         missing = opened_config()
         del missing["scientific_execution_authorisation"]["physical_gpu"]
         with self.assertRaises(runner.B1RunnerError) as caught:
@@ -561,26 +629,58 @@ class AuthorisationTests(unittest.TestCase):
 
 class CudaAndOutputTests(unittest.TestCase):
     def test_missing_cuda_visible_devices_refuses(self):
-        recorder = RecordingDeps(dumped(opened_config()), {})
-        code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
-        assert_closed(self, code, stderr, recorder, "cuda_visible_devices_missing")
+        for environ in ({}, {"CUDA_DEVICE_ORDER": runner.CUDA_DEVICE_ORDER}):
+            recorder = RecordingDeps(dumped(opened_config()), environ)
+            code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
+            assert_closed(self, code, stderr, recorder, "cuda_visible_devices_missing")
+            self.assertNotIn("nvidia-smi", stderr)
 
-    def test_cuda_values_other_than_exact_zero_refuse(self):
-        for value in ("1", "", "0 ", "00", "0,1", "0\n"):
+    def test_cuda_values_other_than_exact_one_refuse(self):
+        for value in ("0", "01", "", "1 ", "11", "0,1", "1\n", "1,0", 0, 1, 2, None):
             recorder = RecordingDeps(
                 dumped(opened_config()),
-                {"CUDA_VISIBLE_DEVICES": value},
+                {
+                    "CUDA_VISIBLE_DEVICES": value,
+                    "CUDA_DEVICE_ORDER": runner.CUDA_DEVICE_ORDER,
+                },
             )
             code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
             assert_closed(self, code, stderr, recorder, "cuda_visible_devices_refused")
+            self.assertNotIn("nvidia-smi", stderr)
 
-    def test_checked_in_configuration_refuses_empty_cuda_before_preflight(self):
+    def test_device_order_other_than_pci_bus_id_refuses(self):
+        for value in ("", "FASTEST_FIRST", "PCI_BUS_ID ", "fastest_first", "0", None):
+            recorder = RecordingDeps(
+                dumped(opened_config()),
+                {
+                    "CUDA_VISIBLE_DEVICES": str(runner.PHYSICAL_GPU),
+                    "CUDA_DEVICE_ORDER": value,
+                },
+            )
+            code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
+            assert_closed(self, code, stderr, recorder, "cuda_device_order_refused")
+            self.assertNotIn("nvidia-smi", stderr)
         recorder = RecordingDeps(
-            real_config_bytes(),
-            {"CUDA_VISIBLE_DEVICES": ""},
+            dumped(opened_config()),
+            {"CUDA_VISIBLE_DEVICES": str(runner.PHYSICAL_GPU)},
         )
         code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
-        assert_closed(self, code, stderr, recorder, "cuda_visible_devices_refused")
+        assert_closed(self, code, stderr, recorder, "cuda_device_order_missing")
+        self.assertNotIn("nvidia-smi", stderr)
+
+    def test_exact_gpu1_environment_reaches_the_output_gate(self):
+        recorder = RecordingDeps(dumped(opened_config()), open_environ())
+        code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
+        assert_closed(self, code, stderr, recorder, "output_path_mismatch")
+        self.assertNotIn("nvidia-smi", stderr)
+
+    def test_checked_in_configuration_refuses_before_cuda_preflight(self):
+        recorder = RecordingDeps(
+            real_config_bytes(),
+            {"CUDA_VISIBLE_DEVICES": "", "CUDA_DEVICE_ORDER": ""},
+        )
+        code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
+        assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
         self.assertNotIn("nvidia-smi", stderr)
         self.assertFalse(REAL_EVIDENCE.exists())
         self.assertFalse(REAL_EVIDENCE.is_symlink())
@@ -595,12 +695,9 @@ class CudaAndOutputTests(unittest.TestCase):
             "/tmp/b1-not-the-evidence-path",
         ]
         for output_dir in supplied:
-            recorder = RecordingDeps(
-                real_config_bytes(),
-                {"CUDA_VISIBLE_DEVICES": "0"},
-            )
+            recorder = RecordingDeps(real_config_bytes(), open_environ())
             code, stderr = run_main(recorder.build(), output_dir)
-            assert_closed(self, code, stderr, recorder, "output_path_mismatch")
+            assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
         self.assertFalse(REAL_EVIDENCE.exists())
         self.assertFalse(REAL_EVIDENCE.is_symlink())
 
@@ -614,19 +711,13 @@ class CudaAndOutputTests(unittest.TestCase):
             "/tmp/b1-not-the-evidence-path",
         ]
         for output_dir in supplied:
-            recorder = RecordingDeps(
-                dumped(opened_config()),
-                {"CUDA_VISIBLE_DEVICES": "0"},
-            )
+            recorder = RecordingDeps(dumped(opened_config()), open_environ())
             code, stderr = run_main(recorder.build(), output_dir)
             assert_closed(self, code, stderr, recorder, "output_path_mismatch")
 
     def test_existing_empty_directory_refuses(self):
         expected = runner.evidence_directory_for_commit(COMMIT)
-        recorder = RecordingDeps(
-            dumped(opened_config()),
-            {"CUDA_VISIBLE_DEVICES": "0"},
-        )
+        recorder = RecordingDeps(dumped(opened_config()), open_environ())
 
         def lstat(path):
             recorder.events.append(("lstat", str(path)))
@@ -651,10 +742,7 @@ class CudaAndOutputTests(unittest.TestCase):
 
     def test_symlink_and_resolved_alias_refuse(self):
         expected = runner.evidence_directory_for_commit(COMMIT)
-        recorder = RecordingDeps(
-            dumped(opened_config()),
-            {"CUDA_VISIBLE_DEVICES": "0"},
-        )
+        recorder = RecordingDeps(dumped(opened_config()), open_environ())
 
         def lstat(path):
             return FakeStat(stat.S_IFLNK, 0)
@@ -678,6 +766,210 @@ class CudaAndOutputTests(unittest.TestCase):
         )
         self.assertEqual(code, 1)
         self.assertIn("error: output_path_symlink:", stderr)
+
+    def test_non_dict_mappings_accept_exact_gpu1_and_refuse_other_values(self):
+        evidence = runner.evidence_directory_for_commit(COMMIT)
+        self.assertFalse(Path(evidence).exists())
+        self.assertFalse(REAL_EVIDENCE.exists())
+        self.assertEqual(runner.PHYSICAL_GPU, 1)
+        self.assertEqual(runner.CUDA_DEVICE_ORDER, "PCI_BUS_ID")
+        source = inspect.getsource(runner.assert_cuda_environment)
+        self.assertIn("collections.abc.Mapping", source)
+        self.assertNotIn("isinstance(environ, dict)", source)
+        self.assertNotIn("type(environ)", source)
+        cuda_before = (
+            os.environ.get("CUDA_VISIBLE_DEVICES"),
+            os.environ.get("CUDA_DEVICE_ORDER"),
+        )
+
+        def forbidden(*_args, **_kwargs):
+            raise AssertionError("GPU query or subprocess was called")
+
+        def assert_parent_unchanged(mapping, before_items):
+            after_items = list(mapping.items())
+            if after_items == before_items:
+                return
+            before = dict(before_items)
+            after = dict(after_items)
+            changed = sorted(
+                key
+                for key in set(before) | set(after)
+                if before.get(key) != after.get(key)
+            )
+            self.fail("parent mapping changed: {}".format(", ".join(changed)))
+
+        def accept(parent):
+            self.assertNotIsInstance(parent, dict)
+            self.assertIsInstance(parent, collections.abc.Mapping)
+            before_items = list(parent.items())
+            runner.assert_cuda_environment(parent)
+            assert_parent_unchanged(parent, before_items)
+            child = runner.build_child_environment(parent, evidence)
+            assert_parent_unchanged(parent, before_items)
+            self.assertIsInstance(child, dict)
+            self.assertIsNot(child, parent)
+            self.assertEqual(child["CUDA_VISIBLE_DEVICES"], "1")
+            self.assertEqual(child["CUDA_VISIBLE_DEVICES"], str(runner.PHYSICAL_GPU))
+            self.assertEqual(child["CUDA_DEVICE_ORDER"], "PCI_BUS_ID")
+            self.assertEqual(child["CUDA_DEVICE_ORDER"], runner.CUDA_DEVICE_ORDER)
+            self.assertIs(type(child["CUDA_VISIBLE_DEVICES"]), str)
+            self.assertIs(type(child["CUDA_DEVICE_ORDER"]), str)
+            self.assertEqual(child["HF_HUB_OFFLINE"], "1")
+            self.assertEqual(child["PYTHONDONTWRITEBYTECODE"], "1")
+            child["CUDA_VISIBLE_DEVICES"] = "0"
+            child["B1_SYNTHETIC_CHILD_MARKER"] = "child-only"
+            self.assertEqual(parent["CUDA_VISIBLE_DEVICES"], "1")
+            self.assertNotIn("B1_SYNTHETIC_CHILD_MARKER", parent)
+            assert_parent_unchanged(parent, before_items)
+            self.assertFalse(Path(evidence).exists())
+            self.assertFalse(REAL_EVIDENCE.exists())
+            for name in FORBIDDEN_RUNTIME_MODULES:
+                self.assertNotIn(name, sys.modules)
+
+        def refuse(parent, code):
+            before_items = list(parent.items())
+            for operation in (
+                lambda: runner.assert_cuda_environment(parent),
+                lambda: runner.build_child_environment(parent, evidence),
+            ):
+                with self.assertRaises(runner.B1RunnerError) as caught:
+                    operation()
+                self.assertEqual(caught.exception.code, code)
+            assert_parent_unchanged(parent, before_items)
+            self.assertFalse(Path(evidence).exists())
+            self.assertFalse(REAL_EVIDENCE.exists())
+
+        def refuse_os(values, removed, code):
+            with mock.patch.dict(os.environ, values, clear=False):
+                for key in removed:
+                    os.environ.pop(key, None)
+                self.assertIs(runner.production_dependencies().environ, os.environ)
+                refuse(os.environ, code)
+
+        user = collections.UserDict(
+            {
+                "CUDA_VISIBLE_DEVICES": "1",
+                "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+                "B1_SYNTHETIC_PARENT_MARKER": "keep",
+                "HF_HUB_OFFLINE": "0",
+            }
+        )
+        patches = (
+            mock.patch.object(runner.subprocess, "run", forbidden),
+            mock.patch.object(runner.subprocess, "Popen", forbidden),
+            mock.patch.object(runner.subprocess, "call", forbidden),
+            mock.patch.object(runner.subprocess, "check_call", forbidden),
+            mock.patch.object(runner.subprocess, "check_output", forbidden),
+            mock.patch.object(runner, "default_subprocess_run", forbidden),
+            mock.patch.object(runner, "default_query_gpu_text", forbidden),
+            mock.patch.object(runner, "default_cuda_probe", forbidden),
+            mock.patch.object(runner, "default_gpu_preflight", forbidden),
+            mock.patch.object(runner, "production_gpu_preflight", forbidden),
+            mock.patch("os.system", forbidden),
+        )
+        with contextlib.ExitStack() as stack:
+            for patch in patches:
+                stack.enter_context(patch)
+            accept(user)
+            self.assertEqual(user["B1_SYNTHETIC_PARENT_MARKER"], "keep")
+            self.assertEqual(user["HF_HUB_OFFLINE"], "0")
+            self.assertNotIn("PYTHONDONTWRITEBYTECODE", user)
+            for value in ("0", "01", "", "1 ", "11", "0,1", "1\n", "1,0", 0, 1, 2, None):
+                refuse(
+                    collections.UserDict(
+                        {
+                            "CUDA_VISIBLE_DEVICES": value,
+                            "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+                        }
+                    ),
+                    "cuda_visible_devices_refused",
+                )
+            for value in ("", "FASTEST_FIRST", "PCI_BUS_ID ", "fastest_first", "0", None):
+                refuse(
+                    collections.UserDict(
+                        {
+                            "CUDA_VISIBLE_DEVICES": "1",
+                            "CUDA_DEVICE_ORDER": value,
+                        }
+                    ),
+                    "cuda_device_order_refused",
+                )
+            refuse(collections.UserDict(), "cuda_visible_devices_missing")
+            refuse(
+                collections.UserDict({"CUDA_DEVICE_ORDER": "PCI_BUS_ID"}),
+                "cuda_visible_devices_missing",
+            )
+            refuse(
+                collections.UserDict({"CUDA_VISIBLE_DEVICES": "1"}),
+                "cuda_device_order_missing",
+            )
+            with self.assertRaises(runner.B1RunnerError) as caught:
+                runner.assert_cuda_environment(None)
+            self.assertEqual(caught.exception.code, "cuda_visible_devices_missing")
+            with self.assertRaises(runner.B1RunnerError) as caught:
+                runner.build_child_environment(None, evidence)
+            self.assertEqual(caught.exception.code, "cuda_visible_devices_missing")
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "CUDA_VISIBLE_DEVICES": "1",
+                    "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+                    "B1_SYNTHETIC_PARENT_MARKER": "keep",
+                },
+            ):
+                environ = runner.production_dependencies().environ
+                self.assertIs(environ, os.environ)
+                accept(environ)
+                self.assertEqual(environ["B1_SYNTHETIC_PARENT_MARKER"], "keep")
+                self.assertEqual(environ["CUDA_DEVICE_ORDER"], "PCI_BUS_ID")
+
+            for value in ("0", "01", "", "1 ", "11", "0,1", "1\n", "1,0"):
+                refuse_os(
+                    {
+                        "CUDA_VISIBLE_DEVICES": value,
+                        "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
+                    },
+                    (),
+                    "cuda_visible_devices_refused",
+                )
+            for value in ("", "FASTEST_FIRST", "PCI_BUS_ID ", "fastest_first", "0"):
+                refuse_os(
+                    {
+                        "CUDA_VISIBLE_DEVICES": "1",
+                        "CUDA_DEVICE_ORDER": value,
+                    },
+                    (),
+                    "cuda_device_order_refused",
+                )
+            refuse_os(
+                {"CUDA_DEVICE_ORDER": "PCI_BUS_ID"},
+                ("CUDA_VISIBLE_DEVICES",),
+                "cuda_visible_devices_missing",
+            )
+            refuse_os(
+                {},
+                ("CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER"),
+                "cuda_visible_devices_missing",
+            )
+            refuse_os(
+                {"CUDA_VISIBLE_DEVICES": "1"},
+                ("CUDA_DEVICE_ORDER",),
+                "cuda_device_order_missing",
+            )
+
+        self.assertNotIn("B1_SYNTHETIC_PARENT_MARKER", os.environ)
+        self.assertEqual(
+            (
+                os.environ.get("CUDA_VISIBLE_DEVICES"),
+                os.environ.get("CUDA_DEVICE_ORDER"),
+            ),
+            cuda_before,
+        )
+        self.assertFalse(Path(evidence).exists())
+        self.assertFalse(REAL_EVIDENCE.exists())
+        for name in FORBIDDEN_RUNTIME_MODULES:
+            self.assertNotIn(name, sys.modules)
 
 
 class PlanAndArgvTests(unittest.TestCase):
@@ -710,10 +1002,35 @@ class PlanAndArgvTests(unittest.TestCase):
         self.assertEqual(plan[0]["seed"], 41000)
         self.assertEqual(plan[-1]["seed"], 41010)
 
+    def test_plan_settings_name_only_physical_gpu_one(self):
+        refusals = (
+            ("physical_gpu", 0),
+            ("physical_gpu", "1"),
+            ("physical_gpu", 2),
+            ("physical_gpu", None),
+            ("cuda_visible_devices", "0"),
+            ("cuda_visible_devices", "01"),
+            ("cuda_visible_devices", ""),
+            ("cuda_device_order", "FASTEST_FIRST"),
+            ("cuda_device_order", ""),
+        )
+        for key, value in refusals:
+            config = opened_config()
+            config["shared_generation_settings"][key] = value
+            with self.assertRaises(runner.B1RunnerError) as caught:
+                runner.build_phase_a_plan(config)
+            self.assertEqual(caught.exception.code, "phase_a_plan_invalid", key)
+        missing = opened_config()
+        del missing["shared_generation_settings"]["cuda_device_order"]
+        with self.assertRaises(runner.B1RunnerError) as caught:
+            runner.build_phase_a_plan(missing)
+        self.assertEqual(caught.exception.code, "phase_a_plan_invalid")
+        self.assertEqual(len(runner.build_phase_a_plan(real_config())), 33)
+
     def test_argv_encoding_and_prohibited_flags(self):
         plan = runner.build_phase_a_plan(real_config())
         evidence = runner.evidence_directory_for_commit(COMMIT)
-        parent = {"CUDA_VISIBLE_DEVICES": "0", "HF_HUB_OFFLINE": "0"}
+        parent = open_environ(HF_HUB_OFFLINE="0")
         before = dict(parent)
         commands = [
             runner.build_subprocess_invocation(item, evidence, parent)
@@ -727,7 +1044,9 @@ class PlanAndArgvTests(unittest.TestCase):
             self.assertIsInstance(argv, list)
             self.assertFalse(command["shell"])
             self.assertEqual(command["cwd"], "/home/laura/RNAGenesis")
-            self.assertEqual(command["env"]["CUDA_VISIBLE_DEVICES"], "0")
+            self.assertEqual(command["env"]["CUDA_VISIBLE_DEVICES"], "1")
+            self.assertEqual(command["env"]["CUDA_VISIBLE_DEVICES"], str(runner.PHYSICAL_GPU))
+            self.assertEqual(command["env"]["CUDA_DEVICE_ORDER"], runner.CUDA_DEVICE_ORDER)
             self.assertEqual(command["env"]["HF_HUB_OFFLINE"], "1")
             self.assertEqual(command["env"]["TRANSFORMERS_OFFLINE"], "1")
             self.assertEqual(command["env"]["PYTHONDONTWRITEBYTECODE"], "1")
@@ -1140,7 +1459,7 @@ class SyntheticExecutionTests(unittest.TestCase):
         config = opened_config()
         plan = runner.build_phase_a_plan(config)
         snapshot = runner.assert_document_gates(config)
-        parent = {"CUDA_VISIBLE_DEVICES": "0", "HF_HUB_OFFLINE": "0", "MARKER": "keep"}
+        parent = open_environ(HF_HUB_OFFLINE="0", MARKER="keep")
         calls = []
 
         def sha256_file(path):
@@ -1152,7 +1471,8 @@ class SyntheticExecutionTests(unittest.TestCase):
         def subprocess_run(argv, cwd, env, shell=False):
             self.assertFalse(shell)
             self.assertEqual(cwd, "/home/laura/RNAGenesis")
-            self.assertEqual(env["CUDA_VISIBLE_DEVICES"], "0")
+            self.assertEqual(env["CUDA_VISIBLE_DEVICES"], str(runner.PHYSICAL_GPU))
+            self.assertEqual(env["CUDA_DEVICE_ORDER"], runner.CUDA_DEVICE_ORDER)
             self.assertEqual(parent["HF_HUB_OFFLINE"], "0")
             calls.append(list(argv))
             runner.assert_argv_prohibitions(argv)
@@ -1206,12 +1526,17 @@ class SyntheticExecutionTests(unittest.TestCase):
                 },
                 "pins": [],
                 "gpu": {
-                    "index": 0,
+                    "index": runner.PHYSICAL_GPU,
+                    "physical_gpu": runner.PHYSICAL_GPU,
                     "uuid": "GPU-synthetic",
+                    "pci_bus_id": "0000:01:00.0",
                     "name": "Synthetic GPU",
                     "memory": "1",
                     "compute_mode": "Default",
                     "logical_device": "cuda:0",
+                    "logical_device_index": 0,
+                    "cuda_visible_devices": str(runner.PHYSICAL_GPU),
+                    "cuda_device_order": runner.CUDA_DEVICE_ORDER,
                     "cpu_fallback": False,
                 },
                 "started_at": "2026-09-30T00:00:00Z",
@@ -1311,7 +1636,7 @@ class IsolationTests(unittest.TestCase):
 
     def test_gpu_preflight_refuses_before_authorisation(self):
         with self.assertRaises(runner.B1RunnerError) as caught:
-            runner.default_gpu_preflight({"CUDA_VISIBLE_DEVICES": "0"})
+            runner.default_gpu_preflight(open_environ())
         self.assertEqual(caught.exception.code, "gpu_preflight_before_authorisation")
 
         def query():
@@ -1320,16 +1645,41 @@ class IsolationTests(unittest.TestCase):
         def probe():
             raise AssertionError("probe ran")
 
-        with self.assertRaises(runner.B1RunnerError) as caught:
-            runner.preflight_gpu({}, query, probe)
-        self.assertEqual(caught.exception.code, "cpu_fallback_prohibited")
-        identity = runner.parse_gpu_identity(
-            "0, GPU-synthetic, Synthetic GPU, 81920, Default\n"
+        refusals = (
+            ({}, "cuda_visible_devices_missing"),
+            (
+                {"CUDA_DEVICE_ORDER": runner.CUDA_DEVICE_ORDER},
+                "cuda_visible_devices_missing",
+            ),
+            (
+                {"CUDA_VISIBLE_DEVICES": "0", "CUDA_DEVICE_ORDER": runner.CUDA_DEVICE_ORDER},
+                "cuda_visible_devices_refused",
+            ),
+            (
+                {"CUDA_VISIBLE_DEVICES": "1", "CUDA_DEVICE_ORDER": "FASTEST_FIRST"},
+                "cuda_device_order_refused",
+            ),
+            (
+                {"CUDA_VISIBLE_DEVICES": str(runner.PHYSICAL_GPU)},
+                "cuda_device_order_missing",
+            ),
         )
-        self.assertEqual(identity["index"], 0)
+        for environ, code in refusals:
+            with self.assertRaises(runner.B1RunnerError) as caught:
+                runner.preflight_gpu(environ, query, probe)
+            self.assertEqual(caught.exception.code, code)
+        identity = runner.parse_gpu_identity(nvidia_smi_text())
+        self.assertIs(type(identity["index"]), int)
+        self.assertEqual(identity["index"], 1)
+        self.assertEqual(identity["index"], runner.PHYSICAL_GPU)
+        self.assertEqual(identity["physical_gpu"], runner.PHYSICAL_GPU)
         self.assertEqual(identity["uuid"], "GPU-synthetic")
+        self.assertEqual(identity["pci_bus_id"], "0000:01:00.0")
+        self.assertEqual(identity["name"], "Synthetic GPU")
+        self.assertEqual(identity["memory"], "81920")
+        self.assertEqual(identity["compute_mode"], "Default")
         self.assertNotIn("logical_device_confirmed", identity)
-        self.assertFalse(identity["cpu_fallback"])
+        self.assertIs(identity["cpu_fallback"], False)
 
     def test_repository_pins_allow_a_later_authorization_commit(self):
         implementation = COMMIT
@@ -1446,14 +1796,17 @@ def probe_payload(**overrides):
             "rna-fm": "0",
             "ViennaRNA": "0",
         },
-        "cuda_visible_devices": "0",
+        "cuda_visible_devices": str(runner.PHYSICAL_GPU),
+        "cuda_device_order": runner.CUDA_DEVICE_ORDER,
     }
     payload.update(overrides)
     return payload
 
 
-def nvidia_smi_text(name="Synthetic GPU"):
-    return "0, GPU-synthetic, {}, 81920, Default\n".format(name)
+def nvidia_smi_text(name="Synthetic GPU", index=None, pci="0000:01:00.0", uuid="GPU-synthetic"):
+    if index is None:
+        index = runner.PHYSICAL_GPU
+    return "{}, {}, {}, {}, 81920, Default\n".format(index, uuid, pci, name)
 
 
 def attempt_for(length, cap, validity, cleaned, leading, trailing, termination):
@@ -1519,7 +1872,7 @@ class CudaProbeTests(unittest.TestCase):
     def setUp(self):
         self.evidence = runner.evidence_directory_for_commit(COMMIT)
         self.env = runner.build_child_environment(
-            {"CUDA_VISIBLE_DEVICES": "0"},
+            open_environ(),
             self.evidence,
         )
 
@@ -1551,8 +1904,19 @@ class CudaProbeTests(unittest.TestCase):
         self.assertEqual(calls, ["nvidia-smi", "torch-probe"])
         self.assertIs(identity["logical_device_confirmed"], True)
         self.assertEqual(identity["logical_device"], "cuda:0")
+        self.assertEqual(identity["logical_device_index"], 0)
         self.assertEqual(identity["device_count"], 1)
         self.assertEqual(identity["device_name"], "Synthetic GPU")
+        self.assertIs(type(identity["index"]), int)
+        self.assertEqual(identity["index"], 1)
+        self.assertEqual(identity["physical_gpu"], runner.PHYSICAL_GPU)
+        self.assertEqual(identity["uuid"], "GPU-synthetic")
+        self.assertEqual(identity["pci_bus_id"], "0000:01:00.0")
+        self.assertEqual(identity["memory"], "81920")
+        self.assertEqual(identity["compute_mode"], "Default")
+        self.assertEqual(identity["cuda_visible_devices"], "1")
+        self.assertEqual(identity["cuda_device_order"], "PCI_BUS_ID")
+        self.assertIs(identity["cpu_fallback"], False)
         self.assertEqual(identity["packages"]["torch"], "2.4.0")
         self.assertEqual(
             set(identity["packages"]),
@@ -1562,7 +1926,7 @@ class CudaProbeTests(unittest.TestCase):
         generation_command = runner.build_subprocess_invocation(
             runner.build_phase_a_plan(real_config())[0],
             self.evidence,
-            {"CUDA_VISIBLE_DEVICES": "0"},
+            open_environ(),
         )
         self.assertEqual(generation_command["env"], self.env)
         self.assertEqual(generation_command["env"]["PYTHONDONTWRITEBYTECODE"], "1")
@@ -1576,11 +1940,17 @@ class CudaProbeTests(unittest.TestCase):
         self.assertEqual(command["argv"][0], generation[0])
         self.assertEqual(command["argv"][0], runner.PINNED_PYTHON)
         self.assertFalse(command["shell"])
-        self.assertEqual(runner.physical_gpu_query_argv()[-2:], ["-i", "0"])
+        query_argv = runner.physical_gpu_query_argv()
+        self.assertEqual(query_argv[-2:], ["-i", "1"])
+        self.assertEqual(query_argv[-2:], ["-i", str(runner.PHYSICAL_GPU)])
+        self.assertIn("pci.bus_id", query_argv[1])
         source = inspect.getsource(runner.default_gpu_preflight)
         self.assertIn("default_query_gpu_text", source)
         self.assertIn("default_cuda_probe", source)
         self.assertIsNotNone(compile(runner.CUDA_PROBE_SOURCE, "<cuda-probe>", "exec"))
+        self.assertIn('device="cuda:0"', runner.CUDA_PROBE_SOURCE)
+        self.assertIn("torch.cuda.synchronize(0)", runner.CUDA_PROBE_SOURCE)
+        self.assertIn("CUDA_DEVICE_ORDER", runner.CUDA_PROBE_SOURCE)
         self.assertNotIn("sys.executable", inspect.getsource(runner.build_generation_argv))
 
     def test_cpu_only_zero_multiple_allocation_and_malformed_probe_results_refuse(self):
@@ -1595,6 +1965,15 @@ class CudaProbeTests(unittest.TestCase):
             ("{", "cuda_probe_malformed"),
             (probe_payload(device_name="Other GPU"), "cuda_probe_mismatch"),
             (probe_payload(python_executable="/tmp/other-python"), "cuda_probe_mismatch"),
+            (probe_payload(cuda_visible_devices="0"), "cuda_probe_mismatch"),
+            (probe_payload(cuda_visible_devices="01"), "cuda_probe_mismatch"),
+            (probe_payload(cuda_visible_devices=""), "cuda_probe_mismatch"),
+            (probe_payload(cuda_device_order="FASTEST_FIRST"), "cuda_probe_mismatch"),
+            (probe_payload(cuda_device_order=""), "cuda_probe_mismatch"),
+            (probe_payload(cuda_device_order=None), "cuda_probe_mismatch"),
+            (probe_payload(logical_device="cuda:1", logical_device_index=1), "cuda_allocation_failed"),
+            (probe_payload(logical_device="cpu"), "cuda_probe_mismatch"),
+            (probe_payload(logical_device_index=1), "cuda_allocation_failed"),
             (
                 probe_payload(
                     packages={
@@ -1610,6 +1989,24 @@ class CudaProbeTests(unittest.TestCase):
             with self.assertRaises(runner.B1RunnerError) as caught:
                 self.preflight(nvidia_smi_text(), payload)
             self.assertEqual(caught.exception.code, code)
+        malformed = (
+            nvidia_smi_text(index=0),
+            nvidia_smi_text(index=2),
+            nvidia_smi_text(index="01"),
+            nvidia_smi_text(uuid=""),
+            nvidia_smi_text(uuid="N/A"),
+            nvidia_smi_text(pci=""),
+            nvidia_smi_text(pci="N/A"),
+            "1, GPU-synthetic, 0000:01:00.0, Synthetic GPU, 81920\n",
+            "1, GPU-synthetic, 0000:01:00.0, , 81920, Default\n",
+            "",
+            "1, GPU-synthetic, 0000:01:00.0, Synthetic GPU, 81920, Default\n"
+            "1, GPU-other, 0000:02:00.0, Other GPU, 1, Default\n",
+        )
+        for text in malformed:
+            with self.assertRaises(runner.B1RunnerError) as caught:
+                self.preflight(text, probe_payload())
+            self.assertEqual(caught.exception.code, "cpu_fallback_prohibited")
 
 
 class DiagnosticTests(unittest.TestCase):
@@ -1663,7 +2060,8 @@ class EvidenceFinalizationTests(unittest.TestCase):
     def subprocess_run(self, argv, cwd, env, shell=False):
         self.assertFalse(shell)
         self.assertEqual(argv[0], runner.PINNED_PYTHON)
-        self.assertEqual(env["CUDA_VISIBLE_DEVICES"], "0")
+        self.assertEqual(env["CUDA_VISIBLE_DEVICES"], str(runner.PHYSICAL_GPU))
+        self.assertEqual(env["CUDA_DEVICE_ORDER"], runner.CUDA_DEVICE_ORDER)
         mid = argv[argv.index("--mid_folder") + 1]
         remark = argv[argv.index("--remark") + 1]
         folder = Path(argv[argv.index("--superfolder") + 1]) / mid
@@ -1714,7 +2112,7 @@ class EvidenceFinalizationTests(unittest.TestCase):
         return runner.RunnerDependencies(
             read_bytes=read_bytes or runner.default_read_bytes,
             lstat=os.lstat,
-            environ={"CUDA_VISIBLE_DEVICES": "0", "HF_HUB_OFFLINE": "0"},
+            environ=open_environ(HF_HUB_OFFLINE="0"),
             write_exclusive=write_exclusive or runner.write_exclusive_bytes,
             subprocess_run=subprocess_run or self.subprocess_run,
             load_cleaner=runner.default_load_cleaner,
@@ -1859,7 +2257,7 @@ class MockedRunTests(unittest.TestCase):
         self.assertFalse(REAL_EVIDENCE.exists())
         config_bytes = dumped(opened_config(implementation))
         runner_bytes = runner.RUNNER_PATH.read_bytes()
-        parent = {"CUDA_VISIBLE_DEVICES": "0", "HF_HUB_OFFLINE": "0", "MARKER": "keep"}
+        parent = open_environ(HF_HUB_OFFLINE="0", MARKER="keep")
         outputs = {}
         seen = {}
         probe_order = []
@@ -1980,6 +2378,31 @@ class MockedRunTests(unittest.TestCase):
                 manifest["authorization"]["executing_implementation_commit"],
             )
             self.assertIs(manifest["gpu_identity"]["logical_device_confirmed"], True)
+            self.assertEqual(manifest["gpu_identity"]["logical_device"], "cuda:0")
+            self.assertEqual(manifest["gpu_identity"]["logical_device_index"], 0)
+            self.assertIs(type(manifest["gpu_identity"]["index"]), int)
+            self.assertEqual(manifest["gpu_identity"]["index"], 1)
+            self.assertEqual(manifest["gpu_identity"]["physical_gpu"], runner.PHYSICAL_GPU)
+            self.assertEqual(manifest["gpu_identity"]["uuid"], "GPU-synthetic")
+            self.assertEqual(manifest["gpu_identity"]["pci_bus_id"], "0000:01:00.0")
+            self.assertEqual(manifest["gpu_identity"]["cuda_visible_devices"], "1")
+            self.assertEqual(
+                manifest["gpu_identity"]["cuda_device_order"],
+                runner.CUDA_DEVICE_ORDER,
+            )
+            self.assertEqual(manifest["authorization"]["physical_gpu"], runner.PHYSICAL_GPU)
+            self.assertEqual(
+                manifest["child_environment_controls"]["CUDA_VISIBLE_DEVICES"],
+                str(runner.PHYSICAL_GPU),
+            )
+            self.assertEqual(
+                manifest["child_environment_controls"]["CUDA_DEVICE_ORDER"],
+                runner.CUDA_DEVICE_ORDER,
+            )
+            self.assertEqual(
+                manifest["child_environment_controls"]["physical_gpu"],
+                runner.PHYSICAL_GPU,
+            )
             self.assertEqual(manifest["hashes"]["python"]["executable"], runner.PINNED_PYTHON)
             self.assertEqual(manifest["hashes"]["python"]["version"], "3.11.0")
             self.assertEqual(manifest["hashes"]["packages"]["torch"], "2.4.0")
@@ -2081,7 +2504,7 @@ class MockedRunTests(unittest.TestCase):
 class AcceptanceCorrectionTests(unittest.TestCase):
     def test_runtime_caches_stay_inside_the_evidence_directory(self):
         evidence = runner.evidence_directory_for_commit(COMMIT)
-        parent = {"CUDA_VISIBLE_DEVICES": "0", "HF_HUB_OFFLINE": "0"}
+        parent = open_environ(HF_HUB_OFFLINE="0")
         before = dict(parent)
         child = runner.build_child_environment(parent, evidence)
         invocation = runner.build_subprocess_invocation(
@@ -2241,7 +2664,7 @@ class AcceptanceCorrectionTests(unittest.TestCase):
             deps = runner.RunnerDependencies(
                 read_bytes=runner.default_read_bytes,
                 lstat=os.lstat,
-                environ={"CUDA_VISIBLE_DEVICES": "0"},
+                environ=open_environ(),
                 write_exclusive=runner.write_exclusive_bytes,
                 subprocess_run=subprocess_run,
                 load_cleaner=runner.default_load_cleaner,
@@ -2311,7 +2734,7 @@ class RawOutputVerificationTests(unittest.TestCase):
             deps = runner.RunnerDependencies(
                 read_bytes=runner.default_read_bytes,
                 lstat=os.lstat,
-                environ={"CUDA_VISIBLE_DEVICES": "0"},
+                environ=open_environ(),
                 write_exclusive=runner.write_exclusive_bytes,
                 subprocess_run=subprocess_run,
                 load_cleaner=runner.default_load_cleaner,

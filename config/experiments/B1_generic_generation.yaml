@@ -1,10 +1,13 @@
-# APPROVED_FOR_SCIENTIFIC_EXECUTION
-# One unconsumed Phase A authorisation may be consumed by the executable workflow.
-# Phase B, B1 eligibility, and the development pool are not authorised.
+# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+# The physical GPU 0 Phase A authorisation is revoked and was not consumed.
+# No Phase A evidence was produced. This file does not authorise execution.
+# Generation settings name physical GPU 1 for a future authorisation.
+# That authorisation is not active. Phase B, B1 eligibility, and the
+# development pool are not authorised.
 # This file does not declare a final length-matching algorithm.
 
-document_status: APPROVED_FOR_SCIENTIFIC_EXECUTION
-consumable_by_executable_workflow: true
+document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
 human_approval:
   approving_person: Laura Hardy
   approval_date: 29 September 2026
@@ -33,17 +36,17 @@ metric_set_schema_version: m4-stage1-draft-1
 created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
 
 execution:
-  authorised: true
+  authorised: false
   gpu_authorised_by_this_draft: false
-  gpu_authorised_by_this_approval: true
+  gpu_authorised_by_this_approval: false
   evidence_directory_created_by_this_stage: false
   overwrite_existing_output: refuse
   silent_truncation: false
 
 scientific_execution_authorisation:
   authorisation_id: m4_b1_phase_a_bdb3dbda1650_gpu0_attempt1
-  authorisation_active: true
-  activation_status: active_unconsumed
+  authorisation_active: false
+  activation_status: revoked_unconsumed
   consumed: false
   authorises_b1_phase_a: true
   gpu_use_authorised: true
@@ -94,9 +97,10 @@ shared_generation_settings:
     Released generation.py creates its output directory with exist_ok=True.
     A future executor must refuse an existing output or evidence directory
     before calling it. This approval does not add that wrapper.
-  physical_gpu: 0
+  physical_gpu: 1
   physical_gpu_gate: separate_explicit_approval_required
-  cuda_visible_devices: "0"
+  cuda_visible_devices: "1"
+  cuda_device_order: PCI_BUS_ID
   visible_python_device: cuda:0
   cpu_fallback: false
   other_gpu_fallback: false
@@ -122,9 +126,9 @@ cleaner_rule:
     limitation: five_step_two_sequence_smoke_not_a_50_step_length_law
 
 phase_a:
-  status: AUTHORISED_FOR_EXECUTION
-  blocked_until: separate_explicit_gpu0_approval
-  executable_now: true
+  status: APPROVED_DESIGN_NOT_APPROVED_FOR_GPU_EXECUTION
+  blocked_until: separate_explicit_physical_gpu_1_authorisation
+  executable_now: false
   purpose: characterize_max_seq_len_versus_cleaned_length
   does_not_select_a_mapping: true
   target_biological_lengths: [20, 30, 40, 50, 60, 70, 80, 90, 100, 112, 123]
