@@ -4,10 +4,12 @@ These tests do not load a model, initialise CUDA, query a GPU, open
 biological sequence data, execute RNAGenesis generation, or create the
 Phase A evidence directory. External operations are injected. Cleaning
 tests call the approved pure-Python audit functions on synthetic strings.
-The checked-in configuration carries one active, unconsumed physical
-GPU 1 Phase A authorisation. The revoked, unconsumed GPU 0 authorisation
-is retained as historical provenance and is not executable. Closed-gate
-cases use synthetic copies.
+The checked-in configuration records one consumed, complete physical
+GPU 1 Phase A authorisation and accepted Phase A evidence. It is not
+executable. The revoked, unconsumed GPU 0 authorisation is retained as
+historical provenance. Closed-gate cases use synthetic copies. If the
+accepted evidence directory is already present, its hashes are snapshotted
+and must remain unchanged. Tests do not require that directory elsewhere.
 """
 
 from __future__ import annotations
@@ -69,6 +71,11 @@ runner = load_source_module(
 COMMIT = "a" * 40
 IMPLEMENTATION_COMMIT = "de60793a66d134e1d4b48bfe9ac9c5abe3874758"
 AUTHORISATION_ID = "m4_b1_phase_a_de60793a66d1_gpu1_attempt1"
+AUTHORIZATION_COMMIT = "f1d8e78dece7a611c14275f606e57c4cbdb30691"
+CANDIDATE_STATUS = (
+    "APPROVED_CANDIDATE_FOR_PHASE_B_EVALUATION_NOT_FINAL_PRODUCTION_MAPPING"
+)
+CANDIDATE_FORMULA = "max_seq_len = requested_biological_length + 1"
 REAL_EVIDENCE = Path(
     "/home/laura/rnagenesis-mres-runs/"
     "m4_b1_generic_generation_B1_generic_released_rnagenesis_de60793a66d1_phaseA"
@@ -79,22 +86,103 @@ HISTORICAL_EVIDENCE = Path(
     "/home/laura/rnagenesis-mres-runs/"
     "m4_b1_generic_generation_B1_generic_released_rnagenesis_bdb3dbda1650_phaseA"
 )
-PROTECTED_EVIDENCE = (REAL_EVIDENCE, HISTORICAL_EVIDENCE)
+EVIDENCE_KEY_FILES = (
+    "phase_a_manifest.json",
+    "phase_a_manifest_sha256.json",
+    "phase_a_raw_attempts.jsonl",
+    "phase_a_audited_attempts.jsonl",
+)
+EXPECTED_EVIDENCE_SHA256 = {
+    "phase_a_manifest.json": (
+        "582fe16d622660c5d305cd4763b1fd8091c3c773798fbf94f0ec723d8322c47a"
+    ),
+    "phase_a_manifest_sha256.json": (
+        "79d43c43d42539eb9da2339b1f0dd8917b108c28c64da22059e43ec0ebbcbfe1"
+    ),
+    "phase_a_raw_attempts.jsonl": (
+        "650bcc01eea4cfd0f33feb7fbd3569f4d0c176b750ab8aec9f61f5c97c01c0dc"
+    ),
+    "phase_a_audited_attempts.jsonl": (
+        "a9e153fc47bf71b7839c3c1880d33f7d6655eb7a2defccda9d8bea38ee607f3c"
+    ),
+}
 WEIGHT_SUFFIXES = (".bin", ".safetensors")
+_ACCEPTED_EVIDENCE_SNAPSHOT = None
 
 
-def assert_protected_evidence_absent(message):
-    for path in PROTECTED_EVIDENCE:
-        if path.exists() or path.is_symlink():
-            raise AssertionError("{}: {}".format(message, path))
+def _sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _snapshot_tree(root):
+    records = {}
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+        dirnames.sort()
+        for name in sorted(filenames):
+            path = Path(dirpath) / name
+            info = path.lstat()
+            relative = str(path.relative_to(root))
+            if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+                records[relative] = ("not-regular", info.st_mode)
+                continue
+            records[relative] = ("file", info.st_size, _sha256_file(path))
+    return records
+
+
+def snapshot_accepted_evidence():
+    """Read-only snapshot. Absent evidence stays portable."""
+    global _ACCEPTED_EVIDENCE_SNAPSHOT
+    if REAL_EVIDENCE.exists() or REAL_EVIDENCE.is_symlink():
+        _ACCEPTED_EVIDENCE_SNAPSHOT = _snapshot_tree(REAL_EVIDENCE)
+    else:
+        _ACCEPTED_EVIDENCE_SNAPSHOT = None
+
+
+def assert_historical_evidence_absent(message):
+    if HISTORICAL_EVIDENCE.exists() or HISTORICAL_EVIDENCE.is_symlink():
+        raise AssertionError("{}: {}".format(message, HISTORICAL_EVIDENCE))
+
+
+def assert_evidence_unchanged(message):
+    assert_historical_evidence_absent(message)
+    present = REAL_EVIDENCE.exists() or REAL_EVIDENCE.is_symlink()
+    if _ACCEPTED_EVIDENCE_SNAPSHOT is None:
+        if present:
+            raise AssertionError(
+                "{}: accepted evidence path was created: {}".format(
+                    message, REAL_EVIDENCE
+                )
+            )
+        return
+    if not present or not REAL_EVIDENCE.is_dir():
+        raise AssertionError(
+            "{}: accepted evidence directory changed: {}".format(
+                message, REAL_EVIDENCE
+            )
+        )
+    observed = _snapshot_tree(REAL_EVIDENCE)
+    if observed != _ACCEPTED_EVIDENCE_SNAPSHOT:
+        raise AssertionError(
+            "{}: accepted evidence hashes changed".format(message)
+        )
 
 
 def setUpModule():
-    assert_protected_evidence_absent("real Phase A evidence path already exists")
+    snapshot_accepted_evidence()
+    assert_evidence_unchanged("accepted Phase A evidence changed before tests")
+    loaded = [name for name in FORBIDDEN_RUNTIME_MODULES if name in sys.modules]
+    if loaded:
+        raise AssertionError(
+            "test process imported {}".format(", ".join(loaded))
+        )
 
 
 def tearDownModule():
-    assert_protected_evidence_absent("real Phase A evidence path was created")
+    assert_evidence_unchanged("accepted Phase A evidence changed during tests")
     loaded = [name for name in FORBIDDEN_RUNTIME_MODULES if name in sys.modules]
     if loaded:
         raise AssertionError(
@@ -255,20 +343,22 @@ def assign_path(config, path, value):
 
 
 class ClosedGateTests(unittest.TestCase):
-    def test_checked_in_configuration_is_active_unconsumed_gpu1(self):
+    def test_checked_in_configuration_is_consumed_complete_gpu1(self):
         config = real_config()
         text = real_config_bytes().decode("utf-8")
         block = config["scientific_execution_authorisation"]
         self.assertEqual(set(block), set(runner.SCIENTIFIC_AUTHORISATION_KEYS))
         self.assertEqual(list(block), list(runner.SCIENTIFIC_AUTHORISATION_KEYS))
         self.assertEqual(len(block), 18)
-        snapshot = runner.assert_document_gates(config)
-        self.assertEqual(snapshot, block)
+        with self.assertRaises(runner.B1RunnerError) as caught:
+            runner.assert_document_gates(config)
+        self.assertEqual(caught.exception.code, "configuration_not_consumable")
         self.assertEqual(block["authorisation_id"], AUTHORISATION_ID)
-        self.assertIs(block["authorisation_active"], True)
-        self.assertEqual(block["activation_status"], "active_unconsumed")
-        self.assertEqual(block["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
-        self.assertIs(block["consumed"], False)
+        self.assertIs(block["authorisation_active"], False)
+        self.assertEqual(block["activation_status"], "consumed_complete")
+        self.assertNotEqual(block["activation_status"], "revoked_unconsumed")
+        self.assertNotEqual(block["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
+        self.assertIs(block["consumed"], True)
         self.assertIs(block["authorises_b1_phase_a"], True)
         self.assertIs(block["gpu_use_authorised"], True)
         self.assertIs(type(block["physical_gpu"]), int)
@@ -290,7 +380,7 @@ class ClosedGateTests(unittest.TestCase):
             block["evidence_directory"],
             runner.evidence_directory_for_commit(IMPLEMENTATION_COMMIT),
         )
-        self.assertIs(block["success_claimed"], False)
+        self.assertIs(block["success_claimed"], True)
         self.assertIs(block["m4_complete"], False)
         self.assertIs(block["b1_eligible"], False)
         self.assertIs(block["phase_b_authorised"], False)
@@ -339,6 +429,9 @@ class ClosedGateTests(unittest.TestCase):
         self.assertIs(historical["phase_b_authorised"], False)
         self.assertIs(historical["development_pool_authorised"], False)
         self.assertNotEqual(historical, block)
+        self.assertEqual(text.count("activation_status: revoked_unconsumed"), 1)
+        self.assertEqual(text.count("activation_status: consumed_complete"), 1)
+        self.assertNotIn("activation_status: active_unconsumed", text)
         self.assertEqual(
             [line.strip() for line in text.splitlines() if "rnagenesis-mres-runs" in line],
             [
@@ -346,6 +439,7 @@ class ClosedGateTests(unittest.TestCase):
                 "evidence_directory: {}".format(REAL_EVIDENCE),
                 "output_directory: {}".format(HISTORICAL_EVIDENCE),
                 "evidence_directory: {}".format(HISTORICAL_EVIDENCE),
+                "evidence_directory: {}".format(REAL_EVIDENCE),
             ],
         )
         refused = opened_config()
@@ -353,17 +447,33 @@ class ClosedGateTests(unittest.TestCase):
         with self.assertRaises(runner.B1RunnerError) as caught:
             runner.assert_document_gates(refused)
         self.assertEqual(caught.exception.code, "scientific_authorisation_inactive")
-        self.assertIs(config["consumable_by_executable_workflow"], True)
-        self.assertEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
-        self.assertIs(config["phase_a"]["executable_now"], True)
-        self.assertEqual(config["phase_a"]["status"], runner.PHASE_A_EXECUTION_STATUS)
+        reused = opened_config()
+        reused["scientific_execution_authorisation"] = copy.deepcopy(block)
+        with self.assertRaises(runner.B1RunnerError) as caught:
+            runner.assert_document_gates(reused)
+        self.assertEqual(caught.exception.code, "scientific_authorisation_inactive")
+        self.assertIs(config["consumable_by_executable_workflow"], False)
+        self.assertEqual(
+            config["document_status"],
+            "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+        )
+        self.assertIn(config["document_status"], runner.NON_EXECUTABLE_DOCUMENT_STATUSES)
+        self.assertNotEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
+        self.assertIs(config["phase_a"]["executable_now"], False)
+        self.assertEqual(config["phase_a"]["status"], "COMPLETE_EVIDENCE_ACCEPTED")
+        self.assertNotEqual(config["phase_a"]["status"], runner.PHASE_A_EXECUTION_STATUS)
         self.assertEqual(
             config["phase_a"]["blocked_until"],
-            "separate_explicit_physical_gpu_1_authorisation",
+            "complete_accepted_evidence_not_reexecutable",
         )
-        self.assertIs(config["execution"]["authorised"], True)
-        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], True)
+        self.assertIs(config["execution"]["authorised"], False)
+        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], False)
         self.assertIs(config["phase_b"]["executable_now"], False)
+        self.assertIs(config["phase_b"]["human_approved_candidate_mapping_required"], False)
+        self.assertEqual(
+            config["phase_b"]["blocked_until"],
+            "separate_explicit_phase_b_authorisation",
+        )
         self.assertIs(config["execution"]["gpu_authorised_by_this_draft"], False)
         shared = config["shared_generation_settings"]
         self.assertIs(type(shared["physical_gpu"]), int)
@@ -394,7 +504,252 @@ class ClosedGateTests(unittest.TestCase):
         plan = runner.build_phase_a_plan(config)
         self.assertEqual(len(plan), 33)
         self.assertEqual(len(plan) * 16, 528)
-        assert_protected_evidence_absent("real Phase A evidence path was created")
+        self._assert_phase_a_acceptance(config)
+        self._assert_candidate_mapping(config)
+        self._assert_checked_in_configuration_refuses_before_side_effects()
+        if _ACCEPTED_EVIDENCE_SNAPSHOT is not None:
+            self._assert_present_evidence_matches_acceptance(config)
+        assert_evidence_unchanged("real Phase A evidence path was created")
+
+    def _assert_phase_a_acceptance(self, config):
+        acceptance = config["phase_a_evidence_acceptance"]
+        self.assertEqual(acceptance["status"], "ACCEPTED")
+        self.assertEqual(acceptance["accepted_by"], "Laura Hardy")
+        self.assertEqual(acceptance["acceptance_date"], "30 September 2026")
+        self.assertEqual(
+            acceptance["acceptance_source"],
+            "formal human acceptance in the M4 review chat",
+        )
+        self.assertEqual(acceptance["authorisation_id"], AUTHORISATION_ID)
+        self.assertEqual(
+            acceptance["executing_implementation_commit"],
+            IMPLEMENTATION_COMMIT,
+        )
+        self.assertEqual(acceptance["authorization_commit"], AUTHORIZATION_COMMIT)
+        self.assertEqual(acceptance["evidence_directory"], str(REAL_EVIDENCE))
+        self.assertEqual(acceptance["manifest_schema"], "m4-b1-phase-a-manifest-1")
+        self.assertEqual(acceptance["manifest_schema"], runner.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(acceptance["run_status"], "complete")
+        self.assertEqual(acceptance["started_at"], "2026-09-30T07:48:14Z")
+        self.assertEqual(acceptance["finished_at"], "2026-09-30T08:10:18Z")
+        self.assertIs(type(acceptance["physical_gpu"]), int)
+        self.assertEqual(acceptance["physical_gpu"], 1)
+        self.assertEqual(
+            acceptance["gpu_uuid"],
+            "GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f",
+        )
+        self.assertEqual(acceptance["pci_bus"], "00000000:61:00.0")
+        self.assertEqual(acceptance["logical_device"], "cuda:0")
+        self.assertEqual(acceptance["completed_invocations"], 33)
+        self.assertEqual(acceptance["raw_attempts"], 528)
+        self.assertEqual(acceptance["raw_outputs"], 33)
+        self.assertEqual(acceptance["valid_outputs"], 528)
+        self.assertEqual(acceptance["invalid_outputs"], 0)
+        self.assertIs(acceptance["final_raw_output_verification_passed"], True)
+        self.assertIs(acceptance["phase_a_failure_manifest_present"], False)
+        hashes = acceptance["evidence_sha256"]
+        self.assertEqual(
+            hashes["phase_a_manifest_json"],
+            EXPECTED_EVIDENCE_SHA256["phase_a_manifest.json"],
+        )
+        self.assertEqual(
+            hashes["phase_a_manifest_sha256_json"],
+            EXPECTED_EVIDENCE_SHA256["phase_a_manifest_sha256.json"],
+        )
+        self.assertEqual(
+            hashes["phase_a_raw_attempts_jsonl"],
+            EXPECTED_EVIDENCE_SHA256["phase_a_raw_attempts.jsonl"],
+        )
+        self.assertEqual(
+            hashes["phase_a_audited_attempts_jsonl"],
+            EXPECTED_EVIDENCE_SHA256["phase_a_audited_attempts.jsonl"],
+        )
+        self.assertEqual(
+            acceptance["review_archive_sha256"],
+            "2dccab9cbd4c4412a9088da4e5046418aff3eb54b22fae3ceb31efe4443b7a75",
+        )
+        boundary = acceptance["boundary_observations"]
+        self.assertEqual(boundary["leading_boundary_11"]["marker"], "11")
+        self.assertEqual(boundary["leading_boundary_11"]["observed"], 528)
+        self.assertEqual(boundary["leading_boundary_11"]["total"], 528)
+        self.assertEqual(boundary["empty_trailing_boundary"]["observed"], 492)
+        self.assertEqual(boundary["empty_trailing_boundary"]["total"], 528)
+        self.assertEqual(boundary["trailing_eos_marker_2"]["marker"], "2")
+        self.assertEqual(boundary["trailing_eos_marker_2"]["observed"], 36)
+        self.assertEqual(boundary["trailing_eos_marker_2"]["total"], 528)
+        self.assertEqual(boundary["selected_cap_early_eos"]["observed"], 12)
+        self.assertEqual(boundary["selected_cap_early_eos"]["total"], 176)
+        self.assertIs(boundary["boundary_reconstruction_exact"], True)
+        self.assertIs(boundary["silent_truncation_used"], False)
+        self.assertIs(boundary["accepted_cleaned_sequences_contain_only_acgu"], True)
+
+    def _assert_candidate_mapping(self, config):
+        mapping = config["phase_b"]["approved_candidate_mapping"]
+        recorded = config["length_algorithm"]["phase_b_candidate_mapping"]
+        self.assertEqual(mapping["status"], CANDIDATE_STATUS)
+        self.assertEqual(recorded["status"], CANDIDATE_STATUS)
+        self.assertEqual(mapping["formula"], CANDIDATE_FORMULA)
+        self.assertEqual(recorded["formula"], CANDIDATE_FORMULA)
+        self.assertEqual(mapping["max_seq_len_offset"], 1)
+        self.assertEqual(recorded["max_seq_len_offset"], 1)
+        self.assertIs(mapping["final_production_mapping"], False)
+        self.assertIs(recorded["final_production_mapping"], False)
+        self.assertIs(
+            config["length_algorithm"]["final_empirical_length_matching_algorithm_declared"],
+            False,
+        )
+        self.assertIs(
+            config["length_algorithm"]["final_rejection_or_resampling_algorithm_declared"],
+            False,
+        )
+        self.assertEqual(mapping["non_eos_selected_cap_exact"], {"exact": 164, "total": 164})
+        self.assertEqual(mapping["selected_cap_exact"], {"exact": 164, "total": 176})
+        self.assertEqual(mapping["overall_exact_hit_rate"], "0.9318181818181818")
+        self.assertEqual(mapping["overall_exact_hit_rate"], format(164 / 176, ".16f"))
+        self.assertEqual(mapping["selected_cap_valid_outputs"], {"valid": 176, "total": 176})
+        self.assertEqual(
+            mapping["selected_cap_unique_cleaned_sequences"],
+            {"unique": 176, "total": 176},
+        )
+        self.assertEqual(mapping["early_eos"], {"observed": 12, "total": 176})
+        self.assertIs(mapping["increasing_the_cap_rescued_paired_early_eos_attempts"], False)
+        cleaned = mapping["non_eos_cleaned_length"]
+        self.assertEqual(
+            cleaned["cap_target"]["cleaned_length"],
+            "requested_biological_length_minus_1",
+        )
+        self.assertIs(cleaned["cap_target"]["every_non_eos_output"], True)
+        self.assertEqual(
+            cleaned["cap_target_plus_1"]["cleaned_length"],
+            "requested_biological_length",
+        )
+        self.assertIs(cleaned["cap_target_plus_1"]["every_non_eos_output"], True)
+        self.assertEqual(
+            cleaned["cap_target_plus_2"]["cleaned_length"],
+            "requested_biological_length_plus_1",
+        )
+        self.assertIs(cleaned["cap_target_plus_2"]["every_non_eos_output"], True)
+        expected_rows = (
+            (20, 21, 16, 0),
+            (30, 31, 16, 0),
+            (40, 41, 16, 0),
+            (50, 51, 16, 0),
+            (60, 61, 16, 0),
+            (70, 71, 15, 1),
+            (80, 81, 16, 0),
+            (90, 91, 16, 0),
+            (100, 101, 14, 2),
+            (112, 113, 11, 5),
+            (123, 124, 12, 4),
+        )
+        rows = mapping["per_target_selected_cap"]
+        self.assertEqual(len(rows), 11)
+        self.assertEqual(
+            [
+                (row["target"], row["cap"], row["exact"], row["early_eos"])
+                for row in rows
+            ],
+            list(expected_rows),
+        )
+        self.assertTrue(all(row["attempts"] == 16 for row in rows))
+        self.assertTrue(all(row["cap"] == row["target"] + 1 for row in rows))
+        self.assertEqual(sum(row["exact"] for row in rows), 164)
+        self.assertEqual(sum(row["early_eos"] for row in rows), 12)
+        self.assertEqual(sum(row["attempts"] for row in rows), 176)
+        interpretation = mapping["interpretation"]
+        self.assertIs(interpretation["provisional_0_90_aggregate_diagnostic_exceeded"], True)
+        self.assertIs(
+            interpretation["every_tested_length_exceeds_provisional_0_50_per_length_diagnostic"],
+            True,
+        )
+        self.assertIs(interpretation["b1_eligibility_claim"], False)
+        self.assertIs(
+            interpretation[
+                "phase_b_must_test_candidate_mapping_across_all_frozen_train_lengths"
+            ],
+            True,
+        )
+        self.assertIs(
+            interpretation[
+                "early_termination_requires_explicit_rejection_or_resampling_consideration"
+            ],
+            True,
+        )
+        self.assertIs(interpretation["silent_trimming_or_truncation_authorized"], False)
+        self.assertIs(interpretation["phase_b_authorised"], False)
+        self.assertIs(interpretation["development_pool_authorised"], False)
+        self.assertIs(interpretation["m4_complete"], False)
+        self.assertIs(config["scientific_execution_authorisation"]["b1_eligible"], False)
+        self.assertIs(config["scientific_execution_authorisation"]["phase_b_authorised"], False)
+        self.assertIs(
+            config["scientific_execution_authorisation"]["development_pool_authorised"],
+            False,
+        )
+        self.assertIs(config["scientific_execution_authorisation"]["m4_complete"], False)
+        pool = config["limited_development_pool"]
+        self.assertEqual(
+            pool["status"],
+            "APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED",
+        )
+        self.assertIs(pool["phase_b_candidate_mapping_unblocks_this_pool"], False)
+        self.assertIs(
+            pool[
+                "execution_blocked_until_length_mapping_or_rejection_resampling_algorithm_approved"
+            ],
+            True,
+        )
+
+    def _assert_checked_in_configuration_refuses_before_side_effects(self):
+        for environ in (
+            {},
+            {"CUDA_VISIBLE_DEVICES": "", "CUDA_DEVICE_ORDER": ""},
+            open_environ(),
+        ):
+            for output_dir in (
+                str(REAL_EVIDENCE),
+                str(REAL_EVIDENCE) + "/",
+                str(HISTORICAL_EVIDENCE),
+                "/tmp/b1-not-the-evidence-path",
+            ):
+                recorder = RecordingDeps(real_config_bytes(), environ)
+                code, stderr = run_main(recorder.build(), output_dir)
+                assert_closed(
+                    self,
+                    code,
+                    stderr,
+                    recorder,
+                    "configuration_not_consumable",
+                )
+                self.assertIn("consumable_by_executable_workflow is not true", stderr)
+                self.assertNotIn("nvidia-smi", stderr)
+
+    def _assert_present_evidence_matches_acceptance(self, config):
+        acceptance = config["phase_a_evidence_acceptance"]
+        for name, digest in EXPECTED_EVIDENCE_SHA256.items():
+            self.assertEqual(_ACCEPTED_EVIDENCE_SNAPSHOT[name][2], digest)
+            self.assertEqual(
+                _sha256_file(REAL_EVIDENCE / name),
+                acceptance["evidence_sha256"][
+                    {
+                        "phase_a_manifest.json": "phase_a_manifest_json",
+                        "phase_a_manifest_sha256.json": "phase_a_manifest_sha256_json",
+                        "phase_a_raw_attempts.jsonl": "phase_a_raw_attempts_jsonl",
+                        "phase_a_audited_attempts.jsonl": "phase_a_audited_attempts_jsonl",
+                    }[name]
+                ],
+            )
+        self.assertNotIn("phase_a_failure_manifest.json", _ACCEPTED_EVIDENCE_SNAPSHOT)
+        raw_files = [
+            relative
+            for relative in _ACCEPTED_EVIDENCE_SNAPSHOT
+            if relative.startswith("rnagenesis_generation_output/")
+            and _ACCEPTED_EVIDENCE_SNAPSHOT[relative][0] == "file"
+        ]
+        self.assertEqual(len(raw_files), 33)
+        for name in ("phase_a_raw_attempts.jsonl", "phase_a_audited_attempts.jsonl"):
+            with open(REAL_EVIDENCE / name, "rb") as handle:
+                row_count = sum(1 for line in handle if line.strip())
+            self.assertEqual(row_count, 528)
 
     def test_synthetic_closed_configuration_refuses_before_side_effects(self):
         recorder = RecordingDeps(
@@ -408,13 +763,13 @@ class ClosedGateTests(unittest.TestCase):
         assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
         self.assertEqual(before, after)
         self.assertIn("consumable_by_executable_workflow is not true", stderr)
-        self.assertFalse(REAL_EVIDENCE.exists())
+        assert_evidence_unchanged("accepted Phase A evidence changed")
 
     def test_missing_cuda_does_not_outrank_the_closed_document(self):
         recorder = RecordingDeps(dumped(synthetic_closed_copy()), {})
         code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
         assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
-        self.assertFalse(REAL_EVIDENCE.exists())
+        assert_evidence_unchanged("accepted Phase A evidence changed")
 
     def test_direct_gate_identifies_the_closed_document(self):
         with self.assertRaises(runner.B1RunnerError) as caught:
@@ -564,7 +919,7 @@ class ClosedGateTests(unittest.TestCase):
             runner.assert_document_gates(missing_gpu)
         self.assertEqual(caught.exception.code, "scientific_authorisation_incomplete")
         self.assertIn("physical_gpu", caught.exception.detail)
-        assert_protected_evidence_absent("real Phase A evidence path was created")
+        assert_evidence_unchanged("real Phase A evidence path was created")
 
 
 class AuthorisationTests(unittest.TestCase):
@@ -717,7 +1072,7 @@ class AuthorisationTests(unittest.TestCase):
         with self.assertRaises(runner.B1RunnerError) as caught:
             runner.assert_document_gates(wrong_commit)
         self.assertEqual(caught.exception.code, "authorisation_evidence_mismatch")
-        assert_protected_evidence_absent("real Phase A evidence path was created")
+        assert_evidence_unchanged("real Phase A evidence path was created")
 
 
 class CudaAndOutputTests(unittest.TestCase):
@@ -773,13 +1128,15 @@ class CudaAndOutputTests(unittest.TestCase):
             {"CUDA_VISIBLE_DEVICES": "", "CUDA_DEVICE_ORDER": ""},
         )
         code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
-        assert_closed(self, code, stderr, recorder, "cuda_visible_devices_refused")
+        assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
+        self.assertIn("consumable_by_executable_workflow is not true", stderr)
         self.assertNotIn("nvidia-smi", stderr)
-        assert_protected_evidence_absent("real Phase A evidence path was created")
+        assert_evidence_unchanged("real Phase A evidence path was created")
 
     def test_real_evidence_aliases_refuse_before_lstat(self):
         expected = str(REAL_EVIDENCE)
         supplied = [
+            expected,
             "phaseA",
             expected + "/",
             "/home/laura/rnagenesis-mres-runs/../rnagenesis-mres-runs/"
@@ -790,9 +1147,9 @@ class CudaAndOutputTests(unittest.TestCase):
         for output_dir in supplied:
             recorder = RecordingDeps(real_config_bytes(), open_environ())
             code, stderr = run_main(recorder.build(), output_dir)
-            assert_closed(self, code, stderr, recorder, "output_path_mismatch")
+            assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
             self.assertNotIn("nvidia-smi", stderr)
-        assert_protected_evidence_absent("real Phase A evidence path was created")
+        assert_evidence_unchanged("real Phase A evidence path was created")
 
     def test_output_mismatch_relative_and_alias_refuse_before_lstat(self):
         expected = runner.evidence_directory_for_commit(COMMIT)
@@ -830,7 +1187,7 @@ class CudaAndOutputTests(unittest.TestCase):
         self.assertNotIn("sha256_file", [event[0] for event in recorder.events])
         self.assertNotIn("mkdir", [event[0] for event in recorder.events])
         self.assertNotIn("gpu_preflight", [event[0] for event in recorder.events])
-        self.assertFalse(REAL_EVIDENCE.exists())
+        assert_evidence_unchanged("accepted Phase A evidence changed")
         self.assertFalse(Path(expected).exists())
 
     def test_symlink_and_resolved_alias_refuse(self):
@@ -863,7 +1220,7 @@ class CudaAndOutputTests(unittest.TestCase):
     def test_non_dict_mappings_accept_exact_gpu1_and_refuse_other_values(self):
         evidence = runner.evidence_directory_for_commit(COMMIT)
         self.assertFalse(Path(evidence).exists())
-        self.assertFalse(REAL_EVIDENCE.exists())
+        assert_evidence_unchanged("accepted Phase A evidence changed")
         self.assertEqual(runner.PHYSICAL_GPU, 1)
         self.assertEqual(runner.CUDA_DEVICE_ORDER, "PCI_BUS_ID")
         source = inspect.getsource(runner.assert_cuda_environment)
@@ -915,7 +1272,7 @@ class CudaAndOutputTests(unittest.TestCase):
             self.assertNotIn("B1_SYNTHETIC_CHILD_MARKER", parent)
             assert_parent_unchanged(parent, before_items)
             self.assertFalse(Path(evidence).exists())
-            self.assertFalse(REAL_EVIDENCE.exists())
+            assert_evidence_unchanged("accepted Phase A evidence changed")
             for name in FORBIDDEN_RUNTIME_MODULES:
                 self.assertNotIn(name, sys.modules)
 
@@ -930,7 +1287,7 @@ class CudaAndOutputTests(unittest.TestCase):
                 self.assertEqual(caught.exception.code, code)
             assert_parent_unchanged(parent, before_items)
             self.assertFalse(Path(evidence).exists())
-            self.assertFalse(REAL_EVIDENCE.exists())
+            assert_evidence_unchanged("accepted Phase A evidence changed")
 
         def refuse_os(values, removed, code):
             with mock.patch.dict(os.environ, values, clear=False):
@@ -1060,7 +1417,7 @@ class CudaAndOutputTests(unittest.TestCase):
             cuda_before,
         )
         self.assertFalse(Path(evidence).exists())
-        self.assertFalse(REAL_EVIDENCE.exists())
+        assert_evidence_unchanged("accepted Phase A evidence changed")
         for name in FORBIDDEN_RUNTIME_MODULES:
             self.assertNotIn(name, sys.modules)
 
@@ -1698,7 +2055,7 @@ class SyntheticExecutionTests(unittest.TestCase):
             self.assertEqual(audited_rows[15]["cleaned_sequence"], "ACGT")
             self.assertNotIn("cleaned_sequence", raw_rows[15])
             self.assertEqual(len(manifest["hashes"]["raw_outputs"]), 33)
-        self.assertFalse(REAL_EVIDENCE.exists())
+        assert_evidence_unchanged("accepted Phase A evidence changed")
 
 
 class IsolationTests(unittest.TestCase):
@@ -2347,7 +2704,7 @@ class MockedRunTests(unittest.TestCase):
         runtime = "b" * 40
         evidence = Path(runner.evidence_directory_for_commit(implementation))
         self.assertFalse(evidence.exists())
-        self.assertFalse(REAL_EVIDENCE.exists())
+        assert_evidence_unchanged("accepted Phase A evidence changed")
         config_bytes = dumped(opened_config(implementation))
         runner_bytes = runner.RUNNER_PATH.read_bytes()
         parent = open_environ(HF_HUB_OFFLINE="0", MARKER="keep")
@@ -2591,7 +2948,7 @@ class MockedRunTests(unittest.TestCase):
             self.assertEqual(parent["MARKER"], "keep")
             self.assertFalse((Path(tmp) / runner.FAILURE_MANIFEST_NAME).exists())
         self.assertFalse(evidence.exists())
-        self.assertFalse(REAL_EVIDENCE.exists())
+        assert_evidence_unchanged("accepted Phase A evidence changed")
 
 
 class AcceptanceCorrectionTests(unittest.TestCase):
@@ -2857,7 +3214,7 @@ class RawOutputVerificationTests(unittest.TestCase):
             self.assertEqual(document["failure"]["attempt_count"], 528)
             self.assertEqual(document["failure"]["completed_invocation_indexes"], list(range(33)))
             self.assertFalse(document["final_raw_output_verification"]["passed"])
-            self.assertFalse(REAL_EVIDENCE.exists())
+            assert_evidence_unchanged("accepted Phase A evidence changed")
 
     def test_mutated_deleted_truncated_and_replaced_raw_files_refuse_success(self):
         secret = "ACGUACGUACGUACGU"

@@ -1,13 +1,17 @@
-# APPROVED_FOR_SCIENTIFIC_EXECUTION
-# One unconsumed physical GPU 1 Phase A authorisation may be consumed by
-# the executable workflow. The physical GPU 0 Phase A authorisation is
-# revoked, was not consumed, and is retained as historical provenance.
-# No Phase A evidence was produced. Phase B, B1 eligibility, and the
-# development pool are not authorised.
-# This file does not declare a final length-matching algorithm.
+# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+# The physical GPU 1 Phase A authorisation was consumed successfully.
+# Its activation status is consumed_complete. It is inactive. Phase A
+# evidence is accepted. This is not a revoked-unconsumed record.
+# Continued operational access to GPU 1 is separate and remains available
+# for separately authorized work. This file does not authorise that work.
+# The physical GPU 0 Phase A authorisation remains revoked and unconsumed.
+# max_seq_len = requested_biological_length + 1 is approved only as a
+# Phase B evaluation candidate. It is not a final production mapping.
+# Phase B, B1 eligibility, M4 completion, and the development pool remain
+# unauthorised. This file does not declare a final length-matching algorithm.
 
-document_status: APPROVED_FOR_SCIENTIFIC_EXECUTION
-consumable_by_executable_workflow: true
+document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
 human_approval:
   approving_person: Laura Hardy
   approval_date: 29 September 2026
@@ -36,18 +40,21 @@ metric_set_schema_version: m4-stage1-draft-1
 created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
 
 execution:
-  authorised: true
+  authorised: false
   gpu_authorised_by_this_draft: false
-  gpu_authorised_by_this_approval: true
+  gpu_authorised_by_this_approval: false
   evidence_directory_created_by_this_stage: false
   overwrite_existing_output: refuse
   silent_truncation: false
 
+# Consumed successfully by the completed physical GPU 1 Phase A run.
+# authorises_b1_phase_a and gpu_use_authorised record that consumed scope.
+# They do not grant another run. consumed_complete is not revoked_unconsumed.
 scientific_execution_authorisation:
   authorisation_id: m4_b1_phase_a_de60793a66d1_gpu1_attempt1
-  authorisation_active: true
-  activation_status: active_unconsumed
-  consumed: false
+  authorisation_active: false
+  activation_status: consumed_complete
+  consumed: true
   authorises_b1_phase_a: true
   gpu_use_authorised: true
   physical_gpu: 1
@@ -57,7 +64,7 @@ scientific_execution_authorisation:
   phase: A
   output_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_de60793a66d1_phaseA
   evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_de60793a66d1_phaseA
-  success_claimed: false
+  success_claimed: true
   m4_complete: false
   b1_eligible: false
   phase_b_authorised: false
@@ -148,9 +155,9 @@ cleaner_rule:
     limitation: five_step_two_sequence_smoke_not_a_50_step_length_law
 
 phase_a:
-  status: AUTHORISED_FOR_EXECUTION
-  blocked_until: separate_explicit_physical_gpu_1_authorisation
-  executable_now: true
+  status: COMPLETE_EVIDENCE_ACCEPTED
+  blocked_until: complete_accepted_evidence_not_reexecutable
+  executable_now: false
   purpose: characterize_max_seq_len_versus_cleaned_length
   does_not_select_a_mapping: true
   target_biological_lengths: [20, 30, 40, 50, 60, 70, 80, 90, 100, 112, 123]
@@ -198,11 +205,158 @@ phase_a:
     - acceptance_status
     - rejection_reason
 
+phase_a_evidence_acceptance:
+  status: ACCEPTED
+  accepted_by: Laura Hardy
+  acceptance_date: 30 September 2026
+  acceptance_source: formal human acceptance in the M4 review chat
+  authorisation_id: m4_b1_phase_a_de60793a66d1_gpu1_attempt1
+  executing_implementation_commit: de60793a66d134e1d4b48bfe9ac9c5abe3874758
+  authorization_commit: f1d8e78dece7a611c14275f606e57c4cbdb30691
+  evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_de60793a66d1_phaseA
+  manifest_schema: m4-b1-phase-a-manifest-1
+  run_status: complete
+  started_at: "2026-09-30T07:48:14Z"
+  finished_at: "2026-09-30T08:10:18Z"
+  physical_gpu: 1
+  gpu_uuid: "GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f"
+  pci_bus: "00000000:61:00.0"
+  logical_device: "cuda:0"
+  completed_invocations: 33
+  raw_attempts: 528
+  raw_outputs: 33
+  valid_outputs: 528
+  invalid_outputs: 0
+  final_raw_output_verification_passed: true
+  phase_a_failure_manifest_present: false
+  evidence_sha256:
+    phase_a_manifest_json: 582fe16d622660c5d305cd4763b1fd8091c3c773798fbf94f0ec723d8322c47a
+    phase_a_manifest_sha256_json: 79d43c43d42539eb9da2339b1f0dd8917b108c28c64da22059e43ec0ebbcbfe1
+    phase_a_raw_attempts_jsonl: 650bcc01eea4cfd0f33feb7fbd3569f4d0c176b750ab8aec9f61f5c97c01c0dc
+    phase_a_audited_attempts_jsonl: a9e153fc47bf71b7839c3c1880d33f7d6655eb7a2defccda9d8bea38ee607f3c
+  review_archive_sha256: 2dccab9cbd4c4412a9088da4e5046418aff3eb54b22fae3ceb31efe4443b7a75
+  boundary_observations:
+    leading_boundary_11:
+      marker: "11"
+      observed: 528
+      total: 528
+    empty_trailing_boundary:
+      observed: 492
+      total: 528
+    trailing_eos_marker_2:
+      marker: "2"
+      observed: 36
+      total: 528
+    selected_cap_early_eos:
+      observed: 12
+      total: 176
+    boundary_reconstruction_exact: true
+    silent_truncation_used: false
+    accepted_cleaned_sequences_contain_only_acgu: true
+
 phase_b:
   status: APPROVED_DESIGN_NOT_APPROVED_FOR_GPU_EXECUTION
-  blocked_until: human_review_of_phase_a
+  blocked_until: separate_explicit_phase_b_authorisation
   executable_now: false
-  human_approved_candidate_mapping_required: true
+  human_approved_candidate_mapping_required: false
+  approved_candidate_mapping:
+    status: APPROVED_CANDIDATE_FOR_PHASE_B_EVALUATION_NOT_FINAL_PRODUCTION_MAPPING
+    formula: "max_seq_len = requested_biological_length + 1"
+    max_seq_len_offset: 1
+    final_production_mapping: false
+    non_eos_selected_cap_exact:
+      exact: 164
+      total: 164
+    selected_cap_exact:
+      exact: 164
+      total: 176
+    overall_exact_hit_rate: "0.9318181818181818"
+    selected_cap_valid_outputs:
+      valid: 176
+      total: 176
+    selected_cap_unique_cleaned_sequences:
+      unique: 176
+      total: 176
+    early_eos:
+      observed: 12
+      total: 176
+    increasing_the_cap_rescued_paired_early_eos_attempts: false
+    non_eos_cleaned_length:
+      cap_target:
+        cleaned_length: requested_biological_length_minus_1
+        every_non_eos_output: true
+      cap_target_plus_1:
+        cleaned_length: requested_biological_length
+        every_non_eos_output: true
+      cap_target_plus_2:
+        cleaned_length: requested_biological_length_plus_1
+        every_non_eos_output: true
+    per_target_selected_cap:
+      - target: 20
+        cap: 21
+        exact: 16
+        attempts: 16
+        early_eos: 0
+      - target: 30
+        cap: 31
+        exact: 16
+        attempts: 16
+        early_eos: 0
+      - target: 40
+        cap: 41
+        exact: 16
+        attempts: 16
+        early_eos: 0
+      - target: 50
+        cap: 51
+        exact: 16
+        attempts: 16
+        early_eos: 0
+      - target: 60
+        cap: 61
+        exact: 16
+        attempts: 16
+        early_eos: 0
+      - target: 70
+        cap: 71
+        exact: 15
+        attempts: 16
+        early_eos: 1
+      - target: 80
+        cap: 81
+        exact: 16
+        attempts: 16
+        early_eos: 0
+      - target: 90
+        cap: 91
+        exact: 16
+        attempts: 16
+        early_eos: 0
+      - target: 100
+        cap: 101
+        exact: 14
+        attempts: 16
+        early_eos: 2
+      - target: 112
+        cap: 113
+        exact: 11
+        attempts: 16
+        early_eos: 5
+      - target: 123
+        cap: 124
+        exact: 12
+        attempts: 16
+        early_eos: 4
+    interpretation:
+      provisional_0_90_aggregate_diagnostic_exceeded: true
+      every_tested_length_exceeds_provisional_0_50_per_length_diagnostic: true
+      b1_eligibility_claim: false
+      phase_b_must_test_candidate_mapping_across_all_frozen_train_lengths: true
+      early_termination_requires_explicit_rejection_or_resampling_consideration: true
+      silent_trimming_or_truncation_authorized: false
+      phase_b_authorised: false
+      development_pool_authorised: false
+      m4_complete: false
   lengths: every_distinct_frozen_TRAIN_length_in_ascending_order
   distinct_train_lengths_recorded_by_m3: 89
   do_not_infer_a_mapping_for_untested_lengths: true
@@ -262,9 +416,15 @@ length_algorithm:
   final_rejection_or_resampling_algorithm_declared: false
   human_decision_required_after: [phase_a_evidence, phase_b_evidence]
   silent_truncation_to_force_a_length: prohibited
+  phase_b_candidate_mapping:
+    status: APPROVED_CANDIDATE_FOR_PHASE_B_EVALUATION_NOT_FINAL_PRODUCTION_MAPPING
+    formula: "max_seq_len = requested_biological_length + 1"
+    max_seq_len_offset: 1
+    final_production_mapping: false
 
 limited_development_pool:
   status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+  phase_b_candidate_mapping_unblocks_this_pool: false
   identification: >
     This 1000-attempt pool is the proposed fixed diagnostic sample for B1
     and, with the same target-length list and paired generation-seed
