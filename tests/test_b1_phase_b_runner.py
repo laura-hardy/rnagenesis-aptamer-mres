@@ -1,9 +1,9 @@
-"""Synthetic tests for the non-executable B1 Phase B runner.
+"""Synthetic tests for the M4 B1 Phase B runner.
 
 External operations, GPU queries, CUDA, model loading, generation, and
-biological sequence files are injected or mocked. The checked-in
-configuration stays closed. These tests must not create Phase B evidence
-or modify accepted Phase A evidence.
+biological sequence files are injected or mocked. These tests must not
+query a GPU, import a model stack, run generation, or create the real
+Phase B evidence directory.
 """
 
 from __future__ import annotations
@@ -64,6 +64,12 @@ PHASE_A_EVIDENCE = Path(
 HISTORICAL_EVIDENCE = Path(
     "/home/laura/rnagenesis-mres-runs/"
     "m4_b1_generic_generation_B1_generic_released_rnagenesis_bdb3dbda1650_phaseA"
+)
+IMPLEMENTATION_COMMIT = "688b18f88f21b427edb9e3e2a79130cc92485440"
+AUTHORISATION_ID = "m4_b1_phase_b_688b18f88f21_gpu1_attempt1"
+PHASE_B_EVIDENCE = Path(
+    "/home/laura/rnagenesis-mres-runs/"
+    "m4_b1_generic_generation_B1_generic_released_rnagenesis_688b18f88f21_phaseB"
 )
 EXPECTED_PHASE_A_SHA256 = {
     "phase_a_manifest.json": (
@@ -277,10 +283,13 @@ def run_main(deps, output_dir, physical_gpu):
     return code, stderr.getvalue()
 
 
-def assert_closed(test, code, stderr, deps):
+def assert_refused_before_side_effects(test, code, stderr, deps, error_code):
     test.assertEqual(code, 1)
-    test.assertIn("error: configuration_not_consumable:", stderr)
+    test.assertIn("error: {}:".format(error_code), stderr)
     test.assertEqual([event[0] for event in deps.events], ["read_bytes"])
+    test.assertNotIn("mkdir", [event[0] for event in deps.events])
+    test.assertNotIn("gpu_preflight", [event[0] for event in deps.events])
+    test.assertNotIn("subprocess_run", [event[0] for event in deps.events])
 
 
 def repository_git(runtime_head, implementation_commit, **overrides):
@@ -408,49 +417,305 @@ def exact_line(length):
     return "11" + body + "2"
 
 
-class ClosedConfigurationTests(unittest.TestCase):
-    def test_checked_in_configuration_refuses_before_every_side_effect(self):
+class CheckedInAuthorisationTests(unittest.TestCase):
+    def test_checked_in_phase_b_authorisation_is_the_single_gpu1_grant(self):
         config = real_config()
-        self.assertIs(config["consumable_by_executable_workflow"], False)
+        text = real_config_bytes().decode("utf-8")
+        self.assertIs(runner.assert_configuration_consumable(config), True)
+        self.assertEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
+        self.assertIs(config["consumable_by_executable_workflow"], True)
+        self.assertIs(config["execution"]["authorised"], True)
+        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], True)
+        self.assertIs(config["execution"]["gpu_authorised_by_this_draft"], False)
+        self.assertIs(config["phase_b"]["executable_now"], True)
+        self.assertEqual(config["phase_b"]["status"], runner.PHASE_B_EXECUTION_STATUS)
+        self.assertIs(config["phase_a"]["executable_now"], False)
+        self.assertEqual(config["phase_a"]["status"], "COMPLETE_EVIDENCE_ACCEPTED")
+        phase_a = config["scientific_execution_authorisation"]
+        self.assertIs(phase_a["authorisation_active"], False)
+        self.assertEqual(phase_a["activation_status"], "consumed_complete")
+        self.assertIs(phase_a["consumed"], True)
+        self.assertIs(type(phase_a["consumed"]), bool)
+        self.assertEqual(phase_a["phase"], "A")
+        self.assertIs(phase_a["phase_b_authorised"], False)
+        self.assertIs(phase_a["b1_eligible"], False)
+        self.assertIs(phase_a["m4_complete"], False)
+        self.assertIs(phase_a["development_pool_authorised"], False)
+        historical = config["historical_scientific_execution_authorisations"]
+        self.assertEqual(len(historical), 1)
+        self.assertIs(historical[0]["authorisation_active"], False)
+        self.assertEqual(historical[0]["activation_status"], "revoked_unconsumed")
+        self.assertIs(historical[0]["consumed"], False)
+        self.assertIs(type(historical[0]["consumed"]), bool)
+        self.assertIs(type(historical[0]["physical_gpu"]), int)
+        self.assertEqual(historical[0]["physical_gpu"], 0)
+        self.assertIs(historical[0]["phase_b_authorised"], False)
+        block = config[runner.PHASE_B_AUTHORISATION_NAME]
+        self.assertEqual(list(block), list(runner.PHASE_B_AUTHORISATION_KEYS))
+        self.assertEqual(set(block), set(runner.PHASE_B_AUTHORISATION_KEYS))
+        self.assertEqual(len(block), len(runner.PHASE_B_AUTHORISATION_KEYS))
+        self.assertEqual(block["authorisation_id"], AUTHORISATION_ID)
+        self.assertIs(block["authorisation_active"], True)
+        self.assertEqual(block["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
+        self.assertIs(block["consumed"], False)
+        self.assertIs(type(block["consumed"]), bool)
+        self.assertNotEqual(block["consumed"], "false")
+        self.assertIs(block["authorises_b1_phase_b"], True)
+        self.assertIs(block["gpu_use_authorised"], True)
+        self.assertIs(type(block["physical_gpu"]), int)
+        self.assertEqual(block["physical_gpu"], 1)
+        self.assertNotEqual(block["physical_gpu"], "1")
+        self.assertEqual(block["executing_implementation_commit"], IMPLEMENTATION_COMMIT)
+        self.assertEqual(block["mres_branch"], "main")
+        self.assertEqual(block["condition"], runner.CONDITION_LABEL)
+        self.assertEqual(block["phase"], "B")
+        expected_directory = runner.evidence_directory_for_commit(IMPLEMENTATION_COMMIT)
+        self.assertEqual(expected_directory, str(PHASE_B_EVIDENCE))
+        self.assertEqual(block["output_directory"], expected_directory)
+        self.assertEqual(block["evidence_directory"], expected_directory)
+        self.assertIs(block["success_claimed"], False)
+        self.assertIs(block["m4_complete"], False)
+        self.assertIs(block["b1_eligible"], False)
+        self.assertIs(block["development_pool_authorised"], False)
+        self.assertIs(block["final_production_mapping_declared"], False)
+        self.assertIs(block["rejection_or_resampling_algorithm_declared"], False)
+        self.assertEqual(text.count("authorisation_active: true"), 1)
+        self.assertEqual(text.count("activation_status: active_unconsumed"), 1)
+        self.assertEqual(text.count("activation_status: consumed_complete"), 1)
+        self.assertEqual(text.count("activation_status: revoked_unconsumed"), 1)
         self.assertEqual(
-            config["document_status"],
-            "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+            sum(
+                1
+                for line in text.splitlines()
+                if line.startswith("phase_b_scientific_execution_authorisation:")
+            ),
+            1,
         )
-        self.assertIs(config["execution"]["authorised"], False)
-        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], False)
-        self.assertIs(config["phase_b"]["executable_now"], False)
-        self.assertNotIn(runner.PHASE_B_AUTHORISATION_NAME, config)
-        self.assertIs(config["scientific_execution_authorisation"]["consumed"], True)
-        self.assertIs(config["scientific_execution_authorisation"]["phase_b_authorised"], False)
-        self.assertIs(config["scientific_execution_authorisation"]["b1_eligible"], False)
-        self.assertIs(config["human_approval"]["m4_complete"], False)
-        self.assertIs(config["limited_development_pool"]["phase_b_candidate_mapping_unblocks_this_pool"], False)
-        record = config["phase_b"]["implementation_record"]
-        self.assertEqual(record["status"], "AWAITING_REVIEW_NOT_EXECUTION")
-        self.assertEqual(record["runner"], "scripts/b1_phase_b_runner.py")
-        self.assertIs(record["authorisation_block_present"], False)
-        self.assertIs(record["implementation_commit_recorded"], False)
-        self.assertIs(record["authorization_commit_recorded"], False)
-        self.assertIs(record["output_path_recorded"], False)
-        self.assertIs(record["approval_timestamp_recorded"], False)
-        self.assertIs(record["selected_physical_gpu_recorded"], False)
+        section = text.split("phase_b_scientific_execution_authorisation:\n", 1)[1]
+        section = section.split("\n\n", 1)[0]
+        self.assertIn("\n  physical_gpu: 1\n", "\n" + section + "\n")
+        self.assertNotIn('physical_gpu: "1"', section)
+        self.assertNotIn("physical_gpu: '1'", section)
+        self.assertIn("\n  consumed: false\n", "\n" + section + "\n")
+        self.assertNotIn('consumed: "false"', section)
+        snapshot = runner.assert_phase_b_authorisation(config, 1)
+        self.assertEqual(snapshot["authorisation_id"], AUTHORISATION_ID)
+        self.assertEqual(snapshot["executing_implementation_commit"], IMPLEMENTATION_COMMIT)
+        self.assertEqual(snapshot["evidence_directory"], expected_directory)
+        self.assertEqual(snapshot["selected_physical_gpu"], 1)
+        self.assertIs(snapshot["consumed"], False)
+        with self.assertRaises(runner.PhaseBRunnerError) as caught:
+            runner.assert_phase_b_authorisation(config, 0)
+        self.assertEqual(caught.exception.code, "phase_b_gpu_mismatch")
         hashes = config["phase_a_evidence_acceptance"]["evidence_sha256"]
-        self.assertEqual(hashes["phase_a_manifest_json"], EXPECTED_PHASE_A_SHA256["phase_a_manifest.json"])
+        self.assertEqual(
+            hashes["phase_a_manifest_json"],
+            EXPECTED_PHASE_A_SHA256["phase_a_manifest.json"],
+        )
+        self.assertEqual(
+            hashes["phase_a_manifest_sha256_json"],
+            EXPECTED_PHASE_A_SHA256["phase_a_manifest_sha256.json"],
+        )
+        self.assertEqual(
+            hashes["phase_a_raw_attempts_jsonl"],
+            EXPECTED_PHASE_A_SHA256["phase_a_raw_attempts.jsonl"],
+        )
         self.assertEqual(
             hashes["phase_a_audited_attempts_jsonl"],
             EXPECTED_PHASE_A_SHA256["phase_a_audited_attempts.jsonl"],
         )
-        for physical_gpu in ("0", "1", "2", ""):
-            for output_dir in (
-                str(PHASE_A_EVIDENCE),
-                str(HISTORICAL_EVIDENCE),
-                "/tmp/not-a-phase-b-evidence-directory",
-                "relative/output",
-            ):
-                recorder = RecordingDeps(real_config_bytes(), {})
-                code, stderr = run_main(recorder.build(), output_dir, physical_gpu)
-                assert_closed(self, code, stderr, recorder)
-        assert_evidence_unchanged("closed-gate test touched evidence")
+        self.assertIs(config["phase_a_evidence_acceptance"]["phase_a_failure_manifest_present"], False)
+        schedule = config["phase_b"]["frozen_schedule"]
+        self.assertEqual(schedule["invocations"], 89)
+        self.assertEqual(schedule["raw_attempts_per_length"], 16)
+        self.assertEqual(schedule["total_raw_attempts"], 1424)
+        self.assertEqual(schedule["max_seq_len_offset"], 1)
+        self.assertEqual(schedule["max_seq_len_formula"], runner.CANDIDATE_FORMULA)
+        self.assertEqual(schedule["base_seed"], 42000)
+        self.assertEqual(schedule["first_seed"], 42000)
+        self.assertEqual(schedule["last_seed"], 42088)
+        self.assertIs(schedule["final_production_mapping"], False)
+        for key in ("rejection", "resampling", "trimming", "padding", "deduplication", "replacement"):
+            self.assertIs(schedule[key], False)
+        mapping = config["phase_b"]["approved_candidate_mapping"]
+        self.assertIs(mapping["final_production_mapping"], False)
+        interpretation = mapping["interpretation"]
+        self.assertIs(interpretation["b1_eligibility_claim"], False)
+        self.assertIs(interpretation["phase_b_authorised"], False)
+        self.assertIs(interpretation["development_pool_authorised"], False)
+        self.assertIs(interpretation["m4_complete"], False)
+        self.assertIs(interpretation["silent_trimming_or_truncation_authorized"], False)
+        self.assertIs(config["human_approval"]["m4_complete"], False)
+        self.assertIs(
+            config["limited_development_pool"]["phase_b_candidate_mapping_unblocks_this_pool"],
+            False,
+        )
+        diagnostics = config["phase_b"]["provisional_diagnostics"]
+        self.assertIs(diagnostics["passing_a_diagnostic_declares_b1_eligible"], False)
+        self.assertIs(diagnostics["declares_final_plus_one_mapping"], False)
+        self.assertIs(diagnostics["declares_rejection_or_resampling_algorithm"], False)
+        self.assertIs(diagnostics["authorises_development_pool"], False)
+        self.assertIs(diagnostics["claims_m4_complete"], False)
+        record = config["phase_b"]["implementation_record"]
+        self.assertEqual(record["runner"], "scripts/b1_phase_b_runner.py")
+        self.assertEqual(record["authorisation_block"], runner.PHASE_B_AUTHORISATION_NAME)
+        self.assertEqual(
+            list(config["phase_b"]["physical_gpu_selection"]["supported_physical_gpus"]),
+            [0, 1],
+        )
+        self.assertIs(config["phase_b"]["physical_gpu_selection"]["selected_by_implementation"], False)
+        self.assertEqual(runner.SUPPORTED_PHYSICAL_GPUS, (0, 1))
+        source = (ROOT / "scripts" / "b1_phase_b_runner.py").read_text(encoding="utf-8")
+        self.assertNotIn("PHYSICAL_GPU = 1", source)
+        self.assertNotIn("PHYSICAL_GPU = 0", source)
+        parent = open_environ(1)
+        command = runner.build_subprocess_invocation(
+            runner.build_phase_b_plan(config)[0],
+            expected_directory,
+            parent,
+            1,
+            realpath=lambda path: str(path),
+        )
+        parsed = runner.build_parser().parse_args(
+            ["--output-dir", expected_directory, "--physical-gpu", "1"]
+        )
+        self.assertEqual(parsed.physical_gpu, "1")
+        self.assertEqual(runner.parse_physical_gpu_argument(parsed.physical_gpu), 1)
+        self.assertEqual(command["env"]["CUDA_VISIBLE_DEVICES"], "1")
+        self.assertEqual(command["env"]["CUDA_DEVICE_ORDER"], "PCI_BUS_ID")
+        self.assertEqual(command["argv"][command["argv"].index("--device") + 1], "cuda:0")
+        self.assertNotIn("--physical-gpu", command["argv"])
+        self.assertEqual(parent["CUDA_VISIBLE_DEVICES"], "1")
+        self.assertFalse(PHASE_B_EVIDENCE.exists())
+        assert_evidence_unchanged("checked-in authorisation test touched evidence")
+
+    def test_checked_in_mismatches_fail_closed_before_side_effects(self):
+        evidence = str(PHASE_B_EVIDENCE)
+        mismatches = (
+            ({}, "0", evidence, "phase_b_gpu_mismatch"),
+            ({}, "1", evidence, "cuda_visible_devices_missing"),
+            (open_environ(0), "1", evidence, "cuda_visible_devices_refused"),
+            (open_environ(1), "0", evidence, "phase_b_gpu_mismatch"),
+            (open_environ(1), "2", evidence, "unsupported_physical_gpu"),
+            (open_environ(1), "01", evidence, "unsupported_physical_gpu"),
+            (open_environ(1), "1", "/tmp/not-the-phase-b-directory", "output_path_mismatch"),
+            (open_environ(1), "1", str(PHASE_A_EVIDENCE), "output_path_mismatch"),
+            (open_environ(1), "1", str(HISTORICAL_EVIDENCE), "output_path_mismatch"),
+            (
+                {"CUDA_VISIBLE_DEVICES": "1", "CUDA_DEVICE_ORDER": "FASTEST_FIRST"},
+                "1",
+                evidence,
+                "cuda_device_order_refused",
+            ),
+            (
+                {"CUDA_VISIBLE_DEVICES": "1"},
+                "1",
+                evidence,
+                "cuda_device_order_missing",
+            ),
+            (
+                {"CUDA_VISIBLE_DEVICES": "", "CUDA_DEVICE_ORDER": "PCI_BUS_ID"},
+                "1",
+                evidence,
+                "cuda_visible_devices_refused",
+            ),
+        )
+        for environ, physical_gpu, output_dir, error_code in mismatches:
+            recorder = RecordingDeps(real_config_bytes(), environ)
+            code, stderr = run_main(recorder.build(), output_dir, physical_gpu)
+            assert_refused_before_side_effects(self, code, stderr, recorder, error_code)
+        self.assertFalse(PHASE_B_EVIDENCE.exists())
+        assert_evidence_unchanged("mismatch test touched evidence")
+
+    def test_synthetic_authorisation_defects_fail_closed(self):
+        evidence = str(PHASE_B_EVIDENCE)
+        cases = (
+            ({"physical_gpu": "1"}, (), "phase_b_gpu_mismatch"),
+            ({"physical_gpu": 0}, (), "phase_b_gpu_mismatch"),
+            ({"consumed": True}, (), "phase_b_authorisation_consumed"),
+            ({"consumed": "false"}, (), "phase_b_authorisation_consumed"),
+            ({"consumed": 0}, (), "phase_b_authorisation_consumed"),
+            ({"unexpected_field": False}, (), "phase_b_authorisation_overbroad"),
+            ({}, ("authorisation_id",), "phase_b_authorisation_missing"),
+            ({"b1_eligible": True}, (), "phase_b_authorisation_overbroad"),
+            ({"m4_complete": True}, (), "phase_b_authorisation_overbroad"),
+            ({"success_claimed": True}, (), "phase_b_authorisation_overbroad"),
+            ({"development_pool_authorised": True}, (), "phase_b_authorisation_overbroad"),
+            ({"final_production_mapping_declared": True}, (), "phase_b_authorisation_overbroad"),
+            (
+                {"rejection_or_resampling_algorithm_declared": True},
+                (),
+                "phase_b_authorisation_overbroad",
+            ),
+            ({"output_directory": "/tmp/elsewhere"}, (), "authorisation_evidence_mismatch"),
+            ({"evidence_directory": "/tmp/elsewhere"}, (), "authorisation_evidence_mismatch"),
+            ({"executing_implementation_commit": "abc"}, (), "authorisation_commit_invalid"),
+            ({"executing_implementation_commit": "c" * 40}, (), "authorisation_evidence_mismatch"),
+            ({"phase": "A"}, (), "phase_a_authorisation_cannot_authorise_phase_b"),
+            ({"authorisation_active": False}, (), "phase_b_authorisation_inactive"),
+            (
+                {"activation_status": "consumed_complete"},
+                (),
+                "phase_b_authorisation_inactive",
+            ),
+            ({"authorises_b1_phase_b": False}, (), "phase_b_authorisation_missing"),
+            ({"gpu_use_authorised": False}, (), "phase_b_gpu_mismatch"),
+        )
+        for overrides, delete_keys, error_code in cases:
+            config = real_config()
+            block = config[runner.PHASE_B_AUTHORISATION_NAME]
+            block.update(overrides)
+            for key in delete_keys:
+                del block[key]
+            recorder = RecordingDeps(dumped(config), open_environ(1))
+            code, stderr = run_main(recorder.build(), evidence, "1")
+            assert_refused_before_side_effects(self, code, stderr, recorder, error_code)
+        missing = real_config()
+        del missing[runner.PHASE_B_AUTHORISATION_NAME]
+        recorder = RecordingDeps(dumped(missing), open_environ(1))
+        code, stderr = run_main(recorder.build(), evidence, "1")
+        assert_refused_before_side_effects(
+            self,
+            code,
+            stderr,
+            recorder,
+            "phase_a_authorisation_cannot_authorise_phase_b",
+        )
+        self.assertFalse(PHASE_B_EVIDENCE.exists())
+        assert_evidence_unchanged("synthetic authorisation test touched evidence")
+
+    def test_matching_command_stops_before_directory_creation(self):
+        evidence = str(PHASE_B_EVIDENCE)
+        recorder = RecordingDeps(real_config_bytes(), open_environ(1))
+
+        def lstat(path):
+            recorder.events.append(("lstat", str(path)))
+            raise FileNotFoundError(path)
+
+        def realpath(path):
+            recorder.events.append(("realpath", str(path)))
+            return str(path)
+
+        def git(repo, args):
+            recorder.events.append(("git", str(repo)))
+            raise runner.PhaseBRunnerError("mres_worktree_dirty", "injected stop before execution")
+
+        code, stderr = run_main(
+            recorder.build(lstat=lstat, realpath=realpath, git=git),
+            evidence,
+            "1",
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("error: mres_worktree_dirty:", stderr)
+        self.assertEqual(
+            [event[0] for event in recorder.events],
+            ["read_bytes", "lstat", "realpath", "git"],
+        )
+        self.assertNotIn("mkdir", [event[0] for event in recorder.events])
+        self.assertNotIn("gpu_preflight", [event[0] for event in recorder.events])
+        self.assertNotIn("subprocess_run", [event[0] for event in recorder.events])
+        self.assertFalse(PHASE_B_EVIDENCE.exists())
+        assert_evidence_unchanged("matching-command stop touched evidence")
 
     def test_plan_mutation_refuses_before_output_inspection(self):
         config = opened_config()
