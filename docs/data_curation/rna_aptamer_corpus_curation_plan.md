@@ -316,11 +316,16 @@ non-protein records during S7.
 
 | Level | `binding_evidence_type` | Definition | `binding_evidence_score` |
 |---|---|---|---|
-| E1 | `structural` | Experimental structure of the aptamer–target complex (PDB, X-ray/NMR/cryo-EM) | 5 |
+| E1 | `structural` | Experimentally verified structure of the aptamer–target complex (PDB, X-ray/NMR/cryo-EM) | 5 |
 | E2 | `quantitative_affinity` | Reported Kd / Ka / IC50 against a named protein target | 4 |
 | E3 | `qualitative_binding` | Named binding assay without a quantitative constant (EMSA, ELONA, SPR yes/no, pull-down, filter binding) | 3 |
 | E4 | `selection_enrichment` | Published clone from a selection, or late-round HT-SELEX enrichment, no independent binding assay | 2 |
 | E5 | `database_annotation` | Database or deposit annotated with a target, no traceable assay | 1 |
+
+E1 is an experimentally verified aptamer–target complex structure. Source-level structural
+indicators such as mmCIF URLs or boolean structure flags are not sufficient by themselves unless
+the applied evidence mapping verifies that the structure is an aptamer–target complex for the
+curated relationship.
 
 Unplaceable → reject `no_binding_evidence`. **Inclusion threshold: E4 (score ≥ 2).** E5 records are
 cleaned and retained in `parked_evidence_e5.csv`, so the database lane can be added back as an
@@ -332,9 +337,11 @@ contains zero E5 identities.
 
 Two sources now supply high-evidence records that were not available in v1.1:
 
-- **riboaptamer** carries `mmCIF Download URL` (structure available → **E1**, and populate `pdb_id`)
-  and `Affinity (Kd)` (→ **E2**). This makes it a materially better source than the truncated export
-  suggested.
+- **riboaptamer** carries `mmCIF Download URL` and `Affinity (Kd)`. The mmCIF Download URL is a
+  structural signal to retain and review; in the corrected v1.6 corpus, these signals were not
+  promoted to E1 because the applied CHECKPOINT-2 rule did not verify aptamer–target complex
+  structure. `Affinity (Kd)` maps to **E2**. This makes it a materially better source than the
+  truncated export suggested.
 - **AptaDB** via `interaction.csv` carries `Binding Conditions/Buffer` and a PubMed reference per
   interaction → **E3** at minimum, no longer E5-by-default (§7).
 
@@ -591,8 +598,10 @@ Three things to handle:
    molecules (aflatoxin); "Amino Acids & Peptides" spans free amino acids (small molecules) and
    peptides. A rule table that silently collapses these would misroute records between the corpus
    and the parked file, which is exactly the decision that most needs to be right.
-3. **Evidence signals are good here.** `mmCIF Download URL` present → **E1**, and populate `pdb_id`.
-   `Affinity (Kd)` present → **E2**. This makes riboaptamer one of the few high-evidence lanes.
+3. **Evidence signals are good here.** `mmCIF Download URL` is a structural signal to retain and
+   review; in the corrected v1.6 corpus, these signals were not promoted to E1 because the applied
+   CHECKPOINT-2 rule did not verify aptamer–target complex structure. `Affinity (Kd)` present →
+   **E2**. This makes riboaptamer one of the few high-evidence lanes.
 
 Regression assertion at S2: <1% of riboaptamer sequences end in `.`/`…`, median length >20 nt.
 Fires if the truncated file is ever re-registered.
@@ -892,12 +901,12 @@ That statement is superseded by the 2026-09-25 corrective S7D rebuild
 |---|---|---|---|---|
 | `aptadiff_a` / `_b` | `seq` (36-nt random region) | Canonical `target_name_raw` empty. Documented IGFBP3 / PTK7 is sidecar provenance until global S4 | Not assigned at S2. Later evidence/affinity must not be read from `p6` at S2 | Experimental molecule `ssDNA`, chemistry `DNA`, no T→U. `construct_scope = random_region_only`, so `sequence_core == sequence_full`. Constant inference disabled. Ordinary valid rows later park as ssDNA and are excluded from the primary RNA corpus by default. Dataset A remains uncapped for a separate replication file. Do not transcribe A/B to RNA for the canonical corpus. |
 | `ena` | `sequence` | `target` | Evidence fields → ladder | §5.2 |
-| `riboaptamer` | `Sequence` | **Parsed from `Aptamer Name` + `Description`** | `mmCIF Download URL` → E1 + `pdb_id`; `Affinity (Kd)` → E2; else E4 | §5.1. `Category` is a prior in `notes`, never the target. Truncation regression assertion at S2 |
+| `riboaptamer` | `Sequence` | **Parsed from `Aptamer Name` + `Description`** | `mmCIF Download URL` is a structural signal to retain and review; in the corrected v1.6 corpus these signals were not promoted to E1 because the applied CHECKPOINT-2 rule did not verify aptamer–target complex structure. `Affinity (Kd)` → E2; else E4 | §5.1. `Category` is a prior in `notes`, never the target. Truncation regression assertion at S2 |
 | `aptadb` | `aptamer.csv.Sequence` via `interaction.csv` spine | `interaction.TargetID` → `protein.Uni-port ID` | `Binding Conditions/Buffer` → E3 | §5.4. One record per interaction row. 37 aptamers without interactions → `missing_target`. Non-protein TargetIDs unresolvable (lookup tables absent) |
 | `aptaindex` | `Sequence` | `Target`, `Target Type` | `Affinity Type`+`Affinity` → E2; else E3 | **Chemical-notation parser required**: `5'-dApdTpdA…`. Parse `dN`/`rN`/`mN`/`fN` tokens; set `chemistry` from the prefix mix and `alphabet_as_reported = chemical_notation`. `Type` gives molecule type (DNA 673, RNA 200, 2′-F-RNA 71, Peptide 57 → drop peptides). 31 missing sequences, 28 missing targets, 25 conflicting targets → CHECKPOINT-1. `redistribution_status = restricted` (Data Use Agreement) |
 | `utexas` | `Aptamer Sequence` | `Target ` (trailing space) | `Kd (nM)` → E2; `Affinity` text → E3 | `Type of Nucleic Acid` → molecule/chemistry (ssRNA, ssDNA, 2′-fluoro-RNA, 2′-amino-RNA). Keep `Post-selex modifications` in `notes`, use the **pre**-modification sequence. Rich citation columns → `publication`/`doi`/`pubmed_id`. The 1,495 punctuation flags are mostly `5'…[3'T]` labels; the label stripper handles them |
 | `aptabase` | `sequence_raw` (not `sequence_clean`) | `target_specific`, fall back `target_general` | `affinity_measurement_type` → E2/E3 | Reuse parsed `affinity_molar`, `doi`, `pmid`. Re-run the shared normaliser on `sequence_raw` so the alphabet policy applies once, uniformly |
-| `aptamerbase` | `sequence` | `label` | Boolean flags → E4/E5 | `has_experimentally_determined_structure` → **E1**, populate `pdb_id`. `is_minimal_aptamer_of` links variants — carry into `notes`, useful for clustering validation. Already uses U |
+| `aptamerbase` | `sequence` | `label` | Boolean flags → E4/E5 | Structure flags, including `has_experimentally_determined_structure`, are retained as structural signals; in the corrected v1.6 corpus they did not assign E1 without verified aptamer–target complex evidence. `is_minimal_aptamer_of` links variants — carry into `notes`, useful for clustering validation. Already uses U |
 | `ncbi_nuc` | GenBank ORIGIN | FEATURES qualifiers | Usually E5 | Parse LOCUS/ACCESSION/DEFINITION/FEATURES. Filenames are opaque (`sequence (1).gb`) — `native_id` from ACCESSION, never the filename. Dedup against `ena` by accession |
 | `selektion_ndm1` | `sequence_cleaned` | Constant: NDM-1 | E4 | Eval lane. `molecule_type = RNA`, `alphabet_as_reported = DNA_T`, `t_to_u_applied = true` (§1.2). Alignment gaps → manual repair at CHECKPOINT-1 |
 | `chen_kpc` | `core_aptamer_sequence_5to3` | `target_name` | Kd in README → E2 | Eval lane. Exclude `is_negative_control` rows |
@@ -1342,5 +1351,5 @@ before publication.
 | 1.2 | 2026-08-04 | Q1–Q6 resolved against the refreshed 203-file inventory. Record grain defined as (sequence, target) and dedup keyed accordingly. ENA input registered as the 679-row review_v2 file with a required 679-vs-676 reconciliation and an explicit singleton policy. riboaptamer resolved to `all_sequences_509_rows.csv` with Category treated as a prior rather than a rule. AptaDB resolved to interaction-grain via `interaction.csv`, upgrading it from E5-by-default and seeding the target dictionary with 194 UniProt entries. Precision-SELEX layout resolved (column B primary, even rows from row 4). Selektion D9 confirmed RNA, with the resulting thesis reframing recorded. `li_et_al` removed. Added `alphabet_as_reported` / `t_to_u_applied` transcription provenance and `target_type_source`. `TRAINING_SEQUENCE_COLUMN` fixed to `sequence_core`. Added §17 project log and §18 version-control and data-handling policy. |
 | 1.3 | 2026-09-10 | AptaDiff A/B source identity corrected from primary-paper review: experimental molecule is ssDNA, canonical S2 retains DNA with no T→U, P6 sequences are random-region-only, and ordinary valid rows later park as ssDNA. They do not enter ordinary primary-RNA target capping. Dataset A remains uncapped for a separate replication/comparability file; any future RNA-alphabet Dataset-A representation is derived and replication-specific. The previous instruction to computationally transcribe A/B to RNA for the canonical corpus is superseded. |
 | 1.4 | 2026-09-17 | S5 clustering interpretation corrected after S5D showed that ENA `near_duplicate_family_id` is not complete global 90%-identity ground truth. MMseqs remains the primary 90% sequence-clustering method. Retained real multi-member ENA families are positive must-links unioned into leakage-safe final `cluster_id` components. Materialised singleton IDs are not cannot-link constraints. CD-HIT was tested and is not selected. S1–S4 scientific decisions are unchanged. |
-| 1.6 | 2026-09-25 | Corrective corpus revision after the RNAGenesis alphabet gate. Seven Aptabase records were re-disposed from primary evidence: two genuine ssDNA records parked, one corrected 19 nt RNA core rejected below 20 nt, and four RNA cores corrected without T-to-U. Implementation was an Aptabase CHECKPOINT-1 overlay, a global S4 refresh, and an S5–S7D rerun. Closed by `10aac629bb0ef0337107c3d628b23e1897962af9` (`Complete corrective corpus revision for RNA modelling alphabet gate`), which supersedes the final corpus in `095236dfb13d1d3b13f11bbb34c2e48319c10184`. Final primary corpus: 1170 identities, 1031 cores, 790 clusters. Role counts: TRAIN 726/569/669, VALIDATION 132/63/95, REF 131/79/113, EVAL 181/79/154. TRAIN text is 669 unique cores. TRAIN/VALIDATION `^[ACGU]+$` gate passes with 0 failures. Authoritative detail: `docs/log.md` 2026-09-25 entry and `docs/data_curation/global_s7d_final_build.md`. Historical stage narratives are not rewritten. |
+| 1.6 | 2026-09-25 | Corrective corpus revision after the RNAGenesis alphabet gate. Seven Aptabase records were re-disposed from primary evidence: two genuine ssDNA records parked, one corrected 19 nt RNA core rejected below 20 nt, and four RNA cores corrected without T-to-U. Implementation was an Aptabase CHECKPOINT-1 overlay, a global S4 refresh, and an S5–S7D rerun. Closed by `10aac629bb0ef0337107c3d628b23e1897962af9` (`Complete corrective corpus revision for RNA modelling alphabet gate`), which supersedes the final corpus in `095236dfb13d1d3b13f11bbb34c2e48319c10184`. Final primary corpus: 1170 identities, 1031 cores, 790 clusters. Role counts: TRAIN 726/569/669, VALIDATION 132/63/95, REF 131/79/113, EVAL 181/79/154. TRAIN text is 669 unique cores. TRAIN/VALIDATION `^[ACGU]+$` gate passes with 0 failures. Authoritative detail: `docs/log.md` 2026-09-25 entry and `docs/data_curation/global_s7d_final_build.md`. Historical stage narratives are not rewritten. The corrected final corpus contains no E1 rows; structural source indicators are retained as unverified structural signals rather than evidence-score-5 assignments. |
 | 1.5 | 2026-09-21 | Records completed CHECKPOINT-3 supervisor decisions. Active `MAX_TARGET_FRACTION` changes from the previous 5% placeholder to **3%** of the current/post-removal identity denominator. Partition strategy changes from target-family-primary to multi-objective comparability across canonical target, evidence, sequence-length regime, and source; `target_family` is a secondary diagnostic only. Retains E2–E4 with E5 parked, and the protein-only primary corpus. Records the deterministic whole-cluster C3-05 removal policy, REF/EVAL freezing before fine-tuning/model-selection/hyperparameter use, cluster-level FT-only train/validation splitting after the top-level split, preservation of the two S6 sequence-length regimes, and the pre-publication repository leakage-audit requirement. Historical S6 observations and candidate-cap simulations are not rewritten. Documentation-only S7D finalisation notes (2026-09-22; no scientific revision): `corpus_final.txt` is frozen FT TRAIN only; Dataset A replication uses the CHECKPOINT-1 parked/canonical schema because A never entered S4/S5; S7D is assembly/diagnostic/reporting/validation only. Documentation/audit-completeness note (2026-09-22): `parked_inventory.csv` indexes every parked lane, including residual source-level parks that are not coerced into ssDNA/non-protein/E5; E5D diagnostic cluster units are a counterfactual approximation, not exact future S5 clusters. |

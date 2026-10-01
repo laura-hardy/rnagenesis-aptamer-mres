@@ -11310,3 +11310,9 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Evidence:** `/home/laura/rnagenesis-mres-runs/m3_tokenizer_112a120_f2bdff1_attempt1` remains the preserved evidence location.
 
 **Boundary:** This closure does not start training, GPU work, or M4.
+
+## 2026-10-01 — E1 structural-evidence wording aligned to the corrected corpus
+
+**Stage:** Aim 2 / data curation / documentation only
+
+**What was done:** The governing curation plan now states that E1 remains an experimentally verified aptamer–target complex structure, and that mmCIF URLs and AptamerBase structure flags are retained structural signals. In the corrected v1.6 corpus those signals were not assigned E1, because the applied CHECKPOINT-2 rule did not verify an aptamer–target complex for the curated relationship. The corrected final corpus contains no E1 rows. No data files, frozen corpus, or curation stages were changed.
