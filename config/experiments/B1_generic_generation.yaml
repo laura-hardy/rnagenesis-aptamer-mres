@@ -1,14 +1,17 @@
 # APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
-# Phase B evidence is accepted. The physical GPU 1 Phase B scientific-run
-# authorisation was consumed successfully. Its activation status is
-# consumed_complete. It is inactive. Consumption of that single scientific
-# run authorisation is not a statement about hardware access. The physical
-# GPU 1 Phase A authorisation remains consumed and complete. Phase A
-# evidence remains accepted. The physical GPU 0 Phase A authorisation
-# remains revoked and unconsumed. Decision B requires a deterministic
-# exact-length rejection/resampling policy. The exact algorithm is not
-# finalized or implemented. B1 eligibility, M4 completion, the development
-# pool, and a final production mapping remain unauthorised.
+# Phase A and Phase B evidence remains accepted and unchanged. Both
+# scientific-run authorisations stay consumed_complete and inactive.
+# On 1 October 2026 Laura Hardy superseded the discussed Approach A
+# fixed_full_retry_table with R=32 before implementation, plan
+# materialization, biological-data access, authorization, or execution.
+# No Approach A schedule, runner, evidence, output, or GPU run exists.
+# The active M4 design is the restored Stage 1 diagnostic contract:
+# 1,000 raw attempts and max_seq_len = requested_biological_length + 1.
+# Early EOS and length mismatch remain observed generator behaviours.
+# They do not trigger rejection, replacement, resampling, or run failure.
+# This design does not declare an exact-length accepted pool or a final
+# M8 production protocol. The development-pool authorisation below is an
+# inactive unconsumed template. It does not select a physical GPU.
 
 document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
 consumable_by_executable_workflow: false
@@ -153,13 +156,31 @@ shared_generation_settings:
     Released generation.py creates its output directory with exist_ok=True.
     A future executor must refuse an existing output or evidence directory
     before calling it. This approval does not add that wrapper.
+  physical_gpu: null
+  physical_gpu_selected_by_this_document: false
+  physical_gpu_gate: later_authorisation_binds_physical_index_uuid_and_pci_bus
+  cuda_visible_devices: null
+  cuda_device_order: PCI_BUS_ID
+  visible_python_device: cuda:0
+  child_logical_device: cuda:0
+  cpu_fallback: false
+  other_gpu_fallback: false
+  later_authorisation_binds:
+    - physical_index
+    - gpu_uuid
+    - pci_bus
+
+# Completed Phase A and Phase B runs used physical GPU 1. This record does
+# not select a device for the development pool. A later authorisation binds
+# the physical index, UUID, and PCI bus. The child process uses logical cuda:0.
+historical_consumed_phase_a_and_phase_b_device:
+  status: HISTORICAL_CONSUMED_EVIDENCE_NOT_AN_ACTIVE_SELECTION
   physical_gpu: 1
-  physical_gpu_gate: separate_explicit_approval_required
   cuda_visible_devices: "1"
   cuda_device_order: PCI_BUS_ID
   visible_python_device: cuda:0
-  cpu_fallback: false
-  other_gpu_fallback: false
+  applies_to_completed_runs_only: true
+  selects_a_device_for_the_development_pool: false
 
 cleaner_rule:
   source: M1_approved_boundary_only_rule
@@ -283,7 +304,7 @@ phase_a_evidence_acceptance:
 
 phase_b:
   status: COMPLETE_EVIDENCE_ACCEPTED
-  blocked_until: "The deterministic exact-length rejection/resampling algorithm must be approved before development-pool execution."
+  blocked_until: "Phase B evidence is accepted and is not re-executable. The 1 October 2026 course change restored the Stage 1 diagnostic contract for the separate development-pool workflow and superseded Approach A before implementation."
   executable_now: false
   human_approved_candidate_mapping_required: false
   approved_candidate_mapping:
@@ -722,17 +743,18 @@ phase_b_human_scientific_decision:
   approving_person: Laura Hardy
   approval_date: 1 October 2026
   phase_b_evidence_accepted: true
-  selected_decision: REQUIRE_DETERMINISTIC_EXACT_LENGTH_REJECTION_RESAMPLING
-  direct_plus_one_retention_without_rejection_or_resampling_accepted: false
+  active_design: restored_stage_1_diagnostic_contract
+  selected_decision: DIAGNOSTIC_NO_REJECTION_REPLACEMENT_OR_RESAMPLING
+  active_design_uses_rejection_replacement_or_resampling: false
+  direct_plus_one_retention_without_rejection_or_resampling_accepted: true
   plus_one_cap_retained_as_the_evaluated_generation_candidate: true
-  exact_cleaned_length_required_for_a_retained_length_matched_sequence: true
+  exact_cleaned_length_required_for_a_retained_length_matched_sequence: false
   early_eos_outputs_must_not_be_silently_counted_as_correctly_length_matched: true
-  all_raw_and_rejected_attempts_must_remain_recorded: true
+  all_raw_attempts_remain_recorded: true
   silent_trimming: prohibited
   padding: prohibited
   silent_replacement: prohibited
   silent_deduplication: prohibited
-  deterministic_rejection_or_resampling_direction_approved: true
   approves_an_executable_algorithm: false
   exact_algorithm_finalized: false
   exact_algorithm_implemented: false
@@ -742,17 +764,73 @@ phase_b_human_scientific_decision:
   limited_b1_development_pool_authorized: false
   b1_eligible: false
   m4_complete: false
-  b1_d1_parity_remains_required_for_the_eventual_algorithm: true
+  disposition: HISTORICAL_SCIENTIFIC_REASONING_SUPERSEDED_BEFORE_IMPLEMENTATION
+  executed: false
+  superseded_by: m4_course_change_1_october_2026
+  historical_superseded_exact_length_rejection_resampling:
+    status: HISTORICAL_SUPERSEDED_BEFORE_IMPLEMENTATION
+    selected_decision: REQUIRE_DETERMINISTIC_EXACT_LENGTH_REJECTION_RESAMPLING
+    deterministic_rejection_or_resampling_direction_approved: true
+    direct_plus_one_retention_without_rejection_or_resampling_accepted: false
+    exact_cleaned_length_required_for_a_retained_length_matched_sequence: true
+    all_raw_and_rejected_attempts_must_remain_recorded: true
+    b1_d1_parity_remains_required_for_the_eventual_algorithm: true
+    approves_an_executable_algorithm: false
+    executed: false
+    implemented: false
+
+m4_course_change_1_october_2026:
+  approving_person: Laura Hardy
+  approval_date: 1 October 2026
+  approval_source: explicit human decision in the M4 review chat
+  opening_statement: "I am making an explicit human decision to change course on the proposed Approach A R=32 development-pool design."
+  supersedes: approach_a_fixed_full_retry_table_r32
+  approach_a_fixed_full_retry_table_r32:
+    discussed_in_review: true
+    approved_in_discussion: true
+    implemented: false
+    plan_materialized: false
+    biological_data_accessed: false
+    authorized: false
+    executed: false
+    superseded_before_implementation: true
+    schedule_exists: false
+    runner_exists: false
+    evidence_exists: false
+    output_exists: false
+    gpu_run_exists: false
+  active_m4_design: restored_stage_1_diagnostic_contract
+  phase_a_evidence_remains_accepted_and_unchanged: true
+  phase_b_evidence_remains_accepted_and_unchanged: true
+  selected_cap: "max_seq_len = requested_biological_length + 1"
+  early_eos_and_length_mismatch: observed_generator_behaviours
+  early_eos_triggers_rejection_replacement_resampling_or_run_failure: false
+  length_mismatch_triggers_rejection_replacement_resampling_or_run_failure: false
+  exact_length_accepted_pool_declared: false
+  final_m8_production_protocol_declared: false
+  historical_rejection_resampling_reasoning_erased: false
+  historical_rejection_resampling_reasoning_executed: false
+  m4_complete: false
 
 length_algorithm:
+  active_m4_design: restored_stage_1_diagnostic_contract
+  diagnostic_only: true
+  rejection: false
+  replacement: false
+  resampling: false
   final_empirical_length_matching_algorithm_declared: false
   final_rejection_or_resampling_algorithm_declared: false
-  direction_decision: REQUIRE_DETERMINISTIC_EXACT_LENGTH_REJECTION_RESAMPLING
-  deterministic_exact_length_rejection_resampling_direction_approved: true
   exact_algorithm_finalized: false
   exact_algorithm_implemented: false
   human_decision_required_after: [phase_a_evidence, phase_b_evidence]
   silent_truncation_to_force_a_length: prohibited
+  historical_superseded_exact_length_rejection_resampling:
+    status: HISTORICAL_SUPERSEDED_BEFORE_IMPLEMENTATION
+    direction_decision: REQUIRE_DETERMINISTIC_EXACT_LENGTH_REJECTION_RESAMPLING
+    deterministic_exact_length_rejection_resampling_direction_approved: true
+    historical_direction_disposition: superseded_before_implementation_not_executed
+    executed: false
+    implemented: false
   phase_b_candidate_mapping:
     status: APPROVED_CANDIDATE_FOR_PHASE_B_EVALUATION_NOT_FINAL_PRODUCTION_MAPPING
     formula: "max_seq_len = requested_biological_length + 1"
@@ -760,11 +838,14 @@ length_algorithm:
     final_production_mapping: false
 
 limited_development_pool:
-  status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+  status: RESTORED_STAGE_1_DIAGNOSTIC_CONTRACT_APPROVED_FOR_IMPLEMENTATION_NOT_EXECUTION
+  active_design: restored_stage_1_diagnostic_contract
   development_pool_authorised: false
   sampling_authorised: false
+  executable_now: false
+  separate_active_authorisation_required: true
   phase_b_candidate_mapping_unblocks_this_pool: false
-  blocked_until: "The deterministic exact-length rejection/resampling algorithm must be specified, implemented, tested, and separately approved before development-pool sampling or execution."
+  blocked_until: "The checked-in configuration is not executable. A later active authorisation must bind the physical GPU, GPU UUID, PCI bus, authorization commit, implementation commit, exact output directory, and immutable schedule hash."
   identification: >
     This 1000-attempt pool is the proposed fixed diagnostic sample for B1
     and, with the same target-length list and paired generation-seed
@@ -773,10 +854,12 @@ limited_development_pool:
   sampling: with_replacement_from_the_669_core_TRAIN_empirical_length_list
   target_length_sampling_seed: 43000
   proposed_length_sampler: numpy.random.default_rng
-  length_sampler_status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+  length_sampler_status: RESTORED_STAGE_1_DIAGNOSTIC_CONTRACT_APPROVED_FOR_IMPLEMENTATION_NOT_EXECUTION
+  source_ordered_length_vector_count: 669
+  source_order_rule: preserve_supplied_first_occurrence_order_do_not_reorder_before_sampling
   generation_seed_base: 44000
   generation_seed_schedule:
-    status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+    status: RESTORED_STAGE_1_DIAGNOSTIC_CONTRACT_APPROVED_FOR_IMPLEMENTATION_NOT_EXECUTION
     separate_from_target_length_sampling_seed: true
     execution_plan:
       - sample_exactly_1000_target_lengths_in_attempt_index_order_from_the_669_core_empirical_length_list
@@ -786,7 +869,7 @@ limited_development_pool:
       - divide_each_group_into_consecutive_chunks_of_at_most_16
       - invoke_generation_once_per_chunk_using_its_actual_chunk_size_with_batch_num_1
       - assign_invocation_seeds_as_44000_plus_zero_based_invocation_index
-      - never_pad_duplicate_or_drop_an_attempt
+      - never_pad_duplicate_replace_reject_resample_or_drop_an_attempt
       - map_every_generated_record_back_to_its_original_target_length_attempt_index
       - reuse_the_identical_target_list_grouping_rule_chunk_membership_and_invocation_seeds_for_paired_b1_d1_comparisons_where_technically_applicable
     manifest_contains_the_complete_invocation_table_before_generation_begins: true
@@ -798,10 +881,41 @@ limited_development_pool:
       - batch_num
       - original_attempt_indexes_in_order
     batch_num: 1
-  execution_blocked_until_length_mapping_or_rejection_resampling_algorithm_approved: true
+  execution_blocked_until_length_mapping_or_rejection_resampling_algorithm_approved: false
+  length_mismatch_and_early_eos_are_diagnostic_outcomes: true
+  length_mismatch_or_early_eos_fails_the_diagnostic_run: false
   do_not_change_1000_to_fit_batch_16: true
   note: >
     1000 is not divisible by 16. Chunks use their actual size, at most 16.
-    The schedule never pads, duplicates, or drops an attempt. Execution
-    stays blocked until the deterministic exact-length rejection/resampling
-    algorithm is specified, implemented, tested, and separately approved.
+    The schedule never pads, duplicates, replaces, rejects, resamples, or
+    drops an attempt. Early EOS and length mismatch are diagnostic outcomes.
+    They do not fail the diagnostic run. This record does not authorise
+    execution and does not select a physical GPU.
+development_pool_execution:
+  executable_now: false
+  status: NOT_AUTHORISED
+  selects_a_physical_gpu: false
+development_pool_scientific_execution_authorisation:
+  authorisation_id: inactive_unconsumed_template
+  authorisation_active: false
+  activation_status: inactive_unconsumed_template
+  consumed: false
+  authorises_b1_development_pool: false
+  gpu_use_authorised: false
+  physical_gpu: null
+  gpu_uuid: null
+  pci_bus: null
+  authorization_commit: null
+  executing_implementation_commit: null
+  mres_branch: main
+  condition: B1_generic_released_rnagenesis
+  phase: development_pool
+  output_directory: null
+  evidence_directory: null
+  schedule_sha256: null
+  success_claimed: false
+  m4_complete: false
+  b1_eligible: false
+  exact_length_accepted_pool_declared: false
+  final_production_mapping_declared: false
+  final_m8_production_protocol_declared: false

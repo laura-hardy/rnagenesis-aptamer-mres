@@ -30,6 +30,19 @@ experiment_id: generator_evaluation_draft
 condition_registry_schema_version: m4-stage1-draft-1
 metric_set: config/modelling/validation_metrics_v1.yaml
 metric_set_schema_version: m4-stage1-draft-1
+minimal_evaluation_implementation:
+  status: IMPLEMENTED_FOR_REVIEW_NOT_COMMITTED_NOT_EXECUTED
+  path: scripts/modelling/m4_diagnostic_metrics.py
+  schema_version: m4-diagnostic-metrics-1
+  sha256: f7abde50ab8020c4d7ee763ed1a88ab1f0f721c98fd46193832fdd912ba28a4e
+  companion_runner: scripts/b1_development_pool_runner.py
+  companion_runner_sha256: d13133cc80f3e27eaac824399184fbf382a4c78bbcd6575c1adeb9a6ea7ec358
+  validation_artifact_builder: scripts/modelling/build_validation_artifacts.py
+  validation_artifact_builder_sha256: dbe525b51d030b7ce6d971144019919edf0e0e77eb5f8b9525da2bb97740f030
+  commit: null
+  clustering_metrics_implemented: false
+  representation_metrics_implemented: false
+  executable_now: false
 created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
 evidence_directory_created_by_this_stage: false
 
@@ -53,12 +66,15 @@ layers:
     items:
       - nearest_TRAIN_normalized_edit_distance
       - maximum_identity_to_TRAIN
-      - generated_cluster_concentration
       - nucleotide_and_dinucleotide_distributions
       - mfe_and_mfe_per_nucleotide
       - paired_fraction
-      - representation_space_distance_to_VALIDATION
       - full_length_stratified_results
+    deferred_beyond_m4:
+      - generated_cluster_concentration
+      - clustering_identity_threshold
+      - frozen_representation_or_embedding_metrics
+      - representation_aggregation_rules
   final_held_out_evaluation:
     role: EVAL_only_after_M9C_unlock
     may_influence_development_decisions: false
@@ -112,23 +128,28 @@ accounting:
     - metric_specific_denominator
   silent_removal_of_invalid_or_duplicate_attempts: prohibited
   requested_length_exact_hit:
-    label: PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE
+    label: DIAGNOSTIC_REPORT_NOT_AN_EXECUTION_SUCCESS_REQUIREMENT
+    execution_success_requirement: false
+    low_exact_hit_rate_invalidates_or_reruns_the_b1_diagnostic_pool: false
     numerator: valid_outputs_whose_cleaned_length_equals_the_requested_biological_length
-    denominator: valid_outputs
-    invalid_attempts_remain_visible_through: raw_attempt_validity_guardrail
-    zero_valid_outputs_exact_hit_rate: 0.0
-    zero_valid_outputs_fails_the_per_length_rule_once_the_raw_attempt_minimum_is_reached: true
+    denominator: raw_attempts
+    measured_before_filtering: true
+    invalid_or_unparseable_accounted_attempts_are_non_hits: true
+    valid_only_diagnostic_does_not_replace_the_raw_attempt_metric: true
+    zero_raw_attempts_exact_hit_rate: 0.0
+    zero_raw_attempts_fails_the_diagnostic_run: false
     always_report_together:
       - raw_attempts
       - valid_outputs
       - exact_hits
 
 sequence_clustering_identity_threshold:
-  status: UNRESOLVED_HUMAN_DECISION
+  status: DEFERRED_BEYOND_M4
+  m4_closure_blocker: false
   value: null
   invented_in_this_draft: false
   clustering_dependent_claims_permitted: false
-  blocked_quantities_until_the_threshold_is_frozen:
+  deferred_quantities:
     - generated_cluster_concentration
     - cluster_count
     - singleton_fraction
@@ -143,12 +164,10 @@ structure_metrics:
   interpretation: distributional_plausibility_not_protein_binding
 
 representation_metrics:
-  model_status: UNRESOLVED_HUMAN_DECISION
-  embedding_aggregation: UNRESOLVED_HUMAN_DECISION
-  must_be_frozen: true
-  development_distance_reference: VALIDATION
-  eval_distance_only_after_m9c: true
-  do_not_train_on_eval: true
+  model_status: DEFERRED_BEYOND_M4
+  embedding_aggregation: DEFERRED_BEYOND_M4
+  m4_closure_blocker: false
+  implemented_in_m4: false
 
 statistical_reporting:
   prefer:
@@ -166,15 +185,17 @@ final_m4_closure_blockers:
   m4_complete: false
   must_be_resolved_before: final_M4_COMPLETE_GO
   items:
-    - final_B1_length_matching_or_rejection_resampling_algorithm
-    - evidence_based_decision_on_the_proposed_requested_length_thresholds
-    - complete_B1_D1_generation_wrapper_and_overwrite_protection
-    - creation_and_verification_of_fixed_validation_tensors_and_order_artifacts
-    - executable_B2_hardening_and_tests
-    - approved_clustering_identity_threshold_or_explicit_removal_of_clustering_dependent_M4_claims
-    - approved_frozen_representation_model_and_embedding_aggregation_or_explicit_deferral_or_removal_of_that_metric
-    - frozen_evaluation_code_commit_and_configuration_hashes
-    - final_D1_pilot_configuration_fields_that_M4_can_freeze_without_M5_evidence
+    - accepted_implementation
+    - materialised_and_verified_1000_attempt_schedule
+    - fixed_validation_artifacts
+    - completed_and_accepted_b1_diagnostic_evidence
+    - frozen_code_and_configuration_hashes
+    - final_human_closure_decision
+  formally_deferred_beyond_m4:
+    - clustering_dependent_claims
+    - clustering_identity_threshold
+    - frozen_representation_or_embedding_metrics
+    - representation_aggregation_rules
   explicitly_deferred_to_m5:
     - microbatch
     - gradient_accumulation

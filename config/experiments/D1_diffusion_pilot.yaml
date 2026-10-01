@@ -144,7 +144,7 @@ checkpoints:
 
 diagnostic_generation:
   status: APPROVED_STAGE_1_DESIGN_BLOCKED_BY_M5_AND_LATER_HUMAN_AUTHORIZATION
-  sample_schedule_status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+  sample_schedule_status: RESTORED_STAGE_1_DIAGNOSTIC_CONTRACT_APPROVED_FOR_IMPLEMENTATION_NOT_EXECUTION
   automatic: false
   only_at_prespecified_checkpoints: true
   only_after_its_own_authorisation: true
@@ -152,7 +152,8 @@ diagnostic_generation:
     - initialization_or_released_B1
     - final_pilot_state
   does_not_cover_updates: [7, 14]
-  length_algorithm_must_already_be_approved: true
+  length_algorithm_must_already_be_approved: false
+  uses_the_restored_1000_attempt_diagnostic_schedule: true
   sample: the_1000_attempt_paired_schedule_in_B1_generic_generation.yaml
 
 unresolved_until_m5:

@@ -189,18 +189,20 @@ why_four_draws:
 hard_guardrails:
   status: APPROVED_STAGE_1_DESIGN
   non_length_guardrail_status: APPROVED_STAGE_1_DESIGN
-  requested_length_threshold_status: PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE
+  requested_length_threshold_status: DIAGNOSTIC_REPORT_NOT_AN_EXECUTION_SUCCESS_REQUIREMENT
   sample:
-    status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+    status: RESTORED_STAGE_1_DIAGNOSTIC_CONTRACT_APPROVED_FOR_IMPLEMENTATION_NOT_EXECUTION
     raw_attempts_per_evaluated_neural_checkpoint: 1000
-    length_protocol: approved_length_allocation_protocol_after_phase_a_and_phase_b
-    paired_seed_schedule: approved_design_blocked_until_length_algorithm_approved
+    length_protocol: max_seq_len_equals_requested_biological_length_plus_1
+    paired_seed_schedule: restored_stage_1_diagnostic_contract
     target_length_sampling_seed: 43000
     generation_seed_base: 44000
-    execution_blocked_until_length_mapping_or_rejection_resampling_algorithm_approved: true
+    execution_blocked_until_length_mapping_or_rejection_resampling_algorithm_approved: false
+    exact_hit_thresholds_are_execution_success_requirements: false
+    low_exact_hit_rate_invalidates_or_reruns_the_b1_diagnostic_pool: false
     executable_now: false
   threshold_label: APPROVED_STAGE_1_DESIGN
-  requested_length_threshold_label: PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE
+  requested_length_threshold_label: DIAGNOSTIC_REPORT_NOT_AN_EXECUTION_SUCCESS_REQUIREMENT
   thresholds:
     - id: valid_nonempty_acgu_fraction
       label: APPROVED_STAGE_1_DESIGN
@@ -228,13 +230,18 @@ hard_guardrails:
       numerator: count_of_the_most_frequent_valid_output
       denominator: valid_outputs
     - id: requested_length_exact_hit_rate
-      label: PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE
-      minimum: 0.90
+      label: DIAGNOSTIC_REPORT_NOT_AN_EXECUTION_SUCCESS_REQUIREMENT
+      historical_provisional_reference: 0.90
+      execution_success_requirement: false
       numerator: valid_outputs_whose_cleaned_length_equals_the_requested_biological_length
-      denominator: valid_outputs
-      measured_before_rejection_or_resampling: true
-      invalid_attempts_remain_visible_through: raw_attempt_validity_guardrail
-      zero_valid_outputs_exact_hit_rate: 0.0
+      denominator: raw_attempts
+      measured_before_filtering: true
+      invalid_or_unparseable_accounted_attempts_are_non_hits: true
+      valid_only_diagnostic:
+        label: valid_outputs_only_diagnostic_not_the_approved_metric
+        denominator: valid_outputs
+        replaces_approved_raw_attempt_metric: false
+      zero_raw_attempts_exact_hit_rate: 0.0
       report_together:
         - raw_attempts
         - valid_outputs
@@ -246,21 +253,22 @@ hard_guardrails:
         - B2_train_matched_empirical_null
         - B0_existing_pool_as_a_checkpoint_eligibility_rule
     - id: per_length_exact_hit_floor
-      label: PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE
+      label: DIAGNOSTIC_REPORT_NOT_AN_EXECUTION_SUCCESS_REQUIREMENT
       rule: >
-        No requested length represented by at least 16 raw characterization
-        attempts may have an exact-hit rate below 0.50. Phase B uses 16 raw
-        attempts for every tested TRAIN length, so every Phase B length is
-        eligible for this guardrail.
-      minimum_exact_hit_rate: 0.50
+        Report the exact-hit rate for each requested length. The historical
+        provisional reference 0.50 is not an execution-success requirement.
+        A low rate does not invalidate or rerun the B1 diagnostic pool.
+      historical_provisional_reference: 0.50
+      execution_success_requirement: false
       minimum_raw_attempts_before_the_rule_binds: 16
       numerator_within_length: valid_outputs_for_that_requested_length_whose_cleaned_length_equals_the_requested_biological_length
-      denominator_within_length: valid_outputs_for_that_requested_length
+      denominator_within_length: raw_attempts_for_that_requested_length
+      invalid_or_unparseable_accounted_attempts_are_non_hits: true
       zero_valid_outputs:
         exact_hit_rate: 0.0
-        result_once_the_raw_attempt_minimum_is_reached: failure
+        result_once_the_raw_attempt_minimum_is_reached: reported_not_a_diagnostic_run_failure
         validity_reported_separately: true
-      lengths_with_fewer_than_16_raw_attempts: reported_and_do_not_trip_this_rule
+      lengths_with_fewer_than_16_raw_attempts: reported
       report_together:
         - raw_attempts
         - valid_outputs
@@ -272,10 +280,11 @@ hard_guardrails:
     - Unique fraction, exact TRAIN match rate, and largest duplicate share use valid outputs as the denominator.
     - Validity and empty-or-unparseable fractions use raw attempts as the denominator.
     - The requested-length exact-hit numerator is the count of valid outputs whose cleaned length equals the requested biological length.
-    - The requested-length exact-hit denominator remains valid outputs.
-    - The requested-length exact-hit rate is computed on valid outputs before any rejection or resampling.
-    - Invalid attempts remain visible through the raw-attempt validity guardrail.
-    - Zero valid outputs yields an exact-hit rate of 0.0 and fails the per-length rule once the raw-attempt minimum is reached.
+    - The requested-length exact-hit denominator is all raw attempts, before filtering.
+    - Invalid or unparseable accounted attempts are non-hits and remain in that denominator.
+    - A separately labelled valid-only diagnostic may be retained. It must not replace the raw-attempt metric.
+    - The requested-length exact-hit rate is computed before any rejection or resampling.
+    - Zero raw attempts yields a reported exact-hit rate of 0.0. That report does not fail the B1 diagnostic run.
     - Raw attempts, valid outputs, and exact hits must always be reported together.
   eligibility:
     any_failed_approved_hard_threshold_makes_the_checkpoint_ineligible: true
@@ -287,19 +296,18 @@ report_only_diagnostics:
   items:
     - nearest_TRAIN_normalized_edit_distance
     - maximum_identity_to_TRAIN
-    - generated_cluster_concentration
     - nucleotide_distribution
     - dinucleotide_distribution
     - mfe
     - mfe_per_nucleotide
     - paired_fraction
-    - representation_space_distance_to_VALIDATION
     - full_length_stratified_results
   clustering_identity_threshold:
-    status: UNRESOLVED_HUMAN_DECISION
+    status: DEFERRED_BEYOND_M4
+    m4_closure_blocker: false
     value: null
     clustering_dependent_claims_permitted: false
-    blocked_until_frozen:
+    deferred_quantities:
       - generated_cluster_concentration
       - cluster_count
       - singleton_fraction
@@ -307,9 +315,7 @@ report_only_diagnostics:
       - shannon_diversity
       - effective_cluster_count
   representation_model:
-    status: UNRESOLVED_HUMAN_DECISION
-    embedding_aggregation: UNRESOLVED_HUMAN_DECISION
-    constraint: frozen_representation_model_only
-    development_reference: VALIDATION
-    prohibited_reference_during_development: [REF, EVAL]
-    do_not_train_a_representation_model_on_EVAL: true
+    status: DEFERRED_BEYOND_M4
+    m4_closure_blocker: false
+    embedding_aggregation: DEFERRED_BEYOND_M4
+    implemented_in_m4: false

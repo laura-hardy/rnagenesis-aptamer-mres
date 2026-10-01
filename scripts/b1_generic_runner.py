@@ -63,8 +63,8 @@ RUN_ROOT = Path("/home/laura/rnagenesis-mres-runs")
 
 RNAGENESIS_HEAD = "e3b855bbf4d1af376f43747643fa30afd662828c"
 RNAGENESIS_BRANCH = "mres-d1-diffusion-finetune"
-# Untracked asset and cache directories on the reviewed RNAGenesis worktree.
-# Tracked and staged changes stay refused. A clean tree is also accepted.
+# Exact porcelain-v1 untracked paths from the reviewed RNAGenesis worktree.
+# These assets are intentionally untracked. The set must match exactly.
 KNOWN_RNAGENESIS_UNTRACKED = (
     ".cache/",
     "__pycache__/",
@@ -886,25 +886,32 @@ def build_phase_a_plan(config):
         ("cpu_fallback", False, "cpu fallback is enabled"),
         ("other_gpu_fallback", False, "other GPU fallback is enabled"),
         ("visible_python_device", "cuda:0", "visible device is not cuda:0"),
-        (
-            "cuda_visible_devices",
-            str(PHYSICAL_GPU),
-            "configured CUDA_VISIBLE_DEVICES is not {}".format(PHYSICAL_GPU),
-        ),
+        ("physical_gpu_selected_by_this_document", False, "shared settings select a physical GPU"),
         (
             "cuda_device_order",
             CUDA_DEVICE_ORDER,
             "configured CUDA_DEVICE_ORDER is not {}".format(CUDA_DEVICE_ORDER),
         ),
     )
+    if shared.get("physical_gpu") is not None or shared.get("cuda_visible_devices") is not None:
+        raise B1RunnerError(
+            "phase_a_plan_invalid",
+            "shared settings must not hard-code a physical GPU",
+        )
+    historical = _require_mapping(
+        config.get("historical_consumed_phase_a_and_phase_b_device"),
+        "phase_a_plan_invalid",
+        "historical consumed device binding is missing",
+    )
     if (
-        "physical_gpu" not in shared
-        or type(shared["physical_gpu"]) is not int
-        or shared["physical_gpu"] != PHYSICAL_GPU
+        type(historical.get("physical_gpu")) is not int
+        or historical.get("physical_gpu") != PHYSICAL_GPU
+        or historical.get("cuda_visible_devices") != str(PHYSICAL_GPU)
+        or historical.get("selects_a_device_for_the_development_pool") is not False
     ):
         raise B1RunnerError(
             "phase_a_plan_invalid",
-            "configured physical GPU is not {}".format(PHYSICAL_GPU),
+            "historical consumed device binding drifted",
         )
     for key, expected, detail in checks:
         if key not in shared or shared[key] != expected:
@@ -1032,27 +1039,32 @@ def _assert_mres_worktree_clean(porcelain):
         raise B1RunnerError("mres_worktree_dirty", "the worktree is not clean")
 
 
-def _known_rnagenesis_untracked(path):
+def reviewed_rnagenesis_porcelain():
+    """Live git-status shape for the reviewed untracked asset directories."""
+    return "".join("?? {}\n".format(path) for path in KNOWN_RNAGENESIS_UNTRACKED)
+
+
+def _normalise_untracked_path(path):
     normalised = path.replace("\\", "/").strip()
     if normalised.startswith("./"):
         normalised = normalised[2:]
-    candidate = normalised if normalised.endswith("/") else normalised + "/"
-    for prefix in KNOWN_RNAGENESIS_UNTRACKED:
-        if candidate == prefix or candidate.startswith(prefix):
-            return True
-    return False
+    if len(normalised) >= 2 and normalised[0] == '"' and normalised[-1] == '"':
+        normalised = normalised[1:-1]
+    return normalised
 
 
 def _assert_rnagenesis_worktree(porcelain):
-    """Allow the known untracked asset set. Refuse tracked or staged changes."""
+    """Require the reviewed untracked fingerprint. Refuse tracked or staged changes.
+
+    An empty porcelain result is refused. The required RNAGenesis assets are
+    intentionally untracked, so their paths must be present exactly. Missing,
+    additional, and renamed untracked paths are refused.
+    """
+    observed = []
     for line in _porcelain_lines(porcelain):
         index_status, worktree_status, path = _split_porcelain(line)
         if index_status == "?" and worktree_status == "?":
-            if not _known_rnagenesis_untracked(path):
-                raise B1RunnerError(
-                    "rnagenesis_untracked_refused",
-                    "untracked path is not a known RNAGenesis asset",
-                )
+            observed.append(_normalise_untracked_path(path))
             continue
         if index_status not in (" ", "?"):
             raise B1RunnerError(
@@ -1062,6 +1074,11 @@ def _assert_rnagenesis_worktree(porcelain):
         raise B1RunnerError(
             "rnagenesis_worktree_dirty",
             "tracked changes are present",
+        )
+    if sorted(observed) != sorted(KNOWN_RNAGENESIS_UNTRACKED):
+        raise B1RunnerError(
+            "rnagenesis_untracked_refused",
+            "untracked path is not the known RNAGenesis asset fingerprint",
         )
 
 
@@ -1158,7 +1175,8 @@ def assert_repository_pins(snapshot, git):
             "dirty_tree_porcelain": rna_porcelain,
             "dirty_tree_description": (
                 "Read-only git status --porcelain=v1. "
-                "Known untracked asset directories may remain. "
+                "The untracked path set must equal the reviewed RNAGenesis asset fingerprint. "
+                "An empty porcelain result is refused because those assets are intentionally untracked. "
                 "Tracked and staged state must be clean. "
                 "The runner does not fetch, checkout, clean, restore, stage, "
                 "or otherwise modify RNAGenesis."

@@ -53,6 +53,8 @@ RUN_ROOT = Path("/home/laura/rnagenesis-mres-runs")
 
 RNAGENESIS_HEAD = "e3b855bbf4d1af376f43747643fa30afd662828c"
 RNAGENESIS_BRANCH = "mres-d1-diffusion-finetune"
+# Exact porcelain-v1 untracked paths from the reviewed RNAGenesis worktree.
+# These assets are intentionally untracked. The set must match exactly.
 KNOWN_RNAGENESIS_UNTRACKED = (
     ".cache/",
     "__pycache__/",
@@ -1256,30 +1258,40 @@ def _assert_mres_worktree_clean(porcelain):
         raise PhaseBRunnerError("mres_worktree_dirty", "the worktree is not clean")
 
 
-def _known_rnagenesis_untracked(path):
+def reviewed_rnagenesis_porcelain():
+    """Live git-status shape for the reviewed untracked asset directories."""
+    return "".join("?? {}\n".format(path) for path in KNOWN_RNAGENESIS_UNTRACKED)
+
+
+def _normalise_untracked_path(path):
     normalised = path.replace("\\", "/").strip()
     if normalised.startswith("./"):
         normalised = normalised[2:]
-    candidate = normalised if normalised.endswith("/") else normalised + "/"
-    for prefix in KNOWN_RNAGENESIS_UNTRACKED:
-        if candidate == prefix or candidate.startswith(prefix):
-            return True
-    return False
+    if len(normalised) >= 2 and normalised[0] == '"' and normalised[-1] == '"':
+        normalised = normalised[1:-1]
+    return normalised
 
 
 def _assert_rnagenesis_worktree(porcelain):
+    """Require the reviewed untracked fingerprint. Refuse tracked or staged changes.
+
+    An empty porcelain result is refused. The required RNAGenesis assets are
+    intentionally untracked. Missing, additional, and renamed paths are refused.
+    """
+    observed = []
     for line in _porcelain_lines(porcelain):
         index_status, worktree_status, path = _split_porcelain(line)
         if index_status == "?" and worktree_status == "?":
-            if not _known_rnagenesis_untracked(path):
-                raise PhaseBRunnerError(
-                    "rnagenesis_untracked_refused",
-                    "untracked path is not a known RNAGenesis asset",
-                )
+            observed.append(_normalise_untracked_path(path))
             continue
         if index_status not in (" ", "?"):
             raise PhaseBRunnerError("rnagenesis_worktree_dirty", "staged changes are present")
         raise PhaseBRunnerError("rnagenesis_worktree_dirty", "tracked changes are present")
+    if sorted(observed) != sorted(KNOWN_RNAGENESIS_UNTRACKED):
+        raise PhaseBRunnerError(
+            "rnagenesis_untracked_refused",
+            "untracked path is not the known RNAGenesis asset fingerprint",
+        )
 
 
 def _git_line(git, repo, args):

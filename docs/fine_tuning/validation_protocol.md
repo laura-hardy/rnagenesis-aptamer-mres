@@ -29,13 +29,16 @@ Written against MRes `b690f44a025a3790f1af1865856fc480dbec1079`. The implementat
 
 ## 1. What this approval fixes and what it leaves open
 
-The approved Stage 1 design fixes the development metric, the checkpoint-selection rule, and the generated-sample guardrail structure. Requested-length thresholds 0.90 and 0.50 remain `PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE`. This approval is for implementation only.
+The approved Stage 1 design fixes the development metric, the checkpoint-selection rule, and the generated-sample guardrail structure. Requested-length exact-hit rates remain required diagnostic reports. The historical provisional values 0.90 and 0.50 are not execution-success requirements. This approval is for implementation only.
+
+On 1 October 2026 Laura Hardy superseded the discussed Approach A fixed-full-table R=32 design before implementation, plan materialization, biological-data access, authorization, or execution. No Approach A schedule, runner, evidence, output, or GPU run exists. The active M4 design is the restored Stage 1 diagnostic contract. Phase A and Phase B evidence remains accepted and unchanged. The selected cap remains `max_seq_len = requested_biological_length + 1`. Early EOS and length mismatch remain observed generator behaviours. They do not trigger rejection, replacement, resampling, or diagnostic-run failure. The design does not declare an exact-length accepted pool or a final M8 production protocol. M4 is not complete.
 
 This approval does not:
 
-- approve a final B1 length-matching or rejection/resampling algorithm;
-- approve a sequence-clustering identity threshold;
-- choose the D1 microbatch, accumulation, mixed precision, or EMA setting;
+- declare an exact-length accepted pool or a final M8 production protocol;
+- keep clustering-dependent claims or a clustering identity threshold inside M4;
+- keep frozen-representation or embedding-aggregation metrics inside M4;
+- choose the D1 microbatch, accumulation, numerical precision, or EMA setting;
 - authorise GPU use, B2 sampling, B1 generation, or the D1 pilot.
 
 M5 must pass before the D1 pilot configuration can become executable. Microbatch, accumulation, mixed precision, and EMA stay assigned to M5. Their absence does not, by itself, block final M4 closure. Matters that can remain open after this implementation approval, and that must be resolved before final M4 `COMPLETE / GO`, are listed in section 10.
@@ -124,7 +127,7 @@ Failure of any approved hard threshold makes a checkpoint ineligible even if its
 
 ## 5. Generated-sample guardrails
 
-**Non-length guardrails are `APPROVED_STAGE_1_DESIGN`.** The requested-length thresholds 0.90 and 0.50 are `PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE`. The 1,000-attempt paired schedule is `APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED`.
+**Non-length guardrails are `APPROVED_STAGE_1_DESIGN`.** Requested-length exact-hit rates are required diagnostic reports. The historical provisional values 0.90 and 0.50 are not execution-success requirements, and a low exact-hit rate does not invalidate or rerun the B1 diagnostic pool. The 1,000-attempt paired schedule is the restored Stage 1 diagnostic contract. It is approved for implementation and is not executable from the checked-in configuration.
 
 The proposed diagnostic sample is 1,000 raw attempts per evaluated neural checkpoint or condition. Target lengths are sampled with seed 43000. Generation invocations use a separate proposed seed base of 44000. The deterministic execution plan is:
 
@@ -139,7 +142,7 @@ The proposed diagnostic sample is 1,000 raw attempts per evaluated neural checkp
 9. map every generated record back to its original target-length attempt index;
 10. reuse the identical target list, grouping rule, chunk membership, and invocation seeds for paired B1/D1 comparisons where technically applicable.
 
-The manifest must contain the complete invocation table before generation begins. Execution stays blocked until the length-mapping or rejection/resampling algorithm is approved.
+The manifest must contain the complete invocation table before generation begins. The checked-in configuration does not authorise that execution. A later active authorisation must bind the physical GPU, its UUID and PCI bus, the authorization commit, the implementation commit, the exact output directory, and the immutable schedule hash. The runner must not hardcode physical GPU 0 or physical GPU 1.
 
 B2 is different. Its required raw set is 30,000 attempts. Guardrail rates for B2 use that full raw set. A 1,000-attempt slice is not a substitute. The existing B0 pool remains 30,080 attempts and is not re-gated as if it had been length-matched.
 
@@ -150,31 +153,27 @@ B2 is different. Its required raw set is 30,000 attempts. Guardrail rates for B2
 | Unique fraction | at least 0.95 | valid outputs |
 | Exact TRAIN match rate | at most 0.01 | valid outputs |
 | Largest duplicate share | at most 0.01 | valid outputs |
-| Requested-length exact-hit rate, before any rejection or resampling | at least 0.90 | valid outputs |
-| Per requested length with at least 16 raw attempts | exact-hit rate at least 0.50 | valid outputs at that requested length |
+| Requested-length exact-hit rate | report the rate; 0.90 is not an execution-success requirement | all raw attempts, before filtering |
+| Per requested length | report the rate; 0.50 is not an execution-success requirement | all raw attempts at that requested length |
 
-The exact-hit numerator is the count of valid outputs whose cleaned length equals the requested biological length. Its stated denominator remains valid outputs. Invalid attempts remain visible through the raw-attempt validity guardrail. If a length has zero valid outputs, its exact-hit rate is 0.0. That length fails the per-length rule once the raw-attempt minimum of 16 is reached. Validity continues to be reported separately. Raw attempts, valid outputs, and exact hits must always be reported together.
+The exact-hit numerator is the count of valid outputs whose cleaned length equals the requested biological length. Its denominator is every raw attempt, before filtering. Invalid or unparseable accounted attempts are non-hits and remain in that denominator. A separately labelled valid-only diagnostic may be retained, and it must not replace this raw-attempt metric. Validity continues to be reported separately. Raw attempts, valid outputs, and exact hits must always be reported together. A low exact-hit rate does not invalidate or rerun the B1 diagnostic pool.
 
-A requested length with fewer than 16 raw characterization attempts is reported and does not trip the 0.50 rule. The overall 0.90 rule still applies. Phase B uses 16 raw attempts at every tested TRAIN length, so every Phase B length is eligible for the 0.50 rule. The requested-length rules apply to B1 and D1. They do not apply to B2, whose length is the sampled length. They are not applied retroactively to the existing B0 pool as a checkpoint-eligibility rule. Both thresholds remain `PROVISIONAL_PENDING_PHASE_A_B_EVIDENCE`. They are not yet approved hard eligibility rules.
+Requested-length exact-hit rates are reported for the diagnostic sample. They are not B1 diagnostic-run success requirements. They do not apply to B2, whose length is the sampled length. They are not applied retroactively to the existing B0 pool as a checkpoint-eligibility rule.
 
 Valid output means a nonempty cleaned body matching `^[ACGU]+$` under the M1-approved cleaner. Raw attempts that fail that test stay in the raw denominator. Duplicate valid outputs stay in the valid denominator. Nothing is dropped silently before a rate is calculated.
 
-B2 raw output, when a later approved stage writes it, is canonical JSON Lines: UTF-8; one JSON object per attempt; key order exactly the declared field order; compact separators `,` and `:`; `ensure_ascii=false`; no spaces outside string values; an LF after every record, including the final record; no BOM; and no carriage returns. The raw-output SHA-256 is the hash of those exact file bytes. Probabilities are computed in float64, in order A, C, U, G. An implementation must reject an empty TRAIN stream, a non-A/C/G/U character, a count other than 669, a duplicate input sequence, a non-finite or negative probability, and any probability vector whose ordered A/C/U/G values fail `abs(sum(probabilities) - 1.0) <= 1e-12`. Relative tolerance is zero. This stage does not compute nucleotide probabilities from biological TRAIN text. The B2 statistical design, seed 42, and 30,000-attempt target are `APPROVED_STAGE_1_DESIGN` and are not approved for execution.
+B2 attempt 2 is completed accepted evidence at `/home/laura/rnagenesis-mres-runs/m4_b2_empirical_null_6f82878_attempt2`. The accepted raw SHA-256 is `bbe35f448db0d7fc02ad0156865798382b0b41e9ad047b4e52eddf7cff740c83` and the accepted manifest SHA-256 is `31c07fb966c462263307569b383b112ecfb39725adb9b1b2fd2f93a95d3d8baa`. That evidence must not be rerun. Its raw output is canonical JSON Lines: UTF-8; one JSON object per attempt; key order exactly the declared field order; compact separators `,` and `:`; `ensure_ascii=false`; no spaces outside string values; an LF after every record, including the final record; no BOM; and no carriage returns. The raw-output SHA-256 is the hash of those exact file bytes. Probabilities were computed in float64, in order A, C, U, G. An implementation must reject an empty TRAIN stream, a non-A/C/G/U character, a count other than 669, a duplicate input sequence, a non-finite or negative probability, and any probability vector whose ordered A/C/U/G values fail `abs(sum(probabilities) - 1.0) <= 1e-12`. Relative tolerance is zero. This stage does not recompute nucleotide probabilities from biological TRAIN text and does not authorise another B2 sample.
 
 Report, and do not threshold-optimize:
 
 - nearest-TRAIN normalized edit distance;
 - maximum identity to TRAIN;
-- generated cluster concentration;
 - nucleotide and dinucleotide distributions;
 - MFE and MFE per nucleotide;
 - paired fraction;
-- representation-space distance to VALIDATION;
 - full length-stratified results.
 
-The sequence-clustering identity threshold is an unresolved human decision. No threshold is invented here. Clustering-dependent claims are prohibited until a threshold is frozen. That block includes generated cluster concentration, cluster count, singleton fraction, largest-cluster share, Shannon diversity, and effective cluster count.
-
-The representation model and its embedding aggregation are also unresolved, except that any model later used must be frozen, development distance uses VALIDATION, and it must not be trained on EVAL. Explicit deferral or removal of that metric is the alternative recorded in section 10.
+Clustering-dependent claims, selection of a clustering identity threshold, frozen-representation or embedding metrics, and representation aggregation rules are formally deferred beyond M4. They are not M4 closure blockers. No substitute optional metrics are added in their place.
 
 ## 6. Roles
 
@@ -189,13 +188,13 @@ Development generator comparisons do not use REF.
 
 ## 7. B1 length characterization
 
-Phase A and Phase B are specified in `config/experiments/B1_generic_generation.yaml`. Their protocol status is `APPROVED_DESIGN_NOT_APPROVED_FOR_GPU_EXECUTION`. Phase A needs a separate GPU0 approval. Phase B waits for human review of Phase A.
+Phase A and Phase B are specified in `config/experiments/B1_generic_generation.yaml`. Both evidence packages are accepted and are not re-executable. The active development-pool design is the restored 1,000-raw-attempt diagnostic contract.
 
 Phase A keeps the eleven target lengths in ascending order. For one target biological length, the three candidate `max_seq_len` values — the target, the target plus 1, and the target plus 2 — use the same seed, `41000 + zero-based target index`. There are 11 seeds, 41000 through 41010. There are not 33 different seeds. Each candidate still has 16 attempts, and each candidate invocation is initialised with that shared target seed, so the total remains 528. Each attempt records `pairing_group` equal to the target length and `attempt_within_candidate` from 0 through 15. Sharing the seed reduces stochastic confounding when comparing decoder caps. It does not imply that output strings must remain aligned after early termination or stochastic divergence.
 
-Phase B uses 16 raw attempts for every one of the 89 distinct TRAIN lengths. The batch size is 16 and the total is `89 × 16 = 1,424`. Each ascending length has one invocation seed, `42000 + zero-based length index`. Sixteen attempts make every tested length eligible for the proposed 0.50 per-length exact-hit guardrail. A length with zero valid outputs has exact-hit rate 0.0 and fails that rule. Validity is still reported separately.
+Phase B used 16 raw attempts for every one of the 89 distinct TRAIN lengths. The batch size was 16 and the total was `89 × 16 = 1,424`. Each ascending length had one invocation seed, `42000 + zero-based length index`. That evidence is accepted. Its exact-hit rates remain diagnostic observations. They do not become execution-success requirements for the restored 1,000-attempt pool. Validity is still reported separately.
 
-This protocol does not declare the empirical-length matching algorithm or a rejection/resampling rule. A human decision is required after Phase A and Phase B evidence. Sequences must not be silently truncated to force a length.
+Phase A and Phase B evidence is accepted. The 1 October 2026 course change restored the 1,000-raw-attempt diagnostic contract and marked the rejection/resampling direction superseded before implementation. Sequences must not be silently truncated to force a length. Early EOS and length mismatch remain diagnostic outcomes.
 
 The M1 boundary observation is a five-step, two-sequence smoke: `max_seq_len` 37, leading `11`, empty suffix, raw length 38, cleaned length 36. It is a boundary reference. It is not a 50-step length law.
 
@@ -238,23 +237,27 @@ An executable workflow must refuse this approved-for-implementation package. In 
 - open REF or EVAL;
 - regenerate B0 by default;
 - overwrite or append to an existing evidence directory;
-- build the 30,000 B2 sequences;
+- rerun the completed accepted B2 evidence;
 - run Phase A, Phase B, or the 1,000-attempt pool;
 - create the fixed validation-draw tensors or the ordered-core provenance artifact as a scientific artifact of this stage;
 - start the D1 pilot.
 
 ## 10. Blockers remaining before final M4 closure
 
-This implementation approval leaves the following matters open. Each must be resolved before final M4 `COMPLETE / GO`:
+This implementation does not mark M4 complete. Final completion still requires:
 
-- the final B1 length-matching or rejection/resampling algorithm;
-- an evidence-based decision on the proposed requested-length thresholds;
-- a complete B1/D1 generation wrapper and overwrite protection;
-- creation and verification of the fixed validation tensors and order artifacts;
-- executable B2 hardening and tests;
-- an approved clustering identity threshold, or explicit removal of clustering-dependent M4 claims;
-- an approved frozen representation model and embedding aggregation, or explicit deferral or removal of that metric;
-- the frozen evaluation-code commit and configuration hashes;
-- the final D1 pilot configuration fields that M4 can freeze without M5 evidence.
+- accepted implementation;
+- a materialised and verified 1,000-attempt schedule;
+- the fixed validation artifacts;
+- completed and accepted B1 diagnostic evidence;
+- frozen code and configuration hashes;
+- the final human closure decision.
 
-Microbatch, accumulation, mixed precision, and EMA stay explicitly deferred to M5, where the implementation plan assigns them. M4 is not blocked merely because those M5-dependent hardware results do not yet exist. The same list is recorded in `config/experiments/generator_evaluation.yaml`.
+Formally deferred beyond M4, and therefore not M4 closure blockers:
+
+- clustering-dependent claims;
+- selection of a clustering identity threshold;
+- frozen-representation and embedding metrics;
+- representation aggregation rules.
+
+Microbatch, gradient accumulation, numerical precision, and EMA stay explicitly deferred to M5. M4 is not blocked merely because those M5-dependent hardware results do not yet exist. The D1 pilot fields that are already fixed, including the learning rate, training seed, one-epoch or 21-update budget, fixed-draw validation points, and frozen EncDec, remain fixed. This implementation does not begin M5 or D1 training. The same deferrals are recorded in `config/experiments/generator_evaluation.yaml`.

@@ -120,7 +120,7 @@ When a GPU is used, record:
 - the visible logical device, such as `cuda:0`;
 - an `nvidia-smi` snapshot taken before the run.
 
-The project default remains physical GPU0, and only after a separate explicit gate. `CUDA_VISIBLE_DEVICES=0` with visible device `cuda:0` is the proposed isolation. No CPU fallback and no other-GPU fallback is permitted for a run that this schema describes as a GPU0 run.
+A later authorisation binds the physical GPU index, its UUID, and its PCI bus at authorisation time. The child process uses logical `cuda:0`. `CUDA_VISIBLE_DEVICES` is the authorised physical index, so that device is the only visible CUDA device. No CPU fallback and no other-GPU fallback is permitted. The development-pool runner does not hard-code physical GPU 0 or physical GPU 1.
 
 ### Commands, outputs, and accounting
 
@@ -135,7 +135,7 @@ The project default remains physical GPU0, and only after a separate explicit ga
 
 Generated-sequence provenance, for every sample set, also includes condition id, checkpoint hash, generation seed, requested length or maximum length, DDIM steps, eta, top-p, top-k, raw attempt index, raw output string, cleaned sequence, and cleaning flags. Raw files are not rewritten by cleaning. Requested-length reporting always includes raw attempts, valid outputs, and exact hits together.
 
-For the 1,000-attempt B1/D1 diagnostic schedule, the manifest contains the complete invocation table before generation begins. Each row records the zero-based invocation index, the invocation seed `44000 + that index`, the target length, the actual chunk size, `batch_num=1`, and the original attempt indexes in that chunk. Every generated record maps back to its original target-length attempt index. The target-length sampling seed remains 43000 and is recorded separately from the generation-seed base. Execution of that schedule stays blocked until the length-mapping or rejection/resampling algorithm is approved.
+For the 1,000-attempt B1/D1 diagnostic schedule, the manifest contains the complete invocation table before generation begins. Each row records the zero-based invocation index, the invocation seed `44000 + that index`, the target length, the actual chunk size, `batch_num=1`, and the original attempt indexes in that chunk. Every generated record maps back to its original target-length attempt index. The target-length sampling seed remains 43000 and is recorded separately from the generation-seed base. The checked-in configuration does not execute that schedule. A later authorisation binds one physical GPU at run time; the development-pool runner does not hardcode physical GPU 0 or physical GPU 1.
 
 Phase A attempt records include `pairing_group`, equal to the target biological length, and `attempt_within_candidate`, from 0 through 15. The three candidate caps for one target are initialised with the same seed, `41000 + zero-based target index`.
 
@@ -173,6 +173,8 @@ D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-42__update-<count>__g
 
 ## 5. B2 manifest addition
 
+B2 attempt 2 is completed accepted evidence at `/home/laura/rnagenesis-mres-runs/m4_b2_empirical_null_6f82878_attempt2`. Its raw SHA-256 is `bbe35f448db0d7fc02ad0156865798382b0b41e9ad047b4e52eddf7cff740c83` and its manifest SHA-256 is `31c07fb966c462263307569b383b112ecfb39725adb9b1b2fd2f93a95d3d8baa`. That evidence must not be rerun. This section describes the manifest of that completed run. It does not authorise another sample.
+
 A B2 manifest also records the fields required by `config/experiments/B2_empirical_null.yaml`: input hashes, derived nucleotide probabilities, the full empirical length counts, NumPy version, RNG name, seed, raw count, unique count as a diagnostic only, output hash, command, repository SHA, timestamps, and exit status.
 
 The raw-output SHA-256 is computed over the canonical file bytes: UTF-8; one JSON object per attempt; key order exactly the declared field order; compact separators `,` and `:`; `ensure_ascii=false`; no spaces outside string values; an LF after every record, including the final record; no BOM; and no carriage returns.
@@ -187,7 +189,7 @@ A completed successful manifest records observed values for every field the run 
 
 ### Approval provenance
 
-A future authorized B2 manifest keeps two approval records distinct. It does not contain a generic `human_approval` field. The configuration may still store the Stage 1 block under `human_approval`. The manifest copies that block only as `protocol_implementation_approval`.
+The accepted B2 manifest keeps two approval records distinct. It must not be rewritten or rerun. A new B2 manifest keeps two approval records distinct. It does not contain a generic `human_approval` field. The configuration may still store the Stage 1 block under `human_approval`. The manifest copies that block only as `protocol_implementation_approval`.
 
 `protocol_implementation_approval` is the Stage 1 protocol and implementation approval. Its `record_role` is `stage_1_protocol_implementation_approval`. `authorizes_scientific_execution` and `authorizes_this_invocation` are both false. `authorizes_this_invocation_meaning` states that this false value means the Stage 1 record did not itself authorize the invocation, and that `scientific_execution_authorisation` did. `explicitly_not_approved` remains the Stage 1 list. `explicitly_not_approved_scope` states that the list applies only to that Stage 1 approval, does not revoke `scientific_execution_authorisation`, and does not mean the invocation lacked scientific-execution approval. The record also keeps the approving person, date, recorded timestamp, source, scope, and `m4_complete`. It records the configuration observed at invocation as `configuration_document_status_at_invocation`, `configuration_consumable_by_executable_workflow_at_invocation`, and `source_configuration_sha256`. Those three values describe the configuration at invocation time. They are not assertions made by the Stage 1 approval. The separate scientific authorization and relationship record remain the authority for the invocation. Top-level `approval_status` and `consumable_by_executable_workflow` continue to record the executable configuration state, and they are derived from those invocation-state values.
 

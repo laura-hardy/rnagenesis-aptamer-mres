@@ -643,18 +643,26 @@ class ClosedGateTests(unittest.TestCase):
         self.assertEqual(
             config["phase_b"]["blocked_until"],
             (
-                "The deterministic exact-length rejection/resampling algorithm "
-                "must be approved before development-pool execution."
+                "Phase B evidence is accepted and is not re-executable. "
+                "The 1 October 2026 course change restored the Stage 1 "
+                "diagnostic contract for the separate development-pool "
+                "workflow and superseded Approach A before implementation."
             ),
         )
         self.assertIs(config["execution"]["gpu_authorised_by_this_draft"], False)
         shared = config["shared_generation_settings"]
-        self.assertIs(type(shared["physical_gpu"]), int)
-        self.assertEqual(shared["physical_gpu"], 1)
-        self.assertEqual(shared["physical_gpu"], runner.PHYSICAL_GPU)
-        self.assertEqual(shared["cuda_visible_devices"], "1")
-        self.assertIs(type(shared["cuda_visible_devices"]), str)
-        self.assertEqual(shared["cuda_visible_devices"], str(runner.PHYSICAL_GPU))
+        self.assertIsNone(shared["physical_gpu"])
+        self.assertIs(shared["physical_gpu_selected_by_this_document"], False)
+        self.assertIsNone(shared["cuda_visible_devices"])
+        self.assertEqual(shared["child_logical_device"], "cuda:0")
+        historical_device = config["historical_consumed_phase_a_and_phase_b_device"]
+        self.assertIs(type(historical_device["physical_gpu"]), int)
+        self.assertEqual(historical_device["physical_gpu"], 1)
+        self.assertEqual(historical_device["physical_gpu"], runner.PHYSICAL_GPU)
+        self.assertEqual(historical_device["cuda_visible_devices"], "1")
+        self.assertIs(type(historical_device["cuda_visible_devices"]), str)
+        self.assertEqual(historical_device["cuda_visible_devices"], str(runner.PHYSICAL_GPU))
+        self.assertIs(historical_device["selects_a_device_for_the_development_pool"], False)
         self.assertEqual(shared["cuda_device_order"], "PCI_BUS_ID")
         self.assertEqual(shared["cuda_device_order"], runner.CUDA_DEVICE_ORDER)
         self.assertEqual(shared["visible_python_device"], "cuda:0")
@@ -862,7 +870,7 @@ class ClosedGateTests(unittest.TestCase):
         pool = config["limited_development_pool"]
         self.assertEqual(
             pool["status"],
-            "APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED",
+            "RESTORED_STAGE_1_DIAGNOSTIC_CONTRACT_APPROVED_FOR_IMPLEMENTATION_NOT_EXECUTION",
         )
         self.assertIs(pool["phase_b_candidate_mapping_unblocks_this_pool"], False)
         self.assertIs(pool["development_pool_authorised"], False)
@@ -872,20 +880,25 @@ class ClosedGateTests(unittest.TestCase):
             pool[
                 "execution_blocked_until_length_mapping_or_rejection_resampling_algorithm_approved"
             ],
-            True,
+            False,
         )
-        self.assertIn(
-            "specified, implemented, tested, and separately approved",
-            pool["blocked_until"],
-        )
+        self.assertIn("checked-in configuration is not executable", pool["blocked_until"])
         decision = config["phase_b_human_scientific_decision"]
         self.assertEqual(decision["approving_person"], "Laura Hardy")
         self.assertEqual(decision["approval_date"], "1 October 2026")
         self.assertIs(decision["phase_b_evidence_accepted"], True)
         self.assertEqual(
             decision["selected_decision"],
+            "DIAGNOSTIC_NO_REJECTION_REPLACEMENT_OR_RESAMPLING",
+        )
+        self.assertIs(decision["active_design_uses_rejection_replacement_or_resampling"], False)
+        historical_decision = decision["historical_superseded_exact_length_rejection_resampling"]
+        self.assertEqual(
+            historical_decision["selected_decision"],
             "REQUIRE_DETERMINISTIC_EXACT_LENGTH_REJECTION_RESAMPLING",
         )
+        self.assertIs(historical_decision["deterministic_rejection_or_resampling_direction_approved"], True)
+        self.assertIs(historical_decision["executed"], False)
         self.assertIs(decision["approves_an_executable_algorithm"], False)
         self.assertIs(decision["exact_algorithm_finalized"], False)
         self.assertIs(decision["exact_algorithm_implemented"], False)
@@ -1688,9 +1701,10 @@ class PlanAndArgvTests(unittest.TestCase):
         refusals = (
             ("physical_gpu", 0),
             ("physical_gpu", "1"),
+            ("physical_gpu", 1),
             ("physical_gpu", 2),
-            ("physical_gpu", None),
             ("cuda_visible_devices", "0"),
+            ("cuda_visible_devices", "1"),
             ("cuda_visible_devices", "01"),
             ("cuda_visible_devices", ""),
             ("cuda_device_order", "FASTEST_FIRST"),
@@ -2413,7 +2427,7 @@ def repository_git(runtime_head, implementation_commit, **overrides):
     ancestor = overrides.get("ancestor", implementation_commit)
     mres_branch = overrides.get("mres_branch", "main")
     mres_status = overrides.get("mres_status", "")
-    rna_status = overrides.get("rna_status", "?? configs/\n")
+    rna_status = overrides["rna_status"] if "rna_status" in overrides else runner.reviewed_rnagenesis_porcelain()
     rna_branch = overrides.get("rna_branch", runner.RNAGENESIS_BRANCH)
     rna_head = overrides.get("rna_head", runner.RNAGENESIS_HEAD)
     worktree_blob = overrides.get("worktree_blob", blob)
@@ -2528,6 +2542,23 @@ class RepositorySeparationTests(unittest.TestCase):
             ({"rna_status": "M  generation.py\n"}, "rnagenesis_worktree_dirty", "staged"),
             ({"rna_branch": "main"}, "rnagenesis_branch_mismatch", "mres-d1-diffusion-finetune"),
             ({"rna_status": "?? notes.txt\n"}, "rnagenesis_untracked_refused", "known RNAGenesis"),
+            ({"rna_status": ""}, "rnagenesis_untracked_refused", "known RNAGenesis"),
+            (
+                {"rna_status": "?? configs/\n?? checkpoints/\n"},
+                "rnagenesis_untracked_refused",
+                "known RNAGenesis",
+            ),
+            (
+                {
+                    "rna_status": runner.reviewed_rnagenesis_porcelain().replace(
+                        "?? configs/\n",
+                        "?? config_renamed/\n",
+                        1,
+                    )
+                },
+                "rnagenesis_untracked_refused",
+                "known RNAGenesis",
+            ),
         ]
         for overrides, code, detail in cases:
             with self.assertRaises(runner.B1RunnerError) as caught:
@@ -2539,15 +2570,40 @@ class RepositorySeparationTests(unittest.TestCase):
             self.assertIn(detail, caught.exception.detail)
         passing = runner.assert_repository_pins(
             snapshot,
-            repository_git(
-                runtime,
-                implementation,
-                rna_status="?? configs/\n?? checkpoints/\n",
-            ),
+            repository_git(runtime, implementation),
         )
         self.assertEqual(passing["mres"]["origin_main"], runtime)
         self.assertEqual(passing["rnagenesis"]["branch"], runner.RNAGENESIS_BRANCH)
         self.assertEqual(passing["rnagenesis"]["head"], runner.RNAGENESIS_HEAD)
+
+    def test_rnagenesis_provenance_requires_the_live_untracked_fingerprint(self):
+        snapshot = runner.assert_document_gates(opened_config(COMMIT))
+        live = runner.reviewed_rnagenesis_porcelain()
+        self.assertTrue(all(line.startswith("?? ") and line.endswith("/") for line in live.splitlines()))
+        self.assertEqual(
+            [line[3:] for line in live.splitlines()],
+            list(runner.KNOWN_RNAGENESIS_UNTRACKED),
+        )
+        provenance = runner.assert_repository_pins(
+            snapshot,
+            repository_git("b" * 40, COMMIT, rna_status=live),
+        )
+        self.assertEqual(provenance["rnagenesis"]["branch"], runner.RNAGENESIS_BRANCH)
+        self.assertEqual(provenance["rnagenesis"]["head"], runner.RNAGENESIS_HEAD)
+        reversed_live = "".join("?? {}\n".format(path) for path in reversed(runner.KNOWN_RNAGENESIS_UNTRACKED))
+        reversed_provenance = runner.assert_repository_pins(
+            snapshot,
+            repository_git("b" * 40, COMMIT, rna_status=reversed_live),
+        )
+        self.assertEqual(reversed_provenance["rnagenesis"]["head"], runner.RNAGENESIS_HEAD)
+        unexpected = live + "?? notes.txt\n"
+        with self.assertRaises(runner.B1RunnerError) as caught:
+            runner.assert_repository_pins(
+                snapshot,
+                repository_git("b" * 40, COMMIT, rna_status=unexpected),
+            )
+        self.assertEqual(caught.exception.code, "rnagenesis_untracked_refused")
+        self.assertIn("known RNAGenesis", caught.exception.detail)
 
 
 class CudaProbeTests(unittest.TestCase):

@@ -384,7 +384,7 @@ def repository_git(runtime_head, implementation_commit, **overrides):
     ancestor = overrides.get("ancestor", implementation_commit)
     mres_branch = overrides.get("mres_branch", "main")
     mres_status = overrides.get("mres_status", "")
-    rna_status = overrides.get("rna_status", "?? configs/\n")
+    rna_status = overrides["rna_status"] if "rna_status" in overrides else runner.reviewed_rnagenesis_porcelain()
     rna_branch = overrides.get("rna_branch", runner.RNAGENESIS_BRANCH)
     rna_head = overrides.get("rna_head", runner.RNAGENESIS_HEAD)
     worktree_blob = overrides.get("worktree_blob", blob)
@@ -528,8 +528,10 @@ class CheckedInAuthorisationTests(unittest.TestCase):
         self.assertEqual(
             config["phase_b"]["blocked_until"],
             (
-                "The deterministic exact-length rejection/resampling algorithm "
-                "must be approved before development-pool execution."
+                "Phase B evidence is accepted and is not re-executable. "
+                "The 1 October 2026 course change restored the Stage 1 "
+                "diagnostic contract for the separate development-pool "
+                "workflow and superseded Approach A before implementation."
             ),
         )
         self.assertIs(config["phase_a"]["executable_now"], False)
@@ -832,27 +834,34 @@ class CheckedInAuthorisationTests(unittest.TestCase):
         self.assertIs(decision["phase_b_evidence_accepted"], True)
         self.assertEqual(
             decision["selected_decision"],
-            "REQUIRE_DETERMINISTIC_EXACT_LENGTH_REJECTION_RESAMPLING",
+            "DIAGNOSTIC_NO_REJECTION_REPLACEMENT_OR_RESAMPLING",
         )
+        self.assertIs(decision["active_design_uses_rejection_replacement_or_resampling"], False)
         self.assertIs(
             decision["direct_plus_one_retention_without_rejection_or_resampling_accepted"],
-            False,
+            True,
         )
         self.assertIs(decision["plus_one_cap_retained_as_the_evaluated_generation_candidate"], True)
         self.assertIs(
             decision["exact_cleaned_length_required_for_a_retained_length_matched_sequence"],
-            True,
+            False,
         )
         self.assertIs(
             decision["early_eos_outputs_must_not_be_silently_counted_as_correctly_length_matched"],
             True,
         )
-        self.assertIs(decision["all_raw_and_rejected_attempts_must_remain_recorded"], True)
+        self.assertIs(decision["all_raw_attempts_remain_recorded"], True)
         self.assertEqual(decision["silent_trimming"], "prohibited")
         self.assertEqual(decision["padding"], "prohibited")
         self.assertEqual(decision["silent_replacement"], "prohibited")
         self.assertEqual(decision["silent_deduplication"], "prohibited")
-        self.assertIs(decision["deterministic_rejection_or_resampling_direction_approved"], True)
+        historical_decision = decision["historical_superseded_exact_length_rejection_resampling"]
+        self.assertEqual(
+            historical_decision["selected_decision"],
+            "REQUIRE_DETERMINISTIC_EXACT_LENGTH_REJECTION_RESAMPLING",
+        )
+        self.assertIs(historical_decision["deterministic_rejection_or_resampling_direction_approved"], True)
+        self.assertIs(historical_decision["executed"], False)
         self.assertIs(decision["approves_an_executable_algorithm"], False)
         self.assertIs(decision["exact_algorithm_finalized"], False)
         self.assertIs(decision["exact_algorithm_implemented"], False)
@@ -863,18 +872,29 @@ class CheckedInAuthorisationTests(unittest.TestCase):
         self.assertIs(decision["b1_eligible"], False)
         self.assertIs(decision["m4_complete"], False)
         self.assertIs(
-            decision["b1_d1_parity_remains_required_for_the_eventual_algorithm"],
+            historical_decision["b1_d1_parity_remains_required_for_the_eventual_algorithm"],
             True,
         )
         algorithm = config["length_algorithm"]
+        self.assertEqual(algorithm["active_m4_design"], "restored_stage_1_diagnostic_contract")
+        self.assertIs(algorithm["diagnostic_only"], True)
+        self.assertIs(algorithm["rejection"], False)
+        self.assertIs(algorithm["replacement"], False)
+        self.assertIs(algorithm["resampling"], False)
         self.assertIs(algorithm["final_empirical_length_matching_algorithm_declared"], False)
         self.assertIs(algorithm["final_rejection_or_resampling_algorithm_declared"], False)
         self.assertIs(algorithm["exact_algorithm_finalized"], False)
         self.assertIs(algorithm["exact_algorithm_implemented"], False)
+        historical_algorithm = algorithm["historical_superseded_exact_length_rejection_resampling"]
         self.assertEqual(
-            algorithm["direction_decision"],
+            historical_algorithm["direction_decision"],
             "REQUIRE_DETERMINISTIC_EXACT_LENGTH_REJECTION_RESAMPLING",
         )
+        self.assertIs(
+            historical_algorithm["deterministic_exact_length_rejection_resampling_direction_approved"],
+            True,
+        )
+        self.assertIs(historical_algorithm["executed"], False)
         pool = config["limited_development_pool"]
         self.assertIs(pool["development_pool_authorised"], False)
         self.assertIs(pool["sampling_authorised"], False)
@@ -882,9 +902,9 @@ class CheckedInAuthorisationTests(unittest.TestCase):
         self.assertIs(pool["phase_b_candidate_mapping_unblocks_this_pool"], False)
         self.assertIs(
             pool["execution_blocked_until_length_mapping_or_rejection_resampling_algorithm_approved"],
-            True,
+            False,
         )
-        self.assertIn("specified, implemented, tested, and separately approved", pool["blocked_until"])
+        self.assertIn("checked-in configuration is not executable", pool["blocked_until"])
         self.assertIs(config["phase_b"]["approved_candidate_mapping"]["final_production_mapping"], False)
         self.assertIs(config["phase_b"]["frozen_schedule"]["final_production_mapping"], False)
         self.assertIs(config["phase_b_scientific_execution_authorisation"]["final_production_mapping_declared"], False)
@@ -2095,11 +2115,28 @@ class InterfaceTests(unittest.TestCase):
             ({"rna_branch": "main"}, "rnagenesis_branch_mismatch"),
             ({"rna_head": "f" * 40}, "rnagenesis_head_mismatch"),
             ({"rna_status": "?? notes.txt\n"}, "rnagenesis_untracked_refused"),
+            ({"rna_status": ""}, "rnagenesis_untracked_refused"),
+            ({"rna_status": "?? configs/\n?? checkpoints/\n"}, "rnagenesis_untracked_refused"),
         )
         for overrides, code in cases:
             with self.assertRaises(runner.PhaseBRunnerError) as caught:
                 runner.assert_repository_pins(snapshot, repository_git(RUNTIME, COMMIT, **overrides))
             self.assertEqual(caught.exception.code, code)
+
+    def test_rnagenesis_provenance_requires_the_live_untracked_fingerprint(self):
+        snapshot = runner.assert_phase_b_authorisation(opened_config(), 0)
+        live = runner.reviewed_rnagenesis_porcelain()
+        self.assertTrue(all(line.startswith("?? ") and line.endswith("/") for line in live.splitlines()))
+        provenance = runner.assert_repository_pins(snapshot, repository_git(RUNTIME, COMMIT, rna_status=live))
+        self.assertEqual(provenance["rnagenesis"]["branch"], runner.RNAGENESIS_BRANCH)
+        self.assertEqual(provenance["rnagenesis"]["head"], runner.RNAGENESIS_HEAD)
+        missing = "".join("?? {}\n".format(path) for path in runner.KNOWN_RNAGENESIS_UNTRACKED[:-1])
+        renamed = live.replace("?? checkpoints/\n", "?? checkpoint_renamed/\n", 1)
+        for status in (missing, renamed, live + "?? unexpected.txt\n", ""):
+            with self.assertRaises(runner.PhaseBRunnerError) as caught:
+                runner.assert_repository_pins(snapshot, repository_git(RUNTIME, COMMIT, rna_status=status))
+            self.assertEqual(caught.exception.code, "rnagenesis_untracked_refused")
+            self.assertIn("known RNAGenesis", caught.exception.detail)
 
     def test_secondary_failure_preserves_the_original_classification(self):
         secret = "ACGUACGUACGUACGU"
