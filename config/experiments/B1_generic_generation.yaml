@@ -1,17 +1,17 @@
-# APPROVED_FOR_SCIENTIFIC_EXECUTION
-# One unconsumed physical GPU 1 Phase B authorisation may be consumed by
-# the executable workflow. It evaluates only
-# max_seq_len = requested_biological_length + 1. That candidate is not a
-# final production mapping. The physical GPU 1 Phase A authorisation was
-# consumed successfully. Its activation status is consumed_complete. It is
-# inactive. Phase A evidence is accepted. This is not a revoked-unconsumed
-# record. The physical GPU 0 Phase A authorisation remains revoked and
-# unconsumed. B1 eligibility, M4 completion, the development pool, and
-# rejection or resampling remain unauthorised. This file does not declare
-# a final length-matching algorithm.
+# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+# Phase B evidence is accepted. The physical GPU 1 Phase B scientific-run
+# authorisation was consumed successfully. Its activation status is
+# consumed_complete. It is inactive. Consumption of that single scientific
+# run authorisation is not a statement about hardware access. The physical
+# GPU 1 Phase A authorisation remains consumed and complete. Phase A
+# evidence remains accepted. The physical GPU 0 Phase A authorisation
+# remains revoked and unconsumed. Decision B requires a deterministic
+# exact-length rejection/resampling policy. The exact algorithm is not
+# finalized or implemented. B1 eligibility, M4 completion, the development
+# pool, and a final production mapping remain unauthorised.
 
-document_status: APPROVED_FOR_SCIENTIFIC_EXECUTION
-consumable_by_executable_workflow: true
+document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
 human_approval:
   approving_person: Laura Hardy
   approval_date: 29 September 2026
@@ -40,9 +40,9 @@ metric_set_schema_version: m4-stage1-draft-1
 created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
 
 execution:
-  authorised: true
+  authorised: false
   gpu_authorised_by_this_draft: false
-  gpu_authorised_by_this_approval: true
+  gpu_authorised_by_this_approval: false
   evidence_directory_created_by_this_stage: false
   overwrite_existing_output: refuse
   silent_truncation: false
@@ -92,13 +92,17 @@ historical_scientific_execution_authorisations:
     phase_b_authorised: false
     development_pool_authorised: false
 
-# Single active Phase B grant. It does not reopen Phase A, select a final
-# production mapping, or authorise the development pool.
+# Consumed successfully by the completed physical GPU 1 Phase B run.
+# authorises_b1_phase_b and gpu_use_authorised record the scope of that
+# consumed scientific-run grant. They do not grant another run. This is
+# not a revoked-unconsumed record, and it does not describe hardware
+# access. This block does not reopen Phase A, declare a final production
+# mapping, or authorise the development pool.
 phase_b_scientific_execution_authorisation:
   authorisation_id: m4_b1_phase_b_688b18f88f21_gpu1_attempt1
-  authorisation_active: true
-  activation_status: active_unconsumed
-  consumed: false
+  authorisation_active: false
+  activation_status: consumed_complete
+  consumed: true
   authorises_b1_phase_b: true
   gpu_use_authorised: true
   physical_gpu: 1
@@ -108,7 +112,7 @@ phase_b_scientific_execution_authorisation:
   phase: B
   output_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_688b18f88f21_phaseB
   evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_688b18f88f21_phaseB
-  success_claimed: false
+  success_claimed: true
   m4_complete: false
   b1_eligible: false
   development_pool_authorised: false
@@ -278,9 +282,9 @@ phase_a_evidence_acceptance:
     accepted_cleaned_sequences_contain_only_acgu: true
 
 phase_b:
-  status: AUTHORISED_FOR_EXECUTION
-  blocked_until: separate_explicit_phase_b_authorisation
-  executable_now: true
+  status: COMPLETE_EVIDENCE_ACCEPTED
+  blocked_until: "The deterministic exact-length rejection/resampling algorithm must be approved before development-pool execution."
+  executable_now: false
   human_approved_candidate_mapping_required: false
   approved_candidate_mapping:
     status: APPROVED_CANDIDATE_FOR_PHASE_B_EVALUATION_NOT_FINAL_PRODUCTION_MAPPING
@@ -433,20 +437,27 @@ phase_b:
       - accepted_cleaned_output_is_empty_or_contains_a_non_ACGU_character
       - raw_output_cannot_be_associated_unambiguously_with_its_attempt_metadata
       - an_output_or_evidence_path_would_be_overwritten
-  # Frozen non-executable implementation contract. This block does not
-  # authorise Phase B, name an output directory, or record an implementation
-  # or authorisation commit.
+  # Accepted and committed Phase B implementation. The recorded scientific
+  # run authorisation is consumed. No executable authorisation is active.
   implementation_record:
-    status: AWAITING_REVIEW_NOT_EXECUTION
+    status: ACCEPTED_AND_COMMITTED
     runner: scripts/b1_phase_b_runner.py
-    separate_execution_authorisation_required: true
+    implementation_accepted: true
+    implementation_committed: true
+    implementation_commit: 688b18f88f21b427edb9e3e2a79130cc92485440
+    implementation_commit_recorded: true
+    authorization_commit: a43836e0a652b2f640fac5d4d8a1e66cb1406543
+    authorization_commit_recorded: true
     authorisation_block: phase_b_scientific_execution_authorisation
-    authorisation_block_present: false
-    implementation_commit_recorded: false
-    authorization_commit_recorded: false
-    output_path_recorded: false
-    approval_timestamp_recorded: false
-    selected_physical_gpu_recorded: false
+    authorisation_block_present: true
+    output_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_688b18f88f21_phaseB
+    evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_688b18f88f21_phaseB
+    output_path_recorded: true
+    selected_physical_gpu: 1
+    selected_physical_gpu_recorded: true
+    human_approval_and_acceptance_date: 1 October 2026
+    separate_execution_authorisation_required: true
+    executable_authorisation_active: false
   frozen_biological_lengths:
     - 20
     - 21
@@ -607,21 +618,139 @@ phase_b:
     success_and_failure_manifests_mutually_exclusive: true
     runtime_caches_under_evidence_directory: true
   provisional_diagnostics:
-    status: PROVISIONAL_UNTIL_HUMAN_REVIEW_OF_PHASE_B_EVIDENCE
+    status: EVIDENCE_OBSERVED_AND_HUMAN_REVIEWED_NON_ELIGIBILITY_DIAGNOSTICS
+    evidence_observed: true
+    human_reviewed: true
     per_length_exact_hit_floor: 0.50
     aggregate_exact_hit_diagnostic: 0.90
     zero_valid_outputs_exact_hit_rate: 0.0
     failing_a_diagnostic_is_an_implementation_crash: false
     passing_a_diagnostic_declares_b1_eligible: false
+    provisional_0_90_and_0_50_diagnostics_remain_non_eligibility_diagnostics: true
+    observed_length_dependent_early_eos_distortion_requires_explicit_algorithm: true
     declares_final_plus_one_mapping: false
     declares_rejection_or_resampling_algorithm: false
+    automatic_final_mapping_declared: false
     authorises_development_pool: false
     executes_development_pool: false
     claims_m4_complete: false
 
+phase_b_evidence_acceptance:
+  status: accepted
+  accepting_person: Laura Hardy
+  acceptance_date: 1 October 2026
+  authorisation_id: m4_b1_phase_b_688b18f88f21_gpu1_attempt1
+  executing_implementation_commit: 688b18f88f21b427edb9e3e2a79130cc92485440
+  authorization_commit: a43836e0a652b2f640fac5d4d8a1e66cb1406543
+  manifest_schema: m4-b1-phase-b-manifest-1
+  evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_generic_generation_B1_generic_released_rnagenesis_688b18f88f21_phaseB
+  physical_gpu: 1
+  gpu_uuid: "GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f"
+  pci_bus: "00000000:61:00.0"
+  logical_device: "cuda:0"
+  completed_invocations: 89
+  raw_generation_files: 89
+  raw_ledger_records: 1424
+  audited_ledger_records: 1424
+  parsed_outputs: 1424
+  valid_outputs: 1424
+  invalid_outputs: 0
+  unique_valid_outputs: 1424
+  duplicates: 0
+  exact_hits: 1325
+  exact_hit_rate: "0.9304775280898876"
+  eos_marker_observations: 99
+  early_eos_observations: 99
+  early_eos_rate: "0.06952247191011236"
+  early_eos_distinct_lengths: 39
+  lengths_with_16_of_16_exact_outputs: 50
+  lengths_below_provisional_0_50_floor: 0
+  aggregate_provisional_0_90_diagnostic_reached: true
+  worst_observed_length:
+    requested_biological_length: 117
+    exact: 8
+    attempts: 16
+  early_eos_requested_length_minimum: 61
+  early_eos_requested_length_maximum: 123
+  early_eos_cleaned_length_minimum: 18
+  early_eos_cleaned_length_maximum: 119
+  shortfall_minimum_nt: 1
+  shortfall_maximum_nt: 57
+  median_shortfall_nt: 13
+  mean_shortfall_nt: "16.22222222222222"
+  final_raw_verification_passed: true
+  phase_b_failure_manifest_present: false
+  evidence_sha256:
+    phase_b_manifest_json: 49cd5b773a0701606ba63f9b28c03cfb6a4aee32865e7f65a4e849481d628de7
+    phase_b_manifest_sha256_json: c81f628389e257bb1e5bb7577e3450c55348ececbb44c2a11b15a299fb0a088e
+    phase_b_raw_attempts_jsonl: bc8baf3f1dd8f9f1e21efd4a8489a0ccec9908f5ed9a6723cab60a2f68366c9b
+    phase_b_audited_attempts_jsonl: a20911c33d647fb3de1fdc0c8a32d944e33e124e37ab76dd481631cbde52259a
+  review_archive_sha256: 70f58d8afe604405abfb37f7de62de343026752b533e1dae2b96d6cc1148ca92
+  phase_a_evidence_unchanged: true
+  source_repositories_unchanged: true
+  full_per_length_table_retained_in_immutable_manifest: true
+  length_bins:
+    - label: lengths_20_to_60
+      minimum_length: 20
+      maximum_length: 60
+      attempts: 656
+      early_eos: 0
+      exact_rate: "1.0"
+    - label: lengths_61_to_80
+      minimum_length: 61
+      maximum_length: 80
+      attempts: 320
+      early_eos: 12
+      early_eos_rate: "0.0375"
+      exact_rate: "0.9625"
+    - label: lengths_81_to_100
+      minimum_length: 81
+      maximum_length: 100
+      attempts: 304
+      early_eos: 47
+      early_eos_rate: "0.15460526315789475"
+      exact_rate: "0.8453947368421053"
+    - label: lengths_101_to_123
+      minimum_length: 101
+      maximum_length: 123
+      attempts: 144
+      early_eos: 40
+      early_eos_rate: "0.2777777777777778"
+      exact_rate: "0.7222222222222222"
+
+phase_b_human_scientific_decision:
+  approving_person: Laura Hardy
+  approval_date: 1 October 2026
+  phase_b_evidence_accepted: true
+  selected_decision: REQUIRE_DETERMINISTIC_EXACT_LENGTH_REJECTION_RESAMPLING
+  direct_plus_one_retention_without_rejection_or_resampling_accepted: false
+  plus_one_cap_retained_as_the_evaluated_generation_candidate: true
+  exact_cleaned_length_required_for_a_retained_length_matched_sequence: true
+  early_eos_outputs_must_not_be_silently_counted_as_correctly_length_matched: true
+  all_raw_and_rejected_attempts_must_remain_recorded: true
+  silent_trimming: prohibited
+  padding: prohibited
+  silent_replacement: prohibited
+  silent_deduplication: prohibited
+  deterministic_rejection_or_resampling_direction_approved: true
+  approves_an_executable_algorithm: false
+  exact_algorithm_finalized: false
+  exact_algorithm_implemented: false
+  final_empirical_length_matching_algorithm_declared: false
+  final_rejection_or_resampling_algorithm_declared: false
+  final_production_mapping_declared: false
+  limited_b1_development_pool_authorized: false
+  b1_eligible: false
+  m4_complete: false
+  b1_d1_parity_remains_required_for_the_eventual_algorithm: true
+
 length_algorithm:
   final_empirical_length_matching_algorithm_declared: false
   final_rejection_or_resampling_algorithm_declared: false
+  direction_decision: REQUIRE_DETERMINISTIC_EXACT_LENGTH_REJECTION_RESAMPLING
+  deterministic_exact_length_rejection_resampling_direction_approved: true
+  exact_algorithm_finalized: false
+  exact_algorithm_implemented: false
   human_decision_required_after: [phase_a_evidence, phase_b_evidence]
   silent_truncation_to_force_a_length: prohibited
   phase_b_candidate_mapping:
@@ -632,7 +761,10 @@ length_algorithm:
 
 limited_development_pool:
   status: APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED
+  development_pool_authorised: false
+  sampling_authorised: false
   phase_b_candidate_mapping_unblocks_this_pool: false
+  blocked_until: "The deterministic exact-length rejection/resampling algorithm must be specified, implemented, tested, and separately approved before development-pool sampling or execution."
   identification: >
     This 1000-attempt pool is the proposed fixed diagnostic sample for B1
     and, with the same target-length list and paired generation-seed
@@ -671,5 +803,5 @@ limited_development_pool:
   note: >
     1000 is not divisible by 16. Chunks use their actual size, at most 16.
     The schedule never pads, duplicates, or drops an attempt. Execution
-    stays blocked until the length-mapping or rejection/resampling
-    algorithm is approved.
+    stays blocked until the deterministic exact-length rejection/resampling
+    algorithm is specified, implemented, tested, and separately approved.

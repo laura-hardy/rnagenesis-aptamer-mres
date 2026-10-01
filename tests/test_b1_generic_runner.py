@@ -1,17 +1,15 @@
 """Synthetic tests for the B1 Phase A runner.
 
 These tests do not load a model, initialise CUDA, query a GPU, open
-biological sequence data, execute RNAGenesis generation, or create the
-Phase A evidence directory. External operations are injected. Cleaning
-tests call the approved pure-Python audit functions on synthetic strings.
-The checked-in configuration records one consumed, complete physical
-GPU 1 Phase A authorisation and accepted Phase A evidence. Phase A
-remains closed through its own gates. Shared document and execution
-gates are open only for a separate active Phase B authorisation. The
-revoked, unconsumed GPU 0 authorisation is retained as historical
-provenance. Globally closed cases use synthetic copies. If the accepted
-evidence directory is already present, its hashes are snapshotted and
-must remain unchanged. Tests do not require that directory elsewhere.
+biological sequence data, execute RNAGenesis generation, or create an
+evidence directory. External operations are injected. Cleaning tests
+call the approved pure-Python audit functions on synthetic strings.
+The checked-in configuration records consumed, complete physical GPU 1
+Phase A and Phase B authorisations. Accepted Phase A evidence and
+accepted Phase B evidence are snapshotted and must remain unchanged.
+Shared document and execution gates are closed. Phase A remains
+non-executable. The revoked, unconsumed GPU 0 authorisation is retained
+as historical provenance. Globally closed cases use synthetic copies.
 """
 
 from __future__ import annotations
@@ -94,6 +92,20 @@ PHASE_B_EVIDENCE = Path(
     "/home/laura/rnagenesis-mres-runs/"
     "m4_b1_generic_generation_B1_generic_released_rnagenesis_688b18f88f21_phaseB"
 )
+EXPECTED_PHASE_B_SHA256 = {
+    "phase_b_manifest.json": (
+        "49cd5b773a0701606ba63f9b28c03cfb6a4aee32865e7f65a4e849481d628de7"
+    ),
+    "phase_b_manifest_sha256.json": (
+        "c81f628389e257bb1e5bb7577e3450c55348ececbb44c2a11b15a299fb0a088e"
+    ),
+    "phase_b_raw_attempts.jsonl": (
+        "bc8baf3f1dd8f9f1e21efd4a8489a0ccec9908f5ed9a6723cab60a2f68366c9b"
+    ),
+    "phase_b_audited_attempts.jsonl": (
+        "a20911c33d647fb3de1fdc0c8a32d944e33e124e37ab76dd481631cbde52259a"
+    ),
+}
 EVIDENCE_KEY_FILES = (
     "phase_a_manifest.json",
     "phase_a_manifest_sha256.json",
@@ -116,6 +128,7 @@ EXPECTED_EVIDENCE_SHA256 = {
 }
 WEIGHT_SUFFIXES = (".bin", ".safetensors")
 _ACCEPTED_EVIDENCE_SNAPSHOT = None
+_PHASE_B_EVIDENCE_SNAPSHOT = None
 
 
 def _sha256_file(path):
@@ -141,13 +154,49 @@ def _snapshot_tree(root):
     return records
 
 
+def _ledger_record_count(path):
+    with open(path, "rb") as handle:
+        return sum(1 for line in handle if line.strip())
+
+
+def assert_phase_b_evidence_identity(snapshot):
+    if snapshot is None:
+        raise AssertionError("accepted Phase B evidence directory is missing")
+    for name, digest in EXPECTED_PHASE_B_SHA256.items():
+        if name not in snapshot or snapshot[name][0] != "file":
+            raise AssertionError("accepted Phase B evidence missing {}".format(name))
+        if snapshot[name][2] != digest:
+            raise AssertionError("accepted Phase B hash changed for {}".format(name))
+    raw_files = [
+        relative
+        for relative, record in snapshot.items()
+        if relative.startswith("rnagenesis_generation_output/") and record[0] == "file"
+    ]
+    if len(raw_files) != 89:
+        raise AssertionError(
+            "accepted Phase B raw generation file count is {}".format(len(raw_files))
+        )
+    if "phase_b_failure_manifest.json" in snapshot:
+        raise AssertionError("accepted Phase B failure manifest is present")
+    for name in ("phase_b_raw_attempts.jsonl", "phase_b_audited_attempts.jsonl"):
+        count = _ledger_record_count(PHASE_B_EVIDENCE / name)
+        if count != 1424:
+            raise AssertionError("{} has {} records".format(name, count))
+
+
 def snapshot_accepted_evidence():
-    """Read-only snapshot. Absent evidence stays portable."""
-    global _ACCEPTED_EVIDENCE_SNAPSHOT
+    """Read-only snapshots of the accepted Phase A and Phase B evidence."""
+    global _ACCEPTED_EVIDENCE_SNAPSHOT, _PHASE_B_EVIDENCE_SNAPSHOT
     if REAL_EVIDENCE.exists() or REAL_EVIDENCE.is_symlink():
         _ACCEPTED_EVIDENCE_SNAPSHOT = _snapshot_tree(REAL_EVIDENCE)
     else:
         _ACCEPTED_EVIDENCE_SNAPSHOT = None
+    if PHASE_B_EVIDENCE.is_symlink() or not PHASE_B_EVIDENCE.is_dir():
+        raise AssertionError(
+            "accepted Phase B evidence directory is missing: {}".format(PHASE_B_EVIDENCE)
+        )
+    _PHASE_B_EVIDENCE_SNAPSHOT = _snapshot_tree(PHASE_B_EVIDENCE)
+    assert_phase_b_evidence_identity(_PHASE_B_EVIDENCE_SNAPSHOT)
 
 
 def assert_historical_evidence_absent(message):
@@ -155,14 +204,25 @@ def assert_historical_evidence_absent(message):
         raise AssertionError("{}: {}".format(message, HISTORICAL_EVIDENCE))
 
 
-def assert_phase_b_evidence_absent(message):
-    if PHASE_B_EVIDENCE.exists() or PHASE_B_EVIDENCE.is_symlink():
-        raise AssertionError("{}: {}".format(message, PHASE_B_EVIDENCE))
+def assert_phase_b_evidence_unchanged(message):
+    if PHASE_B_EVIDENCE.is_symlink() or not PHASE_B_EVIDENCE.is_dir():
+        raise AssertionError(
+            "{}: accepted Phase B evidence directory changed: {}".format(
+                message, PHASE_B_EVIDENCE
+            )
+        )
+    observed = _snapshot_tree(PHASE_B_EVIDENCE)
+    if observed != _PHASE_B_EVIDENCE_SNAPSHOT:
+        raise AssertionError(
+            "{}: accepted Phase B evidence bytes, paths, or file count changed".format(
+                message
+            )
+        )
 
 
 def assert_evidence_unchanged(message):
     assert_historical_evidence_absent(message)
-    assert_phase_b_evidence_absent(message)
+    assert_phase_b_evidence_unchanged(message)
     present = REAL_EVIDENCE.exists() or REAL_EVIDENCE.is_symlink()
     if _ACCEPTED_EVIDENCE_SNAPSHOT is None:
         if present:
@@ -366,10 +426,10 @@ class ClosedGateTests(unittest.TestCase):
         self.assertEqual(len(block), 18)
         with self.assertRaises(runner.B1RunnerError) as caught:
             runner.assert_document_gates(config)
-        self.assertEqual(caught.exception.code, "phase_a_not_authorised")
+        self.assertEqual(caught.exception.code, "configuration_not_consumable")
         self.assertEqual(
             caught.exception.detail,
-            "phase_a.executable_now is not true",
+            "consumable_by_executable_workflow is not true",
         )
         self.assertEqual(block["authorisation_id"], AUTHORISATION_ID)
         self.assertIs(block["authorisation_active"], False)
@@ -448,9 +508,9 @@ class ClosedGateTests(unittest.TestCase):
         self.assertIs(historical["development_pool_authorised"], False)
         self.assertNotEqual(historical, block)
         self.assertEqual(text.count("activation_status: revoked_unconsumed"), 1)
-        self.assertEqual(text.count("activation_status: consumed_complete"), 1)
-        self.assertEqual(text.count("activation_status: active_unconsumed"), 1)
-        self.assertEqual(text.count("authorisation_active: true"), 1)
+        self.assertEqual(text.count("activation_status: consumed_complete"), 2)
+        self.assertEqual(text.count("activation_status: active_unconsumed"), 0)
+        self.assertEqual(text.count("authorisation_active: true"), 0)
         phase_a_section = text.split("scientific_execution_authorisation:\n", 1)[1]
         phase_a_section = phase_a_section.split("\n\n", 1)[0]
         self.assertIn("activation_status: consumed_complete", phase_a_section)
@@ -469,11 +529,14 @@ class ClosedGateTests(unittest.TestCase):
         )[1]
         phase_b_section = phase_b_section.split("\n\n", 1)[0]
         self.assertEqual(
-            phase_b_section.count("activation_status: active_unconsumed"),
+            phase_b_section.count("activation_status: consumed_complete"),
             1,
         )
-        self.assertIn("authorisation_active: true", phase_b_section)
-        self.assertIn("\n  consumed: false\n", "\n" + phase_b_section + "\n")
+        self.assertIn("authorisation_active: false", phase_b_section)
+        self.assertNotIn("active_unconsumed", phase_b_section)
+        self.assertIn("\n  consumed: true\n", "\n" + phase_b_section + "\n")
+        self.assertNotIn('consumed: "true"', phase_b_section)
+        self.assertIn("\n  success_claimed: true\n", "\n" + phase_b_section + "\n")
         self.assertIn("\n  physical_gpu: 1\n", "\n" + phase_b_section + "\n")
         self.assertNotIn('physical_gpu: "1"', phase_b_section)
         self.assertEqual(
@@ -486,6 +549,9 @@ class ClosedGateTests(unittest.TestCase):
                 "output_directory: {}".format(PHASE_B_EVIDENCE),
                 "evidence_directory: {}".format(PHASE_B_EVIDENCE),
                 "evidence_directory: {}".format(REAL_EVIDENCE),
+                "output_directory: {}".format(PHASE_B_EVIDENCE),
+                "evidence_directory: {}".format(PHASE_B_EVIDENCE),
+                "evidence_directory: {}".format(PHASE_B_EVIDENCE),
             ],
         )
         self.assertNotEqual(REAL_EVIDENCE, HISTORICAL_EVIDENCE)
@@ -495,7 +561,8 @@ class ClosedGateTests(unittest.TestCase):
         self.assertTrue(str(HISTORICAL_EVIDENCE).endswith("_phaseA"))
         self.assertTrue(str(PHASE_B_EVIDENCE).endswith("_phaseB"))
         self.assertFalse(HISTORICAL_EVIDENCE.exists() or HISTORICAL_EVIDENCE.is_symlink())
-        self.assertFalse(PHASE_B_EVIDENCE.exists() or PHASE_B_EVIDENCE.is_symlink())
+        self.assertTrue(PHASE_B_EVIDENCE.is_dir())
+        self.assertFalse(PHASE_B_EVIDENCE.is_symlink())
         refused = opened_config()
         refused["scientific_execution_authorisation"] = copy.deepcopy(historical)
         with self.assertRaises(runner.B1RunnerError) as caught:
@@ -508,14 +575,15 @@ class ClosedGateTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "scientific_authorisation_inactive")
         phase_b_block = config["phase_b_scientific_execution_authorisation"]
         self.assertEqual(phase_b_block["authorisation_id"], PHASE_B_AUTHORISATION_ID)
-        self.assertIs(phase_b_block["authorisation_active"], True)
-        self.assertEqual(
+        self.assertIs(phase_b_block["authorisation_active"], False)
+        self.assertEqual(phase_b_block["activation_status"], "consumed_complete")
+        self.assertNotEqual(
             phase_b_block["activation_status"],
             runner.ACTIVE_UNCONSUMED_STATUS,
         )
-        self.assertIs(phase_b_block["consumed"], False)
+        self.assertIs(phase_b_block["consumed"], True)
         self.assertIs(type(phase_b_block["consumed"]), bool)
-        self.assertNotEqual(phase_b_block["consumed"], "false")
+        self.assertNotEqual(phase_b_block["consumed"], "true")
         self.assertIs(phase_b_block["authorises_b1_phase_b"], True)
         self.assertNotIn("authorises_b1_phase_a", phase_b_block)
         self.assertIs(type(phase_b_block["physical_gpu"]), int)
@@ -534,7 +602,7 @@ class ClosedGateTests(unittest.TestCase):
             phase_b_block["evidence_directory"],
             historical["evidence_directory"],
         )
-        self.assertIs(phase_b_block["success_claimed"], False)
+        self.assertIs(phase_b_block["success_claimed"], True)
         borrowed = opened_config()
         borrowed["scientific_execution_authorisation"] = copy.deepcopy(phase_b_block)
         with self.assertRaises(runner.B1RunnerError) as caught:
@@ -542,15 +610,22 @@ class ClosedGateTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "scientific_authorisation_incomplete")
         self.assertIn("authorises_b1_phase_a", caught.exception.detail)
         forced = copy.deepcopy(config)
+        forced["consumable_by_executable_workflow"] = True
+        forced["document_status"] = runner.EXECUTABLE_DOCUMENT_STATUS
+        forced["execution"]["authorised"] = True
+        forced["execution"]["gpu_authorised_by_this_approval"] = True
         forced["phase_a"]["executable_now"] = True
         forced["phase_a"]["status"] = runner.PHASE_A_EXECUTION_STATUS
         with self.assertRaises(runner.B1RunnerError) as caught:
             runner.assert_document_gates(forced)
         self.assertEqual(caught.exception.code, "scientific_authorisation_inactive")
         self.assertEqual(caught.exception.detail, "authorisation_active is not true")
-        self.assertIs(config["consumable_by_executable_workflow"], True)
-        self.assertEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
-        self.assertNotIn(config["document_status"], runner.NON_EXECUTABLE_DOCUMENT_STATUSES)
+        self.assertIs(config["consumable_by_executable_workflow"], False)
+        self.assertEqual(
+            config["document_status"],
+            "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+        )
+        self.assertIn(config["document_status"], runner.NON_EXECUTABLE_DOCUMENT_STATUSES)
         self.assertIs(config["phase_a"]["executable_now"], False)
         self.assertIs(type(config["phase_a"]["executable_now"]), bool)
         self.assertEqual(config["phase_a"]["status"], "COMPLETE_EVIDENCE_ACCEPTED")
@@ -559,14 +634,18 @@ class ClosedGateTests(unittest.TestCase):
             config["phase_a"]["blocked_until"],
             "complete_accepted_evidence_not_reexecutable",
         )
-        self.assertIs(config["execution"]["authorised"], True)
-        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], True)
-        self.assertIs(config["phase_b"]["executable_now"], True)
-        self.assertEqual(config["phase_b"]["status"], "AUTHORISED_FOR_EXECUTION")
+        self.assertIs(config["execution"]["authorised"], False)
+        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], False)
+        self.assertIs(config["phase_b"]["executable_now"], False)
+        self.assertIs(type(config["phase_b"]["executable_now"]), bool)
+        self.assertEqual(config["phase_b"]["status"], "COMPLETE_EVIDENCE_ACCEPTED")
         self.assertIs(config["phase_b"]["human_approved_candidate_mapping_required"], False)
         self.assertEqual(
             config["phase_b"]["blocked_until"],
-            "separate_explicit_phase_b_authorisation",
+            (
+                "The deterministic exact-length rejection/resampling algorithm "
+                "must be approved before development-pool execution."
+            ),
         )
         self.assertIs(config["execution"]["gpu_authorised_by_this_draft"], False)
         shared = config["shared_generation_settings"]
@@ -786,11 +865,40 @@ class ClosedGateTests(unittest.TestCase):
             "APPROVED_DESIGN_BLOCKED_UNTIL_LENGTH_ALGORITHM_APPROVED",
         )
         self.assertIs(pool["phase_b_candidate_mapping_unblocks_this_pool"], False)
+        self.assertIs(pool["development_pool_authorised"], False)
+        self.assertIs(pool["sampling_authorised"], False)
+        self.assertEqual(pool["raw_target_lengths"], 1000)
         self.assertIs(
             pool[
                 "execution_blocked_until_length_mapping_or_rejection_resampling_algorithm_approved"
             ],
             True,
+        )
+        self.assertIn(
+            "specified, implemented, tested, and separately approved",
+            pool["blocked_until"],
+        )
+        decision = config["phase_b_human_scientific_decision"]
+        self.assertEqual(decision["approving_person"], "Laura Hardy")
+        self.assertEqual(decision["approval_date"], "1 October 2026")
+        self.assertIs(decision["phase_b_evidence_accepted"], True)
+        self.assertEqual(
+            decision["selected_decision"],
+            "REQUIRE_DETERMINISTIC_EXACT_LENGTH_REJECTION_RESAMPLING",
+        )
+        self.assertIs(decision["approves_an_executable_algorithm"], False)
+        self.assertIs(decision["exact_algorithm_finalized"], False)
+        self.assertIs(decision["exact_algorithm_implemented"], False)
+        self.assertIs(decision["limited_b1_development_pool_authorized"], False)
+        self.assertIs(decision["b1_eligible"], False)
+        self.assertIs(decision["m4_complete"], False)
+        self.assertIs(
+            config["length_algorithm"]["exact_algorithm_finalized"],
+            False,
+        )
+        self.assertIs(
+            config["length_algorithm"]["exact_algorithm_implemented"],
+            False,
         )
 
     def _assert_checked_in_configuration_refuses_before_side_effects(self):
@@ -814,9 +922,9 @@ class ClosedGateTests(unittest.TestCase):
                     code,
                     stderr,
                     recorder,
-                    "phase_a_not_authorised",
+                    "configuration_not_consumable",
                 )
-                self.assertIn("phase_a.executable_now is not true", stderr)
+                self.assertIn("consumable_by_executable_workflow is not true", stderr)
                 self.assertNotIn("nvidia-smi", stderr)
                 self.assertNotIn("cuda_visible_devices", stderr)
                 self.assertNotIn("cuda_device_order", stderr)
@@ -1234,15 +1342,16 @@ class CudaAndOutputTests(unittest.TestCase):
         for environ in environments:
             recorder = RecordingDeps(real_config_bytes(), environ)
             code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
-            assert_closed(self, code, stderr, recorder, "phase_a_not_authorised")
-            self.assertIn("phase_a.executable_now is not true", stderr)
+            assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
+            self.assertIn("consumable_by_executable_workflow is not true", stderr)
             self.assertNotIn("nvidia-smi", stderr)
             self.assertNotIn("cuda_visible_devices", stderr)
             self.assertNotIn("cuda_device_order", stderr)
             for name in FORBIDDEN_RUNTIME_MODULES:
                 self.assertNotIn(name, sys.modules)
         assert_evidence_unchanged("real Phase A evidence path was created")
-        self.assertFalse(PHASE_B_EVIDENCE.exists() or PHASE_B_EVIDENCE.is_symlink())
+        self.assertTrue(PHASE_B_EVIDENCE.is_dir())
+        self.assertFalse(PHASE_B_EVIDENCE.is_symlink())
 
     def test_real_evidence_aliases_refuse_before_lstat(self):
         expected = str(REAL_EVIDENCE)
@@ -1264,14 +1373,15 @@ class CudaAndOutputTests(unittest.TestCase):
         for output_dir in supplied:
             recorder = RecordingDeps(real_config_bytes(), open_environ())
             code, stderr = run_main(recorder.build(), output_dir)
-            assert_closed(self, code, stderr, recorder, "phase_a_not_authorised")
-            self.assertIn("phase_a.executable_now is not true", stderr)
+            assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
+            self.assertIn("consumable_by_executable_workflow is not true", stderr)
             self.assertNotIn("nvidia-smi", stderr)
             for name in FORBIDDEN_RUNTIME_MODULES:
                 self.assertNotIn(name, sys.modules)
         assert_evidence_unchanged("real Phase A evidence path was created")
         self.assertFalse(HISTORICAL_EVIDENCE.exists() or HISTORICAL_EVIDENCE.is_symlink())
-        self.assertFalse(PHASE_B_EVIDENCE.exists() or PHASE_B_EVIDENCE.is_symlink())
+        self.assertTrue(PHASE_B_EVIDENCE.is_dir())
+        self.assertFalse(PHASE_B_EVIDENCE.is_symlink())
 
     def test_output_mismatch_relative_and_alias_refuse_before_lstat(self):
         expected = runner.evidence_directory_for_commit(COMMIT)
