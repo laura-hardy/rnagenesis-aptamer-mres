@@ -33,6 +33,10 @@ The approved Stage 1 design fixes the development metric, the checkpoint-selecti
 
 On 1 October 2026 Laura Hardy superseded the discussed Approach A fixed-full-table R=32 design before implementation, plan materialization, biological-data access, authorization, or execution. No Approach A schedule, runner, evidence, output, or GPU run exists. The active M4 design is the restored Stage 1 diagnostic contract. Phase A and Phase B evidence remains accepted and unchanged. The selected cap remains `max_seq_len = requested_biological_length + 1`. Early EOS and length mismatch remain observed generator behaviours. They do not trigger rejection, replacement, resampling, or diagnostic-run failure. The design does not declare an exact-length accepted pool or a final M8 production protocol. M4 is not complete.
 
+The same day, the CPU development-pool schedule at `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1` and the CPU VALIDATION draw artifacts at `/home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1` were accepted. The schedule hash is `0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0`. The length-vector hash is `7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c`. The schedule keeps all 1,000 raw attempts, 112 invocations, NumPy 1.22.0, sampling seed 43000, and invocation seeds `44000 + invocation_index`. It does not reject, replace, resample, pad, trim, drop, or deduplicate. The VALIDATION role has 95 sequences, 4 draws, and seed 1. Clustering and frozen-representation metrics stay deferred. B0, B2, Phase A, and Phase B evidence is unchanged. B1 success, checkpoint eligibility, M4 completion, M5, D1 training, REF access, and EVAL access remain unclaimed.
+
+`config/experiments/B1_generic_generation.yaml` records those accepted CPU artifacts and keeps document and execution gates closed. The intended physical GPU 1 binding (`GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, `CUDA_VISIBLE_DEVICES=1`, `CUDA_DEVICE_ORDER=PCI_BUS_ID`, logical `cuda:0`) is a non-executable proposal, `m4_b1_development_pool_d2b2041520d1_gpu1_attempt1`. It does not satisfy the runner's executable authorisation schema and it does not store `authorization_commit`. RNAGenesis remains `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c`. The CPU artifacts were materialised at `d2b2041520d176ebd10a1553cf1fec65ad447ac5`. The evidence directory `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1` is not created by this record. A later authorization-only commit must set `authorization_parent_commit` and `executing_implementation_commit` to the implementation commit and must not modify the runner. The runner computes `authorization_commit` from live HEAD. This protocol document is not that execution grant.
+
 This approval does not:
 
 - declare an exact-length accepted pool or a final M8 production protocol;
@@ -58,7 +62,7 @@ B0 must not be treated as the primary causal baseline. Length-sensitive B0 compa
 
 ## 3. Fixed-draw validation
 
-**Status: `APPROVED_STAGE_1_DESIGN`.** Four fixed VALIDATION draws, seed 1, and deterministic FP32 validation are approved Stage 1 design. Draw tensors are not created in this stage.
+**Status: `ACCEPTED_CPU_ARTIFACT`.** Four fixed VALIDATION draws, seed 1, and deterministic FP32 validation are the accepted CPU artifacts. This protocol document does not create another tensor.
 
 | Item | Proposed value |
 | --- | --- |
@@ -66,8 +70,8 @@ B0 must not be treated as the primary causal baseline. Length-sensitive B0 compa
 | Ordering | frozen first-occurrence order |
 | VALIDATION CSV SHA-256 | `cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd` |
 | Ordered-core artifact | future no-sequence artifact; fields are role, zero-based frozen index, SHA-256 of the sequence core, and biological length |
-| `validation_sequence_order_sha256` | null, `PENDING_ARTIFACT_NOT_CREATED` |
-| `validation_order_artifact_sha256` | null, `PENDING_ARTIFACT_NOT_CREATED` |
+| `validation_sequence_order_sha256` | `eb18fd48e305e86f8000bdc82e9175437d478bd624ea57aef8094497534bda3a`, accepted CPU artifact |
+| `validation_order_artifact_sha256` | `df445b617adf5165f3361412bb5c7bc5d2a05b31a98eb6d2f6d17f4b329de248`, accepted CPU artifact |
 | Seed | 1 |
 | Stochastic draws per sequence | 4 |
 | Sequence/draw pairs | 380 |
@@ -98,7 +102,7 @@ The artifact serialization is approved Stage 1 design and is not created in Stag
 - a final LF is required;
 - `validation_order_artifact_sha256` is the SHA-256 of those exact serialized bytes.
 
-Two ordering hashes are required, and both remain explicit nulls with status `PENDING_ARTIFACT_NOT_CREATED`:
+Two ordering hashes are required. Both now name the accepted CPU artifacts, and neither may be replaced by the VALIDATION CSV hash:
 
 1. `validation_sequence_order_sha256` is the SHA-256 of the concatenation of each of the 95 ASCII sequence cores followed by exactly one LF byte, in frozen first-occurrence order.
 2. `validation_order_artifact_sha256` is the SHA-256 of the serialized no-sequence order artifact.
@@ -111,7 +115,7 @@ Fixed-draw validation requires the complete frozen `EncDec` in evaluation mode a
 
 Each pair loss is the mean squared error across all `[32, 160]` latent elements for one sequence/draw pair. The reported metric is the sum of the 380 pair losses divided by exactly 380. An implementation must not average batch means with equal batch weight when batch sizes differ. With four draws on every sequence, the reported metric equals the unweighted mean of the 95 per-sequence means. No weighted composite score is defined.
 
-Draw tensors and metadata are independently hashed. Draws are materialised once, hashed, and loaded. A training run must refuse to resample them. No tensors are created in this stage.
+Draw tensors and metadata are independently hashed. The accepted CPU artifacts were materialised once. A training run must load those bytes and refuse to resample them. This protocol document does not create another tensor.
 
 ### Why four draws are proposed
 
@@ -127,7 +131,7 @@ Failure of any approved hard threshold makes a checkpoint ineligible even if its
 
 ## 5. Generated-sample guardrails
 
-**Non-length guardrails are `APPROVED_STAGE_1_DESIGN`.** Requested-length exact-hit rates are required diagnostic reports. The historical provisional values 0.90 and 0.50 are not execution-success requirements, and a low exact-hit rate does not invalidate or rerun the B1 diagnostic pool. The 1,000-attempt paired schedule is the restored Stage 1 diagnostic contract. It is approved for implementation and is not executable from the checked-in configuration.
+**Non-length guardrails are `APPROVED_STAGE_1_DESIGN`.** Requested-length exact-hit rates are required diagnostic reports. The historical provisional values 0.90 and 0.50 are not execution-success requirements, and a low exact-hit rate does not invalidate or rerun the B1 diagnostic pool. The 1,000-attempt paired schedule is the restored Stage 1 diagnostic contract. The accepted CPU schedule is immutable. The checked-in stage-1 configuration does not execute it.
 
 The proposed diagnostic sample is 1,000 raw attempts per evaluated neural checkpoint or condition. Target lengths are sampled with seed 43000. Generation invocations use a separate proposed seed base of 44000. The deterministic execution plan is:
 
@@ -142,7 +146,7 @@ The proposed diagnostic sample is 1,000 raw attempts per evaluated neural checkp
 9. map every generated record back to its original target-length attempt index;
 10. reuse the identical target list, grouping rule, chunk membership, and invocation seeds for paired B1/D1 comparisons where technically applicable.
 
-The manifest must contain the complete invocation table before generation begins. The checked-in configuration does not authorise that execution. A later active authorisation must bind the physical GPU, its UUID and PCI bus, the authorization commit, the implementation commit, the exact output directory, and the immutable schedule hash. The runner must not hardcode physical GPU 0 or physical GPU 1.
+The manifest must contain the complete invocation table before generation begins. That table is the accepted schedule `0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0`. The checked-in configuration does not authorise execution. A later authorization-only commit binds one physical GPU, its UUID and PCI bus, `authorization_parent_commit`, `executing_implementation_commit`, the exact output directory, and that schedule hash. It does not store `authorization_commit`; the runner computes that value from live HEAD. The runner does not hardcode physical GPU 0 or physical GPU 1. Execution stays refused while the stage-1 gates are closed, and a future run stays refused unless live HEAD is that authorization commit.
 
 B2 is different. Its required raw set is 30,000 attempts. Guardrail rates for B2 use that full raw set. A 1,000-attempt slice is not a substitute. The existing B0 pool remains 30,080 attempts and is not re-gated as if it had been length-matched.
 
@@ -238,8 +242,9 @@ An executable workflow must refuse this approved-for-implementation package. In 
 - regenerate B0 by default;
 - overwrite or append to an existing evidence directory;
 - rerun the completed accepted B2 evidence;
-- run Phase A, Phase B, or the 1,000-attempt pool;
-- create the fixed validation-draw tensors or the ordered-core provenance artifact as a scientific artifact of this stage;
+- rerun Phase A or Phase B;
+- execute the 1,000-attempt pool from the checked-in stage-1 configuration, or from any HEAD that is not a single-parent authorization commit whose parent is the pinned implementation commit;
+- resample, replace, or rewrite the accepted fixed validation-draw tensors or the ordered-core artifact;
 - start the D1 pilot.
 
 ## 10. Blockers remaining before final M4 closure
@@ -247,8 +252,8 @@ An executable workflow must refuse this approved-for-implementation package. In 
 This implementation does not mark M4 complete. Final completion still requires:
 
 - accepted implementation;
-- a materialised and verified 1,000-attempt schedule;
-- the fixed validation artifacts;
+- the materialised and accepted 1,000-attempt schedule;
+- the accepted fixed validation artifacts;
 - completed and accepted B1 diagnostic evidence;
 - frozen code and configuration hashes;
 - the final human closure decision.

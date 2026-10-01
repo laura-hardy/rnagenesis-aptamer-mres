@@ -3,11 +3,15 @@
 
 The checked-in B1 configuration is closed. A closed document is refused
 before an output path is accepted, a length vector is opened, a GPU is
-queried, a weight is hashed, or generation starts. An authorised run
-measures provenance from live files, loads the approved cleaner from
-hash-verified source, and executes generation.py in an isolated child
-environment. The child sees logical cuda:0. The physical index, UUID, and
-PCI bus come only from the authorisation.
+queried, a weight is hashed, or generation starts. A later authorization
+commit must have exactly one parent, and that parent must be the accepted
+implementation commit. The authorization block stores
+authorization_parent_commit and executing_implementation_commit. It does
+not store its own hash. The runner computes authorization_commit from live
+HEAD. An authorised run measures provenance from live files, loads the
+approved cleaner from hash-verified source, and executes generation.py in
+an isolated child environment. The child sees logical cuda:0. The physical
+index, UUID, and PCI bus come only from the authorisation.
 """
 
 from __future__ import annotations
@@ -28,7 +32,8 @@ MRES_ROOT = Path("/home/laura/rnagenesis-aptamer-mres")
 RNAGENESIS_ROOT = Path("/home/laura/RNAGenesis")
 RUNNER_RELATIVE = "scripts/b1_development_pool_runner.py"
 RUNNER_PATH = MRES_ROOT / RUNNER_RELATIVE
-B1_CONFIG_PATH = MRES_ROOT / "config/experiments/B1_generic_generation.yaml"
+CONFIG_RELATIVE = "config/experiments/B1_generic_generation.yaml"
+B1_CONFIG_PATH = MRES_ROOT / CONFIG_RELATIVE
 METRICS_PATH = MRES_ROOT / "scripts/modelling/m4_diagnostic_metrics.py"
 METRICS_CONFIG_PATH = MRES_ROOT / "config/modelling/validation_metrics_v1.yaml"
 PINNED_PYTHON = "/home/laura/miniconda3/envs/rnagenesis-h200/bin/python"
@@ -92,6 +97,8 @@ SUCCESS_MANIFEST_NAME = "development_pool_manifest.json"
 FAILURE_MANIFEST_NAME = "development_pool_failure_manifest.json"
 HASH_REPORT_NAME = "development_pool_manifest_sha256.json"
 
+# authorization_commit is computed from live HEAD at runtime. It is not a
+# schema field: the authorization commit cannot contain its own hash.
 AUTHORISATION_KEYS = (
     "authorisation_id",
     "authorisation_active",
@@ -102,7 +109,7 @@ AUTHORISATION_KEYS = (
     "physical_gpu",
     "gpu_uuid",
     "pci_bus",
-    "authorization_commit",
+    "authorization_parent_commit",
     "executing_implementation_commit",
     "mres_branch",
     "condition",
@@ -392,7 +399,7 @@ def assert_development_pool_authorisation(config, physical_gpu, output_directory
         raise DevelopmentPoolError("gpu_binding_mismatch", "authorisation GPU UUID is missing")
     if not isinstance(block["pci_bus"], str) or block["pci_bus"].strip() == "":
         raise DevelopmentPoolError("gpu_binding_mismatch", "authorisation PCI bus is missing")
-    if not _is_sha40(block["authorization_commit"]) or not _is_sha40(block["executing_implementation_commit"]):
+    if not _is_sha40(block["authorization_parent_commit"]) or not _is_sha40(block["executing_implementation_commit"]):
         raise DevelopmentPoolError("authorisation_commit_invalid", "authorisation commits must be lowercase SHA-1")
     if block["mres_branch"] != "main" or block["condition"] != CONDITION_LABEL or block["phase"] != "development_pool":
         raise DevelopmentPoolError("authorisation_scope_invalid", "authorisation scope is not the B1 development pool")
@@ -976,11 +983,15 @@ def build_generation_command(invocation, evidence_dir, parent, physical_gpu, rea
     }
 
 
-def _git_line(git, repo, args):
+def _git_text(git, repo, args):
     text = git(repo, args)
     if not isinstance(text, str):
         raise DevelopmentPoolError("git_status_unreadable", "git output is not text")
-    return text.strip()
+    return text
+
+
+def _git_line(git, repo, args):
+    return _git_text(git, repo, args).strip()
 
 
 def _porcelain_lines(porcelain):
@@ -1043,20 +1054,53 @@ def measure_provenance(authorisation, deps):
     mres_head = _git_line(deps.git, MRES_ROOT, ["rev-parse", "HEAD"])
     mres_branch = _git_line(deps.git, MRES_ROOT, ["rev-parse", "--abbrev-ref", "HEAD"])
     mres_porcelain = deps.git(MRES_ROOT, ["status", "--porcelain=v1"])
+    origin_main = _git_line(deps.git, MRES_ROOT, ["rev-parse", "origin/main"])
+    if not _is_sha40(mres_head) or not _is_sha40(origin_main):
+        raise DevelopmentPoolError("provenance_mismatch", "MRes HEAD is not a lowercase SHA-1")
     if mres_branch != authorisation["mres_branch"] or mres_branch != "main":
         raise DevelopmentPoolError("provenance_mismatch", "MRes branch is not the authorised branch")
-    if mres_head != authorisation["authorization_commit"]:
-        raise DevelopmentPoolError("provenance_mismatch", "authorization commit is not the live HEAD")
     if _porcelain_lines(mres_porcelain):
-        raise DevelopmentPoolError("provenance_mismatch", "MRes worktree is not clean")
+        raise DevelopmentPoolError("provenance_mismatch", "MRes worktree or index is not clean")
+    if mres_head != origin_main:
+        raise DevelopmentPoolError("provenance_mismatch", "local HEAD is not origin/main")
+    parents = [
+        line.strip()
+        for line in _git_text(deps.git, MRES_ROOT, ["rev-parse", "HEAD^@"]).splitlines()
+        if line.strip() != ""
+    ]
+    if len(parents) > 1:
+        raise DevelopmentPoolError("provenance_mismatch", "merge commits are refused")
+    if len(parents) != 1 or not _is_sha40(parents[0]):
+        raise DevelopmentPoolError("provenance_mismatch", "live HEAD does not have exactly one parent")
+    parent = parents[0]
+    if parent != authorisation["authorization_parent_commit"]:
+        raise DevelopmentPoolError(
+            "provenance_mismatch",
+            "authorization parent is not the parent of live HEAD",
+        )
     implementation = authorisation["executing_implementation_commit"]
-    merge_base = _git_line(deps.git, MRES_ROOT, ["merge-base", implementation, "HEAD"])
-    if merge_base != implementation:
-        raise DevelopmentPoolError("provenance_mismatch", "executing implementation commit is not an ancestor of HEAD")
-    implementation_blob = _git_line(deps.git, MRES_ROOT, ["rev-parse", "{}:{}".format(implementation, RUNNER_RELATIVE)])
+    if implementation != parent:
+        raise DevelopmentPoolError(
+            "provenance_mismatch",
+            "executing_implementation_commit is not the accepted parent",
+        )
+    implementation_blob = _git_line(
+        deps.git,
+        MRES_ROOT,
+        ["rev-parse", "{}:{}".format(implementation, RUNNER_RELATIVE)],
+    )
     worktree_blob = _git_line(deps.git, MRES_ROOT, ["hash-object", "--", str(RUNNER_PATH)])
-    if implementation_blob == "" or implementation_blob != worktree_blob:
+    if not _is_sha40(implementation_blob) or implementation_blob != worktree_blob:
         raise DevelopmentPoolError("provenance_mismatch", "runner bytes do not match the implementation commit")
+    shown = _git_text(deps.git, MRES_ROOT, ["show", "HEAD:" + CONFIG_RELATIVE])
+    if shown.encode("utf-8") != bytes(config_bytes):
+        raise DevelopmentPoolError("provenance_mismatch", "active authorisation is not the live HEAD blob")
+    head_config = load_config_bytes(shown.encode("utf-8"))
+    head_block = head_config.get(AUTHORISATION_NAME)
+    if not isinstance(head_block, dict) or set(head_block) != set(AUTHORISATION_KEYS):
+        raise DevelopmentPoolError("provenance_mismatch", "active authorisation is not the live HEAD blob")
+    if any(head_block[key] != authorisation[key] for key in AUTHORISATION_KEYS):
+        raise DevelopmentPoolError("provenance_mismatch", "active authorisation is not the live HEAD blob")
     rna_head = _git_line(deps.git, RNAGENESIS_ROOT, ["rev-parse", "HEAD"])
     rna_branch = _git_line(deps.git, RNAGENESIS_ROOT, ["rev-parse", "--abbrev-ref", "HEAD"])
     rna_porcelain = deps.git(RNAGENESIS_ROOT, ["status", "--porcelain=v1"])
@@ -1107,7 +1151,9 @@ def measure_provenance(authorisation, deps):
             "branch": mres_branch,
             "head": mres_head,
             "clean": True,
+            "origin_main": origin_main,
             "authorization_commit": mres_head,
+            "authorization_parent_commit": parent,
             "executing_implementation_commit": implementation,
         },
         "rnagenesis": {

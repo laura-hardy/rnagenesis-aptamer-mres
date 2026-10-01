@@ -58,10 +58,12 @@ data:
   train_core_count: 669
   validation_csv_sha256: cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd
   validation_csv_sha256_does_not_substitute_for_ordering_hashes: true
-  validation_sequence_order_sha256: null
-  validation_sequence_order_sha256_status: PENDING_ARTIFACT_NOT_CREATED
-  validation_order_artifact_sha256: null
-  validation_order_artifact_sha256_status: PENDING_ARTIFACT_NOT_CREATED
+  validation_sequence_order_sha256: eb18fd48e305e86f8000bdc82e9175437d478bd624ea57aef8094497534bda3a
+  validation_sequence_order_sha256_status: ACCEPTED_CPU_ARTIFACT
+  validation_order_artifact_sha256: df445b617adf5165f3361412bb5c7bc5d2a05b31a98eb6d2f6d17f4b329de248
+  validation_order_artifact_sha256_status: ACCEPTED_CPU_ARTIFACT
+  accepted_validation_draw_directory: /home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1
+  d1_training_authorised_by_these_hashes: false
   validation_core_count: 95
 
 optimiser:

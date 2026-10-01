@@ -11316,3 +11316,17 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Stage:** Aim 2 / data curation / documentation only
 
 **What was done:** The governing curation plan now states that E1 remains an experimentally verified aptamer–target complex structure, and that mmCIF URLs and AptamerBase structure flags are retained structural signals. In the corrected v1.6 corpus those signals were not assigned E1, because the applied CHECKPOINT-2 rule did not verify an aptamer–target complex for the curated relationship. The corrected final corpus contains no E1 rows. No data files, frozen corpus, or curation stages were changed.
+
+## 2026-10-01 — Accept M4 CPU artifacts and close the B1 development-pool gate
+
+**Stage:** Aim 2 / modelling / M4 B1 diagnostic pool
+
+**Status:** CPU schedule and VALIDATION draw artifacts accepted. Execution remains closed. No active or consumable development-pool authorisation is stored. The self-referential authorization-commit field is not used.
+
+**Accepted schedule:** `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1`. Schedule SHA-256 `0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0`. Length vector SHA-256 `7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c`. 1,000 raw attempts, 112 invocations, NumPy 1.22.0, sampling seed 43000, invocation seeds `44000 + invocation_index`, maximum chunk 16, cap `target_length + 1`. No rejection, replacement, resampling, padding, trimming, dropping, or deduplication.
+
+**Accepted VALIDATION draws:** `/home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1`. Role VALIDATION, 95 sequences, 4 draws, seed 1. Manifest SHA-256 `b4e8d6d7cf7298d201062986419797e7fc322f2e88066764d4332a432a0d0d49`.
+
+**Non-executable GPU proposal:** `m4_b1_development_pool_d2b2041520d1_gpu1_attempt1` records the intended physical GPU 1 binding, UUID `GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, `CUDA_VISIBLE_DEVICES=1`, `CUDA_DEVICE_ORDER=PCI_BUS_ID`, logical `cuda:0`. It does not satisfy the executable authorisation schema. `authorization_parent_commit` and `executing_implementation_commit` stay unset until a later authorization-only commit. That later commit must not modify the runner. The runner will compute `authorization_commit` from live HEAD. RNAGenesis remains `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c`. The CPU artifacts were materialised at `d2b2041520d176ebd10a1553cf1fec65ad447ac5`. Evidence directory not created.
+
+**Boundary:** B0, B2, Phase A, and Phase B evidence unchanged. Clustering and frozen-representation metrics remain deferred. B1 success, checkpoint eligibility, M4 completion, M5, D1 training, REF, and EVAL remain unclaimed. Nothing was staged, committed, pushed, authorised, or executed.

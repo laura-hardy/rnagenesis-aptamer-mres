@@ -10,8 +10,15 @@
 # Early EOS and length mismatch remain observed generator behaviours.
 # They do not trigger rejection, replacement, resampling, or run failure.
 # This design does not declare an exact-length accepted pool or a final
-# M8 production protocol. The development-pool authorisation below is an
-# inactive unconsumed template. It does not select a physical GPU.
+# M8 production protocol. The accepted CPU schedule and VALIDATION draw
+# artifacts are recorded below. The GPU 1 development-pool record is a
+# non-executable proposal. It does not satisfy the runner's executable
+# authorisation schema and it does not store authorization_commit.
+# A later authorization-only commit must set authorization_parent_commit
+# and executing_implementation_commit to the implementation commit that
+# contains this corrected runner. The runner computes authorization_commit
+# from live HEAD. B1 success, checkpoint eligibility, M4 completion, M5,
+# D1 training, REF, and EVAL remain unclaimed.
 
 document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
 consumable_by_executable_workflow: false
@@ -845,7 +852,7 @@ limited_development_pool:
   executable_now: false
   separate_active_authorisation_required: true
   phase_b_candidate_mapping_unblocks_this_pool: false
-  blocked_until: "The checked-in configuration is not executable. A later active authorisation must bind the physical GPU, GPU UUID, PCI bus, authorization commit, implementation commit, exact output directory, and immutable schedule hash."
+  blocked_until: "The checked-in configuration is not executable. A later authorization-only commit must set authorization_parent_commit and executing_implementation_commit to the implementation commit. The runner computes authorization_commit from live HEAD. This record does not claim B1 success, checkpoint eligibility, or M4 completion."
   identification: >
     This 1000-attempt pool is the proposed fixed diagnostic sample for B1
     and, with the same target-length list and paired generation-seed
@@ -889,30 +896,162 @@ limited_development_pool:
     1000 is not divisible by 16. Chunks use their actual size, at most 16.
     The schedule never pads, duplicates, replaces, rejects, resamples, or
     drops an attempt. Early EOS and length mismatch are diagnostic outcomes.
-    They do not fail the diagnostic run. This record does not authorise
-    execution and does not select a physical GPU.
+    They do not fail the diagnostic run. The proposal below records the
+    intended physical GPU. It does not authorise execution and it does not
+    resample the accepted schedule.
+development_pool_schedule_acceptance:
+  status: ACCEPTED
+  accepted_by: Laura Hardy
+  acceptance_date: 1 October 2026
+  acceptance_source: formal human acceptance in the M4 review chat
+  role: immutable_b1_diagnostic_schedule
+  implementation_commit: d2b2041520d176ebd10a1553cf1fec65ad447ac5
+  directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1
+  numpy_version: "1.22.0"
+  attempt_count: 1000
+  invocation_count: 112
+  sampling_seed: 43000
+  invocation_seed_rule: "44000 + invocation_index"
+  maximum_chunk_size: 16
+  cap_rule: "target_length + 1"
+  rejection: false
+  replacement: false
+  resampling: false
+  padding: false
+  trimming: false
+  dropping: false
+  deduplication: false
+  b1_generation_executed: false
+  cuda_initialized: false
+  gpu_queried: false
+  m4_complete: false
+  b1_eligible: false
+  clustering_deferred: true
+  frozen_representation_metrics_deferred: true
+  train_source:
+    path: /home/laura/rnagenesis-mres-data/development/corpus_final.txt
+    byte_count: 37700
+    count: 669
+    sha256: d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d
+  artifacts:
+    ordered_train_length_vector_json:
+      path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/ordered_train_length_vector.json
+      byte_count: 2022
+      sha256: 7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c
+    development_pool_schedule_json:
+      path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/development_pool_schedule.json
+      byte_count: 30125
+      sha256: 0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0
+    development_pool_schedule_sha256_json:
+      path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/development_pool_schedule_sha256.json
+      byte_count: 140
+      sha256: 7ad13cf5155c55c5cb6ba24f91159c45cc3c3ffa51cd407a92a267e2e51407df
+    schedule_materialization_driver_py:
+      path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/schedule_materialization_driver.py
+      byte_count: 22001
+      sha256: e35b49c001574fb9b1f868843072d6f7e5d026161b292cd6ee0c986180bc6f2b
+    schedule_materialization_driver_sha256_json:
+      path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/schedule_materialization_driver_sha256.json
+      byte_count: 353
+      sha256: c2255b41c7c5b52236e59b35a33ee766cbee6a0bd90d663e7814680112d5cc98
+    schedule_materialization_manifest_json:
+      path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/schedule_materialization_manifest.json
+      byte_count: 1846
+      sha256: e310b51273a38c0eab8e0466b410f6f4385b13a77d5c2d93fc5733abb3fa866b
+    schedule_materialization_manifest_sha256_json:
+      path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/schedule_materialization_manifest_sha256.json
+      byte_count: 181
+      sha256: 68c7de362d3a9c4cd5d377c2279569928d1ccc1671a55ab4fb706274dce8653a
+validation_draw_artifact_acceptance:
+  status: ACCEPTED
+  accepted_by: Laura Hardy
+  acceptance_date: 1 October 2026
+  acceptance_source: formal human acceptance in the M4 review chat
+  role: VALIDATION
+  implementation_commit: d2b2041520d176ebd10a1553cf1fec65ad447ac5
+  directory: /home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1
+  sequence_count: 95
+  draws_per_sequence: 4
+  seed: 1
+  cuda_used: false
+  resampled_on_load: false
+  ref_accessed: false
+  eval_accessed: false
+  m4_complete: false
+  b1_eligible: false
+  d1_training_authorised: false
+  m5_authorised: false
+  clustering_deferred: true
+  frozen_representation_metrics_deferred: true
+  validation_sequence_order_sha256: eb18fd48e305e86f8000bdc82e9175437d478bd624ea57aef8094497534bda3a
+  artifacts:
+    validation_draw_manifest_json:
+      path: /home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1/validation_draw_manifest.json
+      byte_count: 2520
+      sha256: b4e8d6d7cf7298d201062986419797e7fc322f2e88066764d4332a432a0d0d49
+    validation_draw_manifest_sha256_json:
+      path: /home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1/validation_draw_manifest_sha256.json
+      byte_count: 436
+      sha256: bc6c7587e4a22892d84d1e901939bf988304957da778d49afb00cdea552ea075
+    validation_timesteps_int64:
+      path: /home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1/validation_timesteps.int64
+      byte_count: 3040
+      sha256: 9009b50b26ec126978236e6c86ed8d639634a8b211a3fb842ddf8ad9ea38fe07
+    validation_noise_float32:
+      path: /home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1/validation_noise.float32
+      byte_count: 7782400
+      sha256: 6be13ab704ce4b3f21e6ab5787eb18e77943d52540b517de46f41b47b083ccdc
+    validation_order_artifact_csv:
+      path: /home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1/validation_order_artifact.csv
+      byte_count: 7848
+      sha256: df445b617adf5165f3361412bb5c7bc5d2a05b31a98eb6d2f6d17f4b329de248
+development_pool_bound_provenance:
+  # cpu_artifact_commit is the commit that materialised the accepted schedule
+  # and VALIDATION artifacts. It is not the future authorization parent.
+  rnagenesis_branch: mres-d1-diffusion-finetune
+  rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
+  mres_branch: main
+  cpu_artifact_commit: d2b2041520d176ebd10a1553cf1fec65ad447ac5
+  executing_implementation_commit: d2b2041520d176ebd10a1553cf1fec65ad447ac5
+  schedule_path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/development_pool_schedule.json
+  schedule_sha256: 0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0
+  length_vector_path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/ordered_train_length_vector.json
+  length_vector_sha256: 7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c
+development_pool_cuda_binding:
+  physical_gpu: 1
+  gpu_uuid: GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f
+  pci_bus: "00000000:61:00.0"
+  cuda_visible_devices: "1"
+  cuda_device_order: PCI_BUS_ID
+  logical_device: cuda:0
+  cpu_fallback: false
+  other_gpu_fallback: false
+  execution_authorised: false
 development_pool_execution:
   executable_now: false
   status: NOT_AUTHORISED
   selects_a_physical_gpu: false
-development_pool_scientific_execution_authorisation:
-  authorisation_id: inactive_unconsumed_template
+development_pool_gpu1_authorisation_proposal:
+  record_role: non_executable_history
+  satisfies_executable_authorisation_schema: false
+  stores_its_own_commit_hash: false
+  authorisation_id: m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
   authorisation_active: false
-  activation_status: inactive_unconsumed_template
+  activation_status: proposal_not_executable
   consumed: false
   authorises_b1_development_pool: false
   gpu_use_authorised: false
-  physical_gpu: null
-  gpu_uuid: null
-  pci_bus: null
-  authorization_commit: null
+  physical_gpu: 1
+  gpu_uuid: GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f
+  pci_bus: "00000000:61:00.0"
+  authorization_parent_commit: null
   executing_implementation_commit: null
   mres_branch: main
   condition: B1_generic_released_rnagenesis
   phase: development_pool
-  output_directory: null
-  evidence_directory: null
-  schedule_sha256: null
+  output_directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
+  evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
+  schedule_sha256: 0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0
   success_claimed: false
   m4_complete: false
   b1_eligible: false

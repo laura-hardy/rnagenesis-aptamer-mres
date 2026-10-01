@@ -91,7 +91,8 @@ fixed_draw_validation:
     created_in_this_stage: false
     created_in_stage_2a: false
     contains_sequence_text: false
-    hash_status: PENDING_ARTIFACT_NOT_CREATED
+    hash_status: ACCEPTED_CPU_ARTIFACT
+    accepted_order_artifact_sha256: df445b617adf5165f3361412bb5c7bc5d2a05b31a98eb6d2f6d17f4b329de248
     serialization:
       encoding: utf-8
       format: csv
@@ -110,14 +111,14 @@ fixed_draw_validation:
       - sequence_core_sha256
       - biological_length
   validation_sequence_order_sha256:
-    value: null
-    status: PENDING_ARTIFACT_NOT_CREATED
+    value: eb18fd48e305e86f8000bdc82e9175437d478bd624ea57aef8094497534bda3a
+    status: ACCEPTED_CPU_ARTIFACT
     definition: >
       SHA-256 of the concatenation of each of the 95 ASCII sequence cores
       followed by exactly one LF byte, in frozen first-occurrence order.
   validation_order_artifact_sha256:
-    value: null
-    status: PENDING_ARTIFACT_NOT_CREATED
+    value: df445b617adf5165f3361412bb5c7bc5d2a05b31a98eb6d2f6d17f4b329de248
+    status: ACCEPTED_CPU_ARTIFACT
     definition: >
       SHA-256 of the exact serialized no-sequence order artifact: UTF-8 CSV,
       LF line endings, no BOM, no carriage returns, the exact header
