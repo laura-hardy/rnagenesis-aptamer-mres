@@ -35,7 +35,7 @@ On 1 October 2026 Laura Hardy superseded the discussed Approach A fixed-full-tab
 
 The same day, the CPU development-pool schedule at `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1` and the CPU VALIDATION draw artifacts at `/home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1` were accepted. The schedule hash is `0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0`. The length-vector hash is `7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c`. The schedule keeps all 1,000 raw attempts, 112 invocations, NumPy 1.22.0, sampling seed 43000, and invocation seeds `44000 + invocation_index`. It does not reject, replace, resample, pad, trim, drop, or deduplicate. The VALIDATION role has 95 sequences, 4 draws, and seed 1. Clustering and frozen-representation metrics stay deferred. B0, B2, Phase A, and Phase B evidence is unchanged. B1 success, checkpoint eligibility, M4 completion, M5, D1 training, REF access, and EVAL access remain unclaimed.
 
-`config/experiments/B1_generic_generation.yaml` records those accepted CPU artifacts and keeps document and execution gates closed. The intended physical GPU 1 binding (`GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, `CUDA_VISIBLE_DEVICES=1`, `CUDA_DEVICE_ORDER=PCI_BUS_ID`, logical `cuda:0`) is a non-executable proposal, `m4_b1_development_pool_d2b2041520d1_gpu1_attempt1`. It does not satisfy the runner's executable authorisation schema and it does not store `authorization_commit`. RNAGenesis remains `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c`. The CPU artifacts were materialised at `d2b2041520d176ebd10a1553cf1fec65ad447ac5`. The evidence directory `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1` is not created by this record. A later authorization-only commit must set `authorization_parent_commit` and `executing_implementation_commit` to the implementation commit and must not modify the runner. The runner computes `authorization_commit` from live HEAD. This protocol document is not that execution grant.
+`config/experiments/B1_generic_generation.yaml` records those accepted CPU artifacts and now holds one active unconsumed development-pool authorisation, `m4_b1_development_pool_d2b2041520d1_gpu1_attempt1`. The shared document gates and `development_pool_execution` are open for that run only. Phase A and Phase B stay non-executable. The binding is physical GPU 1, UUID `GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, `CUDA_VISIBLE_DEVICES=1`, `CUDA_DEVICE_ORDER=PCI_BUS_ID`, and logical `cuda:0`. `authorization_parent_commit` and `executing_implementation_commit` are both `4de4246aa4a97eadaf30caf449e3046378832366`. The block does not store `authorization_commit`. RNAGenesis remains `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c`. The CPU artifacts were materialised at `d2b2041520d176ebd10a1553cf1fec65ad447ac5` and are not rewritten. The evidence directory `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1` is not created by this record. The future authorization commit must have `4de4246aa4a97eadaf30caf449e3046378832366` as its single parent and must not modify the runner. The runner computes `authorization_commit` from live HEAD and refuses a dirty worktree. This protocol document is not that execution grant. M5, D1 training, REF, and EVAL remain closed.
 
 This approval does not:
 
@@ -43,7 +43,7 @@ This approval does not:
 - keep clustering-dependent claims or a clustering identity threshold inside M4;
 - keep frozen-representation or embedding-aggregation metrics inside M4;
 - choose the D1 microbatch, accumulation, numerical precision, or EMA setting;
-- authorise GPU use, B2 sampling, B1 generation, or the D1 pilot.
+- authorise B2 sampling, Phase A, Phase B, a second B1 run, or the D1 pilot. The single development-pool grant above is the only GPU authorisation in the B1 configuration.
 
 M5 must pass before the D1 pilot configuration can become executable. Microbatch, accumulation, mixed precision, and EMA stay assigned to M5. Their absence does not, by itself, block final M4 closure. Matters that can remain open after this implementation approval, and that must be resolved before final M4 `COMPLETE / GO`, are listed in section 10.
 
@@ -131,7 +131,7 @@ Failure of any approved hard threshold makes a checkpoint ineligible even if its
 
 ## 5. Generated-sample guardrails
 
-**Non-length guardrails are `APPROVED_STAGE_1_DESIGN`.** Requested-length exact-hit rates are required diagnostic reports. The historical provisional values 0.90 and 0.50 are not execution-success requirements, and a low exact-hit rate does not invalidate or rerun the B1 diagnostic pool. The 1,000-attempt paired schedule is the restored Stage 1 diagnostic contract. The accepted CPU schedule is immutable. The checked-in stage-1 configuration does not execute it.
+**Non-length guardrails are `APPROVED_STAGE_1_DESIGN`.** Requested-length exact-hit rates are required diagnostic reports. The historical provisional values 0.90 and 0.50 are not execution-success requirements, and a low exact-hit rate does not invalidate or rerun the B1 diagnostic pool. The 1,000-attempt paired schedule is the restored Stage 1 diagnostic contract. The accepted CPU schedule is immutable. The checked-in B1 configuration authorises one future run of that schedule and does not execute it.
 
 The proposed diagnostic sample is 1,000 raw attempts per evaluated neural checkpoint or condition. Target lengths are sampled with seed 43000. Generation invocations use a separate proposed seed base of 44000. The deterministic execution plan is:
 
@@ -146,7 +146,7 @@ The proposed diagnostic sample is 1,000 raw attempts per evaluated neural checkp
 9. map every generated record back to its original target-length attempt index;
 10. reuse the identical target list, grouping rule, chunk membership, and invocation seeds for paired B1/D1 comparisons where technically applicable.
 
-The manifest must contain the complete invocation table before generation begins. That table is the accepted schedule `0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0`. The checked-in configuration does not authorise execution. A later authorization-only commit binds one physical GPU, its UUID and PCI bus, `authorization_parent_commit`, `executing_implementation_commit`, the exact output directory, and that schedule hash. It does not store `authorization_commit`; the runner computes that value from live HEAD. The runner does not hardcode physical GPU 0 or physical GPU 1. Execution stays refused while the stage-1 gates are closed, and a future run stays refused unless live HEAD is that authorization commit.
+The manifest must contain the complete invocation table before generation begins. That table is the accepted schedule `0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0`. The length vector is `7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c`. The checked-in B1 configuration authorises one unconsumed development-pool run on physical GPU 1 (`GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, `CUDA_VISIBLE_DEVICES=1`, `CUDA_DEVICE_ORDER=PCI_BUS_ID`, logical `cuda:0`). `authorization_parent_commit` and `executing_implementation_commit` are both `4de4246aa4a97eadaf30caf449e3046378832366`. The block does not store `authorization_commit`; the runner computes that value from live HEAD. The runner does not hardcode physical GPU 0 or physical GPU 1. A dirty worktree is refused. A future run stays refused unless live HEAD is a clean authorization commit with that single parent. Phase A, Phase B, M5, D1 training, REF, and EVAL stay closed. Length mismatch and early EOS stay retained diagnostic outcomes and do not trigger rejection or resampling.
 
 B2 is different. Its required raw set is 30,000 attempts. Guardrail rates for B2 use that full raw set. A 1,000-attempt slice is not a substitute. The existing B0 pool remains 30,080 attempts and is not re-gated as if it had been length-matched.
 
@@ -243,7 +243,7 @@ An executable workflow must refuse this approved-for-implementation package. In 
 - overwrite or append to an existing evidence directory;
 - rerun the completed accepted B2 evidence;
 - rerun Phase A or Phase B;
-- execute the 1,000-attempt pool from the checked-in stage-1 configuration, or from any HEAD that is not a single-parent authorization commit whose parent is the pinned implementation commit;
+- execute the 1,000-attempt pool from a dirty worktree, from Phase A, from Phase B, or from any HEAD that is not a clean single-parent authorization commit whose parent is `4de4246aa4a97eadaf30caf449e3046378832366`;
 - resample, replace, or rewrite the accepted fixed validation-draw tensors or the ordered-core artifact;
 - start the D1 pilot.
 

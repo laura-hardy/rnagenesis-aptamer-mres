@@ -11330,3 +11330,15 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Non-executable GPU proposal:** `m4_b1_development_pool_d2b2041520d1_gpu1_attempt1` records the intended physical GPU 1 binding, UUID `GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, `CUDA_VISIBLE_DEVICES=1`, `CUDA_DEVICE_ORDER=PCI_BUS_ID`, logical `cuda:0`. It does not satisfy the executable authorisation schema. `authorization_parent_commit` and `executing_implementation_commit` stay unset until a later authorization-only commit. That later commit must not modify the runner. The runner will compute `authorization_commit` from live HEAD. RNAGenesis remains `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c`. The CPU artifacts were materialised at `d2b2041520d176ebd10a1553cf1fec65ad447ac5`. Evidence directory not created.
 
 **Boundary:** B0, B2, Phase A, and Phase B evidence unchanged. Clustering and frozen-representation metrics remain deferred. B1 success, checkpoint eligibility, M4 completion, M5, D1 training, REF, and EVAL remain unclaimed. Nothing was staged, committed, pushed, authorised, or executed.
+
+## 2026-10-01 — Prepare the M4 B1 development-pool authorization
+
+**Stage:** Aim 2 / modelling / M4 B1 diagnostic pool
+
+**Status:** One unconsumed development-pool authorisation is prepared in the working tree. It is not staged, committed, pushed, or executed. The evidence directory is not created.
+
+**Authorisation:** `development_pool_scientific_execution_authorisation`, id `m4_b1_development_pool_d2b2041520d1_gpu1_attempt1`, status `active_unconsumed`, consumed false. `authorization_parent_commit` and `executing_implementation_commit` are both `4de4246aa4a97eadaf30caf449e3046378832366`. The block does not store `authorization_commit`. The future authorization commit must have that commit as its single parent and must not modify `scripts/b1_development_pool_runner.py`. The runner computes `authorization_commit` from live HEAD.
+
+**Binding:** Physical GPU 1, UUID `GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, `CUDA_VISIBLE_DEVICES=1`, `CUDA_DEVICE_ORDER=PCI_BUS_ID`, logical `cuda:0`. RNAGenesis remains `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c`. Schedule SHA-256 `0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0`. Length-vector SHA-256 `7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c`. Output and evidence directory `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1`.
+
+**Boundary:** Shared and development-pool execution gates are open for this one run. Phase A, Phase B, M5, D1 training, REF, and EVAL stay closed. Clustering and frozen-representation metrics stay deferred. Length mismatch and early EOS stay retained diagnostic outcomes. B1 success, checkpoint eligibility, and M4 completion stay unclaimed. Nothing was staged, committed, pushed, or executed.

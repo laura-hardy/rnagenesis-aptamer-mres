@@ -512,16 +512,13 @@ class CheckedInAuthorisationTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "configuration_not_consumable")
         self.assertEqual(
             caught.exception.detail,
-            "consumable_by_executable_workflow is not true",
+            "phase_b.executable_now is not true",
         )
-        self.assertEqual(
-            config["document_status"],
-            "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
-        )
-        self.assertIn(config["document_status"], runner.NON_EXECUTABLE_DOCUMENT_STATUSES)
-        self.assertIs(config["consumable_by_executable_workflow"], False)
-        self.assertIs(config["execution"]["authorised"], False)
-        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], False)
+        self.assertEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
+        self.assertNotIn(config["document_status"], runner.NON_EXECUTABLE_DOCUMENT_STATUSES)
+        self.assertIs(config["consumable_by_executable_workflow"], True)
+        self.assertIs(config["execution"]["authorised"], True)
+        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], True)
         self.assertIs(config["execution"]["gpu_authorised_by_this_draft"], False)
         self.assertIs(config["phase_b"]["executable_now"], False)
         self.assertEqual(config["phase_b"]["status"], "COMPLETE_EVIDENCE_ACCEPTED")
@@ -585,8 +582,8 @@ class CheckedInAuthorisationTests(unittest.TestCase):
         self.assertIs(block["development_pool_authorised"], False)
         self.assertIs(block["final_production_mapping_declared"], False)
         self.assertIs(block["rejection_or_resampling_algorithm_declared"], False)
-        self.assertEqual(text.count("authorisation_active: true"), 0)
-        self.assertEqual(text.count("activation_status: active_unconsumed"), 0)
+        self.assertEqual(text.count("authorisation_active: true"), 1)
+        self.assertEqual(text.count("activation_status: active_unconsumed"), 1)
         self.assertEqual(text.count("activation_status: consumed_complete"), 2)
         self.assertEqual(text.count("activation_status: revoked_unconsumed"), 1)
         self.assertEqual(
@@ -896,7 +893,8 @@ class CheckedInAuthorisationTests(unittest.TestCase):
         )
         self.assertIs(historical_algorithm["executed"], False)
         pool = config["limited_development_pool"]
-        self.assertIs(pool["development_pool_authorised"], False)
+        self.assertIs(pool["development_pool_authorised"], True)
+        self.assertIs(pool["executable_now"], True)
         self.assertIs(pool["sampling_authorised"], False)
         self.assertEqual(pool["raw_target_lengths"], 1000)
         self.assertIs(pool["phase_b_candidate_mapping_unblocks_this_pool"], False)
@@ -904,7 +902,8 @@ class CheckedInAuthorisationTests(unittest.TestCase):
             pool["execution_blocked_until_length_mapping_or_rejection_resampling_algorithm_approved"],
             False,
         )
-        self.assertIn("checked-in configuration is not executable", pool["blocked_until"])
+        self.assertIn("4de4246aa4a97eadaf30caf449e3046378832366", pool["blocked_until"])
+        self.assertIn("Phase A, Phase B, M5", pool["blocked_until"])
         self.assertIs(config["phase_b"]["approved_candidate_mapping"]["final_production_mapping"], False)
         self.assertIs(config["phase_b"]["frozen_schedule"]["final_production_mapping"], False)
         self.assertIs(config["phase_b_scientific_execution_authorisation"]["final_production_mapping_declared"], False)
@@ -957,7 +956,7 @@ class CheckedInAuthorisationTests(unittest.TestCase):
                 closed,
                 "configuration_not_consumable",
             )
-            self.assertIn("consumable_by_executable_workflow is not true", stderr)
+            self.assertIn("phase_b.executable_now is not true", stderr)
             called = [event[0] for event in closed.events]
             for name in (
                 "lstat",

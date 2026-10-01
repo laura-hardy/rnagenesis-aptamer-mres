@@ -36,6 +36,7 @@ PHASE_B = Path(
 B2_ATTEMPT2 = Path("/home/laura/rnagenesis-mres-runs/m4_b2_empirical_null_6f82878_attempt2")
 B0_CHECKSUM = ROOT / "results/phase4_1_unadapted_rnagenesis_30k/checksums/sha256_raw_generated_files.txt"
 IMPLEMENTATION_COMMIT = "d2b2041520d176ebd10a1553cf1fec65ad447ac5"
+AUTHORIZATION_PARENT = "4de4246aa4a97eadaf30caf449e3046378832366"
 AUTHORISATION_ID = "m4_b1_development_pool_d2b2041520d1_gpu1_attempt1"
 SCHEDULE_DIRECTORY = Path(
     "/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1"
@@ -740,46 +741,91 @@ class ExecutionGateTests(unittest.TestCase):
     def test_checked_in_configuration_refuses_before_side_effects(self):
         config = yaml.safe_load(B1_CONFIG.read_text(encoding="utf-8"))
         text = B1_CONFIG.read_text(encoding="utf-8")
-        with self.assertRaises(runner.DevelopmentPoolError) as closed:
-            runner.assert_configuration_consumable(config)
-        self.assertEqual(closed.exception.code, "configuration_not_consumable")
-        self.assertEqual(config["document_status"], "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION")
-        self.assertIs(config["consumable_by_executable_workflow"], False)
-        self.assertIs(config["execution"]["authorised"], False)
-        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], False)
-        self.assertIs(config["development_pool_execution"]["executable_now"], False)
-        self.assertNotEqual(config["development_pool_execution"]["status"], runner.POOL_EXECUTION_STATUS)
-        self.assertNotIn(runner.AUTHORISATION_NAME, config)
+        self.assertTrue(runner.assert_configuration_consumable(config))
+        self.assertEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
+        self.assertIs(config["consumable_by_executable_workflow"], True)
+        self.assertIs(config["execution"]["authorised"], True)
+        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], True)
+        self.assertIs(config["execution"]["gpu_authorised_by_this_draft"], False)
+        self.assertIs(config["development_pool_execution"]["executable_now"], True)
+        self.assertEqual(config["development_pool_execution"]["status"], runner.POOL_EXECUTION_STATUS)
+        self.assertIs(config["development_pool_execution"]["selects_a_physical_gpu"], False)
+        self.assertIs(config["phase_a"]["executable_now"], False)
+        self.assertEqual(config["phase_a"]["status"], "COMPLETE_EVIDENCE_ACCEPTED")
+        self.assertIs(config["phase_b"]["executable_now"], False)
+        self.assertEqual(config["phase_b"]["status"], "COMPLETE_EVIDENCE_ACCEPTED")
+        self.assertIs(config["validation_draw_artifact_acceptance"]["m5_authorised"], False)
+        self.assertIs(config["validation_draw_artifact_acceptance"]["d1_training_authorised"], False)
+        self.assertIs(config["validation_draw_artifact_acceptance"]["ref_accessed"], False)
+        self.assertIs(config["validation_draw_artifact_acceptance"]["eval_accessed"], False)
+        self.assertIs(config["development_pool_schedule_acceptance"]["clustering_deferred"], True)
+        self.assertIs(config["development_pool_schedule_acceptance"]["frozen_representation_metrics_deferred"], True)
+        phase_a = config["scientific_execution_authorisation"]
+        self.assertIs(phase_a["authorisation_active"], False)
+        self.assertEqual(phase_a["activation_status"], "consumed_complete")
+        self.assertIs(phase_a["consumed"], True)
+        self.assertEqual(phase_a["phase"], "A")
+        phase_b = config["phase_b_scientific_execution_authorisation"]
+        self.assertIs(phase_b["authorisation_active"], False)
+        self.assertEqual(phase_b["activation_status"], "consumed_complete")
+        self.assertIs(phase_b["consumed"], True)
+        self.assertEqual(phase_b["phase"], "B")
+        generic = load_module("b1_generic_runner_closed", ROOT / "scripts/b1_generic_runner.py")
+        phase_b_runner = load_module("b1_phase_b_runner_closed", ROOT / "scripts/b1_phase_b_runner.py")
+        with self.assertRaises(generic.B1RunnerError) as phase_a_closed:
+            generic.assert_document_gates(config)
+        self.assertEqual(phase_a_closed.exception.code, "phase_a_not_authorised")
+        self.assertEqual(phase_a_closed.exception.detail, "phase_a.executable_now is not true")
+        with self.assertRaises(phase_b_runner.PhaseBRunnerError) as phase_b_closed:
+            phase_b_runner.assert_configuration_consumable(config)
+        self.assertEqual(phase_b_closed.exception.code, "configuration_not_consumable")
+        self.assertEqual(phase_b_closed.exception.detail, "phase_b.executable_now is not true")
         self.assertNotIn("authorization_commit", runner.AUTHORISATION_KEYS)
         self.assertIn("authorization_parent_commit", runner.AUTHORISATION_KEYS)
+        block = runner.assert_development_pool_authorisation(config, 1, str(POOL_EVIDENCE))
+        self.assertEqual(list(block), list(runner.AUTHORISATION_KEYS))
+        self.assertEqual(set(block), set(runner.AUTHORISATION_KEYS))
+        self.assertEqual(len(block), len(runner.AUTHORISATION_KEYS))
+        self.assertNotIn("authorization_commit", block)
+        self.assertEqual(block["authorisation_id"], AUTHORISATION_ID)
+        self.assertIs(block["authorisation_active"], True)
+        self.assertEqual(block["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
+        self.assertIs(block["consumed"], False)
+        self.assertIs(block["authorises_b1_development_pool"], True)
+        self.assertIs(block["gpu_use_authorised"], True)
+        self.assertIs(type(block["physical_gpu"]), int)
+        self.assertEqual(block["physical_gpu"], 1)
+        self.assertNotEqual(block["physical_gpu"], "1")
+        self.assertEqual(block["gpu_uuid"], GPU_UUID)
+        self.assertEqual(block["pci_bus"], PCI_BUS)
+        self.assertEqual(block["authorization_parent_commit"], AUTHORIZATION_PARENT)
+        self.assertEqual(block["executing_implementation_commit"], AUTHORIZATION_PARENT)
+        self.assertEqual(block["mres_branch"], "main")
+        self.assertEqual(block["condition"], runner.CONDITION_LABEL)
+        self.assertEqual(block["phase"], "development_pool")
+        self.assertEqual(block["output_directory"], str(POOL_EVIDENCE))
+        self.assertEqual(block["evidence_directory"], str(POOL_EVIDENCE))
+        self.assertEqual(block["schedule_sha256"], SCHEDULE_SHA256)
+        for key in (
+            "success_claimed",
+            "m4_complete",
+            "b1_eligible",
+            "exact_length_accepted_pool_declared",
+            "final_production_mapping_declared",
+            "final_m8_production_protocol_declared",
+        ):
+            self.assertIs(block[key], False)
         proposal = config["development_pool_gpu1_authorisation_proposal"]
         self.assertNotEqual(set(proposal), set(runner.AUTHORISATION_KEYS))
         self.assertIs(proposal["satisfies_executable_authorisation_schema"], False)
         self.assertIs(proposal["stores_its_own_commit_hash"], False)
         self.assertNotIn("authorization_commit", proposal)
-        self.assertEqual(proposal["authorisation_id"], AUTHORISATION_ID)
         self.assertIs(proposal["authorisation_active"], False)
         self.assertNotEqual(proposal["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
-        self.assertIs(proposal["consumed"], False)
-        self.assertIs(type(proposal["physical_gpu"]), int)
-        self.assertEqual(proposal["physical_gpu"], 1)
-        self.assertEqual(proposal["gpu_uuid"], GPU_UUID)
-        self.assertEqual(proposal["pci_bus"], PCI_BUS)
-        self.assertIsNone(proposal["authorization_parent_commit"])
-        self.assertIsNone(proposal["executing_implementation_commit"])
-        self.assertEqual(proposal["output_directory"], str(POOL_EVIDENCE))
-        self.assertEqual(proposal["evidence_directory"], str(POOL_EVIDENCE))
-        self.assertEqual(proposal["schedule_sha256"], SCHEDULE_SHA256)
-        self.assertIs(proposal["authorises_b1_development_pool"], False)
-        self.assertIs(proposal["gpu_use_authorised"], False)
-        self.assertIs(proposal["success_claimed"], False)
-        self.assertIs(proposal["m4_complete"], False)
-        self.assertIs(proposal["b1_eligible"], False)
-        self.assertEqual(text.count("authorisation_active: true"), 0)
-        self.assertEqual(text.count("activation_status: active_unconsumed"), 0)
-        with self.assertRaises(runner.DevelopmentPoolError) as missing:
-            runner.assert_development_pool_authorisation(config, 1, str(POOL_EVIDENCE))
-        self.assertEqual(missing.exception.code, "authorisation_missing")
+        self.assertEqual(text.count("authorisation_active: true"), 1)
+        self.assertEqual(text.count("activation_status: active_unconsumed"), 1)
+        self.assertEqual(text.count("activation_status: consumed_complete"), 2)
+        self.assertEqual(text.count("activation_status: revoked_unconsumed"), 1)
         course = config["m4_course_change_1_october_2026"]
         approach = course["approach_a_fixed_full_retry_table_r32"]
         self.assertIs(approach["superseded_before_implementation"], True)
@@ -788,10 +834,11 @@ class ExecutionGateTests(unittest.TestCase):
         self.assertIs(approach["schedule_exists"], False)
         self.assertEqual(course["active_m4_design"], "restored_stage_1_diagnostic_contract")
         self.assertIs(course["exact_length_accepted_pool_declared"], False)
-        self.assertIs(config["limited_development_pool"]["development_pool_authorised"], False)
-        self.assertIs(config["limited_development_pool"]["executable_now"], False)
+        self.assertIs(config["limited_development_pool"]["development_pool_authorised"], True)
+        self.assertIs(config["limited_development_pool"]["executable_now"], True)
         self.assertIs(config["limited_development_pool"]["sampling_authorised"], False)
-        self.assertIn("checked-in configuration is not executable", config["limited_development_pool"]["blocked_until"])
+        self.assertIn(AUTHORIZATION_PARENT, config["limited_development_pool"]["blocked_until"])
+        self.assertIn("Phase A, Phase B, M5", config["limited_development_pool"]["blocked_until"])
         self.assertIsNone(config["shared_generation_settings"]["physical_gpu"])
         self.assertIs(config["shared_generation_settings"]["physical_gpu_selected_by_this_document"], False)
         self.assertEqual(config["shared_generation_settings"]["child_logical_device"], "cuda:0")
@@ -810,12 +857,19 @@ class ExecutionGateTests(unittest.TestCase):
             deps = runner.RunnerDependencies()
             deps.environ = parent_for(1)
             real_read = deps.read_bytes
+            real_git = deps.git
 
             def read_bytes(path):
                 opened.append(str(path))
                 return real_read(path)
 
+            def git(repo, args):
+                if list(args) == ["status", "--porcelain=v1"] and os.path.normpath(str(repo)) == os.path.normpath(str(runner.MRES_ROOT)):
+                    return " M config/experiments/B1_generic_generation.yaml\n"
+                return real_git(repo, args)
+
             deps.read_bytes = read_bytes
+            deps.git = git
 
             def query(*args):
                 opened.append("gpu")
@@ -846,8 +900,9 @@ class ExecutionGateTests(unittest.TestCase):
                 )
         finally:
             runner.production_dependencies = original
-        self.assertEqual(code, 2)
-        self.assertIn("configuration_not_consumable", stderr.getvalue())
+        self.assertEqual(code, 1)
+        self.assertIn("provenance_mismatch", stderr.getvalue())
+        self.assertIn("MRes worktree or index is not clean", stderr.getvalue())
         self.assertNotIn(length_path, opened)
         self.assertNotIn("gpu", opened)
         self.assertNotIn("mkdir", opened)
@@ -855,6 +910,179 @@ class ExecutionGateTests(unittest.TestCase):
         self.assertFalse(POOL_EVIDENCE.is_symlink())
         self.assertEqual(list(inspect.signature(runner.main).parameters), ["argv"])
         self.assertNotIn("generate", inspect.signature(runner.main).parameters)
+
+    def test_checked_in_grant_fails_closed_and_future_parent_is_single(self):
+        loaded = yaml.safe_load(B1_CONFIG.read_text(encoding="utf-8"))
+        grant = loaded[runner.AUTHORISATION_NAME]
+        with self.assertRaises(runner.DevelopmentPoolError) as wrong_gpu:
+            runner.assert_development_pool_authorisation(loaded, 0, str(POOL_EVIDENCE))
+        self.assertEqual(wrong_gpu.exception.code, "gpu_binding_mismatch")
+        accepted_probe = {
+            "physical_index": 1,
+            "uuid": GPU_UUID,
+            "pci_bus": PCI_BUS,
+            "logical_device": "cuda:0",
+            "device_type": "cuda",
+            "cuda_device_count": 1,
+            "cpu_fallback": False,
+            "other_gpu_fallback": False,
+        }
+        runner.assert_gpu_probe(accepted_probe, 1, grant)
+        with self.assertRaises(runner.DevelopmentPoolError) as wrong_uuid:
+            runner.assert_gpu_probe(dict(accepted_probe, uuid="GPU-other"), 1, grant)
+        self.assertEqual(wrong_uuid.exception.code, "unauthorized_gpu")
+        with self.assertRaises(runner.DevelopmentPoolError) as wrong_bus:
+            runner.assert_gpu_probe(dict(accepted_probe, pci_bus="00000000:41:00.0"), 1, grant)
+        self.assertEqual(wrong_bus.exception.code, "unauthorized_gpu")
+
+        def retarget(output, **changes):
+            config = yaml.safe_load(B1_CONFIG.read_text(encoding="utf-8"))
+            block = config[runner.AUTHORISATION_NAME]
+            block["output_directory"] = output
+            block["evidence_directory"] = output
+            block.update(changes)
+            return config
+
+        future = {
+            "head": "c" * 40,
+            "origin": "c" * 40,
+            "parents": [AUTHORIZATION_PARENT],
+            "implementation_blob_commit": AUTHORIZATION_PARENT,
+            "porcelain": "",
+        }
+        lengths = synthetic_lengths()
+        with tempfile.TemporaryDirectory() as tmp:
+            output = os.path.join(tmp, "evidence")
+            dirty = build_deps(
+                retarget(output),
+                output + ".json",
+                lengths,
+                1,
+                provenance={"porcelain": " M config/experiments/B1_generic_generation.yaml\n"},
+            )
+            with self.assertRaises(runner.DevelopmentPoolError) as dirty_error:
+                runner.run(output, "1", output + ".json", dirty)
+            self.assertEqual(dirty_error.exception.code, "provenance_mismatch")
+            self.assertEqual(dirty_error.exception.detail, "MRes worktree or index is not clean")
+            self.assertFalse(any(event[0] == "gpu" for event in dirty.events))
+            self.assertFalse(os.path.exists(output))
+
+            wrong_parent = build_deps(
+                retarget(output),
+                output + ".json",
+                lengths,
+                1,
+                provenance={"parents": ["d" * 40], "implementation_blob_commit": "d" * 40},
+            )
+            with self.assertRaises(runner.DevelopmentPoolError) as parent_error:
+                runner.run(output, "1", output + ".json", wrong_parent)
+            self.assertEqual(parent_error.exception.code, "provenance_mismatch")
+            self.assertEqual(parent_error.exception.detail, "authorization parent is not the parent of live HEAD")
+            self.assertFalse(any(event[0] == "gpu" for event in wrong_parent.events))
+
+            drifted = build_deps(
+                retarget(output),
+                output + ".json",
+                lengths,
+                1,
+                provenance=dict(future, runner_worktree="e" * 40),
+            )
+            with self.assertRaises(runner.DevelopmentPoolError) as drift_error:
+                runner.run(output, "1", output + ".json", drifted)
+            self.assertEqual(drift_error.exception.code, "provenance_mismatch")
+            self.assertEqual(drift_error.exception.detail, "runner bytes do not match the implementation commit")
+            self.assertFalse(any(event[0] == "gpu" for event in drifted.events))
+
+            consumed = build_deps(
+                retarget(output, consumed=True),
+                output + ".json",
+                lengths,
+                1,
+                provenance=future,
+            )
+            with self.assertRaises(runner.DevelopmentPoolError) as consumed_error:
+                runner.run(output, "1", output + ".json", consumed)
+            self.assertEqual(consumed_error.exception.code, "authorisation_consumed")
+            self.assertFalse(any(event[0] == "gpu" for event in consumed.events))
+
+            os.mkdir(output)
+            reused = build_deps(retarget(output), output + ".json", lengths, 1, provenance=future)
+            with self.assertRaises(runner.DevelopmentPoolError) as reuse_error:
+                runner.run(output, "1", output + ".json", reused)
+            self.assertEqual(reuse_error.exception.code, "output_directory_exists")
+            self.assertFalse(any(event[0] == "gpu" for event in reused.events))
+            self.assertFalse(os.path.exists(os.path.join(output, runner.SUCCESS_MANIFEST_NAME)))
+
+            fresh = os.path.join(tmp, "fresh")
+            mismatched = build_deps(
+                retarget(fresh, schedule_sha256="c" * 64),
+                fresh + ".json",
+                lengths,
+                1,
+                provenance=future,
+            )
+            mismatched.gpu_preflight = lambda parent, physical: dict(accepted_probe)
+            with self.assertRaises(runner.DevelopmentPoolError) as schedule_error:
+                runner.run(fresh, "1", fresh + ".json", mismatched)
+            self.assertEqual(schedule_error.exception.code, "schedule_hash_mismatch")
+            self.assertFalse(os.path.exists(fresh))
+
+            accepted = build_deps(retarget(fresh), fresh + ".json", lengths, 1, provenance=future)
+            snapshot = runner.measure_provenance(
+                runner.assert_development_pool_authorisation(retarget(fresh), 1, fresh),
+                accepted,
+            )
+            self.assertEqual(snapshot["mres"]["head"], "c" * 40)
+            self.assertEqual(snapshot["mres"]["authorization_commit"], "c" * 40)
+            self.assertEqual(snapshot["mres"]["authorization_parent_commit"], AUTHORIZATION_PARENT)
+            self.assertEqual(snapshot["mres"]["executing_implementation_commit"], AUTHORIZATION_PARENT)
+            self.assertEqual(len(snapshot["mres"]["authorization_parent_commit"]), 40)
+            parents = snapshot["mres"]["authorization_parent_commit"]
+            self.assertEqual(parents, snapshot["mres"]["executing_implementation_commit"])
+            self.assertNotEqual(snapshot["mres"]["head"], AUTHORIZATION_PARENT)
+            self.assertFalse(any(event[0] == "gpu" for event in accepted.events))
+            self.assertFalse(os.path.exists(fresh))
+
+        early = self._early_eos_attempt()
+        self.assertNotEqual(early["cleaned_length"], early["requested_target_length"])
+        self.assertTrue(early["early_eos"])
+        self.assertFalse(early["exact_length_hit"])
+        reasons = runner.technical_failure_reasons(
+            [early],
+            {
+                "invocations": [
+                    {
+                        "invocation_index": 0,
+                        "actual_chunk_size": 1,
+                        "original_attempt_indexes": [0],
+                    }
+                ],
+                "invocation_count": 1,
+                "total_attempts": 1,
+            },
+            True,
+            True,
+            True,
+        )
+        self.assertEqual(reasons, [])
+        self.assertTrue(runner.diagnostic_run_succeeded(
+            attempts=[early],
+            schedule={
+                "invocations": [
+                    {
+                        "invocation_index": 0,
+                        "actual_chunk_size": 1,
+                        "original_attempt_indexes": [0],
+                    }
+                ],
+                "invocation_count": 1,
+                "total_attempts": 1,
+            },
+            raw_verified=True,
+            provenance_matched=True,
+            manifests_exclusive=True,
+        ))
+        self.assertFalse(POOL_EVIDENCE.exists())
 
     def test_accepted_artifacts_bind_the_gpu_schedule_and_refuse_resampling(self):
         config = yaml.safe_load(B1_CONFIG.read_text(encoding="utf-8"))
@@ -910,11 +1138,18 @@ class ExecutionGateTests(unittest.TestCase):
         provenance = config["development_pool_bound_provenance"]
         self.assertEqual(provenance["rnagenesis_branch"], runner.RNAGENESIS_BRANCH)
         self.assertEqual(provenance["rnagenesis_commit"], runner.RNAGENESIS_HEAD)
+        self.assertEqual(provenance["schedule_path"], str(SCHEDULE_DIRECTORY / "development_pool_schedule.json"))
         self.assertEqual(provenance["schedule_sha256"], SCHEDULE_SHA256)
+        self.assertEqual(provenance["length_vector_path"], str(SCHEDULE_DIRECTORY / "ordered_train_length_vector.json"))
         self.assertEqual(provenance["length_vector_sha256"], LENGTH_VECTOR_SHA256)
-        with self.assertRaises(runner.DevelopmentPoolError) as missing:
-            runner.assert_development_pool_authorisation(config, 1, str(POOL_EVIDENCE))
-        self.assertEqual(missing.exception.code, "authorisation_missing")
+        self.assertEqual(provenance["authorization_parent_commit"], AUTHORIZATION_PARENT)
+        self.assertEqual(provenance["executing_implementation_commit"], AUTHORIZATION_PARENT)
+        self.assertEqual(provenance["cpu_artifact_commit"], IMPLEMENTATION_COMMIT)
+        self.assertIs(binding["execution_authorised"], True)
+        checked_in = runner.assert_development_pool_authorisation(config, 1, str(POOL_EVIDENCE))
+        self.assertEqual(list(checked_in), list(runner.AUTHORISATION_KEYS))
+        self.assertEqual(checked_in["authorization_parent_commit"], AUTHORIZATION_PARENT)
+        self.assertEqual(checked_in["executing_implementation_commit"], AUTHORIZATION_PARENT)
         synthetic = authorised_config(str(POOL_EVIDENCE), 1, SCHEDULE_SHA256)
         authorisation = runner.assert_development_pool_authorisation(
             synthetic,

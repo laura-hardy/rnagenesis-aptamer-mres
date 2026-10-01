@@ -1,6 +1,7 @@
-# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
-# Phase A and Phase B evidence remains accepted and unchanged. Both
-# scientific-run authorisations stay consumed_complete and inactive.
+# APPROVED_FOR_SCIENTIFIC_EXECUTION
+# This document authorises one unconsumed B1 development-pool diagnostic
+# run. Phase A and Phase B evidence remains accepted and unchanged. Both
+# of those scientific-run authorisations stay consumed_complete and inactive.
 # On 1 October 2026 Laura Hardy superseded the discussed Approach A
 # fixed_full_retry_table with R=32 before implementation, plan
 # materialization, biological-data access, authorization, or execution.
@@ -11,17 +12,18 @@
 # They do not trigger rejection, replacement, resampling, or run failure.
 # This design does not declare an exact-length accepted pool or a final
 # M8 production protocol. The accepted CPU schedule and VALIDATION draw
-# artifacts are recorded below. The GPU 1 development-pool record is a
-# non-executable proposal. It does not satisfy the runner's executable
-# authorisation schema and it does not store authorization_commit.
-# A later authorization-only commit must set authorization_parent_commit
-# and executing_implementation_commit to the implementation commit that
-# contains this corrected runner. The runner computes authorization_commit
-# from live HEAD. B1 success, checkpoint eligibility, M4 completion, M5,
-# D1 training, REF, and EVAL remain unclaimed.
+# artifacts are recorded below and are not rewritten by this grant.
+# development_pool_scientific_execution_authorisation is the executable
+# block. It does not store authorization_commit. authorization_parent_commit
+# and executing_implementation_commit are both
+# 4de4246aa4a97eadaf30caf449e3046378832366. The future authorization commit
+# must have that commit as its single parent and must not modify the runner.
+# The runner computes authorization_commit from live HEAD. A dirty worktree
+# cannot execute. M5, D1 training, REF, and EVAL remain closed. B1 success,
+# checkpoint eligibility, and M4 completion remain unclaimed.
 
-document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
-consumable_by_executable_workflow: false
+document_status: APPROVED_FOR_SCIENTIFIC_EXECUTION
+consumable_by_executable_workflow: true
 human_approval:
   approving_person: Laura Hardy
   approval_date: 29 September 2026
@@ -50,9 +52,9 @@ metric_set_schema_version: m4-stage1-draft-1
 created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
 
 execution:
-  authorised: false
+  authorised: true
   gpu_authorised_by_this_draft: false
-  gpu_authorised_by_this_approval: false
+  gpu_authorised_by_this_approval: true
   evidence_directory_created_by_this_stage: false
   overwrite_existing_output: refuse
   silent_truncation: false
@@ -845,14 +847,14 @@ length_algorithm:
     final_production_mapping: false
 
 limited_development_pool:
-  status: RESTORED_STAGE_1_DIAGNOSTIC_CONTRACT_APPROVED_FOR_IMPLEMENTATION_NOT_EXECUTION
+  status: RESTORED_STAGE_1_DIAGNOSTIC_CONTRACT_AUTHORISED_FOR_ONE_UNCONSUMED_RUN
   active_design: restored_stage_1_diagnostic_contract
-  development_pool_authorised: false
+  development_pool_authorised: true
   sampling_authorised: false
-  executable_now: false
+  executable_now: true
   separate_active_authorisation_required: true
   phase_b_candidate_mapping_unblocks_this_pool: false
-  blocked_until: "The checked-in configuration is not executable. A later authorization-only commit must set authorization_parent_commit and executing_implementation_commit to the implementation commit. The runner computes authorization_commit from live HEAD. This record does not claim B1 success, checkpoint eligibility, or M4 completion."
+  blocked_until: "One unconsumed development-pool run is authorised. Execution still requires a clean authorization commit whose single parent is 4de4246aa4a97eadaf30caf449e3046378832366. The runner computes authorization_commit from live HEAD. This record does not claim B1 success, checkpoint eligibility, or M4 completion. Phase A, Phase B, M5, D1 training, REF, and EVAL stay closed."
   identification: >
     This 1000-attempt pool is the proposed fixed diagnostic sample for B1
     and, with the same target-length list and paired generation-seed
@@ -896,9 +898,9 @@ limited_development_pool:
     1000 is not divisible by 16. Chunks use their actual size, at most 16.
     The schedule never pads, duplicates, replaces, rejects, resamples, or
     drops an attempt. Early EOS and length mismatch are diagnostic outcomes.
-    They do not fail the diagnostic run. The proposal below records the
-    intended physical GPU. It does not authorise execution and it does not
-    resample the accepted schedule.
+    They do not fail the diagnostic run. The executable authorisation below
+    binds physical GPU 1 for one unconsumed run. It does not resample the
+    accepted schedule.
 development_pool_schedule_acceptance:
   status: ACCEPTED
   accepted_by: Laura Hardy
@@ -1007,12 +1009,13 @@ validation_draw_artifact_acceptance:
       sha256: df445b617adf5165f3361412bb5c7bc5d2a05b31a98eb6d2f6d17f4b329de248
 development_pool_bound_provenance:
   # cpu_artifact_commit is the commit that materialised the accepted schedule
-  # and VALIDATION artifacts. It is not the future authorization parent.
+  # and VALIDATION artifacts. It is not the authorization parent.
   rnagenesis_branch: mres-d1-diffusion-finetune
   rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
   mres_branch: main
   cpu_artifact_commit: d2b2041520d176ebd10a1553cf1fec65ad447ac5
-  executing_implementation_commit: d2b2041520d176ebd10a1553cf1fec65ad447ac5
+  authorization_parent_commit: 4de4246aa4a97eadaf30caf449e3046378832366
+  executing_implementation_commit: 4de4246aa4a97eadaf30caf449e3046378832366
   schedule_path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/development_pool_schedule.json
   schedule_sha256: 0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0
   length_vector_path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/ordered_train_length_vector.json
@@ -1026,13 +1029,38 @@ development_pool_cuda_binding:
   logical_device: cuda:0
   cpu_fallback: false
   other_gpu_fallback: false
-  execution_authorised: false
+  execution_authorised: true
 development_pool_execution:
-  executable_now: false
-  status: NOT_AUTHORISED
+  executable_now: true
+  status: AUTHORISED_FOR_EXECUTION
   selects_a_physical_gpu: false
+development_pool_scientific_execution_authorisation:
+  authorisation_id: m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
+  authorisation_active: true
+  activation_status: active_unconsumed
+  consumed: false
+  authorises_b1_development_pool: true
+  gpu_use_authorised: true
+  physical_gpu: 1
+  gpu_uuid: GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f
+  pci_bus: "00000000:61:00.0"
+  authorization_parent_commit: 4de4246aa4a97eadaf30caf449e3046378832366
+  executing_implementation_commit: 4de4246aa4a97eadaf30caf449e3046378832366
+  mres_branch: main
+  condition: B1_generic_released_rnagenesis
+  phase: development_pool
+  output_directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
+  evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
+  schedule_sha256: 0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0
+  success_claimed: false
+  m4_complete: false
+  b1_eligible: false
+  exact_length_accepted_pool_declared: false
+  final_production_mapping_declared: false
+  final_m8_production_protocol_declared: false
+# Retained non-executable history. The runner does not read this block.
 development_pool_gpu1_authorisation_proposal:
-  record_role: non_executable_history
+  record_role: superseded_non_executable_history
   satisfies_executable_authorisation_schema: false
   stores_its_own_commit_hash: false
   authorisation_id: m4_b1_development_pool_d2b2041520d1_gpu1_attempt1

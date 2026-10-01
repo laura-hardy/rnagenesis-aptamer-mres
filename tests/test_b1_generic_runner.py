@@ -426,10 +426,10 @@ class ClosedGateTests(unittest.TestCase):
         self.assertEqual(len(block), 18)
         with self.assertRaises(runner.B1RunnerError) as caught:
             runner.assert_document_gates(config)
-        self.assertEqual(caught.exception.code, "configuration_not_consumable")
+        self.assertEqual(caught.exception.code, "phase_a_not_authorised")
         self.assertEqual(
             caught.exception.detail,
-            "consumable_by_executable_workflow is not true",
+            "phase_a.executable_now is not true",
         )
         self.assertEqual(block["authorisation_id"], AUTHORISATION_ID)
         self.assertIs(block["authorisation_active"], False)
@@ -509,8 +509,8 @@ class ClosedGateTests(unittest.TestCase):
         self.assertNotEqual(historical, block)
         self.assertEqual(text.count("activation_status: revoked_unconsumed"), 1)
         self.assertEqual(text.count("activation_status: consumed_complete"), 2)
-        self.assertEqual(text.count("activation_status: active_unconsumed"), 0)
-        self.assertEqual(text.count("authorisation_active: true"), 0)
+        self.assertEqual(text.count("activation_status: active_unconsumed"), 1)
+        self.assertEqual(text.count("authorisation_active: true"), 1)
         phase_a_section = text.split("scientific_execution_authorisation:\n", 1)[1]
         phase_a_section = phase_a_section.split("\n\n", 1)[0]
         self.assertIn("activation_status: consumed_complete", phase_a_section)
@@ -568,6 +568,8 @@ class ClosedGateTests(unittest.TestCase):
                 "path: /home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1/validation_order_artifact.csv",
                 "schedule_path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/development_pool_schedule.json",
                 "length_vector_path: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1/ordered_train_length_vector.json",
+                "output_directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1",
+                "evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1",
                 "output_directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1",
                 "evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1",
             ],
@@ -638,12 +640,9 @@ class ClosedGateTests(unittest.TestCase):
             runner.assert_document_gates(forced)
         self.assertEqual(caught.exception.code, "scientific_authorisation_inactive")
         self.assertEqual(caught.exception.detail, "authorisation_active is not true")
-        self.assertIs(config["consumable_by_executable_workflow"], False)
-        self.assertEqual(
-            config["document_status"],
-            "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
-        )
-        self.assertIn(config["document_status"], runner.NON_EXECUTABLE_DOCUMENT_STATUSES)
+        self.assertIs(config["consumable_by_executable_workflow"], True)
+        self.assertEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
+        self.assertNotIn(config["document_status"], runner.NON_EXECUTABLE_DOCUMENT_STATUSES)
         self.assertIs(config["phase_a"]["executable_now"], False)
         self.assertIs(type(config["phase_a"]["executable_now"]), bool)
         self.assertEqual(config["phase_a"]["status"], "COMPLETE_EVIDENCE_ACCEPTED")
@@ -652,8 +651,8 @@ class ClosedGateTests(unittest.TestCase):
             config["phase_a"]["blocked_until"],
             "complete_accepted_evidence_not_reexecutable",
         )
-        self.assertIs(config["execution"]["authorised"], False)
-        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], False)
+        self.assertIs(config["execution"]["authorised"], True)
+        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], True)
         self.assertIs(config["phase_b"]["executable_now"], False)
         self.assertIs(type(config["phase_b"]["executable_now"]), bool)
         self.assertEqual(config["phase_b"]["status"], "COMPLETE_EVIDENCE_ACCEPTED")
@@ -888,11 +887,12 @@ class ClosedGateTests(unittest.TestCase):
         pool = config["limited_development_pool"]
         self.assertEqual(
             pool["status"],
-            "RESTORED_STAGE_1_DIAGNOSTIC_CONTRACT_APPROVED_FOR_IMPLEMENTATION_NOT_EXECUTION",
+            "RESTORED_STAGE_1_DIAGNOSTIC_CONTRACT_AUTHORISED_FOR_ONE_UNCONSUMED_RUN",
         )
         self.assertIs(pool["phase_b_candidate_mapping_unblocks_this_pool"], False)
-        self.assertIs(pool["development_pool_authorised"], False)
+        self.assertIs(pool["development_pool_authorised"], True)
         self.assertIs(pool["sampling_authorised"], False)
+        self.assertIs(pool["executable_now"], True)
         self.assertEqual(pool["raw_target_lengths"], 1000)
         self.assertIs(
             pool[
@@ -900,7 +900,8 @@ class ClosedGateTests(unittest.TestCase):
             ],
             False,
         )
-        self.assertIn("checked-in configuration is not executable", pool["blocked_until"])
+        self.assertIn("4de4246aa4a97eadaf30caf449e3046378832366", pool["blocked_until"])
+        self.assertIn("Phase A, Phase B, M5", pool["blocked_until"])
         decision = config["phase_b_human_scientific_decision"]
         self.assertEqual(decision["approving_person"], "Laura Hardy")
         self.assertEqual(decision["approval_date"], "1 October 2026")
@@ -953,9 +954,9 @@ class ClosedGateTests(unittest.TestCase):
                     code,
                     stderr,
                     recorder,
-                    "configuration_not_consumable",
+                    "phase_a_not_authorised",
                 )
-                self.assertIn("consumable_by_executable_workflow is not true", stderr)
+                self.assertIn("phase_a.executable_now is not true", stderr)
                 self.assertNotIn("nvidia-smi", stderr)
                 self.assertNotIn("cuda_visible_devices", stderr)
                 self.assertNotIn("cuda_device_order", stderr)
@@ -1373,8 +1374,8 @@ class CudaAndOutputTests(unittest.TestCase):
         for environ in environments:
             recorder = RecordingDeps(real_config_bytes(), environ)
             code, stderr = run_main(recorder.build(), "/tmp/b1-not-the-evidence-path")
-            assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
-            self.assertIn("consumable_by_executable_workflow is not true", stderr)
+            assert_closed(self, code, stderr, recorder, "phase_a_not_authorised")
+            self.assertIn("phase_a.executable_now is not true", stderr)
             self.assertNotIn("nvidia-smi", stderr)
             self.assertNotIn("cuda_visible_devices", stderr)
             self.assertNotIn("cuda_device_order", stderr)
@@ -1404,8 +1405,8 @@ class CudaAndOutputTests(unittest.TestCase):
         for output_dir in supplied:
             recorder = RecordingDeps(real_config_bytes(), open_environ())
             code, stderr = run_main(recorder.build(), output_dir)
-            assert_closed(self, code, stderr, recorder, "configuration_not_consumable")
-            self.assertIn("consumable_by_executable_workflow is not true", stderr)
+            assert_closed(self, code, stderr, recorder, "phase_a_not_authorised")
+            self.assertIn("phase_a.executable_now is not true", stderr)
             self.assertNotIn("nvidia-smi", stderr)
             for name in FORBIDDEN_RUNTIME_MODULES:
                 self.assertNotIn(name, sys.modules)
