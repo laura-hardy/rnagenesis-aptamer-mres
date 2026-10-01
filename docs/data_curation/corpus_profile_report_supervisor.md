@@ -19,7 +19,7 @@ covering **409 canonical protein targets**. The RNAGenesis fitting file,
 TRAIN and VALIDATION cores pass `^[ACGU]+$` with **0 failures**. The closure records
 **0 cross-role cluster leakage** and **0 cross-role core leakage**. The maximum
 target share is HIV-1 Rev protein at 34/1170 (2.906%), within the approved 3% cap.
-The primary corpus remains protein-only and E2–E4; E5 remains excluded.
+The primary corpus remains protein-only and E2–E4. E1 and E5 are both absent. E1 is absent because the applied evidence rule requires a verified aptamer–target complex; an mmCIF URL or a structure boolean does not assign it. See the evidence section below.
 
 RNAGenesis M0 resumes from this corrected corpus. **Do not rerun S7D or any curation
 stage for this handoff.** This report update changes documentation only.
@@ -57,7 +57,7 @@ status is historical; the corrected closure completes the approved work.
 | --- | --- | --- |
 | C3-01 | Maximum target share 3%, calculated against the post-cap identity denominator. | Applied; every target passes. |
 | C3-02 | No additional target-family balancing; compare target representation, evidence, length regime, and source; use family labels as a secondary diagnostic. | Frozen FT/REF/EVAL and TRAIN/VALIDATION splits are complete. |
-| C3-03 | Retain E2–E4; exclude E5 and quantify its possible inclusion separately. | E2 800, E3 247, E4 123, E5 0; informational E5 diagnostic complete. |
+| C3-03 | Retain E2–E4; exclude E5 and quantify its possible inclusion separately. | E1 0, E2 800, E3 247, E4 123, E5 0; informational E5 diagnostic complete. E1 was never assigned under the applied verified-complex rule. |
 | C3-04 | Retain protein-only primary scope. | Non-protein records remain parked. |
 | C3-05 | Remove whole clusters deterministically: target-pure first, ranked by descending target count; use mixed clusters only if needed with least collateral removal; break ties by stable cluster ID and recompute the denominator after each removal. | Two NGF target-pure clusters removed; 108 identities; no mixed-cluster or collateral removals. |
 
@@ -96,6 +96,13 @@ closure snapshot, not a live status claim about subsequent modelling work.
 | Qualitative binding (E3) | 247 | 21.11% |
 | Selection / enrichment (E4) | 123 | 10.51% |
 | Database/deposit-only (E5) | 0 | 0.00% |
+| Verified aptamer–target complex (E1) | 0 | 0.00% |
+
+E1 is genuinely absent from the final primary corpus and from the upstream primary tables. `corpus_final.csv` has `binding_evidence_type` quantitative_affinity / qualitative_binding / selection_enrichment = 800 / 247 / 123, and `binding_evidence_score` 4 / 3 / 2 for those same counts. The implemented ladder is E1=5, E2=4, E3=3, E4=2, E5=1. Score 5, type `structural`, `evidence_level = E1`, and nonempty `pdb_id` are all 0 on 1170 rows. S4 evidence proposals (3095 rows), reviewed S4 relationships (2948), and the pre-cap deduplicated and clustered tables (1278) are also E1=0. S7A removed 108 E4 ENA identities and no E1 row.
+
+The curation plan's source table says a riboaptamer mmCIF URL, or AptamerBase `has_experimentally_determined_structure`, can assign E1. The applied CHECKPOINT-2 rule records those signals as unverified (`mmcif_url_present_complex_not_verified`, `has_experimentally_determined_structure_true_not_verified_complex`) and sets the level from affinity, assay, or selection. No proposal row is E1.
+
+Of 95 S4-input riboaptamer records with a nonempty mmCIF URL, the record map sends 34 to the primary corpus (31 protein E2, 3 protein E4), 50 to `park_non_protein`, and 11 to `hold_target_unresolved`. All 34 primary-candidate records are present in the final corpus. The 34 identities that include one are 31 E2 and 3 E4. On 31 of those identities the mmCIF record is the primary `record_id`; on 3 it is only a contributing record. The URLs match a PDB-style accession pattern, and `pdb_id` stays blank. Of 125 S4-input AptamerBase records with the experimental-structure flag true, the record map sends 64 to the primary corpus (56 protein E2, 8 protein E3), 41 to `park_non_protein`, and 20 to `hold_target_unresolved`. All 64 primary-candidate records are present in the final corpus, across 71 identities (65 E2, 6 E3). On 68 of those identities the structure-flag record is the primary `record_id`. Quantitative affinity assigned E2 where that rule fired. The structure signal did not create an E1 row. The E2–E4 statement is correct for this corpus. Counts are from the S4 record map, the S4-ready inputs, and `corpus_final.csv`.
 
 Target family is unknown for 986/1170 identities (84.27%). It remains a secondary
 diagnostic rather than a balancing objective. The largest retained targets include
@@ -141,6 +148,18 @@ The upstream profile found length regimes associated with source, without provin
 a protocol cause. This remains a caveat for length priors and reference distributions.
 Any RNAGenesis development choice must respect the frozen role restrictions above.
 
+### Corrected S7B and S7C search results
+
+These are the corrected 1170-identity search results. S7B values are in `data/interim/s7b_partition/s7b_partition_manifest.json` and `config/checkpoint_reviews/s7b_partition_freeze.json`. S7C values are in `data/interim/s7c_ft_split/s7c_ft_split_manifest.json` and `config/checkpoint_reviews/s7c_ft_split_freeze.json`. The matching preview manifests agree on the objectives (0 objective mismatches). Random baselines are in the corrected preview manifests only: `data/interim/s7b_partition_preview/s7b_partition_preview_manifest.json` and `data/interim/s7c_ft_split_preview_v2/s7c_ft_split_preview_manifest.json`.
+
+Accepted swaps, pass counts, convergence, and `determinism_ok` are recorded. Swaps considered, exact objective evaluations, and elapsed search time were computed during search and were not written to these manifests.
+
+S7B uses `jsd_minimax` with log base 2 and cluster quotas FT/REF/EVAL 632/79/79 (identities 858/131/181). O1 = D_target = 0.2651670832178181. O3 = 0.2934460226158675. The other primary components are D_source 0.02791414733622999, D_evidence 0.0003621586886345721, and D_length 0.0000026333731848120863. Greedy O1 before local search was 0.48140955249371287. Local search accepted 4342 pairwise swaps across 97 passes, including the terminal no-improve pass, and converged. `determinism_ok` is true. Across 21 random seeds, O1 min/mean/max = 0.41327561989158856 / 0.4673373014154567 / 0.497941055448334.
+
+S7C uses maximum absolute category-proportion deviation inside FT. Cluster quotas are TRAIN 569 and VALIDATION 63, giving TRAIN 726 identities / 669 cores and VALIDATION 132 identities / 95 cores. R1 = M_target = 0.01282051282051282. R3 = 0.01862200443076723. The other primary components are M_source 0.0029137529137529122, M_length 0.0017222375310003146, and M_evidence 0.0011655011655011815. Greedy R1 before local search was 0.12589769726173378. Local search accepted 567 pairwise swaps across 29 passes, including the terminal no-improve pass, and converged. `determinism_ok` is true. Across 21 random seeds, R1 min/mean/max = 0.043206793206793215 / 0.07906851280997876 / 0.16947907165298473. JSD on this split is diagnostic only; diagnostic O1 is 0.4559281414000081.
+
+The stage narratives in [global S7B](global_s7b_partition.md) and [global S7C](global_s7c_ft_train_validation.md) still describe the superseded 2026-09-21 split, including its O1/R1 and the 678/117 core counts. Those pages are historical for the objectives. The corrected values are the ones in this section.
+
 ### E5 and other excluded lanes
 
 The E5 counterfactual reports 521 relationship rows / 521 source records, 520 exact
@@ -179,7 +198,7 @@ of this report. Use the final-file hashes above for the modelling handoff.
 - **Sequence core / full sequence:** the core is the standardised sequence used to compare and cluster aptamers. The full sequence retains construct context such as flanking regions where available.
 - **Sequence cluster / related-sequence cluster:** a group of similar sequence cores. Clusters are kept intact in the frozen splits so related sequences cannot leak between FT, REF, and EVAL. The final grouping combines 90% sequence-similarity clustering with trusted ENA family links; not every pair within a final cluster must itself be 90% identical.
 - **Leakage-safe:** closely related sequences are assigned together, rather than being allowed to appear in both model development and evaluation datasets.
-- **Evidence level:** E2 means a reported quantitative affinity measurement (for example Kd, Ka, or IC50) against a named protein; E3 means a named qualitative binding assay without a quantitative constant; E4 means a published selection/enrichment result without an independent binding assay; E5 means a database/deposit target annotation without a traceable assay. The current inclusion threshold is E4 or stronger.
+- **Evidence level:** E1 means a verified experimental structure of the aptamer–target complex. E2 means a reported quantitative affinity measurement (for example Kd, Ka, or IC50) against a named protein; E3 means a named qualitative binding assay without a quantitative constant; E4 means a published selection/enrichment result without an independent binding assay; E5 means a database/deposit target annotation without a traceable assay. The implemented scores are E1=5 through E5=1. An mmCIF URL or a structure boolean does not assign E1. The current inclusion threshold is E4 or stronger, and the frozen corpus contains E2–E4 only.
 - **Corroboration:** independent source databases supporting the same aptamer–target identity. It preserves provenance but does not upgrade the evidence level.
 - **FT / REF / EVAL:** frozen fine-tuning, reference, and evaluation partitions. FT is further split into TRAIN and VALIDATION; only TRAIN is used for fitting.
 
@@ -192,6 +211,13 @@ The superseded build had 1173 identities / 794 clusters / 1036 unique cores,
 Its TRAIN counts were 746 identities / 571 clusters / 678 cores; VALIDATION was
 149 / 64 / 117. These values and that build's hashes are superseded by the corrected
 closure. Historical final-file hashes are not repeated here; they remain in Git history.
+
+That 678/117 TRAIN/VALIDATION core split is the earlier M3 length discrepancy.
+Its short/long counts were TRAIN 382/296 and VALIDATION 66/51. M3 found obsolete
+repository-local copies with those counts; they failed the RNA alphabet gate and
+were deleted. The corrected expectation, which M0 and M3 gated, is 669 TRAIN cores
+(386 short / 283 long) and 95 VALIDATION cores (55 short / 40 long). Those are the
+S7D counts in the frozen-role table above. The 678/117 figures stay historical.
 
 ### Corrected S6/pre-cap profile retained for stage provenance
 
