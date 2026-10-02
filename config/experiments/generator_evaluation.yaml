@@ -1,7 +1,9 @@
 # APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
 # This file must not be consumed by an executable workflow.
 # Guardrails, checkpoint selection, diagnostics, and final evaluation are approved for implementation only.
-# No clustering identity threshold is defined here. M4 is not complete.
+# No clustering identity threshold is defined here.
+# Formal M4 is COMPLETE / GO for M5 planning only. This file remains
+# non-executable and does not authorise M5 execution or D1 training.
 
 document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
 consumable_by_executable_workflow: false
@@ -23,6 +25,7 @@ human_approval:
     - staging
     - committing
     - pushing
+  # Historical Stage 1 approval. Formal closure is final_m4_closure_blockers.
   m4_complete: false
   previous_document_status: DRAFT_PENDING_HUMAN_APPROVAL
 schema_version: m4-stage1-draft-1
@@ -179,10 +182,15 @@ statistical_reporting:
   avoid: tiny_p_values_produced_only_by_tens_of_thousands_of_generated_sequences
 
 final_m4_closure_blockers:
-  status: OPEN_AFTER_STAGE_1_IMPLEMENTATION_APPROVAL_UNTIL_FINAL_M4_COMPLETE
-  may_remain_open_after_approval_of_this_stage_1_package: true
-  may_remain_open_after_approval_of_this_draft: true
-  m4_complete: false
+  status: RESOLVED_M4_COMPLETE_GO_M5_PLANNING_ONLY
+  may_remain_open_after_approval_of_this_stage_1_package: false
+  may_remain_open_after_approval_of_this_draft: false
+  m4_complete: true
+  resolved_on: 2 October 2026
+  decision: GO
+  decision_scope: m5_planning_only
+  m5_execution_authorised: false
+  d1_training_authorised: false
   must_be_resolved_before: final_M4_COMPLETE_GO
   items:
     - accepted_implementation

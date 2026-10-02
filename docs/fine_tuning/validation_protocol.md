@@ -2,7 +2,7 @@
 
 **APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION**
 
-This document must not be consumed by an executable workflow. The Stage 1 protocol package is approved for M4 implementation only. It does not create draw tensors, generate sequences, train a model, select a checkpoint, or open an evidence directory. M4 is not complete.
+This document must not be consumed by an executable workflow. The Stage 1 protocol package is approved for M4 implementation only. It does not create draw tensors, generate sequences, train a model, select a checkpoint, or open an evidence directory. Formal M4 is COMPLETE / GO for M5 planning only. This document does not authorise M5 execution or D1 training.
 
 Human approval:
 
@@ -31,11 +31,15 @@ Written against MRes `b690f44a025a3790f1af1865856fc480dbec1079`. The implementat
 
 The approved Stage 1 design fixes the development metric, the checkpoint-selection rule, and the generated-sample guardrail structure. Requested-length exact-hit rates remain required diagnostic reports. The historical provisional values 0.90 and 0.50 are not execution-success requirements. This approval is for implementation only.
 
-On 1 October 2026 Laura Hardy superseded the discussed Approach A fixed-full-table R=32 design before implementation, plan materialization, biological-data access, authorization, or execution. No Approach A schedule, runner, evidence, output, or GPU run exists. The active M4 design is the restored Stage 1 diagnostic contract. Phase A and Phase B evidence remains accepted and unchanged. The selected cap remains `max_seq_len = requested_biological_length + 1`. Early EOS and length mismatch remain observed generator behaviours. They do not trigger rejection, replacement, resampling, or diagnostic-run failure. The design does not declare an exact-length accepted pool or a final M8 production protocol. M4 is not complete.
+On 1 October 2026 Laura Hardy superseded the discussed Approach A fixed-full-table R=32 design before implementation, plan materialization, biological-data access, authorization, or execution. No Approach A schedule, runner, evidence, output, or GPU run exists. The active M4 design is the restored Stage 1 diagnostic contract. Phase A and Phase B evidence remains accepted and unchanged. The selected cap remains `max_seq_len = requested_biological_length + 1`. Early EOS and length mismatch remain observed generator behaviours. They do not trigger rejection, replacement, resampling, or diagnostic-run failure. The design does not declare an exact-length accepted pool or a final M8 production protocol. At that course change, M4 was not complete.
 
-The same day, the CPU development-pool schedule at `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1` and the CPU VALIDATION draw artifacts at `/home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1` were accepted. The schedule hash is `0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0`. The length-vector hash is `7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c`. The schedule keeps all 1,000 raw attempts, 112 invocations, NumPy 1.22.0, sampling seed 43000, and invocation seeds `44000 + invocation_index`. It does not reject, replace, resample, pad, trim, drop, or deduplicate. The VALIDATION role has 95 sequences, 4 draws, and seed 1. Clustering and frozen-representation metrics stay deferred. B0, B2, Phase A, and Phase B evidence is unchanged. B1 success, checkpoint eligibility, M4 completion, M5, D1 training, REF access, and EVAL access remain unclaimed.
+The same day, the CPU development-pool schedule at `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1` and the CPU VALIDATION draw artifacts at `/home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1` were accepted. The schedule hash is `0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0`. The length-vector hash is `7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c`. The schedule keeps all 1,000 raw attempts, 112 invocations, NumPy 1.22.0, sampling seed 43000, and invocation seeds `44000 + invocation_index`. It does not reject, replace, resample, pad, trim, drop, or deduplicate. The VALIDATION role has 95 sequences, 4 draws, and seed 1. Clustering and frozen-representation metrics stay deferred. B0, B2, Phase A, and Phase B evidence is unchanged. At that CPU-artifact acceptance, B1 success, checkpoint eligibility, M4 completion, M5, D1 training, REF access, and EVAL access remained unclaimed.
 
-`config/experiments/B1_generic_generation.yaml` records those accepted CPU artifacts and now holds one active unconsumed development-pool authorisation, `m4_b1_development_pool_d2b2041520d1_gpu1_attempt1`. The shared document gates and `development_pool_execution` are open for that run only. Phase A and Phase B stay non-executable. The binding is physical GPU 1, UUID `GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, `CUDA_VISIBLE_DEVICES=1`, `CUDA_DEVICE_ORDER=PCI_BUS_ID`, and logical `cuda:0`. `authorization_parent_commit` and `executing_implementation_commit` are both `4de4246aa4a97eadaf30caf449e3046378832366`. The block does not store `authorization_commit`. RNAGenesis remains `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c`. The CPU artifacts were materialised at `d2b2041520d176ebd10a1553cf1fec65ad447ac5` and are not rewritten. The evidence directory `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1` is not created by this record. The future authorization commit must have `4de4246aa4a97eadaf30caf449e3046378832366` as its single parent and must not modify the runner. The runner computes `authorization_commit` from live HEAD and refuses a dirty worktree. This protocol document is not that execution grant. M5, D1 training, REF, and EVAL remain closed.
+On 2 October 2026 the B1 development-pool evidence at `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1` was accepted for its diagnostic M4 role. The authorisation `m4_b1_development_pool_d2b2041520d1_gpu1_attempt1` is inactive, consumed, successful, and `consumed_complete`. Its physical GPU 1 scope is preserved: UUID `GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, `CUDA_VISIBLE_DEVICES=1`, `CUDA_DEVICE_ORDER=PCI_BUS_ID`, and logical `cuda:0`. Recording that consumption does not claim that access to GPU 1 has been revoked. `authorization_parent_commit` and `executing_implementation_commit` remain `4de4246aa4a97eadaf30caf449e3046378832366`. The runner computed `authorization_commit` `9c0624e9384e19930251355a6b1d61b2d4fdb153` from live HEAD. RNAGenesis remains `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c`. The CPU artifacts materialised at `d2b2041520d176ebd10a1553cf1fec65ad447ac5` are not rewritten.
+
+Independent revalidation, without rewriting the evidence, reconciled 112 invocation files, 1,000 raw records, and 1,000 audited records: 1,000 parsed and valid outputs, zero invalid outputs, 961 exact-length hits, exact-hit rate 0.961, 39 early-EOS length shortfalls, zero length excesses, 1,000 unique outputs, zero duplicates, largest duplicate multiplicity 1, and largest duplicate share 0.001. The pool is a diagnostic generation sample reusable for the later paired D1 workflow. It is not an independent-biological-replicate set or an exact-length accepted production pool. `exact_length_accepted_pool_declared`, `final_production_mapping_declared`, and `final_m8_production_protocol_declared` stay false. B0, B2, Phase A, and Phase B evidence hashes are unchanged. Clustering-dependent and frozen-representation metrics stay deferred beyond M4. The fixed VALIDATION ordering, stored timestep and noise artifacts, checkpoint-selection rule, core sample guardrails, and D1 pilot fields stay in force. Microbatch size, gradient accumulation, numerical precision, and EMA stay deferred to M5.
+
+Formal M4 is **COMPLETE / GO**. The GO authorises progression to M5 planning only. It does not authorise M5 execution or D1 training. REF and EVAL remain closed.
 
 This approval does not:
 
@@ -43,7 +47,7 @@ This approval does not:
 - keep clustering-dependent claims or a clustering identity threshold inside M4;
 - keep frozen-representation or embedding-aggregation metrics inside M4;
 - choose the D1 microbatch, accumulation, numerical precision, or EMA setting;
-- authorise B2 sampling, Phase A, Phase B, a second B1 run, or the D1 pilot. The single development-pool grant above is the only GPU authorisation in the B1 configuration.
+- authorise B2 sampling, Phase A, Phase B, a second B1 run, M5 execution, or the D1 pilot. The consumed development-pool authorisation is not a new grant.
 
 M5 must pass before the D1 pilot configuration can become executable. Microbatch, accumulation, mixed precision, and EMA stay assigned to M5. Their absence does not, by itself, block final M4 closure. Matters that can remain open after this implementation approval, and that must be resolved before final M4 `COMPLETE / GO`, are listed in section 10.
 
@@ -243,13 +247,13 @@ An executable workflow must refuse this approved-for-implementation package. In 
 - overwrite or append to an existing evidence directory;
 - rerun the completed accepted B2 evidence;
 - rerun Phase A or Phase B;
-- execute the 1,000-attempt pool from a dirty worktree, from Phase A, from Phase B, or from any HEAD that is not a clean single-parent authorization commit whose parent is `4de4246aa4a97eadaf30caf449e3046378832366`;
+- rerun the accepted 1,000-attempt development pool, or treat its consumed authorisation as a new grant;
 - resample, replace, or rewrite the accepted fixed validation-draw tensors or the ordered-core artifact;
 - start the D1 pilot.
 
-## 10. Blockers remaining before final M4 closure
+## 10. M4 closure
 
-This implementation does not mark M4 complete. Final completion still requires:
+The closure conditions are satisfied. Formal M4 is COMPLETE / GO for M5 planning only:
 
 - accepted implementation;
 - the materialised and accepted 1,000-attempt schedule;
@@ -258,7 +262,7 @@ This implementation does not mark M4 complete. Final completion still requires:
 - frozen code and configuration hashes;
 - the final human closure decision.
 
-Formally deferred beyond M4, and therefore not M4 closure blockers:
+The GO does not authorise M5 execution or D1 training. Formally deferred beyond M4, and therefore not M4 closure blockers:
 
 - clustering-dependent claims;
 - selection of a clustering identity threshold;

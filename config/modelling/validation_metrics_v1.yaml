@@ -1,7 +1,13 @@
 # APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
 # This file must not be consumed by an executable workflow.
 # Fixed-draw validation and generated-sample guardrails are approved for implementation only.
-# This approval does not create the draw tensors and does not select a checkpoint.
+# Formal M4 is COMPLETE / GO for M5 planning only. This file remains
+# non-executable. The fixed ordering, timestep and noise artifacts,
+# checkpoint-selection rule, and core sample guardrails stay in force.
+# Clustering-dependent and frozen-representation metrics stay deferred
+# beyond M4. Microbatch, gradient accumulation, numerical precision, and
+# EMA stay deferred to M5. This approval does not create the draw tensors,
+# select a checkpoint, or authorise M5 execution or D1 training.
 
 document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
 consumable_by_executable_workflow: false

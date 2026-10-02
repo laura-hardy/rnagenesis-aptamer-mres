@@ -1,7 +1,9 @@
 # APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
 # This file must not be consumed by an executable workflow.
 # The one-epoch/21-update D1 pilot design is approved for implementation only.
-# It remains blocked by M5 and later human authorization. Do not run it.
+# Formal M4 is COMPLETE / GO for M5 planning only. That GO does not make
+# this pilot executable. It remains blocked by M5 and later human
+# authorization. Do not run it.
 
 document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
 consumable_by_executable_workflow: false
@@ -166,6 +168,11 @@ unresolved_until_m5:
     - ema_use
     - whether_generation_uses_raw_or_ema_weights
   m4_closure:
+    formal_status: COMPLETE
+    decision: GO
+    decision_scope: m5_planning_only
+    m5_execution_authorised: false
+    d1_training_authorised: false
     these_items_are_deferred_to_m5: true
     absence_does_not_by_itself_block_final_m4_closure: true
     reason: >

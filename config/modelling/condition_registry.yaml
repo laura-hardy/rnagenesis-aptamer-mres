@@ -1,7 +1,9 @@
 # APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
 # This file must not be consumed by an executable workflow.
 # M4 Stage 1 condition labels are approved for implementation only.
-# This registry does not authorise generation, training, checkpoint selection, or a run.
+# Formal M4 is COMPLETE / GO for M5 planning only. This registry remains
+# non-executable. It does not authorise M5 execution, D1 training,
+# generation, checkpoint selection, or a run.
 
 document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
 consumable_by_executable_workflow: false

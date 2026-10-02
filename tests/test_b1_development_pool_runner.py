@@ -1,8 +1,10 @@
 """CPU-only tests for the restored B1 development-pool diagnostic contract.
 
 These tests do not query a GPU, initialise CUDA, load model weights, run
-generation.py, rewrite the accepted CPU artifacts, or create the prepared
-evidence directory.
+generation.py, rewrite the accepted CPU artifacts, or rewrite the accepted
+development-pool evidence directory. The checked-in configuration refuses
+at the earliest shared closed gate. Synthetic explicitly opened
+configurations cover the deeper phase and authorization gates.
 """
 
 from __future__ import annotations
@@ -130,6 +132,46 @@ def assert_regular_file(test, path, byte_count, digest):
     test.assertTrue(stat.S_ISREG(observed.st_mode))
     test.assertEqual(observed.st_size, byte_count)
     test.assertEqual(sha256_file(path), digest)
+
+
+POOL_EVIDENCE_FILES = {
+    "development_pool_manifest.json": (
+        82416,
+        "6a3e3be9d589443e82f2f8b0321c445e96f0f989b4984ec8c25ce10db48927c8",
+    ),
+    "development_pool_manifest_sha256.json": (
+        635,
+        "15acfa7b7ee0fbaba27e03a3719f72c1b8fbc881d7e23ec7d0350df2fe5be99e",
+    ),
+    "development_pool_metrics.json": (
+        76776,
+        "5c927839c94d78d575d787392da137c28f1310ef637b57bbb8b500e7dbf9b3ea",
+    ),
+    "development_pool_raw_attempts.jsonl": (
+        222388,
+        "086d26458fc2363017c812dc65cb0440185ad6b4f8cfe4fc3377dfa74c5f292a",
+    ),
+    "development_pool_audited_attempts.jsonl": (
+        530720,
+        "3aad5a0cd59405aca52a9800c47c1fe8f70e474d68b8a602e5fb1b8f5e14e150",
+    ),
+    "development_pool_invocation_outputs.json": (
+        52917,
+        "331308120e3ce7d672381178a06b1924dabd371cc5cfdaa8f9787e924725d572",
+    ),
+    "development_pool_schedule.json": (30125, SCHEDULE_SHA256),
+    "development_pool_schedule_sha256.json": (
+        140,
+        "7ad13cf5155c55c5cb6ba24f91159c45cc3c3ffa51cd407a92a267e2e51407df",
+    ),
+}
+
+
+def assert_pool_evidence_unchanged(test):
+    test.assertTrue(POOL_EVIDENCE.is_dir())
+    test.assertFalse(POOL_EVIDENCE.is_symlink())
+    for name, (byte_count, digest) in POOL_EVIDENCE_FILES.items():
+        assert_regular_file(test, POOL_EVIDENCE / name, byte_count, digest)
 
 
 def synthetic_lengths():
@@ -741,14 +783,27 @@ class ExecutionGateTests(unittest.TestCase):
     def test_checked_in_configuration_refuses_before_side_effects(self):
         config = yaml.safe_load(B1_CONFIG.read_text(encoding="utf-8"))
         text = B1_CONFIG.read_text(encoding="utf-8")
-        self.assertTrue(runner.assert_configuration_consumable(config))
-        self.assertEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
-        self.assertIs(config["consumable_by_executable_workflow"], True)
-        self.assertIs(config["execution"]["authorised"], True)
-        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], True)
+        with self.assertRaises(runner.DevelopmentPoolError) as closed:
+            runner.assert_configuration_consumable(config)
+        self.assertEqual(closed.exception.code, "configuration_not_consumable")
+        self.assertEqual(
+            closed.exception.detail,
+            "consumable_by_executable_workflow is not true",
+        )
+        self.assertEqual(
+            config["document_status"],
+            "APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION",
+        )
+        self.assertNotEqual(config["document_status"], runner.EXECUTABLE_DOCUMENT_STATUS)
+        self.assertIs(config["consumable_by_executable_workflow"], False)
+        self.assertIs(config["execution"]["authorised"], False)
+        self.assertIs(config["execution"]["gpu_authorised_by_this_approval"], False)
         self.assertIs(config["execution"]["gpu_authorised_by_this_draft"], False)
-        self.assertIs(config["development_pool_execution"]["executable_now"], True)
-        self.assertEqual(config["development_pool_execution"]["status"], runner.POOL_EXECUTION_STATUS)
+        self.assertIs(config["development_pool_execution"]["executable_now"], False)
+        self.assertEqual(
+            config["development_pool_execution"]["status"],
+            "EVIDENCE_ACCEPTED_NOT_REEXECUTABLE",
+        )
         self.assertIs(config["development_pool_execution"]["selects_a_physical_gpu"], False)
         self.assertIs(config["phase_a"]["executable_now"], False)
         self.assertEqual(config["phase_a"]["status"], "COMPLETE_EVIDENCE_ACCEPTED")
@@ -774,23 +829,53 @@ class ExecutionGateTests(unittest.TestCase):
         phase_b_runner = load_module("b1_phase_b_runner_closed", ROOT / "scripts/b1_phase_b_runner.py")
         with self.assertRaises(generic.B1RunnerError) as phase_a_closed:
             generic.assert_document_gates(config)
-        self.assertEqual(phase_a_closed.exception.code, "phase_a_not_authorised")
-        self.assertEqual(phase_a_closed.exception.detail, "phase_a.executable_now is not true")
+        self.assertEqual(phase_a_closed.exception.code, "configuration_not_consumable")
+        self.assertEqual(
+            phase_a_closed.exception.detail,
+            "consumable_by_executable_workflow is not true",
+        )
         with self.assertRaises(phase_b_runner.PhaseBRunnerError) as phase_b_closed:
             phase_b_runner.assert_configuration_consumable(config)
         self.assertEqual(phase_b_closed.exception.code, "configuration_not_consumable")
-        self.assertEqual(phase_b_closed.exception.detail, "phase_b.executable_now is not true")
+        self.assertEqual(
+            phase_b_closed.exception.detail,
+            "consumable_by_executable_workflow is not true",
+        )
+        opened_phase = yaml.safe_load(B1_CONFIG.read_text(encoding="utf-8"))
+        opened_phase["document_status"] = runner.EXECUTABLE_DOCUMENT_STATUS
+        opened_phase["consumable_by_executable_workflow"] = True
+        opened_phase["execution"]["authorised"] = True
+        opened_phase["execution"]["gpu_authorised_by_this_approval"] = True
+        with self.assertRaises(runner.DevelopmentPoolError) as pool_phase:
+            runner.assert_configuration_consumable(opened_phase)
+        self.assertEqual(pool_phase.exception.code, "configuration_not_consumable")
+        self.assertEqual(
+            pool_phase.exception.detail,
+            "development_pool_execution.executable_now is not true",
+        )
+        with self.assertRaises(generic.B1RunnerError) as opened_phase_a:
+            generic.assert_document_gates(opened_phase)
+        self.assertEqual(opened_phase_a.exception.code, "phase_a_not_authorised")
+        self.assertEqual(opened_phase_a.exception.detail, "phase_a.executable_now is not true")
+        with self.assertRaises(phase_b_runner.PhaseBRunnerError) as opened_phase_b:
+            phase_b_runner.assert_configuration_consumable(opened_phase)
+        self.assertEqual(opened_phase_b.exception.code, "configuration_not_consumable")
+        self.assertEqual(opened_phase_b.exception.detail, "phase_b.executable_now is not true")
         self.assertNotIn("authorization_commit", runner.AUTHORISATION_KEYS)
         self.assertIn("authorization_parent_commit", runner.AUTHORISATION_KEYS)
-        block = runner.assert_development_pool_authorisation(config, 1, str(POOL_EVIDENCE))
+        with self.assertRaises(runner.DevelopmentPoolError) as inactive:
+            runner.assert_development_pool_authorisation(config, 1, str(POOL_EVIDENCE))
+        self.assertEqual(inactive.exception.code, "authorisation_inactive")
+        block = config[runner.AUTHORISATION_NAME]
         self.assertEqual(list(block), list(runner.AUTHORISATION_KEYS))
         self.assertEqual(set(block), set(runner.AUTHORISATION_KEYS))
         self.assertEqual(len(block), len(runner.AUTHORISATION_KEYS))
         self.assertNotIn("authorization_commit", block)
         self.assertEqual(block["authorisation_id"], AUTHORISATION_ID)
-        self.assertIs(block["authorisation_active"], True)
-        self.assertEqual(block["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
-        self.assertIs(block["consumed"], False)
+        self.assertIs(block["authorisation_active"], False)
+        self.assertEqual(block["activation_status"], "consumed_complete")
+        self.assertIs(block["consumed"], True)
+        self.assertIs(block["success_claimed"], True)
         self.assertIs(block["authorises_b1_development_pool"], True)
         self.assertIs(block["gpu_use_authorised"], True)
         self.assertIs(type(block["physical_gpu"]), int)
@@ -807,7 +892,6 @@ class ExecutionGateTests(unittest.TestCase):
         self.assertEqual(block["evidence_directory"], str(POOL_EVIDENCE))
         self.assertEqual(block["schedule_sha256"], SCHEDULE_SHA256)
         for key in (
-            "success_claimed",
             "m4_complete",
             "b1_eligible",
             "exact_length_accepted_pool_declared",
@@ -822,9 +906,9 @@ class ExecutionGateTests(unittest.TestCase):
         self.assertNotIn("authorization_commit", proposal)
         self.assertIs(proposal["authorisation_active"], False)
         self.assertNotEqual(proposal["activation_status"], runner.ACTIVE_UNCONSUMED_STATUS)
-        self.assertEqual(text.count("authorisation_active: true"), 1)
-        self.assertEqual(text.count("activation_status: active_unconsumed"), 1)
-        self.assertEqual(text.count("activation_status: consumed_complete"), 2)
+        self.assertEqual(text.count("authorisation_active: true"), 0)
+        self.assertEqual(text.count("activation_status: active_unconsumed"), 0)
+        self.assertEqual(text.count("activation_status: consumed_complete"), 3)
         self.assertEqual(text.count("activation_status: revoked_unconsumed"), 1)
         course = config["m4_course_change_1_october_2026"]
         approach = course["approach_a_fixed_full_retry_table_r32"]
@@ -834,8 +918,12 @@ class ExecutionGateTests(unittest.TestCase):
         self.assertIs(approach["schedule_exists"], False)
         self.assertEqual(course["active_m4_design"], "restored_stage_1_diagnostic_contract")
         self.assertIs(course["exact_length_accepted_pool_declared"], False)
-        self.assertIs(config["limited_development_pool"]["development_pool_authorised"], True)
-        self.assertIs(config["limited_development_pool"]["executable_now"], True)
+        self.assertEqual(
+            config["limited_development_pool"]["status"],
+            "DIAGNOSTIC_EVIDENCE_ACCEPTED_NOT_REEXECUTABLE",
+        )
+        self.assertIs(config["limited_development_pool"]["development_pool_authorised"], False)
+        self.assertIs(config["limited_development_pool"]["executable_now"], False)
         self.assertIs(config["limited_development_pool"]["sampling_authorised"], False)
         self.assertIn(AUTHORIZATION_PARENT, config["limited_development_pool"]["blocked_until"])
         self.assertIn("Phase A, Phase B, M5", config["limited_development_pool"]["blocked_until"])
@@ -900,14 +988,13 @@ class ExecutionGateTests(unittest.TestCase):
                 )
         finally:
             runner.production_dependencies = original
-        self.assertEqual(code, 1)
-        self.assertIn("provenance_mismatch", stderr.getvalue())
-        self.assertIn("MRes worktree or index is not clean", stderr.getvalue())
+        self.assertEqual(code, 2)
+        self.assertIn("configuration_not_consumable", stderr.getvalue())
+        self.assertIn("consumable_by_executable_workflow is not true", stderr.getvalue())
         self.assertNotIn(length_path, opened)
         self.assertNotIn("gpu", opened)
         self.assertNotIn("mkdir", opened)
-        self.assertFalse(POOL_EVIDENCE.exists())
-        self.assertFalse(POOL_EVIDENCE.is_symlink())
+        assert_pool_evidence_unchanged(self)
         self.assertEqual(list(inspect.signature(runner.main).parameters), ["argv"])
         self.assertNotIn("generate", inspect.signature(runner.main).parameters)
 
@@ -916,7 +1003,7 @@ class ExecutionGateTests(unittest.TestCase):
         grant = loaded[runner.AUTHORISATION_NAME]
         with self.assertRaises(runner.DevelopmentPoolError) as wrong_gpu:
             runner.assert_development_pool_authorisation(loaded, 0, str(POOL_EVIDENCE))
-        self.assertEqual(wrong_gpu.exception.code, "gpu_binding_mismatch")
+        self.assertEqual(wrong_gpu.exception.code, "authorisation_inactive")
         accepted_probe = {
             "physical_index": 1,
             "uuid": GPU_UUID,
@@ -937,7 +1024,18 @@ class ExecutionGateTests(unittest.TestCase):
 
         def retarget(output, **changes):
             config = yaml.safe_load(B1_CONFIG.read_text(encoding="utf-8"))
+            config["document_status"] = runner.EXECUTABLE_DOCUMENT_STATUS
+            config["consumable_by_executable_workflow"] = True
+            config["execution"]["authorised"] = True
+            config["execution"]["gpu_authorised_by_this_approval"] = True
+            pool = config["development_pool_execution"]
+            pool["executable_now"] = True
+            pool["status"] = runner.POOL_EXECUTION_STATUS
             block = config[runner.AUTHORISATION_NAME]
+            block["authorisation_active"] = True
+            block["activation_status"] = runner.ACTIVE_UNCONSUMED_STATUS
+            block["consumed"] = False
+            block["success_claimed"] = False
             block["output_directory"] = output
             block["evidence_directory"] = output
             block.update(changes)
@@ -1082,7 +1180,7 @@ class ExecutionGateTests(unittest.TestCase):
             provenance_matched=True,
             manifests_exclusive=True,
         ))
-        self.assertFalse(POOL_EVIDENCE.exists())
+        assert_pool_evidence_unchanged(self)
 
     def test_accepted_artifacts_bind_the_gpu_schedule_and_refuse_resampling(self):
         config = yaml.safe_load(B1_CONFIG.read_text(encoding="utf-8"))
@@ -1145,11 +1243,57 @@ class ExecutionGateTests(unittest.TestCase):
         self.assertEqual(provenance["authorization_parent_commit"], AUTHORIZATION_PARENT)
         self.assertEqual(provenance["executing_implementation_commit"], AUTHORIZATION_PARENT)
         self.assertEqual(provenance["cpu_artifact_commit"], IMPLEMENTATION_COMMIT)
-        self.assertIs(binding["execution_authorised"], True)
-        checked_in = runner.assert_development_pool_authorisation(config, 1, str(POOL_EVIDENCE))
-        self.assertEqual(list(checked_in), list(runner.AUTHORISATION_KEYS))
-        self.assertEqual(checked_in["authorization_parent_commit"], AUTHORIZATION_PARENT)
-        self.assertEqual(checked_in["executing_implementation_commit"], AUTHORIZATION_PARENT)
+        self.assertIs(binding["execution_authorised"], False)
+        with self.assertRaises(runner.DevelopmentPoolError) as consumed_grant:
+            runner.assert_development_pool_authorisation(config, 1, str(POOL_EVIDENCE))
+        self.assertEqual(consumed_grant.exception.code, "authorisation_inactive")
+        acceptance = config["development_pool_evidence_acceptance"]
+        self.assertEqual(acceptance["status"], "ACCEPTED")
+        self.assertEqual(acceptance["invocation_files"], 112)
+        self.assertEqual(acceptance["raw_records"], 1000)
+        self.assertEqual(acceptance["audited_records"], 1000)
+        self.assertEqual(acceptance["parsed_outputs"], 1000)
+        self.assertEqual(acceptance["valid_outputs"], 1000)
+        self.assertEqual(acceptance["invalid_outputs"], 0)
+        self.assertEqual(acceptance["exact_length_hits"], 961)
+        self.assertEqual(acceptance["exact_hit_rate"], "0.961")
+        self.assertEqual(acceptance["early_eos_length_shortfalls"], 39)
+        self.assertEqual(acceptance["length_excesses"], 0)
+        self.assertEqual(acceptance["unique_outputs"], 1000)
+        self.assertEqual(acceptance["duplicates"], 0)
+        self.assertEqual(acceptance["largest_duplicate_multiplicity"], 1)
+        self.assertEqual(acceptance["largest_duplicate_share"], "0.001")
+        self.assertIs(acceptance["independent_biological_replicate_set"], False)
+        self.assertIs(acceptance["exact_length_accepted_production_pool"], False)
+        self.assertIs(acceptance["exact_length_accepted_pool_declared"], False)
+        self.assertIs(acceptance["final_production_mapping_declared"], False)
+        self.assertIs(acceptance["final_m8_production_protocol_declared"], False)
+        self.assertIs(acceptance["m5_execution_authorised"], False)
+        self.assertIs(acceptance["d1_training_authorised"], False)
+        self.assertIs(acceptance["gpu_access_revoked"], False)
+        closure = config["m4_closure"]
+        self.assertEqual(closure["status"], "COMPLETE")
+        self.assertEqual(closure["decision"], "GO")
+        self.assertEqual(closure["decision_scope"], "m5_planning_only")
+        self.assertIs(closure["m5_planning_authorised"], True)
+        self.assertIs(closure["m5_execution_authorised"], False)
+        self.assertIs(closure["d1_training_authorised"], False)
+        self.assertIs(closure["exact_length_accepted_pool_declared"], False)
+        self.assertIs(closure["final_production_mapping_declared"], False)
+        self.assertIs(closure["final_m8_production_protocol_declared"], False)
+        recorded = {
+            "development_pool_manifest_json": "development_pool_manifest.json",
+            "development_pool_manifest_sha256_json": "development_pool_manifest_sha256.json",
+            "development_pool_metrics_json": "development_pool_metrics.json",
+            "development_pool_raw_attempts_jsonl": "development_pool_raw_attempts.jsonl",
+            "development_pool_audited_attempts_jsonl": "development_pool_audited_attempts.jsonl",
+            "development_pool_invocation_outputs_json": "development_pool_invocation_outputs.json",
+            "development_pool_schedule_json": "development_pool_schedule.json",
+            "development_pool_schedule_sha256_json": "development_pool_schedule_sha256.json",
+        }
+        for key, filename in recorded.items():
+            self.assertEqual(acceptance["evidence_sha256"][key], POOL_EVIDENCE_FILES[filename][1])
+        assert_pool_evidence_unchanged(self)
         synthetic = authorised_config(str(POOL_EVIDENCE), 1, SCHEDULE_SHA256)
         authorisation = runner.assert_development_pool_authorisation(
             synthetic,

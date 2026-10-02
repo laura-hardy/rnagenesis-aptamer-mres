@@ -9,8 +9,10 @@
 # Stage 1 approval metadata. Its raw scientific output remains valid and is
 # byte-identical to attempt 2. The original attempt-1 evidence remains
 # immutable and retained. This acceptance completes B2 only. It does not
-# complete M4. GPU use, model loading, REF access, and EVAL access remain
-# prohibited. Future production execution is refused.
+# complete M4. Formal M4 closure is recorded separately and does not make
+# this file executable. GPU use, model loading, REF access, and EVAL access
+# remain prohibited. Future production execution is refused. M5 execution
+# and D1 training remain unauthorised.
 
 document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
 consumable_by_executable_workflow: false

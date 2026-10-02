@@ -1,7 +1,13 @@
-# APPROVED_FOR_SCIENTIFIC_EXECUTION
-# This document authorises one unconsumed B1 development-pool diagnostic
-# run. Phase A and Phase B evidence remains accepted and unchanged. Both
-# of those scientific-run authorisations stay consumed_complete and inactive.
+# M4 COMPLETE / GO — 2 October 2026. The GO authorises M5 planning only.
+# It does not authorise M5 execution or D1 training.
+# The single development-pool scientific authorisation
+# m4_b1_development_pool_d2b2041520d1_gpu1_attempt1 is inactive, consumed,
+# successful, and consumed_complete. authorises_b1_development_pool and
+# gpu_use_authorised record that consumed physical GPU 1 scope. They do not
+# grant another run, and this record does not claim that access to GPU 1
+# has been revoked. Phase A and Phase B evidence remains accepted and
+# unchanged. Both of those scientific-run authorisations stay
+# consumed_complete and inactive.
 # On 1 October 2026 Laura Hardy superseded the discussed Approach A
 # fixed_full_retry_table with R=32 before implementation, plan
 # materialization, biological-data access, authorization, or execution.
@@ -12,18 +18,26 @@
 # They do not trigger rejection, replacement, resampling, or run failure.
 # This design does not declare an exact-length accepted pool or a final
 # M8 production protocol. The accepted CPU schedule and VALIDATION draw
-# artifacts are recorded below and are not rewritten by this grant.
-# development_pool_scientific_execution_authorisation is the executable
-# block. It does not store authorization_commit. authorization_parent_commit
-# and executing_implementation_commit are both
-# 4de4246aa4a97eadaf30caf449e3046378832366. The future authorization commit
-# must have that commit as its single parent and must not modify the runner.
-# The runner computes authorization_commit from live HEAD. A dirty worktree
-# cannot execute. M5, D1 training, REF, and EVAL remain closed. B1 success,
-# checkpoint eligibility, and M4 completion remain unclaimed.
+# artifacts remain recorded below and are not rewritten by this acceptance.
+# Formal M4 completion is non-executable. document_status is
+# APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION and the shared
+# current-state execution gates are closed. This document is not
+# consumable by an executable workflow. Any M5 execution, D1 training,
+# or later GPU run requires a separate authorization.
+# development_pool_execution.executable_now is false. No run is authorised.
+# development_pool_scientific_execution_authorisation does not store
+# authorization_commit. authorization_parent_commit and
+# executing_implementation_commit remain
+# 4de4246aa4a97eadaf30caf449e3046378832366. The runner computed
+# authorization_commit 9c0624e9384e19930251355a6b1d61b2d4fdb153 from live
+# HEAD at execution. M5 execution, D1 training, REF, and EVAL remain closed.
+# B1 is accepted for its diagnostic M4 role. Checkpoint eligibility remains
+# unclaimed.
 
-document_status: APPROVED_FOR_SCIENTIFIC_EXECUTION
-consumable_by_executable_workflow: true
+document_status: APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
+# human_approval is the 29 September 2026 Stage 1 approval. Its
+# m4_complete value stays false. Formal milestone closure is m4_closure.
 human_approval:
   approving_person: Laura Hardy
   approval_date: 29 September 2026
@@ -51,10 +65,13 @@ condition_registry_schema_version: m4-stage1-draft-1
 metric_set_schema_version: m4-stage1-draft-1
 created_against_mres_commit: b690f44a025a3790f1af1865856fc480dbec1079
 
+# Shared execution gates are closed. gpu_authorised_by_this_draft stays
+# false. Any M5 execution, D1 training, or later GPU run requires a
+# separate authorization.
 execution:
-  authorised: true
+  authorised: false
   gpu_authorised_by_this_draft: false
-  gpu_authorised_by_this_approval: true
+  gpu_authorised_by_this_approval: false
   evidence_directory_created_by_this_stage: false
   overwrite_existing_output: refuse
   silent_truncation: false
@@ -847,18 +864,20 @@ length_algorithm:
     final_production_mapping: false
 
 limited_development_pool:
-  status: RESTORED_STAGE_1_DIAGNOSTIC_CONTRACT_AUTHORISED_FOR_ONE_UNCONSUMED_RUN
+  status: DIAGNOSTIC_EVIDENCE_ACCEPTED_NOT_REEXECUTABLE
   active_design: restored_stage_1_diagnostic_contract
-  development_pool_authorised: true
+  development_pool_authorised: false
   sampling_authorised: false
-  executable_now: true
+  executable_now: false
   separate_active_authorisation_required: true
   phase_b_candidate_mapping_unblocks_this_pool: false
-  blocked_until: "One unconsumed development-pool run is authorised. Execution still requires a clean authorization commit whose single parent is 4de4246aa4a97eadaf30caf449e3046378832366. The runner computes authorization_commit from live HEAD. This record does not claim B1 success, checkpoint eligibility, or M4 completion. Phase A, Phase B, M5, D1 training, REF, and EVAL stay closed."
+  blocked_until: "The single development-pool run is consumed_complete and is not re-executable. The authorization parent remains 4de4246aa4a97eadaf30caf449e3046378832366. Phase A, Phase B, M5 execution, and D1 training stay closed. M4 COMPLETE / GO authorises M5 planning only. Checkpoint eligibility remains unclaimed. REF and EVAL stay closed."
   identification: >
-    This 1000-attempt pool is the proposed fixed diagnostic sample for B1
-    and, with the same target-length list and paired generation-seed
-    schedule, for later D1 comparison where technically applicable.
+    This 1000-attempt pool is the accepted diagnostic generation sample for
+    B1 and, with the same target-length list and paired generation-seed
+    schedule, is reusable for the later paired D1 workflow where technically
+    applicable. It is not an independent-biological-replicate set or an
+    exact-length accepted production pool.
   raw_target_lengths: 1000
   sampling: with_replacement_from_the_669_core_TRAIN_empirical_length_list
   target_length_sampling_seed: 43000
@@ -898,9 +917,9 @@ limited_development_pool:
     1000 is not divisible by 16. Chunks use their actual size, at most 16.
     The schedule never pads, duplicates, replaces, rejects, resamples, or
     drops an attempt. Early EOS and length mismatch are diagnostic outcomes.
-    They do not fail the diagnostic run. The executable authorisation below
-    binds physical GPU 1 for one unconsumed run. It does not resample the
-    accepted schedule.
+    They do not fail the diagnostic run. The authorisation below records the
+    consumed physical GPU 1 scope. It does not authorise another run and
+    does not resample the accepted schedule.
 development_pool_schedule_acceptance:
   status: ACCEPTED
   accepted_by: Laura Hardy
@@ -923,6 +942,7 @@ development_pool_schedule_acceptance:
   trimming: false
   dropping: false
   deduplication: false
+  # Schedule-acceptance snapshot from 1 October 2026, before the consumed run.
   b1_generation_executed: false
   cuda_initialized: false
   gpu_queried: false
@@ -1029,16 +1049,19 @@ development_pool_cuda_binding:
   logical_device: cuda:0
   cpu_fallback: false
   other_gpu_fallback: false
-  execution_authorised: true
+  # Records the consumed GPU 1 binding. execution_authorised is false.
+  # It does not grant another run and does not claim that access to GPU 1
+  # has been revoked. A later GPU run requires a separate authorization.
+  execution_authorised: false
 development_pool_execution:
-  executable_now: true
-  status: AUTHORISED_FOR_EXECUTION
+  executable_now: false
+  status: EVIDENCE_ACCEPTED_NOT_REEXECUTABLE
   selects_a_physical_gpu: false
 development_pool_scientific_execution_authorisation:
   authorisation_id: m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
-  authorisation_active: true
-  activation_status: active_unconsumed
-  consumed: false
+  authorisation_active: false
+  activation_status: consumed_complete
+  consumed: true
   authorises_b1_development_pool: true
   gpu_use_authorised: true
   physical_gpu: 1
@@ -1052,7 +1075,7 @@ development_pool_scientific_execution_authorisation:
   output_directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
   evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
   schedule_sha256: 0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0
-  success_claimed: false
+  success_claimed: true
   m4_complete: false
   b1_eligible: false
   exact_length_accepted_pool_declared: false
@@ -1086,3 +1109,86 @@ development_pool_gpu1_authorisation_proposal:
   exact_length_accepted_pool_declared: false
   final_production_mapping_declared: false
   final_m8_production_protocol_declared: false
+development_pool_evidence_acceptance:
+  status: ACCEPTED
+  accepted_by: Laura Hardy
+  acceptance_date: 2 October 2026
+  acceptance_source: formal human acceptance in the M4 review chat
+  authorisation_id: m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
+  authorization_commit: 9c0624e9384e19930251355a6b1d61b2d4fdb153
+  authorization_parent_commit: 4de4246aa4a97eadaf30caf449e3046378832366
+  executing_implementation_commit: 4de4246aa4a97eadaf30caf449e3046378832366
+  evidence_directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
+  role: diagnostic_generation_sample_reusable_for_the_later_paired_d1_workflow
+  independent_biological_replicate_set: false
+  exact_length_accepted_production_pool: false
+  physical_gpu: 1
+  gpu_uuid: GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f
+  pci_bus: "00000000:61:00.0"
+  logical_device: cuda:0
+  gpu_access_revoked: false
+  invocation_files: 112
+  raw_records: 1000
+  audited_records: 1000
+  parsed_outputs: 1000
+  valid_outputs: 1000
+  invalid_outputs: 0
+  exact_length_hits: 961
+  exact_hit_rate: "0.961"
+  early_eos_length_shortfalls: 39
+  length_excesses: 0
+  unique_outputs: 1000
+  duplicates: 0
+  largest_duplicate_multiplicity: 1
+  largest_duplicate_share: "0.001"
+  exact_length_accepted_pool_declared: false
+  final_production_mapping_declared: false
+  final_m8_production_protocol_declared: false
+  m5_execution_authorised: false
+  d1_training_authorised: false
+  b1_eligible: false
+  schedule_and_validation_artifacts_rewritten: false
+  phase_a_evidence_unchanged: true
+  phase_b_evidence_unchanged: true
+  b0_evidence_unchanged: true
+  b2_evidence_unchanged: true
+  clustering_dependent_metrics_deferred_beyond_m4: true
+  frozen_representation_metrics_deferred_beyond_m4: true
+  evidence_sha256:
+    development_pool_manifest_json: 6a3e3be9d589443e82f2f8b0321c445e96f0f989b4984ec8c25ce10db48927c8
+    development_pool_manifest_sha256_json: 15acfa7b7ee0fbaba27e03a3719f72c1b8fbc881d7e23ec7d0350df2fe5be99e
+    development_pool_metrics_json: 5c927839c94d78d575d787392da137c28f1310ef637b57bbb8b500e7dbf9b3ea
+    development_pool_raw_attempts_jsonl: 086d26458fc2363017c812dc65cb0440185ad6b4f8cfe4fc3377dfa74c5f292a
+    development_pool_audited_attempts_jsonl: 3aad5a0cd59405aca52a9800c47c1fe8f70e474d68b8a602e5fb1b8f5e14e150
+    development_pool_invocation_outputs_json: 331308120e3ce7d672381178a06b1924dabd371cc5cfdaa8f9787e924725d572
+    development_pool_schedule_json: 0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0
+    development_pool_schedule_sha256_json: 7ad13cf5155c55c5cb6ba24f91159c45cc3c3ffa51cd407a92a267e2e51407df
+m4_closure:
+  status: COMPLETE
+  decision: GO
+  decision_label: "M4 COMPLETE / GO"
+  closure_date: 2 October 2026
+  approving_person: Laura Hardy
+  approval_source: formal human closure in the M4 review chat
+  decision_scope: m5_planning_only
+  m5_planning_authorised: true
+  m5_execution_authorised: false
+  d1_training_authorised: false
+  b1_diagnostic_role_accepted: true
+  b1_eligible: false
+  m4_complete: true
+  exact_length_accepted_pool_declared: false
+  final_production_mapping_declared: false
+  final_m8_production_protocol_declared: false
+  clustering_dependent_metrics: deferred_beyond_m4
+  frozen_representation_metrics: deferred_beyond_m4
+  validation_ordering_preserved: true
+  timestep_and_noise_artifacts_preserved: true
+  checkpoint_selection_rule_preserved: true
+  core_sample_guardrails_preserved: true
+  d1_pilot_fields_preserved: true
+  microbatch_gradient_accumulation_numerical_precision_and_ema: deferred_to_m5
+  ref_accessed: false
+  eval_accessed: false
+  evidence_directories_rewritten: false
+  rnagenesis_rewritten: false

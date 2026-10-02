@@ -1580,6 +1580,10 @@ Approve baseline definitions, metric definitions and D1 pilot config.
 
 - no D1 biological fine-tuning before this gate passes.
 
+**Current status: COMPLETE / GO — 2 October 2026.**
+
+The human gate is GO for M5 planning only. Laura Hardy accepted the B1 development-pool evidence at `/home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1` for its diagnostic M4 role. The authorisation `m4_b1_development_pool_d2b2041520d1_gpu1_attempt1` is inactive, consumed, successful, and `consumed_complete`. Physical GPU 1 scope is preserved and this record does not claim that access to GPU 1 has been revoked. Independent revalidation found 112 invocation files, 1,000 raw records, 1,000 audited records, 1,000 valid outputs, zero invalid outputs, 961 exact-length hits, exact-hit rate 0.961, 39 early-EOS length shortfalls, zero length excesses, 1,000 unique outputs, zero duplicates, largest duplicate multiplicity 1, and largest duplicate share 0.001. The pool is a diagnostic generation sample reusable for the later paired D1 workflow. It is not an independent-biological-replicate set or an exact-length accepted production pool. `exact_length_accepted_pool_declared`, `final_production_mapping_declared`, and `final_m8_production_protocol_declared` stay false. M5 execution and D1 training stay unauthorised. Clustering-dependent and frozen-representation metrics stay deferred beyond M4. Microbatch, gradient accumulation, numerical precision, and EMA stay deferred to M5. The accepted CPU schedule, VALIDATION artifacts, and B0, B2, Phase A, and Phase B evidence were revalidated and not rewritten.
+
 ---
 
 ### M5 — Diffusion-training software smoke tests
@@ -2046,12 +2050,12 @@ The MRes RNAGenesis modelling implementation is complete when:
 
 ## 22. Immediate next actions
 
-M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 2026. M2 is COMPLETE / GO — 28 September 2026. M3 is COMPLETE / GO — 29 September 2026, as recorded in [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c`. M4 is the next formal milestone. Biological fine-tuning is not authorised.
+M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 2026. M2 is COMPLETE / GO — 28 September 2026. M3 is COMPLETE / GO — 29 September 2026, as recorded in [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c`. M4 is COMPLETE / GO — 2 October 2026, for M5 planning only. Biological fine-tuning is not authorised. M5 execution is not authorised.
 
 Proceed in this order:
 
-1. M4, baselines and validation-protocol freeze;
-2. only then run M5 synthetic/training smoke tests on GPU0 by default when adequate memory is available, or on GPU1 only when GPU1 has been explicitly authorised for that session/run;
+1. M5 planning only. Do not execute M5 and do not begin D1 training;
+2. M5 synthetic/training smoke tests only after a later execution authorisation, on GPU0 by default when adequate memory is available, or on GPU1 only when GPU1 has been explicitly authorised for that session/run;
 3. M6 and later biological D1 fitting only after those gates pass.
 
 ---
