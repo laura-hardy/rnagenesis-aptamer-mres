@@ -1627,6 +1627,16 @@ Approve transition to real-data pilot.
 - no full TRAIN run;
 - no EVAL/REF.
 
+**Current status: COMPLETE / GO — 3 October 2026.**
+
+The human gate is GO for M6 planning only. It does not authorise M6 execution, biological TRAIN access, D1 training, REF or EVAL access, or GPU use. Attempt 3 at `/home/laura/rnagenesis-mres-runs/m5_synthetic_smoke_e8550e7_gpu1_attempt3` is the sole accepted M5 smoke evidence. Attempts 1 and 2 remain preserved failed engineering attempts and are not accepted evidence. The run exited 0, emitted `m5_smoke_manifest.json`, and emitted no failure record. Manifest SHA-256 `e82ad082d7b66adce128cf6757e36be20bf3a0289d8aa2a9b5b10754b4f53532`. After the order-independent validator correction at `9d818e11c18e33e95b48dda8b5b2a72870ca30b0`, replay with that committed contract reconstructed the canonical manifest byte for byte and left the manifest SHA unchanged. RNAGenesis was not modified and remains `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c`. Execution used implementation commit `e8550e7da095cfc6f17dd001425734e4bea6a3cb` and single-use authorisation commit `d947d4eaef7cc1e7d85cdabbf83f7e02d4bfda72`. The checked-in smoke configuration stays inactive. The stored field `m5_milestone_complete` remains false because this acceptance does not rewrite the manifest.
+
+Physical GPU 1 was `GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, NVIDIA H200 NVL. The correctness path used physical microbatch 8, gradient accumulation 4, observed effective batch 32, and FP32. Loss and gradients were finite. The gradient norm was 5.4995274281909055. The denoiser update max absolute delta was 3.0040740966796875e-05. The encoder, Q-Former, query tokens, latent projection, and decoder remained frozen after backward, update, and generation. Checkpoint fresh reload, AdamW state, scheduler, global step, RNG restoration, and the subsequent resumed update passed. The tiny overfit losses were 0.6921789050102234, 0.6151523590087891, 0.5786029696464539, 0.5625630617141724, and 0.5575369596481323. Generation reloaded the immutable one-update checkpoint after the training objects were released. Training peak allocated was 42,046,809,088 bytes and training peak reserved was 42,563,796,992 bytes. Overall peak allocated was 72,871,646,208 bytes and overall peak reserved was 73,614,229,504 bytes. Total wall time was 193.7824976965785 seconds. TRAIN, VALIDATION, REF, and EVAL were not accessed.
+
+BF16 is an observation only. The FP32 paired loss was 0.8125295639038086. The BF16 paired loss was 0.8128108978271484. The absolute difference was 0.00028133392333984375. The relative difference was 0.0003462445378457017. The comparison was finite. No acceptance tolerance was applied. It does not select production precision.
+
+Production numerical precision, production gradient accumulation and batch policy, EMA policy and raw-versus-EMA generation policy, the final D1 seed count, and biological training authorisation remain unresolved. Both smoke generation strings contain a leading `1` followed by 32 A/C/G/U characters. That is a decoder and control-token format observation, not a biologically valid sequence claim. Production generation or biological interpretation requires explicit output normalisation and nucleotide-alphabet validation.
+
 ---
 
 ### M6 — Small real-data D1 pilot
@@ -2050,13 +2060,13 @@ The MRes RNAGenesis modelling implementation is complete when:
 
 ## 22. Immediate next actions
 
-M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 2026. M2 is COMPLETE / GO — 28 September 2026. M3 is COMPLETE / GO — 29 September 2026, as recorded in [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c`. M4 is COMPLETE / GO — 2 October 2026, for M5 planning only. Biological fine-tuning is not authorised. M5 execution is not authorised.
+M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 2026. M2 is COMPLETE / GO — 28 September 2026. M3 is COMPLETE / GO — 29 September 2026, as recorded in [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c`. M4 is COMPLETE / GO — 2 October 2026, for M5 planning only. M5 is COMPLETE / GO — 3 October 2026, for M6 planning only. Biological fine-tuning is not authorised. M6 execution is not authorised. This does not authorise biological TRAIN access, D1 training, REF or EVAL access, or GPU use.
 
 Proceed in this order:
 
-1. M5 planning only. Do not execute M5 and do not begin D1 training;
-2. M5 synthetic/training smoke tests only after a later execution authorisation, on GPU0 by default when adequate memory is available, or on GPU1 only when GPU1 has been explicitly authorised for that session/run;
-3. M6 and later biological D1 fitting only after those gates pass.
+1. M6 planning only. Do not execute M6, do not access biological TRAIN, and do not begin D1 training;
+2. a biological D1 pilot only after a later, separate execution authorisation;
+3. M7 and later only after those gates pass.
 
 ---
 

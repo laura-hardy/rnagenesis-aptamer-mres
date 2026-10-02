@@ -235,7 +235,7 @@ The final pilot state remains a technical and scientific pilot result. It is not
 
 There is no automatic learning-rate change. A reduction to `1e-5` requires human review of the `3e-5` evidence. Diagnostic generation occurs only at the prespecified checkpoints above and only after its own authorization.
 
-Microbatch, accumulation, mixed precision, and EMA stay unresolved until M5 memory and smoke evidence. M5 must pass before this pilot becomes executable. Those four items are deferred to M5. Their absence does not, by itself, block final M4 closure.
+Microbatch, accumulation, mixed precision, and EMA were deferred to M5. Their absence does not, by itself, block final M4 closure. M5 must pass before this pilot becomes executable. The accepted 3 October 2026 M5 smoke does not settle them. Production numerical precision, production gradient accumulation and batch policy, EMA policy and raw-versus-EMA generation policy, the final D1 seed count, and biological training authorisation remain unresolved for M6 and D1 planning.
 
 ## 9. Still not executable
 
@@ -270,3 +270,5 @@ The GO does not authorise M5 execution or D1 training. Formally deferred beyond 
 - representation aggregation rules.
 
 Microbatch, gradient accumulation, numerical precision, and EMA stay explicitly deferred to M5. M4 is not blocked merely because those M5-dependent hardware results do not yet exist. The D1 pilot fields that are already fixed, including the learning rate, training seed, one-epoch or 21-update budget, fixed-draw validation points, and frozen EncDec, remain fixed. This implementation does not begin M5 or D1 training. The same deferrals are recorded in `config/experiments/generator_evaluation.yaml`.
+
+On 3 October 2026 formal M5 became COMPLETE / GO for M6 planning only. The account is the M5 current status in `docs/fine-tuning-implementation-plan.md` and the same-day entry in `docs/log.md`. The GO does not authorise M6 execution, biological TRAIN access, D1 training, REF or EVAL access, or GPU use. The accepted smoke does not resolve production numerical precision, production gradient accumulation and batch policy, EMA policy and raw-versus-EMA generation policy, the final D1 seed count, or biological training authorisation. This protocol remains non-executable. The M4 GO above still authorises M5 planning only; it is not the M5 acceptance.
