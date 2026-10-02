@@ -1,14 +1,16 @@
-# APPROVED_FOR_M5_IMPLEMENTATION_NOT_EXECUTION
-# This file must not be consumed by an executable workflow.
-# It contains no active authorisation and no physical GPU index, UUID, or PCI bus.
-# A later authorisation commit may change only the activation fields. It must
-# not store its own commit hash. implementation_config_sha256 stays null here
-# because this file cannot contain its own digest; a later authorisation
-# records the parent blob instead.
+# Active single-use M5 synthetic-smoke execution authorization.
+# Bound to physical GPU 1, UUID GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f,
+# PCI bus 00000000:61:00.0.
+# This authorization covers only the bounded synthetic sequence described
+# by the scope field.
+# It does not authorize biological data, TRAIN, VALIDATION, REF, EVAL,
+# D1 training, fallback microbatches, or a sweep.
+# implementation_config_sha256 identifies the reviewed inactive parent blob.
+# This authorization file cannot contain its own commit hash.
 # Smoke-only settings are not D1, M6, or M7 decisions.
 
-document_status: APPROVED_FOR_M5_IMPLEMENTATION_NOT_EXECUTION
-consumable_by_executable_workflow: false
+document_status: APPROVED_FOR_M5_SYNTHETIC_EXECUTION
+consumable_by_executable_workflow: true
 schema_version: m5-synthetic-smoke-config-1
 manifest_schema_version: m5-synthetic-smoke-manifest-1
 experiment_id: m5_synthetic_diffusion_smoke
@@ -16,44 +18,47 @@ created_against_mres_commit: 7fbf79d530e528b6be78a22d89cb9cc991914a0b
 condition_manifest_label: D1_mres_curated_aptamer_diffusion_adapted
 
 execution:
-  authorised: false
-  gpu_authorised_by_this_approval: false
+  authorised: true
+  gpu_authorised_by_this_approval: true
   evidence_directory_created_by_this_document: false
 
 smoke_execution:
-  executable_now: false
-  status: IMPLEMENTATION_ONLY_NOT_AUTHORISED
+  executable_now: true
+  status: AUTHORISED_FOR_EXECUTION
 
 smoke_execution_authorisation:
-  authorisation_id: null
-  authorisation_active: false
-  activation_status: inactive_no_authorisation
+  authorisation_id: m5_synthetic_smoke_1266a9b_gpu1_attempt1_auth
+  authorisation_active: true
+  activation_status: active_unconsumed
   consumed: false
-  single_use_run_id: null
-  authorization_parent_commit: null
-  executing_implementation_commit: null
+  single_use_run_id: m5_synthetic_smoke_1266a9b_gpu1_attempt1
+  authorization_parent_commit: 1266a9b45ae2e39fbe45a9e43474e2e9d69139b2
+  executing_implementation_commit: 1266a9b45ae2e39fbe45a9e43474e2e9d69139b2
   rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
   mres_branch: main
   implementation_contract_sha256: 43be9ddb69c8d274e583f9fc756bc7d105bbd4d82e6cea01e09d8c750abe93dc
   implementation_harness_sha256: bfeddca7beb16cd5742874cace98e81f3d33cfd6f3d3a6e014745471ee41ebc9
-  implementation_config_sha256: null
+  implementation_config_sha256: 83936e804c811385dab84bae4324526faa17ed6facdcc985ee0b8c173ac37af4
   fixture_relative_path: tests/modelling/fixtures/m5_synthetic_smoke_sequences.txt
   fixture_sha256: 123e0416257469f160f65c02ccf900109c0bfd52ee8c4b383893b40d28847558
-  output_directory: null
-  evidence_directory: null
+  output_directory: /home/laura/rnagenesis-mres-runs/m5_synthetic_smoke_1266a9b_gpu1_attempt1
+  evidence_directory: /home/laura/rnagenesis-mres-runs/m5_synthetic_smoke_1266a9b_gpu1_attempt1
   allowed_smoke_settings_sha256: 7e97f18f698d256900b5b96ee08e2020422b9cf5b97e288bfe05226fe3a8d2b2
-  authorisation_timestamp: null
-  scope: null
+  authorisation_timestamp: "2026-10-02T10:14:35Z"
+  scope: "Single-use authorization for only the one bounded synthetic M5 sequence: correctness, microbatch 8, accumulation 4, effective batch 32, FP32/BF16 observation, B1 inventory inspection, checkpoint/reload/resume, tiny overfit, and generation. This authorization excludes biological data, TRAIN, VALIDATION, REF, EVAL, D1 training, fallback microbatches, and a parameter sweep. GPU 1 is booked and shared execution has been explicitly authorized. At the identity observation it contained marjan PID 3139370, using approximately 6676 MiB; that user has been contacted."
   synthetic_only: true
   train_access: false
   validation_access: false
   ref_access: false
   eval_access: false
-  gpu_use_authorised: false
-  authorises_m5_synthetic_smoke: false
+  gpu_use_authorised: true
+  authorises_m5_synthetic_smoke: true
   success_claimed: false
   m5_complete: false
   d1_training_authorised: false
+  physical_gpu: 1
+  gpu_uuid: GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f
+  pci_bus: "00000000:61:00.0"
 
 fixture:
   relative_path: tests/modelling/fixtures/m5_synthetic_smoke_sequences.txt
