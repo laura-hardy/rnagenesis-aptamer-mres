@@ -82,15 +82,26 @@ def checkpoint_proof():
     }
     digest = "5" * 64
     config = "6" * 64
+    normalized = "e" * 64
+    ignored = {"_name_or_path": "observed-load-source"}
     return {
         "saved_file_hashes": saved,
         "fresh_load_succeeded": True,
         "original_denoiser_id": 11,
         "reloaded_denoiser_id": 22,
         "tensor_digest_comparisons": [{"name": "weight", "saved": digest, "reloaded": digest, "match": True}],
-        "configuration_compatible": True,
         "original_config_sha256": config,
         "reloaded_config_sha256": config,
+        "raw_config_sha256_equal": True,
+        "configuration_compatibility": {
+            "ignored_top_level_keys": ["_name_or_path"],
+            "original_ignored_values": dict(ignored),
+            "reloaded_ignored_values": dict(ignored),
+            "original_normalized_config_sha256": normalized,
+            "reloaded_normalized_config_sha256": normalized,
+            "normalized_config_sha256_equal": True,
+        },
+        "configuration_compatible": True,
     }
 
 
@@ -1081,6 +1092,149 @@ class HarnessMockTests(unittest.TestCase):
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(completed.stdout, "")
+
+    def test_configuration_compatibility_ignores_only_top_level_name_or_path(self):
+        import sys
+
+        original_source = "../../checkpoint-27500"
+        reloaded_source = "/home/laura/RNAGenesis/configs/rnagenesis/diffusion"
+        for path in (ROOT + "/scripts/modelling/m5_smoke_contract.py", ROOT + "/scripts/modelling/m5_smoke_harness.py"):
+            source = pathlib.Path(path).read_text(encoding="utf-8")
+            self.assertNotIn(original_source, source)
+            self.assertNotIn(reloaded_source, source)
+
+        def mapping(name_or_path, **overrides):
+            payload = {
+                "_class_name": "UNet1DModel",
+                "_diffusers_version": "0.25.0",
+                "_name_or_path": name_or_path,
+                "in_channels": 160,
+                "layers_per_block": 2,
+                "attention_head_dim": 8,
+                "block_out_channels": [32, 64],
+                "down_block_types": ["DownBlock1D", "AttnDownBlock1D"],
+                "mid_block": {"_name_or_path": "nested-source", "attention_head_dim": 8},
+            }
+            payload.update(overrides)
+            return payload
+
+        def independent_digest(payload, drop_name):
+            copied = dict(payload)
+            if drop_name and "_name_or_path" in copied:
+                del copied["_name_or_path"]
+            return contract.sha256_bytes(contract.canonical_json(copied))
+
+        def proof_for(original, reloaded):
+            observed = harness.observe_configuration_compatibility(original, reloaded)
+            saved = checkpoint_proof()["saved_file_hashes"]
+            digest = "5" * 64
+            return harness.build_checkpoint_reload_proof(
+                saved,
+                True,
+                11,
+                22,
+                [{"name": "weight", "saved": digest, "reloaded": digest, "match": True}],
+                observed,
+            )
+
+        original = mapping(original_source)
+        reloaded = mapping(reloaded_source)
+        observed = harness.observe_configuration_compatibility(original, reloaded)
+        compatibility = observed["configuration_compatibility"]
+        self.assertEqual(observed["original_config_sha256"], independent_digest(original, False))
+        self.assertEqual(observed["reloaded_config_sha256"], independent_digest(reloaded, False))
+        self.assertNotEqual(observed["original_config_sha256"], observed["reloaded_config_sha256"])
+        self.assertFalse(observed["raw_config_sha256_equal"])
+        self.assertEqual(compatibility["ignored_top_level_keys"], ["_name_or_path"])
+        self.assertEqual(compatibility["original_ignored_values"], {"_name_or_path": original_source})
+        self.assertEqual(compatibility["reloaded_ignored_values"], {"_name_or_path": reloaded_source})
+        self.assertEqual(compatibility["original_normalized_config_sha256"], independent_digest(original, True))
+        self.assertEqual(compatibility["reloaded_normalized_config_sha256"], independent_digest(reloaded, True))
+        self.assertEqual(compatibility["original_normalized_config_sha256"], compatibility["reloaded_normalized_config_sha256"])
+        self.assertNotEqual(observed["original_config_sha256"], compatibility["original_normalized_config_sha256"])
+        self.assertTrue(compatibility["normalized_config_sha256_equal"])
+        self.assertTrue(observed["configuration_compatible"])
+        self.assertEqual(tuple(compatibility), contract.CONFIGURATION_COMPATIBILITY_FIELD_ORDER)
+        passing = proof_for(original, reloaded)
+        self.assertEqual(tuple(passing), contract.CHECKPOINT_RELOAD_FIELD_ORDER)
+        self.assertTrue(contract.assert_checkpoint_reload(passing))
+        self.assertEqual(original["_name_or_path"], original_source)
+        self.assertEqual(reloaded["_name_or_path"], reloaded_source)
+
+        class ToDictConfig:
+            def __init__(self, name_or_path):
+                self.name_or_path = name_or_path
+
+            def to_dict(self):
+                return mapping(self.name_or_path)
+
+        to_dict_observed = harness.observe_configuration_compatibility(ToDictConfig(original_source), ToDictConfig(reloaded_source))
+        self.assertEqual(to_dict_observed["original_config_sha256"], observed["original_config_sha256"])
+        self.assertTrue(to_dict_observed["configuration_compatible"])
+
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+        os.environ["HF_DATASETS_OFFLINE"] = "1"
+        before = set(sys.modules)
+        from diffusers.configuration_utils import FrozenDict
+
+        added = [name for name in sys.modules if name not in before]
+        self.assertFalse(any(name == "generation" or name.startswith("models.") for name in added))
+        torch_module = sys.modules.get("torch")
+        if torch_module is not None:
+            self.assertFalse(torch_module.cuda.is_initialized())
+            self.assertEqual(torch_module.cuda.device_count(), 0)
+        frozen_original = FrozenDict(list(original.items()))
+        frozen_reloaded = FrozenDict(list(reloaded.items()))
+        self.assertIs(type(frozen_original), FrozenDict)
+        frozen_observed = harness.observe_configuration_compatibility(frozen_original, frozen_reloaded)
+        self.assertEqual(frozen_observed["original_config_sha256"], observed["original_config_sha256"])
+        self.assertEqual(frozen_observed["reloaded_config_sha256"], observed["reloaded_config_sha256"])
+        self.assertTrue(frozen_observed["configuration_compatible"])
+        self.assertEqual(frozen_original["_name_or_path"], original_source)
+        self.assertTrue(contract.assert_checkpoint_reload(proof_for(frozen_original, frozen_reloaded)))
+
+        def reject_change(**overrides):
+            changed = mapping(reloaded_source, **overrides)
+            changed_observed = harness.observe_configuration_compatibility(original, changed)
+            self.assertNotEqual(
+                changed_observed["configuration_compatibility"]["original_normalized_config_sha256"],
+                changed_observed["configuration_compatibility"]["reloaded_normalized_config_sha256"],
+            )
+            self.assertFalse(changed_observed["configuration_compatibility"]["normalized_config_sha256_equal"])
+            self.assertFalse(changed_observed["configuration_compatible"])
+            with self.assertRaises(contract.M5SmokeError) as caught:
+                contract.assert_checkpoint_reload(proof_for(original, changed))
+            self.assertEqual(caught.exception.code, "checkpoint_reload_mismatch")
+            self.assertEqual(caught.exception.detail, "reloaded configuration is not compatible")
+
+        reject_change(in_channels=128)
+        reject_change(layers_per_block=3)
+        reject_change(attention_head_dim=16)
+        reject_change(block_out_channels=[32, 32])
+        reject_change(_class_name="OtherUNet")
+        reject_change(_diffusers_version="0.26.0")
+        reject_change(mid_block={"_name_or_path": "different-nested-source", "attention_head_dim": 8})
+        nested_attention = mapping(reloaded_source)
+        nested_attention["mid_block"] = {"_name_or_path": "nested-source", "attention_head_dim": 4}
+        reject_change(mid_block=nested_attention["mid_block"])
+
+        absent = mapping(original_source)
+        del absent["_name_or_path"]
+        absent_observed = harness.observe_configuration_compatibility(original, absent)
+        self.assertNotIn("_name_or_path", absent_observed["configuration_compatibility"]["reloaded_ignored_values"])
+        with self.assertRaises(contract.M5SmokeError) as caught:
+            contract.assert_checkpoint_reload(proof_for(original, absent))
+        self.assertEqual(caught.exception.detail, "ignored configuration values were not observed")
+
+        second_key = proof_for(original, reloaded)
+        second_key["configuration_compatibility"]["ignored_top_level_keys"] = ["_name_or_path", "in_channels"]
+        second_key["configuration_compatibility"]["original_ignored_values"]["in_channels"] = 160
+        second_key["configuration_compatibility"]["reloaded_ignored_values"]["in_channels"] = 160
+        with self.assertRaises(contract.M5SmokeError) as caught:
+            contract.assert_checkpoint_reload(second_key)
+        self.assertEqual(caught.exception.detail, "configuration normalization ignores an extra key")
 
     def test_config_sha256_accepts_frozendict_and_rejects_unsupported_values(self):
         import sys

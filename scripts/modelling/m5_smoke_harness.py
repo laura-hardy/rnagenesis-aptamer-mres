@@ -801,12 +801,13 @@ def inspect_starting_ema(diffusion_dir, walk):
     }
 
 
-def _config_sha256(config):
-    """Hash a denoiser config as deterministic canonical JSON.
+def _configuration_mapping(config):
+    """Return a plain mapping for a denoiser config.
 
     A callable to_dict() is used when present. Otherwise a mapping, including
     Diffusers FrozenDict, is converted with dict(config). Unsupported objects,
-    a non-mapping to_dict() result, and serialization failures fail closed.
+    a non-mapping to_dict() result, and conversion failures fail closed.
+    The returned mapping is a shallow copy and is not mutated.
     """
     from collections.abc import Mapping
 
@@ -844,7 +845,19 @@ def _config_sha256(config):
             "denoiser configuration is not a supported representation",
         )
     try:
-        encoded = contract.canonical_json(payload)
+        return dict(payload)
+    except contract.M5SmokeError:
+        raise
+    except Exception:
+        raise contract.M5SmokeError(
+            "checkpoint_reload_mismatch",
+            "denoiser configuration could not be converted with dict()",
+        ) from None
+
+
+def _hash_configuration_mapping(mapping):
+    try:
+        encoded = contract.canonical_json(mapping)
     except contract.M5SmokeError:
         raise
     except Exception:
@@ -853,6 +866,98 @@ def _config_sha256(config):
             "denoiser configuration could not be serialized as canonical JSON",
         ) from None
     return contract.sha256_bytes(encoded)
+
+
+def _config_sha256(config):
+    """Hash a denoiser config as deterministic canonical JSON.
+
+    This is the full raw digest. It keeps every field, including `_name_or_path`.
+    """
+    return _hash_configuration_mapping(_configuration_mapping(config))
+
+
+def _allowlist_or_reject():
+    allowlist = contract.CONFIGURATION_COMPATIBILITY_IGNORED_TOP_LEVEL_KEYS
+    if allowlist != ("_name_or_path",):
+        raise contract.M5SmokeError(
+            "checkpoint_reload_mismatch",
+            "configuration compatibility allowlist is not exactly ['_name_or_path']",
+        )
+    return allowlist
+
+
+def _observed_ignored_values(mapping, allowlist):
+    """Read allowlisted top-level values from the live mapping."""
+    return {key: mapping[key] for key in allowlist if key in mapping}
+
+
+def _normalized_configuration(mapping, allowlist):
+    """Drop the allowlisted top-level keys. Nested mappings are not walked."""
+    return {key: value for key, value in mapping.items() if key not in allowlist}
+
+
+def observe_configuration_compatibility(original_config, reloaded_config):
+    """Record raw configuration digests and top-level `_name_or_path` compatibility.
+
+    Both raw digests use canonical JSON of the complete mappings. The
+    normalized digests remove only the top-level key `_name_or_path`.
+    `_class_name`, `_diffusers_version`, nested `_name_or_path`, and every
+    other field remain in the normalized digest. Ignored values are read
+    from the live mappings.
+    """
+    allowlist = _allowlist_or_reject()
+    original = _configuration_mapping(original_config)
+    reloaded = _configuration_mapping(reloaded_config)
+    original_raw = _hash_configuration_mapping(original)
+    reloaded_raw = _hash_configuration_mapping(reloaded)
+    original_normalized = _normalized_configuration(original, allowlist)
+    reloaded_normalized = _normalized_configuration(reloaded, allowlist)
+    original_normalized_sha = _hash_configuration_mapping(original_normalized)
+    reloaded_normalized_sha = _hash_configuration_mapping(reloaded_normalized)
+    normalized_equal = original_normalized_sha == reloaded_normalized_sha
+    compatibility = {
+        "ignored_top_level_keys": list(allowlist),
+        "original_ignored_values": _observed_ignored_values(original, allowlist),
+        "reloaded_ignored_values": _observed_ignored_values(reloaded, allowlist),
+        "original_normalized_config_sha256": original_normalized_sha,
+        "reloaded_normalized_config_sha256": reloaded_normalized_sha,
+        "normalized_config_sha256_equal": normalized_equal,
+    }
+    if tuple(compatibility) != contract.CONFIGURATION_COMPATIBILITY_FIELD_ORDER:
+        raise contract.M5SmokeError("checkpoint_reload_mismatch", "configuration compatibility field order drifted")
+    return {
+        "original_config_sha256": original_raw,
+        "reloaded_config_sha256": reloaded_raw,
+        "raw_config_sha256_equal": original_raw == reloaded_raw,
+        "configuration_compatibility": compatibility,
+        "configuration_compatible": normalized_equal,
+    }
+
+
+def build_checkpoint_reload_proof(
+    saved_file_hashes,
+    fresh_load_succeeded,
+    original_denoiser_id,
+    reloaded_denoiser_id,
+    tensor_digest_comparisons,
+    configuration,
+):
+    """Assemble checkpoint reload evidence in the documented field order."""
+    proof = {
+        "saved_file_hashes": saved_file_hashes,
+        "fresh_load_succeeded": fresh_load_succeeded,
+        "original_denoiser_id": original_denoiser_id,
+        "reloaded_denoiser_id": reloaded_denoiser_id,
+        "tensor_digest_comparisons": tensor_digest_comparisons,
+        "original_config_sha256": configuration["original_config_sha256"],
+        "reloaded_config_sha256": configuration["reloaded_config_sha256"],
+        "raw_config_sha256_equal": configuration["raw_config_sha256_equal"],
+        "configuration_compatibility": configuration["configuration_compatibility"],
+        "configuration_compatible": configuration["configuration_compatible"],
+    }
+    if tuple(proof) != contract.CHECKPOINT_RELOAD_FIELD_ORDER:
+        raise contract.M5SmokeError("checkpoint_reload_mismatch", "checkpoint reload field order drifted")
+    return proof
 
 
 def _sha256_path(path):
@@ -1232,9 +1337,8 @@ def _collect_training_evidence(torch, trainer, pipeline_cls, plan, evidence_dir)
         tensor_comparisons.append(
             {"name": name, "saved": saved_digest, "reloaded": reloaded_digest, "match": saved_digest == reloaded_digest}
         )
-    original_config_sha = _config_sha256(denoiser.config)
-    reloaded_config_sha = _config_sha256(fresh.config)
-    configuration_compatible = original_config_sha == reloaded_config_sha
+    configuration = observe_configuration_compatibility(denoiser.config, fresh.config)
+    configuration_compatible = configuration["configuration_compatible"]
     restored_optimizer = trainer.build_adamw(fresh, learning_rate)
     restored_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         restored_optimizer,
@@ -1326,16 +1430,14 @@ def _collect_training_evidence(torch, trainer, pipeline_cls, plan, evidence_dir)
         "sidecar_fields": list(observed_sidecar_keys),
         "sidecar_fields_source": "reread_sidecar_keys",
     }
-    checkpoint_proof = {
-        "saved_file_hashes": saved_inventory,
-        "fresh_load_succeeded": fresh_load_succeeded,
-        "original_denoiser_id": id(denoiser),
-        "reloaded_denoiser_id": id(fresh),
-        "tensor_digest_comparisons": tensor_comparisons,
-        "configuration_compatible": configuration_compatible,
-        "original_config_sha256": original_config_sha,
-        "reloaded_config_sha256": reloaded_config_sha,
-    }
+    checkpoint_proof = build_checkpoint_reload_proof(
+        saved_inventory,
+        fresh_load_succeeded,
+        id(denoiser),
+        id(fresh),
+        tensor_comparisons,
+        configuration,
+    )
 
     def measured_loss():
         with torch.no_grad():

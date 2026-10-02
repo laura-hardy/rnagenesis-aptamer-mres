@@ -142,6 +142,29 @@ CHECKPOINT_WEIGHT_MEMBERS = (
     "unet/diffusion_pytorch_model.safetensors",
     "unet/diffusion_pytorch_model.bin",
 )
+# Diffusers load-source provenance. Removed only from the compatibility
+# digest, and only at the top level of an in-memory configuration mapping.
+CONFIGURATION_COMPATIBILITY_IGNORED_TOP_LEVEL_KEYS = ("_name_or_path",)
+CHECKPOINT_RELOAD_FIELD_ORDER = (
+    "saved_file_hashes",
+    "fresh_load_succeeded",
+    "original_denoiser_id",
+    "reloaded_denoiser_id",
+    "tensor_digest_comparisons",
+    "original_config_sha256",
+    "reloaded_config_sha256",
+    "raw_config_sha256_equal",
+    "configuration_compatibility",
+    "configuration_compatible",
+)
+CONFIGURATION_COMPATIBILITY_FIELD_ORDER = (
+    "ignored_top_level_keys",
+    "original_ignored_values",
+    "reloaded_ignored_values",
+    "original_normalized_config_sha256",
+    "reloaded_normalized_config_sha256",
+    "normalized_config_sha256_equal",
+)
 EXTERNAL_MANIFEST_HASH_NAME = "m5_smoke_manifest.sha256"
 PHYSICAL_MICROBATCH_CANDIDATE = 8
 ACCUMULATION_MICROSTEPS = 4
@@ -1413,6 +1436,102 @@ def assert_checkpoint_members(saved_hashes):
     return True
 
 
+def _require_sha256_pair(proof, left_key, right_key, missing_detail, malformed_detail):
+    if left_key not in proof or right_key not in proof:
+        raise M5SmokeError("checkpoint_reload_mismatch", missing_detail)
+    left = proof[left_key]
+    right = proof[right_key]
+    if not _is_sha256(left) or not _is_sha256(right):
+        raise M5SmokeError("checkpoint_reload_mismatch", malformed_detail)
+    return left, right
+
+
+def _reject_ignored_top_level_keys(keys):
+    if keys == ["_name_or_path"]:
+        return
+    if not isinstance(keys, list) or any(type(key) is not str for key in keys):
+        raise M5SmokeError("checkpoint_reload_mismatch", "ignored top-level keys are not exactly ['_name_or_path']")
+    if any("*" in key or "." in key or "/" in key for key in keys):
+        raise M5SmokeError("checkpoint_reload_mismatch", "configuration normalization must not be recursive or wildcarded")
+    if "_class_name" in keys or "_diffusers_version" in keys:
+        raise M5SmokeError(
+            "checkpoint_reload_mismatch",
+            "configuration normalization must not ignore _class_name or _diffusers_version",
+        )
+    if "_name_or_path" in keys and len(keys) != 1:
+        raise M5SmokeError("checkpoint_reload_mismatch", "configuration normalization ignores an extra key")
+    raise M5SmokeError("checkpoint_reload_mismatch", "ignored top-level keys are not exactly ['_name_or_path']")
+
+
+def _assert_observed_ignored_values(mapping):
+    if not isinstance(mapping, dict):
+        raise M5SmokeError("checkpoint_reload_mismatch", "ignored configuration values were not observed")
+    if list(mapping) != ["_name_or_path"]:
+        if "_name_or_path" in mapping and len(mapping) != 1:
+            raise M5SmokeError("checkpoint_reload_mismatch", "configuration normalization ignores an extra key")
+        raise M5SmokeError("checkpoint_reload_mismatch", "ignored configuration values were not observed")
+    return mapping["_name_or_path"]
+
+
+def _assert_configuration_compatibility(proof):
+    """Require raw digests plus a top-level `_name_or_path` compatibility record.
+
+    Raw digests may differ. Compatibility is the exact allowlist together
+    with equality of the normalized digests. A claimed equality flag that
+    disagrees with the recorded digests is rejected.
+    """
+    original_raw, reloaded_raw = _require_sha256_pair(
+        proof,
+        "original_config_sha256",
+        "reloaded_config_sha256",
+        "raw configuration digests are missing",
+        "raw configuration digest is malformed",
+    )
+    if "raw_config_sha256_equal" not in proof:
+        raise M5SmokeError("checkpoint_reload_mismatch", "raw configuration equality is missing")
+    if proof["raw_config_sha256_equal"] is not (original_raw == reloaded_raw):
+        raise M5SmokeError("checkpoint_reload_mismatch", "raw configuration equality does not match the recorded digests")
+    if "configuration_compatibility" not in proof:
+        raise M5SmokeError("checkpoint_reload_mismatch", "checkpoint configuration compatibility evidence is missing")
+    compatibility = proof["configuration_compatibility"]
+    if not isinstance(compatibility, dict):
+        raise M5SmokeError("checkpoint_reload_mismatch", "checkpoint configuration compatibility record is malformed")
+    missing = [key for key in CONFIGURATION_COMPATIBILITY_FIELD_ORDER if key not in compatibility]
+    if missing:
+        raise M5SmokeError("checkpoint_reload_mismatch", "checkpoint configuration compatibility evidence is missing")
+    if tuple(compatibility) != CONFIGURATION_COMPATIBILITY_FIELD_ORDER:
+        raise M5SmokeError("checkpoint_reload_mismatch", "checkpoint configuration compatibility record is malformed")
+    _reject_ignored_top_level_keys(compatibility["ignored_top_level_keys"])
+    _assert_observed_ignored_values(compatibility["original_ignored_values"])
+    _assert_observed_ignored_values(compatibility["reloaded_ignored_values"])
+    original_normalized, reloaded_normalized = _require_sha256_pair(
+        compatibility,
+        "original_normalized_config_sha256",
+        "reloaded_normalized_config_sha256",
+        "normalized configuration digests are missing",
+        "normalized configuration digest is malformed",
+    )
+    if "normalized_config_sha256_equal" not in compatibility:
+        raise M5SmokeError("checkpoint_reload_mismatch", "normalized configuration equality is missing")
+    normalized_equal = original_normalized == reloaded_normalized
+    if compatibility["normalized_config_sha256_equal"] is not normalized_equal:
+        raise M5SmokeError(
+            "checkpoint_reload_mismatch",
+            "normalized configuration equality does not match the recorded digests",
+        )
+    derived = compatibility["ignored_top_level_keys"] == ["_name_or_path"] and normalized_equal
+    if "configuration_compatible" not in proof:
+        raise M5SmokeError("checkpoint_reload_mismatch", "configuration compatibility flag is missing")
+    if proof["configuration_compatible"] is not derived:
+        raise M5SmokeError(
+            "checkpoint_reload_mismatch",
+            "configuration compatibility does not match the allowlist and normalized digests",
+        )
+    if proof["configuration_compatible"] is not True:
+        raise M5SmokeError("checkpoint_reload_mismatch", "reloaded configuration is not compatible")
+    return True
+
+
 def assert_checkpoint_reload(proof):
     """A directory listing compared with itself is not evidence that weights reloaded."""
     if not isinstance(proof, dict):
@@ -1433,10 +1552,9 @@ def assert_checkpoint_reload(proof):
             raise M5SmokeError("checkpoint_reload_mismatch", "tensor digest comparison is incomplete")
         if not _is_sha256(row.get("saved", "")) or row.get("saved") != row.get("reloaded") or row.get("match") is not True:
             raise M5SmokeError("checkpoint_reload_mismatch", "a reloaded tensor digest does not match the saved tensor")
-    if proof.get("configuration_compatible") is not True:
-        raise M5SmokeError("checkpoint_reload_mismatch", "reloaded configuration is not compatible")
-    if not _is_sha256(proof.get("original_config_sha256", "")) or proof.get("original_config_sha256") != proof.get("reloaded_config_sha256"):
-        raise M5SmokeError("checkpoint_reload_mismatch", "reloaded configuration digest does not match")
+    _assert_configuration_compatibility(proof)
+    if tuple(proof) != CHECKPOINT_RELOAD_FIELD_ORDER:
+        raise M5SmokeError("checkpoint_reload_mismatch", "checkpoint reload fields do not match the worker field order")
     if proof.get("generation_uses_reloaded_object") is True or proof.get("generation_object_id") == reloaded_id:
         raise M5SmokeError("checkpoint_reload_mismatch", "the training reload is not the generation checkpoint")
     return True

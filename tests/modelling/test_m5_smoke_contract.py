@@ -47,6 +47,40 @@ class _Stat:
         self.st_size = size
 
 
+def reload_proof(raw_equal=True, normalized_equal=True):
+    saved = {
+        "model_index.json": "1" * 64,
+        "scheduler/scheduler_config.json": "2" * 64,
+        "unet/config.json": "3" * 64,
+        "unet/diffusion_pytorch_model.safetensors": "4" * 64,
+    }
+    raw_original = "6" * 64
+    raw_reloaded = raw_original if raw_equal else "7" * 64
+    normalized_original = "e" * 64
+    normalized_reloaded = normalized_original if normalized_equal else "f" * 64
+    original_ignored = "source-original"
+    reloaded_ignored = "source-original" if raw_equal else "source-reloaded"
+    return {
+        "saved_file_hashes": saved,
+        "fresh_load_succeeded": True,
+        "original_denoiser_id": 11,
+        "reloaded_denoiser_id": 22,
+        "tensor_digest_comparisons": [{"name": "weight", "saved": "5" * 64, "reloaded": "5" * 64, "match": True}],
+        "original_config_sha256": raw_original,
+        "reloaded_config_sha256": raw_reloaded,
+        "raw_config_sha256_equal": raw_original == raw_reloaded,
+        "configuration_compatibility": {
+            "ignored_top_level_keys": ["_name_or_path"],
+            "original_ignored_values": {"_name_or_path": original_ignored},
+            "reloaded_ignored_values": {"_name_or_path": reloaded_ignored},
+            "original_normalized_config_sha256": normalized_original,
+            "reloaded_normalized_config_sha256": normalized_reloaded,
+            "normalized_config_sha256_equal": normalized_original == normalized_reloaded,
+        },
+        "configuration_compatible": normalized_original == normalized_reloaded,
+    }
+
+
 def sha256_file(path):
     digest = hashlib.sha256()
     with open(path, "rb") as handle:
@@ -508,8 +542,103 @@ class ContractTests(unittest.TestCase):
         hash_block = text.split("OBSERVED_FILE_HASH_KEYS\n", 1)[1].split("\nEND_OBSERVED_FILE_HASH_KEYS", 1)[0]
         self.assertEqual(tuple(field_block.splitlines()), contract.MANIFEST_KEYS)
         self.assertEqual(tuple(hash_block.splitlines()), contract.OBSERVED_FILE_HASH_KEYS)
+        reload_block = text.split("CHECKPOINT_RELOAD_FIELD_ORDER\n", 1)[1].split("\nEND_CHECKPOINT_RELOAD_FIELD_ORDER", 1)[0]
+        compatibility_block = text.split("CONFIGURATION_COMPATIBILITY_FIELD_ORDER\n", 1)[1].split(
+            "\nEND_CONFIGURATION_COMPATIBILITY_FIELD_ORDER", 1
+        )[0]
+        self.assertEqual(tuple(reload_block.splitlines()), contract.CHECKPOINT_RELOAD_FIELD_ORDER)
+        self.assertEqual(tuple(compatibility_block.splitlines()), contract.CONFIGURATION_COMPATIBILITY_FIELD_ORDER)
         self.assertNotIn("actual_input_paths", contract.MANIFEST_KEYS)
         self.assertNotIn("manifest_sha256", contract.MANIFEST_KEYS)
+
+    def test_configuration_compatibility_requires_raw_digests_and_exact_allowlist(self):
+        proof = reload_proof()
+        self.assertTrue(contract.assert_checkpoint_reload(proof))
+        differing_raw = reload_proof(raw_equal=False)
+        self.assertNotEqual(differing_raw["original_config_sha256"], differing_raw["reloaded_config_sha256"])
+        self.assertFalse(differing_raw["raw_config_sha256_equal"])
+        self.assertTrue(contract.assert_checkpoint_reload(differing_raw))
+        self.assertEqual(
+            contract.CONFIGURATION_COMPATIBILITY_IGNORED_TOP_LEVEL_KEYS,
+            ("_name_or_path",),
+        )
+        b1_config = [row for row in contract.REQUIRED_MODEL_FILES if row[3] == "b1_unet_config"]
+        self.assertEqual(
+            b1_config,
+            [
+                (
+                    "configs/rnagenesis/diffusion/unet/config.json",
+                    "3a9975ff165bbd5ca82923e6ed1c5ed7eb383a23f4f3f55db713c995031f8ee3",
+                    531,
+                    "b1_unet_config",
+                )
+            ],
+        )
+
+        def reject(sample, detail):
+            with self.assertRaises(contract.M5SmokeError) as caught:
+                contract.assert_checkpoint_reload(sample)
+            self.assertEqual(caught.exception.code, "checkpoint_reload_mismatch")
+            self.assertEqual(caught.exception.detail, detail)
+
+        missing_record = reload_proof()
+        del missing_record["configuration_compatibility"]
+        reject(missing_record, "checkpoint configuration compatibility evidence is missing")
+        missing_raw = reload_proof()
+        del missing_raw["original_config_sha256"]
+        reject(missing_raw, "raw configuration digests are missing")
+        missing_normalized = reload_proof()
+        del missing_normalized["configuration_compatibility"]["original_normalized_config_sha256"]
+        reject(missing_normalized, "checkpoint configuration compatibility evidence is missing")
+        malformed_raw = reload_proof()
+        malformed_raw["original_config_sha256"] = "g" * 64
+        reject(malformed_raw, "raw configuration digest is malformed")
+        malformed_normalized = reload_proof()
+        malformed_normalized["configuration_compatibility"]["reloaded_normalized_config_sha256"] = "e" * 63
+        reject(malformed_normalized, "normalized configuration digest is malformed")
+        uppercase = reload_proof()
+        uppercase["reloaded_config_sha256"] = "A" * 64
+        reject(uppercase, "raw configuration digest is malformed")
+
+        extra_key = reload_proof()
+        extra_key["configuration_compatibility"]["ignored_top_level_keys"] = ["_name_or_path", "in_channels"]
+        extra_key["configuration_compatibility"]["original_ignored_values"]["in_channels"] = 160
+        extra_key["configuration_compatibility"]["reloaded_ignored_values"]["in_channels"] = 160
+        reject(extra_key, "configuration normalization ignores an extra key")
+        wildcard = reload_proof()
+        wildcard["configuration_compatibility"]["ignored_top_level_keys"] = ["*"]
+        reject(wildcard, "configuration normalization must not be recursive or wildcarded")
+        recursive = reload_proof()
+        recursive["configuration_compatibility"]["ignored_top_level_keys"] = ["layers._name_or_path"]
+        reject(recursive, "configuration normalization must not be recursive or wildcarded")
+        recursive_flag = reload_proof()
+        recursive_flag["configuration_compatibility"]["recursive"] = True
+        reject(recursive_flag, "checkpoint configuration compatibility record is malformed")
+        class_name = reload_proof()
+        class_name["configuration_compatibility"]["ignored_top_level_keys"] = ["_class_name"]
+        reject(class_name, "configuration normalization must not ignore _class_name or _diffusers_version")
+        diffusers_version = reload_proof()
+        diffusers_version["configuration_compatibility"]["ignored_top_level_keys"] = ["_diffusers_version"]
+        reject(diffusers_version, "configuration normalization must not ignore _class_name or _diffusers_version")
+        unobserved = reload_proof()
+        unobserved["configuration_compatibility"]["original_ignored_values"] = {}
+        reject(unobserved, "ignored configuration values were not observed")
+
+        raw_flag = reload_proof(raw_equal=False)
+        raw_flag["raw_config_sha256_equal"] = True
+        reject(raw_flag, "raw configuration equality does not match the recorded digests")
+        raw_flag_false = reload_proof()
+        raw_flag_false["raw_config_sha256_equal"] = False
+        reject(raw_flag_false, "raw configuration equality does not match the recorded digests")
+        normalized_flag = reload_proof(normalized_equal=False)
+        normalized_flag["configuration_compatibility"]["normalized_config_sha256_equal"] = True
+        normalized_flag["configuration_compatible"] = True
+        reject(normalized_flag, "normalized configuration equality does not match the recorded digests")
+        claimed_compatible = reload_proof(normalized_equal=False)
+        claimed_compatible["configuration_compatible"] = True
+        reject(claimed_compatible, "configuration compatibility does not match the allowlist and normalized digests")
+        functional_mismatch = reload_proof(normalized_equal=False)
+        reject(functional_mismatch, "reloaded configuration is not compatible")
 
     def _dump(self, config):
         import yaml

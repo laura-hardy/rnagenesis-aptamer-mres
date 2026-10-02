@@ -339,6 +339,38 @@ The authorized sequence uses one physical-microbatch candidate, microbatch 8, an
 
 `frozen_state` contains `after_backward`, `after_update`, and `after_generation`. A passing manifest requires all three. `after_generation.optimizer_membership_evidence_basis` is `live_adamw_parameter_identities`. That evidence is the parameter identities of the proof AdamW and the restored AdamW, recorded while both optimizers existed, and recomputed as disjoint from every EncDec parameter. A replacement optimizer does not satisfy the assertion. The overfit trajectory contains the loss before the configured optimizer updates and the loss after every configured update. Four updates produce five observations. The pass rule compares the first observation with the last, which is the loss after the fourth update.
 
-Checkpoint reload records the expected Diffusers members and their saved file hashes, a successful fresh training load, selected original-versus-reloaded tensor digests, and configuration compatibility. Comparing a directory inventory with itself is not sufficient. That training object is then resumed and overfit. Generation does not use it. Generation loads a new pipeline from the original one-update smoke checkpoint only after weak references taken while the original denoiser, the resumed denoiser, representative parameters, both optimizers, and the other GPU-bearing training objects were live are observed dead. `training_objects_released_before_generation_reload` is that observation. `released_training_object_names` lists only referents observed dead. Python object ids remain supplementary and are not the release proof. `generation_reload` records the selected checkpoint path, its inventory and hash set, the pre-generation reloaded tensor digests, the match to the on-disk checkpoint, and the separation from the mutated training object. Python object identity is not sufficient for that separation. Resume records fresh object identity, saved-versus-reloaded weight digests, optimizer state loaded against the fresh denoiser, optimizer moments, restored scheduler position and learning rate, restored global step, Python RNG restored with `random.setstate`, restored torch CPU, torch CUDA, and dedicated diffusion-generator states, and NumPy RNG as `not_applicable` when NumPy randomness is unused. Each restored RNG is verified with one draw and then set back to the saved state before the resumed optimizer step. The subsequent loss and gradients are finite, and a subsequent update changes a parameter of the fresh denoiser. `sidecar_fields` are the keys reread from the closed sidecar. Weight-only reload is not training resume.
+Checkpoint reload records the expected Diffusers members and their saved file hashes, a successful fresh training load, selected original-versus-reloaded tensor digests, and configuration compatibility. Comparing a directory inventory with itself is not sufficient. The worker writes `checkpoint_reload` in this order:
+
+```text
+CHECKPOINT_RELOAD_FIELD_ORDER
+saved_file_hashes
+fresh_load_succeeded
+original_denoiser_id
+reloaded_denoiser_id
+tensor_digest_comparisons
+original_config_sha256
+reloaded_config_sha256
+raw_config_sha256_equal
+configuration_compatibility
+configuration_compatible
+END_CHECKPOINT_RELOAD_FIELD_ORDER
+```
+
+`original_config_sha256` and `reloaded_config_sha256` are the canonical raw SHA-256 digests of the complete original and reloaded in-memory denoiser configurations. Those raw digests stay recorded under those names. `raw_config_sha256_equal` records whether the two raw digests are equal. The raw digests may differ. `configuration_compatibility` is the nested compatibility record, in this order:
+
+```text
+CONFIGURATION_COMPATIBILITY_FIELD_ORDER
+ignored_top_level_keys
+original_ignored_values
+reloaded_ignored_values
+original_normalized_config_sha256
+reloaded_normalized_config_sha256
+normalized_config_sha256_equal
+END_CONFIGURATION_COMPATIBILITY_FIELD_ORDER
+```
+
+`ignored_top_level_keys` is exactly `["_name_or_path"]`. The compatibility digest removes only that top-level key. The removal is not recursive and does not apply to every underscore-prefixed field. `_class_name`, `_diffusers_version`, architecture fields, unknown metadata, and every other field remain in the normalized digest. A nested `_name_or_path` remains covered. `original_ignored_values` and `reloaded_ignored_values` record the values observed for that key on the live original and reloaded configuration mappings. `original_normalized_config_sha256` and `reloaded_normalized_config_sha256` are the canonical SHA-256 digests after that single top-level exclusion. `normalized_config_sha256_equal` records whether those normalized digests are equal. `configuration_compatible` is true only when the allowlist is exactly that one key and the normalized digests are equal. Raw and normalized digests both use deterministic canonical JSON. This normalization does not weaken the accepted B1 raw config-file hash, B1 weight identity, or the saved checkpoint inventory hashes. Those remain hashes of the closed files. Tensor-digest comparisons, the fresh-object proof, and resume assertions are unchanged.
+
+That training object is then resumed and overfit. Generation does not use it. Generation loads a new pipeline from the original one-update smoke checkpoint only after weak references taken while the original denoiser, the resumed denoiser, representative parameters, both optimizers, and the other GPU-bearing training objects were live are observed dead. `training_objects_released_before_generation_reload` is that observation. `released_training_object_names` lists only referents observed dead. Python object ids remain supplementary and are not the release proof. `generation_reload` records the selected checkpoint path, its inventory and hash set, the pre-generation reloaded tensor digests, the match to the on-disk checkpoint, and the separation from the mutated training object. Python object identity is not sufficient for that separation. Resume records fresh object identity, saved-versus-reloaded weight digests, optimizer state loaded against the fresh denoiser, optimizer moments, restored scheduler position and learning rate, restored global step, Python RNG restored with `random.setstate`, restored torch CPU, torch CUDA, and dedicated diffusion-generator states, and NumPy RNG as `not_applicable` when NumPy randomness is unused. Each restored RNG is verified with one draw and then set back to the saved state before the resumed optimizer step. The subsequent loss and gradients are finite, and a subsequent update changes a parameter of the fresh denoiser. `sidecar_fields` are the keys reread from the closed sidecar. Weight-only reload is not training resume.
 
 Loss finiteness, gradient finiteness, gradient norm, the denoiser-update slice, peak allocated and reserved GPU memory, timings, warnings, and deviations are required. Critical model assets and the diffusers patch are regular, non-symlink files whose size and SHA-256 match the accepted M0 manifest. The pinned biomap encoder config is `models/autoencoder/encoder/biomap/config.json`, 1369 bytes, SHA-256 `bf7ef6843232f370f3f7fc37d608f85cb0ff0d75291eed35cef52213e34978f7`. The diffusers patch is `/home/laura/miniconda3/envs/rnagenesis-h200/lib/python3.8/site-packages/diffusers/models/normalization.py`, 9516 bytes, SHA-256 `09bc632069f1d6e1dc1b1cb7f5b9ca096c83e3010835f11b8dc6c58b45aa13a5`. B1 remains the starting diffusion checkpoint. B0 is not accepted in its place. Tracked RNAGenesis source remains the clean commit `e3b855bbf4d1af376f43747643fa30afd662828c`.
