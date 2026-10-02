@@ -7,6 +7,7 @@ biological data, or a visible CUDA device.
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import pathlib
 import subprocess
@@ -424,6 +425,25 @@ class HarnessMockTests(unittest.TestCase):
         self.assertEqual(manifest["overfit_trajectory"], [1.0, 0.8, 0.6, 0.4, 0.2])
         self.assertNotIn("manifest_sha256", manifest)
         self.assertNotIn("manifest", manifest["file_hashes"])
+
+    def test_parsed_synthetic_manifest_round_trips_without_reordering(self):
+        manifest, failure = harness.execute_observed(observed(), contract.EXPECTED_SMOKE_ONLY)
+        self.assertIsNone(failure)
+        encoded = contract.canonical_json(manifest)
+        parsed = json.loads(encoded.decode("utf-8"))
+        reload_mapping = parsed["checkpoint_reload"]
+        compatibility = reload_mapping["configuration_compatibility"]
+        self.assertEqual(tuple(manifest["checkpoint_reload"]), contract.CHECKPOINT_RELOAD_FIELD_ORDER)
+        self.assertEqual(
+            tuple(manifest["checkpoint_reload"]["configuration_compatibility"]),
+            contract.CONFIGURATION_COMPATIBILITY_FIELD_ORDER,
+        )
+        self.assertNotEqual(tuple(reload_mapping), contract.CHECKPOINT_RELOAD_FIELD_ORDER)
+        self.assertNotEqual(tuple(compatibility), contract.CONFIGURATION_COMPATIBILITY_FIELD_ORDER)
+        self.assertEqual(set(reload_mapping), set(contract.CHECKPOINT_RELOAD_FIELD_ORDER))
+        self.assertEqual(set(compatibility), set(contract.CONFIGURATION_COMPATIBILITY_FIELD_ORDER))
+        rebuilt = contract.build_final_manifest(parsed)
+        self.assertEqual(contract.canonical_json(rebuilt), encoded)
 
     def test_nonfinite_loss_suppresses_the_manifest(self):
         sample = observed()
@@ -1158,6 +1178,16 @@ class HarnessMockTests(unittest.TestCase):
         passing = proof_for(original, reloaded)
         self.assertEqual(tuple(passing), contract.CHECKPOINT_RELOAD_FIELD_ORDER)
         self.assertTrue(contract.assert_checkpoint_reload(passing))
+        reversed_proof = {key: passing[key] for key in reversed(tuple(passing))}
+        reversed_proof["configuration_compatibility"] = {
+            key: compatibility[key] for key in reversed(tuple(compatibility))
+        }
+        self.assertNotEqual(tuple(reversed_proof), contract.CHECKPOINT_RELOAD_FIELD_ORDER)
+        self.assertNotEqual(
+            tuple(reversed_proof["configuration_compatibility"]),
+            contract.CONFIGURATION_COMPATIBILITY_FIELD_ORDER,
+        )
+        self.assertTrue(contract.assert_checkpoint_reload(reversed_proof))
         self.assertEqual(original["_name_or_path"], original_source)
         self.assertEqual(reloaded["_name_or_path"], reloaded_source)
 

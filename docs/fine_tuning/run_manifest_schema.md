@@ -339,7 +339,7 @@ The authorized sequence uses one physical-microbatch candidate, microbatch 8, an
 
 `frozen_state` contains `after_backward`, `after_update`, and `after_generation`. A passing manifest requires all three. `after_generation.optimizer_membership_evidence_basis` is `live_adamw_parameter_identities`. That evidence is the parameter identities of the proof AdamW and the restored AdamW, recorded while both optimizers existed, and recomputed as disjoint from every EncDec parameter. A replacement optimizer does not satisfy the assertion. The overfit trajectory contains the loss before the configured optimizer updates and the loss after every configured update. Four updates produce five observations. The pass rule compares the first observation with the last, which is the loss after the fourth update.
 
-Checkpoint reload records the expected Diffusers members and their saved file hashes, a successful fresh training load, selected original-versus-reloaded tensor digests, and configuration compatibility. Comparing a directory inventory with itself is not sufficient. The worker writes `checkpoint_reload` in this order:
+Checkpoint reload records the expected Diffusers members and their saved file hashes, a successful fresh training load, selected original-versus-reloaded tensor digests, and configuration compatibility. Comparing a directory inventory with itself is not sufficient. The worker constructs `checkpoint_reload` by inserting keys in this order:
 
 ```text
 CHECKPOINT_RELOAD_FIELD_ORDER
@@ -356,7 +356,7 @@ configuration_compatible
 END_CHECKPOINT_RELOAD_FIELD_ORDER
 ```
 
-`original_config_sha256` and `reloaded_config_sha256` are the canonical raw SHA-256 digests of the complete original and reloaded in-memory denoiser configurations. Those raw digests stay recorded under those names. `raw_config_sha256_equal` records whether the two raw digests are equal. The raw digests may differ. `configuration_compatibility` is the nested compatibility record, in this order:
+`original_config_sha256` and `reloaded_config_sha256` are the canonical raw SHA-256 digests of the complete original and reloaded in-memory denoiser configurations. Those raw digests stay recorded under those names. `raw_config_sha256_equal` records whether the two raw digests are equal. The raw digests may differ. `configuration_compatibility` is the nested compatibility record. The worker constructs that nested mapping by inserting keys in this order:
 
 ```text
 CONFIGURATION_COMPATIBILITY_FIELD_ORDER
@@ -368,6 +368,8 @@ reloaded_normalized_config_sha256
 normalized_config_sha256_equal
 END_CONFIGURATION_COMPATIBILITY_FIELD_ORDER
 ```
+
+`CHECKPOINT_RELOAD_FIELD_ORDER` and `CONFIGURATION_COMPATIBILITY_FIELD_ORDER` are the worker's field-construction order. They document the sequence in which the worker inserts keys before serialization. They do not decide whether a parsed mapping is valid. Canonical JSON then serializes every mapping with keys sorted lexicographically, compact separators, ASCII escaping, and a trailing newline. Parsing that document restores lexicographic key order, not worker insertion order. Validation of a parsed `checkpoint_reload` mapping, and of its nested `configuration_compatibility` mapping, is order-independent. Each mapping must contain exactly the documented key set: a missing key is rejected, and an unexpected key is rejected. The same keys and values in a different insertion order are accepted. A closed manifest can therefore be parsed and passed to manifest validation without reordering nested mappings.
 
 `ignored_top_level_keys` is exactly `["_name_or_path"]`. The compatibility digest removes only that top-level key. The removal is not recursive and does not apply to every underscore-prefixed field. `_class_name`, `_diffusers_version`, architecture fields, unknown metadata, and every other field remain in the normalized digest. A nested `_name_or_path` remains covered. `original_ignored_values` and `reloaded_ignored_values` record the values observed for that key on the live original and reloaded configuration mappings. `original_normalized_config_sha256` and `reloaded_normalized_config_sha256` are the canonical SHA-256 digests after that single top-level exclusion. `normalized_config_sha256_equal` records whether those normalized digests are equal. `configuration_compatible` is true only when the allowlist is exactly that one key and the normalized digests are equal. Raw and normalized digests both use deterministic canonical JSON. This normalization does not weaken the accepted B1 raw config-file hash, B1 weight identity, or the saved checkpoint inventory hashes. Those remain hashes of the closed files. Tensor-digest comparisons, the fresh-object proof, and resume assertions are unchanged.
 

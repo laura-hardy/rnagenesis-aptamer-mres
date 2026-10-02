@@ -1,7 +1,8 @@
 """CPU-only tests for the inactive M5 synthetic-smoke contract.
 
 These tests use temporary synthetic files. They do not read frozen
-biological corpora, protected M4 evidence, model weights, or a GPU.
+biological corpora, protected M4 evidence, model weights, a GPU,
+or a run evidence directory.
 """
 
 from __future__ import annotations
@@ -637,6 +638,77 @@ class ContractTests(unittest.TestCase):
         claimed_compatible = reload_proof(normalized_equal=False)
         claimed_compatible["configuration_compatible"] = True
         reject(claimed_compatible, "configuration compatibility does not match the allowlist and normalized digests")
+        functional_mismatch = reload_proof(normalized_equal=False)
+        reject(functional_mismatch, "reloaded configuration is not compatible")
+
+    def test_parsed_checkpoint_mappings_accept_any_insertion_order(self):
+        def reorder(mapping):
+            return {key: mapping[key] for key in reversed(tuple(mapping))}
+
+        def lexicographic(mapping):
+            return {key: mapping[key] for key in sorted(mapping)}
+
+        def reject(sample, detail):
+            with self.assertRaises(contract.M5SmokeError) as caught:
+                contract.assert_checkpoint_reload(sample)
+            self.assertEqual(caught.exception.code, "checkpoint_reload_mismatch")
+            self.assertEqual(caught.exception.detail, detail)
+
+        worker_order = reload_proof()
+        self.assertEqual(tuple(worker_order), contract.CHECKPOINT_RELOAD_FIELD_ORDER)
+        self.assertEqual(
+            tuple(worker_order["configuration_compatibility"]),
+            contract.CONFIGURATION_COMPATIBILITY_FIELD_ORDER,
+        )
+        self.assertTrue(contract.assert_checkpoint_reload(worker_order))
+
+        reversed_proof = reorder(worker_order)
+        reversed_proof["configuration_compatibility"] = reorder(worker_order["configuration_compatibility"])
+        self.assertNotEqual(tuple(reversed_proof), contract.CHECKPOINT_RELOAD_FIELD_ORDER)
+        self.assertNotEqual(
+            tuple(reversed_proof["configuration_compatibility"]),
+            contract.CONFIGURATION_COMPATIBILITY_FIELD_ORDER,
+        )
+        self.assertTrue(contract.assert_checkpoint_reload(reversed_proof))
+
+        parsed_order = lexicographic(worker_order)
+        parsed_order["configuration_compatibility"] = lexicographic(worker_order["configuration_compatibility"])
+        self.assertNotEqual(tuple(parsed_order), contract.CHECKPOINT_RELOAD_FIELD_ORDER)
+        self.assertTrue(contract.assert_checkpoint_reload(parsed_order))
+
+        missing_nested = reload_proof()
+        del missing_nested["configuration_compatibility"]["reloaded_ignored_values"]
+        reject(missing_nested, "checkpoint configuration compatibility evidence is missing")
+        missing_top = reload_proof()
+        del missing_top["saved_file_hashes"]
+        reject(missing_top, "checkpoint inventory is missing")
+
+        unexpected_nested = reload_proof()
+        unexpected_nested["configuration_compatibility"]["recursive"] = True
+        reject(unexpected_nested, "checkpoint configuration compatibility record is malformed")
+        unexpected_top = reload_proof()
+        unexpected_top["generation_object_id"] = 99
+        reject(unexpected_top, "checkpoint reload record has an unexpected field")
+
+        raw_flag = reload_proof(raw_equal=False)
+        raw_flag["raw_config_sha256_equal"] = True
+        reject(raw_flag, "raw configuration equality does not match the recorded digests")
+        normalized_flag = reload_proof(normalized_equal=False)
+        normalized_flag["configuration_compatibility"]["normalized_config_sha256_equal"] = True
+        normalized_flag["configuration_compatible"] = True
+        reject(normalized_flag, "normalized configuration equality does not match the recorded digests")
+
+        extra_ignored = reload_proof()
+        extra_ignored["configuration_compatibility"]["ignored_top_level_keys"] = ["_name_or_path", "in_channels"]
+        extra_ignored["configuration_compatibility"]["original_ignored_values"]["in_channels"] = 160
+        extra_ignored["configuration_compatibility"]["reloaded_ignored_values"]["in_channels"] = 160
+        reject(extra_ignored, "configuration normalization ignores an extra key")
+        wildcard = reload_proof()
+        wildcard["configuration_compatibility"]["ignored_top_level_keys"] = ["*"]
+        reject(wildcard, "configuration normalization must not be recursive or wildcarded")
+        nested_exclusion = reload_proof()
+        nested_exclusion["configuration_compatibility"]["ignored_top_level_keys"] = ["mid_block._name_or_path"]
+        reject(nested_exclusion, "configuration normalization must not be recursive or wildcarded")
         functional_mismatch = reload_proof(normalized_equal=False)
         reject(functional_mismatch, "reloaded configuration is not compatible")
 

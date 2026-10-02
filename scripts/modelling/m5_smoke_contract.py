@@ -145,6 +145,9 @@ CHECKPOINT_WEIGHT_MEMBERS = (
 # Diffusers load-source provenance. Removed only from the compatibility
 # digest, and only at the top level of an in-memory configuration mapping.
 CONFIGURATION_COMPATIBILITY_IGNORED_TOP_LEVEL_KEYS = ("_name_or_path",)
+# Worker field-construction order. canonical_json sorts mapping keys, so
+# these tuples do not decide whether a parsed mapping is valid. Validation
+# accepts any insertion order and rejects a missing or unexpected key.
 CHECKPOINT_RELOAD_FIELD_ORDER = (
     "saved_file_hashes",
     "fresh_load_succeeded",
@@ -478,6 +481,11 @@ def sha256_bytes(data):
 
 
 def canonical_json(value):
+    """Serialize with lexicographically sorted mapping keys.
+
+    A parsed document therefore does not preserve worker insertion order.
+    Callers validate mappings by exact key set.
+    """
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8") + b"\n"
 
 
@@ -1473,12 +1481,26 @@ def _assert_observed_ignored_values(mapping):
     return mapping["_name_or_path"]
 
 
+def _assert_exact_key_set(mapping, expected_keys, missing_detail, unexpected_detail):
+    """Accept any insertion order. Reject every missing or unexpected key.
+
+    expected_keys documents the worker construction set. Its sequence is
+    not an acceptance criterion for a parsed, canonically serialized mapping.
+    """
+    if any(key not in mapping for key in expected_keys):
+        raise M5SmokeError("checkpoint_reload_mismatch", missing_detail)
+    if any(key not in expected_keys for key in mapping):
+        raise M5SmokeError("checkpoint_reload_mismatch", unexpected_detail)
+
+
 def _assert_configuration_compatibility(proof):
     """Require raw digests plus a top-level `_name_or_path` compatibility record.
 
     Raw digests may differ. Compatibility is the exact allowlist together
     with equality of the normalized digests. A claimed equality flag that
-    disagrees with the recorded digests is rejected.
+    disagrees with the recorded digests is rejected. The nested record is
+    accepted only when its key set equals CONFIGURATION_COMPATIBILITY_FIELD_ORDER.
+    Parsed key order is not checked, because canonical JSON sorts mapping keys.
     """
     original_raw, reloaded_raw = _require_sha256_pair(
         proof,
@@ -1496,11 +1518,12 @@ def _assert_configuration_compatibility(proof):
     compatibility = proof["configuration_compatibility"]
     if not isinstance(compatibility, dict):
         raise M5SmokeError("checkpoint_reload_mismatch", "checkpoint configuration compatibility record is malformed")
-    missing = [key for key in CONFIGURATION_COMPATIBILITY_FIELD_ORDER if key not in compatibility]
-    if missing:
-        raise M5SmokeError("checkpoint_reload_mismatch", "checkpoint configuration compatibility evidence is missing")
-    if tuple(compatibility) != CONFIGURATION_COMPATIBILITY_FIELD_ORDER:
-        raise M5SmokeError("checkpoint_reload_mismatch", "checkpoint configuration compatibility record is malformed")
+    _assert_exact_key_set(
+        compatibility,
+        CONFIGURATION_COMPATIBILITY_FIELD_ORDER,
+        "checkpoint configuration compatibility evidence is missing",
+        "checkpoint configuration compatibility record is malformed",
+    )
     _reject_ignored_top_level_keys(compatibility["ignored_top_level_keys"])
     _assert_observed_ignored_values(compatibility["original_ignored_values"])
     _assert_observed_ignored_values(compatibility["reloaded_ignored_values"])
@@ -1533,7 +1556,11 @@ def _assert_configuration_compatibility(proof):
 
 
 def assert_checkpoint_reload(proof):
-    """A directory listing compared with itself is not evidence that weights reloaded."""
+    """A directory listing compared with itself is not evidence that weights reloaded.
+
+    CHECKPOINT_RELOAD_FIELD_ORDER is the worker construction order. A parsed
+    proof is valid when it has that exact key set, in any insertion order.
+    """
     if not isinstance(proof, dict):
         raise M5SmokeError("checkpoint_reload_mismatch", "checkpoint reload proof is missing")
     saved = proof.get("saved_file_hashes")
@@ -1553,8 +1580,12 @@ def assert_checkpoint_reload(proof):
         if not _is_sha256(row.get("saved", "")) or row.get("saved") != row.get("reloaded") or row.get("match") is not True:
             raise M5SmokeError("checkpoint_reload_mismatch", "a reloaded tensor digest does not match the saved tensor")
     _assert_configuration_compatibility(proof)
-    if tuple(proof) != CHECKPOINT_RELOAD_FIELD_ORDER:
-        raise M5SmokeError("checkpoint_reload_mismatch", "checkpoint reload fields do not match the worker field order")
+    _assert_exact_key_set(
+        proof,
+        CHECKPOINT_RELOAD_FIELD_ORDER,
+        "checkpoint reload record is missing a required field",
+        "checkpoint reload record has an unexpected field",
+    )
     if proof.get("generation_uses_reloaded_object") is True or proof.get("generation_object_id") == reloaded_id:
         raise M5SmokeError("checkpoint_reload_mismatch", "the training reload is not the generation checkpoint")
     return True
