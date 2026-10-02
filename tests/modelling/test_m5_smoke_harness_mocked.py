@@ -1082,6 +1082,124 @@ class HarnessMockTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual(completed.stdout, "")
 
+    def test_config_sha256_accepts_frozendict_and_rejects_unsupported_values(self):
+        import sys
+        import traceback
+        from collections.abc import Mapping
+
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+        os.environ["HF_DATASETS_OFFLINE"] = "1"
+        before = set(sys.modules)
+        from diffusers.configuration_utils import FrozenDict
+
+        added = [name for name in sys.modules if name not in before]
+        self.assertFalse(any(name == "generation" or name.startswith("models.") for name in added))
+        torch_module = sys.modules.get("torch")
+        if torch_module is not None:
+            self.assertFalse(torch_module.cuda.is_initialized())
+            self.assertEqual(torch_module.cuda.device_count(), 0)
+
+        payload = {"sample_size": 32, "in_channels": 160, "layers": {"b": 2, "a": 1}}
+        frozen = FrozenDict([("layers", {"b": 2, "a": 1}), ("in_channels", 160), ("sample_size", 32)])
+        reordered = FrozenDict([("sample_size", 32), ("in_channels", 160), ("layers", {"a": 1, "b": 2})])
+        plain = {"in_channels": 160, "sample_size": 32, "layers": {"a": 1, "b": 2}}
+        self.assertIs(type(frozen), FrozenDict)
+        self.assertFalse(hasattr(FrozenDict, "to_dict"))
+        frozen_digest = harness._config_sha256(frozen)
+        self.assertEqual(frozen_digest, harness._config_sha256(plain))
+        self.assertEqual(frozen_digest, harness._config_sha256(dict(payload)))
+        self.assertEqual(frozen_digest, harness._config_sha256(reordered))
+        self.assertEqual(harness._config_sha256({"b": 1, "a": 2}), harness._config_sha256({"a": 2, "b": 1}))
+
+        class ToDictConfig:
+            def to_dict(self):
+                return {"layers": {"b": 2, "a": 1}, "sample_size": 32, "in_channels": 160}
+
+        self.assertEqual(harness._config_sha256(ToDictConfig()), frozen_digest)
+
+        class ReturnsFrozenDict:
+            def to_dict(self):
+                return FrozenDict([("b", 1), ("a", 2)])
+
+        self.assertEqual(harness._config_sha256(ReturnsFrozenDict()), harness._config_sha256({"a": 2, "b": 1}))
+
+        class Unsupported:
+            pass
+
+        with self.assertRaises(contract.M5SmokeError) as caught:
+            harness._config_sha256(Unsupported())
+        self.assertEqual(caught.exception.code, "checkpoint_reload_mismatch")
+        self.assertEqual(caught.exception.detail, "denoiser configuration is not a supported representation")
+
+        class NonMappingToDict:
+            def to_dict(self):
+                return ["not", "a", "mapping"]
+
+        with self.assertRaises(contract.M5SmokeError) as caught:
+            harness._config_sha256(NonMappingToDict())
+        self.assertEqual(caught.exception.code, "checkpoint_reload_mismatch")
+        self.assertEqual(caught.exception.detail, "denoiser configuration to_dict() did not return a mapping")
+
+        def assert_traceback_hides(config, detail, secret):
+            with self.assertRaises(contract.M5SmokeError) as caught:
+                harness._config_sha256(config)
+            self.assertEqual(caught.exception.code, "checkpoint_reload_mismatch")
+            self.assertEqual(caught.exception.detail, detail)
+            formatted = "".join(
+                traceback.format_exception(
+                    type(caught.exception),
+                    caught.exception,
+                    caught.exception.__traceback__,
+                    chain=True,
+                )
+            )
+            self.assertNotIn(secret, formatted)
+            self.assertNotIn(secret, str(caught.exception))
+
+        to_dict_secret = "sensitive configuration text"
+
+        class FailingToDict:
+            def to_dict(self):
+                raise RuntimeError(to_dict_secret)
+
+        assert_traceback_hides(FailingToDict(), "denoiser configuration to_dict() failed", to_dict_secret)
+
+        mapping_secret = "sensitive mapping conversion text"
+
+        class BrokenMapping(Mapping):
+            def __getitem__(self, key):
+                raise RuntimeError(mapping_secret)
+
+            def __iter__(self):
+                raise RuntimeError(mapping_secret)
+
+            def __len__(self):
+                return 1
+
+        assert_traceback_hides(
+            BrokenMapping(),
+            "denoiser configuration could not be converted with dict()",
+            mapping_secret,
+        )
+
+        canonical_secret = "sensitive canonical json text"
+
+        class SensitiveSortKey(str):
+            def __lt__(self, other):
+                raise RuntimeError(canonical_secret)
+
+        class UnserializableToDict:
+            def to_dict(self):
+                return {SensitiveSortKey("b"): 1, SensitiveSortKey("a"): 2}
+
+        assert_traceback_hides(
+            UnserializableToDict(),
+            "denoiser configuration could not be serialized as canonical JSON",
+            canonical_secret,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

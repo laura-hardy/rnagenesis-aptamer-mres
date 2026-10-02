@@ -802,7 +802,57 @@ def inspect_starting_ema(diffusion_dir, walk):
 
 
 def _config_sha256(config):
-    return contract.sha256_bytes(contract.canonical_json(config.to_dict()))
+    """Hash a denoiser config as deterministic canonical JSON.
+
+    A callable to_dict() is used when present. Otherwise a mapping, including
+    Diffusers FrozenDict, is converted with dict(config). Unsupported objects,
+    a non-mapping to_dict() result, and serialization failures fail closed.
+    """
+    from collections.abc import Mapping
+
+    to_dict = getattr(config, "to_dict", None)
+    if callable(to_dict):
+        try:
+            payload = to_dict()
+        except contract.M5SmokeError:
+            raise
+        except Exception:
+            raise contract.M5SmokeError("checkpoint_reload_mismatch", "denoiser configuration to_dict() failed") from None
+        if not isinstance(payload, Mapping):
+            raise contract.M5SmokeError(
+                "checkpoint_reload_mismatch",
+                "denoiser configuration to_dict() did not return a mapping",
+            )
+    elif isinstance(config, Mapping):
+        try:
+            payload = dict(config)
+        except contract.M5SmokeError:
+            raise
+        except Exception:
+            raise contract.M5SmokeError(
+                "checkpoint_reload_mismatch",
+                "denoiser configuration could not be converted with dict()",
+            ) from None
+        if not isinstance(payload, Mapping):
+            raise contract.M5SmokeError(
+                "checkpoint_reload_mismatch",
+                "denoiser configuration conversion did not return a mapping",
+            )
+    else:
+        raise contract.M5SmokeError(
+            "checkpoint_reload_mismatch",
+            "denoiser configuration is not a supported representation",
+        )
+    try:
+        encoded = contract.canonical_json(payload)
+    except contract.M5SmokeError:
+        raise
+    except Exception:
+        raise contract.M5SmokeError(
+            "checkpoint_reload_mismatch",
+            "denoiser configuration could not be serialized as canonical JSON",
+        ) from None
+    return contract.sha256_bytes(encoded)
 
 
 def _sha256_path(path):
