@@ -1,0 +1,190 @@
+# APPROVED_FOR_M5_IMPLEMENTATION_NOT_EXECUTION
+# This file must not be consumed by an executable workflow.
+# It contains no active authorisation and no physical GPU index, UUID, or PCI bus.
+# A later authorisation commit may change only the activation fields. It must
+# not store its own commit hash. implementation_config_sha256 stays null here
+# because this file cannot contain its own digest; a later authorisation
+# records the parent blob instead.
+# Smoke-only settings are not D1, M6, or M7 decisions.
+
+document_status: APPROVED_FOR_M5_IMPLEMENTATION_NOT_EXECUTION
+consumable_by_executable_workflow: false
+schema_version: m5-synthetic-smoke-config-1
+manifest_schema_version: m5-synthetic-smoke-manifest-1
+experiment_id: m5_synthetic_diffusion_smoke
+created_against_mres_commit: 7fbf79d530e528b6be78a22d89cb9cc991914a0b
+condition_manifest_label: D1_mres_curated_aptamer_diffusion_adapted
+
+execution:
+  authorised: false
+  gpu_authorised_by_this_approval: false
+  evidence_directory_created_by_this_document: false
+
+smoke_execution:
+  executable_now: false
+  status: IMPLEMENTATION_ONLY_NOT_AUTHORISED
+
+smoke_execution_authorisation:
+  authorisation_id: null
+  authorisation_active: false
+  activation_status: inactive_no_authorisation
+  consumed: false
+  single_use_run_id: null
+  authorization_parent_commit: null
+  executing_implementation_commit: null
+  rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
+  mres_branch: main
+  implementation_contract_sha256: 43be9ddb69c8d274e583f9fc756bc7d105bbd4d82e6cea01e09d8c750abe93dc
+  implementation_harness_sha256: bfeddca7beb16cd5742874cace98e81f3d33cfd6f3d3a6e014745471ee41ebc9
+  implementation_config_sha256: null
+  fixture_relative_path: tests/modelling/fixtures/m5_synthetic_smoke_sequences.txt
+  fixture_sha256: 123e0416257469f160f65c02ccf900109c0bfd52ee8c4b383893b40d28847558
+  output_directory: null
+  evidence_directory: null
+  allowed_smoke_settings_sha256: 7e97f18f698d256900b5b96ee08e2020422b9cf5b97e288bfe05226fe3a8d2b2
+  authorisation_timestamp: null
+  scope: null
+  synthetic_only: true
+  train_access: false
+  validation_access: false
+  ref_access: false
+  eval_access: false
+  gpu_use_authorised: false
+  authorises_m5_synthetic_smoke: false
+  success_claimed: false
+  m5_complete: false
+  d1_training_authorised: false
+
+fixture:
+  relative_path: tests/modelling/fixtures/m5_synthetic_smoke_sequences.txt
+  basename: m5_synthetic_smoke_sequences.txt
+  sha256: 123e0416257469f160f65c02ccf900109c0bfd52ee8c4b383893b40d28847558
+  alphabet: ACGU
+  synthetic_only: true
+  derived_from_biological_corpus: false
+  arbitrary_paths_denied: true
+
+denied_inputs:
+  basenames:
+    - corpus_final.txt
+    - ft_train.csv
+    - ft_validation.csv
+    - ref.csv
+    - eval.csv
+  path_components:
+    - TRAIN
+    - VALIDATION
+    - REF
+    - EVAL
+  hashes:
+    d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d: TRAIN
+    cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd: VALIDATION
+    531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23: REF
+    ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015: EVAL
+
+model:
+  starting_diffusion: B1_generic_released_rnagenesis
+  starting_diffusion_relative: configs/rnagenesis/diffusion
+  prohibited_initialisation: checkpoints/Aptamer/diffusion
+  encdec_relative: configs/rnagenesis/autoencoder
+  encdec_released_frozen: true
+  b1_unet_config_sha256: 3a9975ff165bbd5ca82923e6ed1c5ed7eb383a23f4f3f55db713c995031f8ee3
+  b1_unet_weight_sha256: c268021b6cab37423e3bffd495b139bb69698d8d11c7b96477fbfb239b0cff26
+  b0_unet_config_sha256: fab9c517efba8269c0edf194b7d0379f317e93da0f849b5ce815e098088b4756
+  b0_unet_weight_sha256: 149f012287b1ae83865c25867d7c0bbe0952fa51bcc068e259725092d5dff0ca
+  identity_is_hash_not_directory_trust: true
+  biomap_encoder_config_relative: models/autoencoder/encoder/biomap/config.json
+  biomap_encoder_config_sha256: bf7ef6843232f370f3f7fc37d608f85cb0ff0d75291eed35cef52213e34978f7
+  biomap_encoder_config_bytes: 1369
+  diffusers_normalization_patch_path: /home/laura/miniconda3/envs/rnagenesis-h200/lib/python3.8/site-packages/diffusers/models/normalization.py
+  diffusers_normalization_patch_sha256: 09bc632069f1d6e1dc1b1cb7f5b9ca096c83e3010835f11b8dc6c58b45aa13a5
+  diffusers_normalization_patch_bytes: 9516
+  pinned_python: /home/laura/miniconda3/envs/rnagenesis-h200/bin/python
+  accepted_runtime_versions:
+    python: "3.8.13"
+    torch: "2.1.2+cu121"
+    diffusers: "0.25.0"
+    accelerate: "0.25.0"
+    transformers: "4.36.2"
+
+unresolved_d1_decisions:
+  physical_microbatch: null
+  gradient_accumulation: null
+  production_precision: null
+  ema_policy: null
+  m6_seed: null
+  m7_seeds: null
+  status: UNRESOLVED_NOT_A_SMOKE_MEASUREMENT
+
+smoke_only:
+  label: software_behaviour_check
+  not_biological_learning: true
+  not_a_d1_hyperparameter_decision: true
+  learning_rate: "3.0e-5"
+  learning_rate_source: accepted_initial_project_value
+  smoke_microbatch: 8
+  smoke_gradient_accumulation: 4
+  smoke_effective_batch: 32
+  smoke_precision: float32
+  ema_enabled: false
+  generation_weights: raw
+  overfit_optimizer_updates: 4
+  overfit_fixed_timestep: 17
+  overfit_noise_seed: 5
+  loss_pass_rule: final_loss_strictly_less_than_initial_loss
+  loss_decrease_tolerance: "0"
+  generation_count: 2
+  generation_ddim_steps: 4
+  generation_eta: "0"
+  smoke_generation_seed: 11
+  smoke_max_seq_len: 33
+  decoding: greedy
+  does_not_set_m6_or_m7_seeds: true
+  fixture_record_count: 8
+  physical_microbatch_candidate: 8
+  deterministic_fixture_reuse_across_accumulation: true
+  m5_complete_from_correctness_phase: false
+  phases:
+    correctness:
+      name: synthetic_correctness
+      microbatch: 8
+      gradient_accumulation: 4
+      effective_batch: 32
+      precision: float32
+      collects_m5_milestone: false
+    physical_microbatch_feasibility:
+      name: bounded_physical_microbatch_feasibility
+      candidate_microbatch: 8
+      intended_effective_batch: 32
+      accumulation_if_candidate_succeeds: 4
+      attempted_microbatches:
+        - 8
+      fallback_microbatches: []
+      sweep: false
+      fail_closed_on_candidate_failure: true
+      status: executed_under_the_single_smoke_authorisation
+    fp32_observation:
+      precision: float32
+      status: collected_by_the_authorized_sequence
+      selects_production_precision: false
+    bf16_numerical_observation:
+      status: collected_by_the_authorized_sequence
+      same_fixed_latent_timestep_and_noise: true
+      selects_production_precision: false
+      pass_tolerance: null
+    starting_ema_inspection:
+      status: collected_by_the_authorized_sequence
+      selects_ema_policy: false
+      accepted_inventory: b1_diffusion_directory
+    generation_weight_state:
+      record_raw_and_ema_separately: true
+      smoke_generation_variant: raw
+      generation_checkpoint: original_one_update_smoke_checkpoint
+
+outputs:
+  inside_git_repositories: false
+  overwrite_existing: false
+  exclusive_creation: true
+  partial_suffix: .partial
+  final_manifest_requires_all_assertions: true
+  checkpoints_caches_and_evidence_outside_git: true

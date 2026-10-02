@@ -228,4 +228,117 @@ The unique count of the 30,000 sequences does not authorise dropping rows.
 
 This schema does not authorise a run. A process that reads this file while its status is `APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION`, or while `consumable_by_executable_workflow` is false, must refuse to create `/home/laura/rnagenesis-mres-runs/` content from it.
 
-Matters that may remain open after this implementation approval, and that must be resolved before final M4 `COMPLETE / GO`, are listed in `docs/fine_tuning/validation_protocol.md` and `config/experiments/generator_evaluation.yaml`. Microbatch, accumulation, mixed precision, and EMA remain deferred to M5. Their absence does not, by itself, block final M4 closure.
+Matters that may remain open after this implementation approval, and that must be resolved before final M4 `COMPLETE / GO`, are listed in `docs/fine_tuning/validation_protocol.md` and `config/experiments/generator_evaluation.yaml`. Microbatch, accumulation, mixed precision, and EMA remain deferred to M5. Their absence does not, by itself, block final M4 closure. The M5 synthetic-smoke manifest in section 7 records smoke-only values and does not settle those D1 decisions.
+
+## 7. M5 synthetic-smoke manifest
+
+Schema version for the JSON manifest: `m5-synthetic-smoke-manifest-1`. The configuration schema version is `m5-synthetic-smoke-config-1`. This section does not authorise M5 execution, GPU use, or D1 training. The checked-in smoke configuration stays inactive and non-consumable.
+
+A passing manifest is written only after every required assertion passes. Its first field is `manifest_schema_version`. The field order is exactly the `MANIFEST_KEYS` tuple in `scripts/modelling/m5_smoke_contract.py`, and the worker writes those fields and no others. A failure writes `m5_smoke_failure_record.json` and does not write `m5_smoke_manifest.json`. The manifest does not contain its own hash. After the manifest file is closed, the worker rereads it and writes the external file `m5_smoke_manifest.sha256`. That external hash is not a manifest field.
+
+```text
+MANIFEST_FIELD_ORDER
+manifest_schema_version
+schema_version
+experiment_id
+run_id
+synthetic_only
+authorisation_id
+authorisation_consumption_state
+mres_implementation_commit
+mres_authorization_commit
+rnagenesis_commit
+tracked_clean
+untracked_state
+file_hashes
+permitted_input_paths
+declared_scientific_data_inputs
+validated_required_asset_paths
+data_input_audit
+train_not_accessed
+validation_not_accessed
+ref_not_accessed
+eval_not_accessed
+physical_gpu_index
+gpu_uuid
+pci_bus
+gpu_model
+logical_device_mapping
+package_runtime
+parameter_table
+shapes_dtypes
+optimizer_state
+scheduler_state
+requested_microbatch
+measured_microbatch
+actual_batch_shape
+requested_accumulation
+measured_accumulation
+requested_effective_batch
+measured_effective_batch
+phase_records
+precision_used
+ema_enabled
+starting_ema_inspection
+generation_weight_variant
+m5_milestone_complete
+loss_finite
+gradients_finite
+gradient_norm
+frozen_state
+denoiser_update
+checkpoint_reload
+resume_proof
+overfit_trajectory
+overfit_pass_rule
+overfit_passed
+generation_reload
+generation_output
+peak_training_allocated_bytes
+peak_training_reserved_bytes
+peak_allocated_bytes
+peak_reserved_bytes
+memory_peak_accounting
+timings
+warnings
+deviations
+failure_state
+completion_state
+smoke_measurements_are_not_d1_decisions
+END_MANIFEST_FIELD_ORDER
+```
+
+`completion_state` on a passing correctness-phase manifest is `correctness_phase_passed`. `failure_state` is null. `m5_milestone_complete` is false. The authorized sequence collects the physical-microbatch, accumulation, precision, EMA, checkpoint, and generation evidence, and M5 completion remains a human gate after that evidence is reviewed. The manifest does not require another source-code implementation to collect those observations, and it does not settle the unresolved D1 decisions.
+
+`file_hashes` has exactly these keys. Each value is an observed SHA-256, or a mapping of path to observed SHA-256. The manifest hash is absent.
+
+```text
+OBSERVED_FILE_HASH_KEYS
+configuration
+fixture
+implementation_contract
+implementation_harness
+starting_assets
+checkpoint_inventory
+resume_sidecar
+generation_output
+END_OBSERVED_FILE_HASH_KEYS
+```
+
+`configuration`, `fixture`, `implementation_contract`, and `implementation_harness` are the hashes of the bytes the parent read. `starting_assets` maps each required B1, EncDec, biomap-encoder-config, decoder, and tokenizer path, plus the diffusers normalization patch path, to the SHA-256 observed while verifying that regular file. `checkpoint_inventory` is the complete saved Diffusers checkpoint, hashed from the closed files. `resume_sidecar` is the SHA-256 of the sidecar after it is closed and reread. `generation_output` is the SHA-256 of the generation file after it is closed and reread.
+
+`permitted_input_paths` and `declared_scientific_data_inputs` contain only the tracked synthetic fixture. `validated_required_asset_paths` lists the hashed model files and the diffusers patch. `data_input_audit` records `declared_scientific_data_inputs`, `validated_required_asset_paths`, an empty `cli_scientific_data_arguments` list, `data_access_guard_basis`, and `dynamic_file_open_audit_performed: false`. The guard basis is the closed CLI, the pinned constant fixture path, the pinned call graph, the denied role names and hashes, and the exact repository commits. This is not an observed-open audit. An assembled list of expected paths is not called `opened_paths`. `train_not_accessed`, `validation_not_accessed`, `ref_not_accessed`, and `eval_not_accessed` mean those roles were unreachable through the authorized CLI and pinned worker path. They are copied from `derive_data_access` after that guard is accepted. They are not independent literals and they are not a claim that every file open was intercepted.
+
+The evidence directory is a new direct child of `/home/laura/rnagenesis-mres-runs`. The root itself, a path outside that root, a trailing slash, a symlinked parent, and an existing target are refused. Creation is exclusive and does not overwrite.
+
+Device fields are the physical index, UUID, PCI bus, GPU model, and the logical mapping. Logical `cuda:0` is the remapped view of the authorised physical device. `package_runtime` records the pinned Python executable `/home/laura/miniconda3/envs/rnagenesis-h200/bin/python` and the accepted M0 versions: Python `3.8.13`, torch `2.1.2+cu121`, diffusers `0.25.0`, accelerate `0.25.0`, and transformers `4.36.2`.
+
+The parameter table has one row each for `encoder`, `qformer`, `query_tokens`, `latent_projection`, `decoder`, and `denoiser`. `qformer` is the Q-Former layers. `query_tokens` is only the query-token embedding table. A `qt.*` parameter that is not `query_embeddings` is a Q-Former parameter. Each row records total, trainable, and frozen counts and dtypes. Token, mask, latent, noise, timestep, and loss shapes and dtypes are recorded. `actual_batch_shape` is the collated token shape. Its batch dimension is the measured microbatch.
+
+The authorized sequence uses one physical-microbatch candidate, microbatch 8, and does not sweep or fall back to 16 or 32. If that candidate fails, the run fails closed and preserves the failure record. The fixture contains 8 synthetic records. Accumulation executes four backward microsteps on those same eight records, divides each microstep loss by 4, and then takes one optimizer update, so the exercised effective batch is 32. The manifest records the deterministic reuse. A successful first optimizer step allocates AdamW moments before `peak_training_allocated_bytes` and `peak_training_reserved_bytes` are captured. `peak_allocated_bytes` and `peak_reserved_bytes` are the overall peaks, including checkpoint, reload, resume, and generation. `memory_peak_accounting` records that separation. `phase_records.fp32_observation` is the FP32 loss on the fixed latent, timestep, and noise. `phase_records.bf16_numerical_observation` is one bounded comparison on those same tensors. If BF16 autocast is unsupported, the record has no BF16 result. If autocast is supported and the forward returns, the record stores that returned loss and whether it is finite, plus the FP32 loss, the absolute difference, the relative difference, and a memory observation when one is available. If the forward raises, the run fails closed with `bf16_forward_failed` and does not write a passing manifest. An exception is not recorded as a non-finite BF16 result. It does not select production precision and it does not declare a pass tolerance. `starting_ema_inspection` records the exact accepted B1 diffusion inventory. That inventory has no EMA artifact, so compatibility is `not_applicable_absent`. An unexpected checkpoint or EMA member fails asset identity. The inspection does not select an EMA policy. `generation_weight_variant` is `raw`. `phase_records.generation_weight_state` records raw as `used` and EMA as `not_used`. These are smoke measurements. `smoke_measurements_are_not_d1_decisions` is true. They do not settle physical microbatch, accumulation, production precision, EMA policy, the M6 seed, or the M7 seeds.
+
+`frozen_state` contains `after_backward`, `after_update`, and `after_generation`. A passing manifest requires all three. `after_generation.optimizer_membership_evidence_basis` is `live_adamw_parameter_identities`. That evidence is the parameter identities of the proof AdamW and the restored AdamW, recorded while both optimizers existed, and recomputed as disjoint from every EncDec parameter. A replacement optimizer does not satisfy the assertion. The overfit trajectory contains the loss before the configured optimizer updates and the loss after every configured update. Four updates produce five observations. The pass rule compares the first observation with the last, which is the loss after the fourth update.
+
+Checkpoint reload records the expected Diffusers members and their saved file hashes, a successful fresh training load, selected original-versus-reloaded tensor digests, and configuration compatibility. Comparing a directory inventory with itself is not sufficient. That training object is then resumed and overfit. Generation does not use it. Generation loads a new pipeline from the original one-update smoke checkpoint only after weak references taken while the original denoiser, the resumed denoiser, representative parameters, both optimizers, and the other GPU-bearing training objects were live are observed dead. `training_objects_released_before_generation_reload` is that observation. `released_training_object_names` lists only referents observed dead. Python object ids remain supplementary and are not the release proof. `generation_reload` records the selected checkpoint path, its inventory and hash set, the pre-generation reloaded tensor digests, the match to the on-disk checkpoint, and the separation from the mutated training object. Python object identity is not sufficient for that separation. Resume records fresh object identity, saved-versus-reloaded weight digests, optimizer state loaded against the fresh denoiser, optimizer moments, restored scheduler position and learning rate, restored global step, Python RNG restored with `random.setstate`, restored torch CPU, torch CUDA, and dedicated diffusion-generator states, and NumPy RNG as `not_applicable` when NumPy randomness is unused. Each restored RNG is verified with one draw and then set back to the saved state before the resumed optimizer step. The subsequent loss and gradients are finite, and a subsequent update changes a parameter of the fresh denoiser. `sidecar_fields` are the keys reread from the closed sidecar. Weight-only reload is not training resume.
+
+Loss finiteness, gradient finiteness, gradient norm, the denoiser-update slice, peak allocated and reserved GPU memory, timings, warnings, and deviations are required. Critical model assets and the diffusers patch are regular, non-symlink files whose size and SHA-256 match the accepted M0 manifest. The pinned biomap encoder config is `models/autoencoder/encoder/biomap/config.json`, 1369 bytes, SHA-256 `bf7ef6843232f370f3f7fc37d608f85cb0ff0d75291eed35cef52213e34978f7`. The diffusers patch is `/home/laura/miniconda3/envs/rnagenesis-h200/lib/python3.8/site-packages/diffusers/models/normalization.py`, 9516 bytes, SHA-256 `09bc632069f1d6e1dc1b1cb7f5b9ca096c83e3010835f11b8dc6c58b45aa13a5`. B1 remains the starting diffusion checkpoint. B0 is not accepted in its place. Tracked RNAGenesis source remains the clean commit `e3b855bbf4d1af376f43747643fa30afd662828c`.
