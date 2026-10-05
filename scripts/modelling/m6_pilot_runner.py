@@ -421,17 +421,54 @@ def assert_denoiser_fp32(torch_module, denoiser):
     return True
 
 
+def _normalize_logical_cuda_device(device, torch_module):
+    """Accept Accelerate's unindexed ``torch.device("cuda")`` only when it is logical cuda:0.
+
+    Accelerate 0.25 ``PartialState.default_device`` returns ``torch.device("cuda")``
+    when CUDA is available. ``str`` of that object is ``cuda``, its type is
+    ``cuda``, and its index is ``None``. ``str(torch.device("cuda", 0))`` is
+    the canonical ``cuda:0``. An explicit index must already be 0. A missing
+    index is resolved with ``torch.cuda.current_device`` and must also be 0.
+    """
+    try:
+        resolved = torch_module.device(device)
+    except contract.M6PilotError:
+        raise
+    except Exception:
+        raise contract.M6PilotError("identity_mismatch", "logical device is not cuda:0")
+    if getattr(resolved, "type", None) != "cuda":
+        raise contract.M6PilotError("identity_mismatch", "logical device is not cuda:0")
+    index = getattr(resolved, "index", None)
+    if index is None:
+        try:
+            index = torch_module.cuda.current_device()
+        except contract.M6PilotError:
+            raise
+        except Exception:
+            raise contract.M6PilotError("identity_mismatch", "logical device is not cuda:0")
+    if isinstance(index, bool):
+        raise contract.M6PilotError("identity_mismatch", "logical device is not cuda:0")
+    try:
+        numeric_index = int(index)
+    except Exception:
+        raise contract.M6PilotError("identity_mismatch", "logical device is not cuda:0")
+    if numeric_index != 0:
+        raise contract.M6PilotError("identity_mismatch", "logical device is not cuda:0")
+    normalized = torch_module.device("cuda", 0)
+    if str(normalized) != contract.LOGICAL_CUDA_DEVICE or getattr(normalized, "index", None) != 0:
+        raise contract.M6PilotError("identity_mismatch", "logical device is not cuda:0")
+    return normalized
+
+
 def assert_prepared_runtime(accelerator, torch_module, device_count):
     if int(getattr(accelerator, "num_processes", 0)) != 1:
         raise contract.M6PilotError("identity_mismatch", "Accelerate must run as exactly one process")
     if int(device_count) != 1:
         raise contract.M6PilotError("identity_mismatch", "the worker must see exactly one CUDA device")
-    if str(getattr(accelerator, "device", "")) != contract.LOGICAL_CUDA_DEVICE:
-        raise contract.M6PilotError("identity_mismatch", "logical device is not cuda:0")
+    logical_device = _normalize_logical_cuda_device(getattr(accelerator, "device", None), torch_module)
     if accelerator.gradient_accumulation_steps != 1 or accelerator.mixed_precision != "no":
         raise contract.M6PilotError("microbatch_arithmetic_invalid", "Accelerate would divide the manual accumulation again")
-    del torch_module
-    return True
+    return logical_device
 
 
 def _rotary_cache(name):
@@ -924,8 +961,8 @@ def run_authorized_pilot(authorisation, stack, directory):
     _assert_adamw_hyperparameters(optimizer)
     accelerator = stack.accelerator()
     denoiser, optimizer = accelerator.prepare(denoiser, optimizer)
-    assert_prepared_runtime(accelerator, torch, _cuda_device_count(stack, torch))
-    encdec = _place(stack, encdec, accelerator.device)
+    logical_device = assert_prepared_runtime(accelerator, torch, _cuda_device_count(stack, torch))
+    encdec = _place(stack, encdec, logical_device)
     encdec.eval()
     denoiser.train()
     membership = live_parameter_identity_proof(optimizer, denoiser, encdec)
@@ -946,7 +983,7 @@ def run_authorized_pilot(authorisation, stack, directory):
         _progress_stage(stack, "validation", update=update)
         started_at = clock.stamp()
         aggregate = _validation_aggregate(
-            stack, accelerator, denoiser, encdec, scheduler, validation_sequences, loaded, tokenizer, torch
+            stack, accelerator, denoiser, encdec, scheduler, validation_sequences, loaded, tokenizer, torch, logical_device
         )
         validation_durations.append({"seconds": clock.stamp() - started_at, "update": update})
         return aggregate
@@ -972,8 +1009,8 @@ def run_authorized_pilot(authorisation, stack, directory):
             batch = stack.collate_sequences(examples, tokenizer)
             latent = stack.extract_latents(
                 encdec,
-                _place(stack, batch["input_ids"], accelerator.device),
-                _place(stack, batch["attention_mask"], accelerator.device),
+                _place(stack, batch["input_ids"], logical_device),
+                _place(stack, batch["attention_mask"], logical_device),
             )
             timesteps, noise = stack.sample_train_diffusion(
                 latent.shape[0], rng["diffusion_generator"], int(scheduler.config.num_train_timesteps), latent.device
@@ -1129,7 +1166,7 @@ def _open_artifacts(authorisation, stack, artifact_path):
     return loaded
 
 
-def _validation_aggregate(stack, accelerator, denoiser, encdec, scheduler, sequences, loaded, tokenizer, torch):
+def _validation_aggregate(stack, accelerator, denoiser, encdec, scheduler, sequences, loaded, tokenizer, torch, logical_device):
     """Evaluate the same prepared denoiser, then restore its training flag."""
     was_training = bool(denoiser.training)
     denoiser.eval()
@@ -1142,8 +1179,8 @@ def _validation_aggregate(stack, accelerator, denoiser, encdec, scheduler, seque
                 batch = stack.collate_sequences([{"index": 0, "sequence": sequence}], tokenizer)
                 latent = stack.extract_latents(
                     encdec,
-                    _place(stack, batch["input_ids"], accelerator.device),
-                    _place(stack, batch["attention_mask"], accelerator.device),
+                    _place(stack, batch["input_ids"], logical_device),
+                    _place(stack, batch["attention_mask"], logical_device),
                 )
                 for draw in range(contract.VALIDATION_DRAWS):
                     timestep = loaded["timesteps"][index, draw]

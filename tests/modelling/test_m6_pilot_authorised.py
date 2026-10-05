@@ -1324,7 +1324,8 @@ class AuthorisedPathTests(unittest.TestCase):
             "timesteps": torch.zeros(contract.VALIDATION_SEQUENCE_COUNT, contract.VALIDATION_DRAWS, dtype=torch.int64),
             "noise": torch.zeros(contract.VALIDATION_SEQUENCE_COUNT, contract.VALIDATION_DRAWS, 2),
         }
-        runner._validation_aggregate(Stack(), Accelerator(), denoiser, encdec, None, sequences, loaded, None, torch)
+        logical_device = runner.assert_prepared_runtime(Accelerator(), torch, 1)
+        runner._validation_aggregate(Stack(), Accelerator(), denoiser, encdec, None, sequences, loaded, None, torch, logical_device)
         self.assertEqual(len(seen), contract.VALIDATION_PAIR_COUNT)
         self.assertTrue(all(item[0] is False and item[1] is False for item in seen))
         self.assertTrue(denoiser.training)
@@ -1340,11 +1341,111 @@ class AuthorisedPathTests(unittest.TestCase):
         torch.no_grad = lambda: Open()
         try:
             with self.assertRaises(contract.M6PilotError) as caught:
-                runner._validation_aggregate(Stack(), Accelerator(), denoiser, encdec, None, sequences, loaded, None, torch)
+                runner._validation_aggregate(Stack(), Accelerator(), denoiser, encdec, None, sequences, loaded, None, torch, logical_device)
             self.assertIn("gradients enabled", caught.exception.detail)
         finally:
             torch.no_grad = original
         self.assertTrue(denoiser.training)
+
+    def test_logical_device_normalization(self):
+        class FakeCuda(object):
+            def __init__(self, current=0, error=None):
+                self.current = current
+                self.error = error
+                self.calls = 0
+
+            def current_device(self):
+                self.calls += 1
+                if self.error is not None:
+                    raise self.error
+                return self.current
+
+        class FakeTorch(object):
+            def __init__(self, cuda):
+                self.cuda = cuda
+
+            def device(self, *args, **kwargs):
+                return torch.device(*args, **kwargs)
+
+        class Accelerator(object):
+            def __init__(self, processes=1, device="cuda:0", accumulation=1, precision="no"):
+                self.num_processes = processes
+                self.device = device
+                self.gradient_accumulation_steps = accumulation
+                self.mixed_precision = precision
+
+        def accepted(device, cuda):
+            torch_module = FakeTorch(cuda)
+            logical = runner.assert_prepared_runtime(Accelerator(device=device), torch_module, 1)
+            self.assertEqual(str(logical), contract.LOGICAL_CUDA_DEVICE)
+            self.assertEqual(logical.type, "cuda")
+            self.assertEqual(logical.index, 0)
+            return cuda.calls
+
+        unindexed = FakeCuda(current=0)
+        self.assertEqual(accepted(torch.device("cuda"), unindexed), 1)
+        explicit = FakeCuda(current=1, error=RuntimeError("current device must not be consulted"))
+        self.assertEqual(accepted(torch.device("cuda", 0), explicit), 0)
+        self.assertEqual(str(runner.assert_prepared_runtime(Accelerator(), torch, 1)), "cuda:0")
+
+        def rejected(device, cuda, count=1, processes=1, accumulation=1, precision="no", code="identity_mismatch"):
+            with self.assertRaises(contract.M6PilotError) as caught:
+                runner.assert_prepared_runtime(
+                    Accelerator(processes=processes, device=device, accumulation=accumulation, precision=precision),
+                    FakeTorch(cuda),
+                    count,
+                )
+            self.assertEqual(caught.exception.code, code)
+            return cuda.calls
+
+        self.assertEqual(rejected(torch.device("cpu"), FakeCuda(error=RuntimeError("not cuda"))), 0)
+        self.assertEqual(rejected(torch.device("cuda", 1), FakeCuda(error=RuntimeError("explicit index"))), 0)
+        self.assertEqual(rejected(None, FakeCuda(error=RuntimeError("missing device"))), 0)
+        self.assertEqual(rejected("not-a-device", FakeCuda(error=RuntimeError("malformed device"))), 0)
+        self.assertEqual(rejected(torch.device("cuda"), FakeCuda(current=1)), 1)
+        self.assertEqual(rejected(torch.device("cuda"), FakeCuda(error=RuntimeError("lookup failed"))), 1)
+        self.assertEqual(rejected(torch.device("cuda", 0), FakeCuda(), count=2), 0)
+        self.assertEqual(rejected(torch.device("cuda", 0), FakeCuda(), processes=2), 0)
+        with self.assertRaises(contract.M6PilotError) as caught:
+            runner.assert_prepared_runtime(Accelerator(processes=2), FakeTorch(FakeCuda()), 1)
+        self.assertIn("exactly one process", caught.exception.detail)
+        with self.assertRaises(contract.M6PilotError) as caught:
+            runner.assert_prepared_runtime(Accelerator(device=torch.device("cuda", 0)), FakeTorch(FakeCuda()), 0)
+        self.assertIn("exactly one CUDA device", caught.exception.detail)
+        self.assertEqual(rejected(torch.device("cuda", 0), FakeCuda(), accumulation=4, code="microbatch_arithmetic_invalid"), 0)
+        self.assertEqual(rejected(torch.device("cuda", 0), FakeCuda(), precision="fp16", code="microbatch_arithmetic_invalid"), 0)
+
+        recorded = []
+
+        class Stack(object):
+            def place(self, tensor, device):
+                recorded.append(device)
+                return tensor
+
+            def collate_sequences(self, examples, tokenizer):
+                return {"input_ids": torch.zeros(1, 2, dtype=torch.long), "attention_mask": torch.ones(1, 2)}
+
+            def extract_latents(self, encdec, input_ids, attention_mask):
+                return torch.ones(1, 2)
+
+            def denoising_mse(self, model, scheduler, latents, noise, timesteps):
+                return torch.nn.functional.mse_loss(latents.float(), noise.float())
+
+        raw = torch.device("cuda")
+        logical = runner.assert_prepared_runtime(Accelerator(device=raw), FakeTorch(FakeCuda(current=0)), 1)
+        self.assertNotEqual(str(raw), contract.LOGICAL_CUDA_DEVICE)
+        denoiser = torch.nn.Linear(1, 1)
+        sequences = ["ACGU"] * contract.VALIDATION_SEQUENCE_COUNT
+        loaded = {
+            "timesteps": torch.zeros(contract.VALIDATION_SEQUENCE_COUNT, contract.VALIDATION_DRAWS, dtype=torch.int64),
+            "noise": torch.zeros(contract.VALIDATION_SEQUENCE_COUNT, contract.VALIDATION_DRAWS, 2),
+        }
+        runner._validation_aggregate(
+            Stack(), Accelerator(device=raw), denoiser, denoiser, None, sequences, loaded, None, torch, logical
+        )
+        self.assertTrue(recorded)
+        self.assertTrue(all(str(device) == "cuda:0" and device.index == 0 for device in recorded))
+        self.assertTrue(all(device is not raw for device in recorded))
 
     def test_synchronized_clock_orders_sync_before_time(self):
         order = []
