@@ -6,15 +6,16 @@ checked-in configuration is rejected before torch, Accelerate, Diffusers,
 RNAGenesis, biological data, validation tensors, CUDA, or a directory
 create. A future authorisation-only commit can satisfy the active schema in
 the contract. After that schema, the repository, and the bound paths pass,
-this module imports the pinned RNAGenesis training stack and runs the real
-worker. Synthetic tests call ``run_synthetic_control_flow`` or pass an
-in-process worker. Neither path is reachable from the CLI or from
-environment variables. A zero child exit is accepted only after the parent
-reopens and validates the success manifest. The final production CUDA RNG
-read fails closed and does not reuse the initial state. An ordinary
-exception after consumption keeps the latest stage, update, and microbatch,
-and records only the exception class. It does not record the exception
-message or a traceback.
+the parent starts the production child with its working directory set to
+the pinned RNAGenesis root. The child confirms that resolved directory
+before it imports the training stack. Synthetic tests call
+``run_synthetic_control_flow`` or pass an in-process worker. Neither path
+is reachable from the CLI or from environment variables. A zero child exit
+is accepted only after the parent reopens and validates the success
+manifest. The final production CUDA RNG read fails closed and does not
+reuse the initial state. An ordinary exception after consumption keeps the
+latest stage, update, and microbatch, and records only the exception class.
+It does not record the exception message or a traceback.
 
 Position 22 is recorded as the next unapplied schedule position. The worker
 does not step a PyTorch learning-rate scheduler and does not store that
@@ -232,8 +233,37 @@ def _pinned_path(path):
     return Path(path)
 
 
+def assert_production_worker_directory():
+    """Fail closed unless the resolved cwd is the pinned RNAGenesis root.
+
+    The production child is launched with that root as its working directory,
+    which is the accepted M5 execution behaviour. This check does not change
+    the working directory. It runs before the training stack is imported.
+
+    The pinned biomap RNA EncDec constructor opens two files through the
+    relative ``ProGenPath`` prefix ``models/autoencoder/decoder/progen_configs``:
+    ``<decoder_config>.json`` and ``<rna_tokenizer_config>.json``. With the
+    released EncDec config those are the already hashed decoder configuration
+    and tokenizer. The biomap encoder config and the xTrimo vocabulary are
+    resolved from ``__file__``. ``DATA_CACHE_DIR`` is unused.
+    ``XDG_CACHE_HOME = ".cache"`` is assigned only by ``generation.py`` and
+    ``models/guidance/classifier.py``, which this worker does not import.
+    ``pipeline_ddim`` imports ``ProGenPath`` and does not open it.
+    """
+    observed = os.path.realpath(os.getcwd())
+    expected = os.path.realpath(contract.RNAGENESIS_ROOT)
+    if observed != expected:
+        raise contract.M6PilotError(
+            "identity_mismatch",
+            "production worker working directory is not the pinned RNAGenesis root",
+            stage="production_worker_directory",
+        )
+    return expected
+
+
 def _import_pinned_training_stack():
     """Import RNAGenesis and the artifact loader. Called only after the gate and isolation."""
+    assert_production_worker_directory()
     root = contract.RNAGENESIS_ROOT
     encoder = os.path.join(root, "models", "autoencoder", "encoder")
     for path in (root, encoder):
@@ -718,7 +748,7 @@ def launch_isolated_worker(authorisation, run_root=None, spawn=None, asset_obser
             directory,
             authorisation["authorization_commit"],
         ]
-        completed = spawn(argv, env, contract.MRES_ROOT)
+        completed = spawn(argv, env, contract.RNAGENESIS_ROOT)
         if getattr(completed, "returncode", 1) != 0:
             raise contract.M6PilotError(
                 "incomplete_evidence_or_manifest",
@@ -738,6 +768,9 @@ def worker_main(output_directory, authorization_commit, config_loader=None, obse
 
     Optional loaders are the in-process test seam. The production bootstrap
     calls this function with the output directory and authorisation commit only.
+    That production path confirms the resolved working directory is the pinned
+    RNAGenesis root before it imports the training stack. An injected
+    ``stack_loader`` remains a test seam and does not replace that production check.
     """
     authorisation = None
     progress = {"microbatch": None, "retained_checkpoints": [], "stage": "worker_isolation", "update": None}
@@ -763,6 +796,9 @@ def worker_main(output_directory, authorization_commit, config_loader=None, obse
                 "worker authorization commit drifted",
                 stage="authorisation_commit",
             )
+        if stack_loader is None:
+            progress["stage"] = "production_worker_directory"
+            assert_production_worker_directory()
         progress["stage"] = "training_stack_import"
         try:
             if stack_loader is None:

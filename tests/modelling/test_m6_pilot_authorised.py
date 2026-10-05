@@ -10,6 +10,7 @@ import ast
 import copy
 import hashlib
 import importlib.util
+import inspect
 import json
 import os
 import shutil
@@ -2300,6 +2301,283 @@ class AuthorisedPathTests(unittest.TestCase):
         self.assertEqual(trainer.opened_paths, [])
         self.assertEqual(len(manifest["weight_checkpoints"]), 3)
         self.assertFalse(os.path.exists(os.path.join(directory, contract.FAILURE_RECORD_NAME)))
+
+    def test_production_spawn_uses_pinned_rnagenesis_cwd(self):
+        captured = {}
+
+        def spawn(argv, env, cwd):
+            captured["argv"] = list(argv)
+            captured["env"] = dict(env)
+            captured["cwd"] = cwd
+            return type("Completed", (), {"returncode": 1})()
+
+        _caught, config = self._launch("m6-production-cwd", spawn)
+        directory = config["execution"]["output_directory"]
+        self.assertEqual(captured["cwd"], contract.RNAGENESIS_ROOT)
+        self.assertEqual(os.path.realpath(captured["cwd"]), os.path.realpath(contract.RNAGENESIS_ROOT))
+        self.assertNotEqual(captured["cwd"], contract.MRES_ROOT)
+        argv = captured["argv"]
+        self.assertEqual(argv[0], contract.m5_contract().PINNED_PYTHON)
+        self.assertEqual(argv[1], "-B")
+        self.assertTrue(os.path.isabs(argv[4]))
+        self.assertEqual(argv[4], os.path.join(contract.MRES_ROOT, contract.RUNNER_RELATIVE))
+        self.assertTrue(os.path.isabs(runner.CONFIG_PATH))
+        self.assertEqual(runner.CONFIG_PATH, os.path.join(contract.MRES_ROOT, contract.CONFIG_RELATIVE))
+        self.assertTrue(os.path.isabs(contract.ARTIFACT_LOADER_PATH))
+        self.assertIn("cwd=cwd", inspect.getsource(runner._default_spawn))
+        self.assertIn("shell=False", inspect.getsource(runner._default_spawn))
+        self.assertIn("spawn(argv, env, contract.RNAGENESIS_ROOT)", inspect.getsource(runner.launch_isolated_worker))
+        caches = contract.m5_contract().runtime_isolation_paths(directory)
+        for key, path in caches.items():
+            self.assertEqual(captured["env"][key], path)
+            self.assertTrue(os.path.isabs(path))
+            self.assertTrue(path == directory or path.startswith(directory + os.sep))
+            self.assertFalse(path.startswith(contract.RNAGENESIS_ROOT + os.sep) or path == contract.RNAGENESIS_ROOT)
+            self.assertFalse(path.startswith(contract.MRES_ROOT + os.sep) or path == contract.MRES_ROOT)
+        for key in ("HF_HOME", "TORCH_HOME", "XDG_CACHE_HOME", "PYTHONPYCACHEPREFIX"):
+            self.assertIn(key, caches)
+        recorded = {}
+        original = runner.subprocess.check_output
+
+        def fake_check_output(argv, cwd, text=None):
+            recorded["argv"] = list(argv)
+            recorded["cwd"] = cwd
+            return contract.RNAGENESIS_COMMIT + "\n"
+
+        runner.subprocess.check_output = fake_check_output
+        try:
+            observed = runner._git(contract.RNAGENESIS_ROOT, ["rev-parse", "HEAD"]).strip()
+        finally:
+            runner.subprocess.check_output = original
+        self.assertEqual(observed, contract.RNAGENESIS_COMMIT)
+        self.assertEqual(recorded["cwd"], contract.RNAGENESIS_ROOT)
+        self.assertEqual(recorded["argv"][:2], ["git", "rev-parse"])
+
+    def test_production_worker_rejects_wrong_cwd_before_training_stack(self):
+        imported = {"called": False}
+        original_loader = runner.load_training_stack
+
+        def trap(authorisation, importer=None):
+            imported["called"] = True
+            raise AssertionError("training stack was used")
+
+        runner.load_training_stack = trap
+        previous = os.getcwd()
+        try:
+            os.chdir(self.temp)
+            caught, config = self._run_production_worker("m6-wrong-cwd")
+        finally:
+            os.chdir(previous)
+            runner.load_training_stack = original_loader
+        self.assertFalse(imported["called"])
+        self.assertEqual(caught.code, "identity_mismatch")
+        self.assertEqual(caught.stage, "production_worker_directory")
+        failure = self._failure_document(config)
+        self.assertEqual(failure["failure_code"], "identity_mismatch")
+        self.assertEqual(failure["stage"], "production_worker_directory")
+        self.assertIsNone(failure["update"])
+        self.assertIsNone(failure["microbatch"])
+        self.assertFalse(os.path.exists(os.path.join(config["execution"]["output_directory"], contract.SUCCESS_MANIFEST_NAME)))
+
+        imported["called"] = False
+        runner.load_training_stack = trap
+        path_before = list(sys.path)
+        try:
+            os.chdir(contract.RNAGENESIS_ROOT)
+            reached, reached_config = self._run_production_worker("m6-rnagenesis-cwd")
+        finally:
+            os.chdir(previous)
+            runner.load_training_stack = original_loader
+            sys.path[:] = path_before
+        self.assertTrue(imported["called"])
+        self.assertEqual(reached.code, "training_stack_import_failed")
+        self.assertEqual(self._failure_document(reached_config)["stage"], "training_stack_import")
+
+        imported_names = []
+        original_import = runner.importlib.import_module
+
+        def tracking(name, package=None):
+            imported_names.append(name)
+            raise AssertionError(name)
+
+        runner.importlib.import_module = tracking
+        path_before = list(sys.path)
+        try:
+            os.chdir(self.temp)
+            with self.assertRaises(contract.M6PilotError) as direct:
+                runner._import_pinned_training_stack()
+            self.assertEqual(imported_names, [])
+            self.assertEqual(direct.exception.stage, "production_worker_directory")
+            self.assertEqual(list(sys.path), path_before)
+            os.chdir(contract.RNAGENESIS_ROOT)
+            with self.assertRaises(AssertionError):
+                runner._import_pinned_training_stack()
+            self.assertEqual(imported_names, ["train_diffusion_mres"])
+        finally:
+            os.chdir(previous)
+            runner.importlib.import_module = original_import
+            sys.path[:] = path_before
+
+    def test_relative_decoder_paths_resolve_to_hashed_rnagenesis_assets(self):
+        progen = self._assigned_string(os.path.join(contract.RNAGENESIS_ROOT, "util.py"), "ProGenPath")
+        self.assertEqual(progen, "models/autoencoder/decoder/progen_configs")
+        self.assertFalse(os.path.isabs(progen))
+        config_path = os.path.join(contract.RNAGENESIS_ROOT, "configs/rnagenesis/autoencoder/config.json")
+        with open(config_path, "rb") as handle:
+            released = json.loads(handle.read().decode("utf-8"))
+        self.assertEqual(released["data_type"], "rna")
+        self.assertEqual(released["rna_encoder_type"], "biomap")
+        self.assertIn("rna", os.path.basename(released["decoder_config"]))
+        decoder_relative = progen + "/" + released["decoder_config"] + ".json"
+        tokenizer_relative = progen + "/" + released["rna_tokenizer_config"] + ".json"
+        expected = {
+            role: (relative, digest_value, size)
+            for relative, digest_value, size, role in contract.m5_contract().REQUIRED_MODEL_FILES
+        }
+        self.assertEqual(decoder_relative, expected["decoder_config"][0])
+        self.assertEqual(tokenizer_relative, expected["tokenizer"][0])
+        previous = os.getcwd()
+        try:
+            os.chdir(contract.RNAGENESIS_ROOT)
+            resolved = {
+                "decoder_config": os.path.realpath(decoder_relative),
+                "tokenizer": os.path.realpath(tokenizer_relative),
+            }
+            os.chdir(contract.MRES_ROOT)
+            misplaced = {
+                "decoder_config": os.path.realpath(decoder_relative),
+                "tokenizer": os.path.realpath(tokenizer_relative),
+            }
+        finally:
+            os.chdir(previous)
+        for role, relative in (("decoder_config", decoder_relative), ("tokenizer", tokenizer_relative)):
+            accepted = os.path.realpath(os.path.join(contract.RNAGENESIS_ROOT, expected[role][0]))
+            self.assertEqual(resolved[role], accepted)
+            self.assertNotEqual(misplaced[role], accepted)
+            self.assertFalse(os.path.lexists(misplaced[role]))
+            self.assertTrue(os.path.isfile(accepted))
+            self.assertFalse(os.path.islink(accepted))
+            size = os.path.getsize(accepted)
+            digest_value = hashlib.sha256()
+            with open(accepted, "rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest_value.update(chunk)
+            self.assertEqual(size, expected[role][2])
+            self.assertEqual(digest_value.hexdigest(), expected[role][1])
+        encdec_source = self._read_text(os.path.join(contract.RNAGENESIS_ROOT, "models/autoencoder/encdec.py"))
+        trainer_source = self._read_text(os.path.join(contract.RNAGENESIS_ROOT, "train_diffusion_mres.py"))
+        pipeline_source = self._read_text(os.path.join(contract.RNAGENESIS_ROOT, "models/diffusion_models/pipeline_ddim.py"))
+        generation_source = self._read_text(os.path.join(contract.RNAGENESIS_ROOT, "generation.py"))
+        classifier_source = self._read_text(os.path.join(contract.RNAGENESIS_ROOT, "models/guidance/classifier.py"))
+        token_source = self._read_text(
+            os.path.join(contract.RNAGENESIS_ROOT, "models/autoencoder/encoder/biomap/rna_tokens.py")
+        )
+        self.assertIn('os.path.join(os.path.dirname(__file__), "encoder", "biomap")', encdec_source)
+        self.assertIn('f"{ProGenPath}/{config.decoder_config}.json"', encdec_source)
+        self.assertIn("f'{ProGenPath}/{self.rna_tokenizer_config}.json'", encdec_source)
+        self.assertIn("REPO_ROOT = Path(__file__).resolve().parent", trainer_source)
+        self.assertNotIn("os.environ['XDG_CACHE_HOME']", trainer_source)
+        self.assertNotIn("import generation", trainer_source)
+        self.assertNotIn("DATA_CACHE_DIR", trainer_source + encdec_source + pipeline_source + token_source)
+        self.assertEqual(pipeline_source.count("ProGenPath"), 1)
+        self.assertIn("os.environ['XDG_CACHE_HOME'] = XDG_CACHE_HOME", generation_source)
+        self.assertIn("os.environ['XDG_CACHE_HOME'] = XDG_CACHE_HOME", classifier_source)
+        self.assertIn("os.path.dirname(os.path.abspath(__file__))", token_source)
+        self.assertEqual(self._assigned_string(os.path.join(contract.RNAGENESIS_ROOT, "util.py"), "DATA_CACHE_DIR"), ".cache/data")
+        self.assertEqual(self._assigned_string(os.path.join(contract.RNAGENESIS_ROOT, "util.py"), "XDG_CACHE_HOME"), ".cache")
+
+    def test_cwd_correction_performs_no_repository_write(self):
+        before = {
+            contract.MRES_ROOT: self._porcelain(contract.MRES_ROOT),
+            contract.RNAGENESIS_ROOT: self._porcelain(contract.RNAGENESIS_ROOT),
+        }
+        source = inspect.getsource(runner.assert_production_worker_directory)
+        self.assertNotIn("chdir", source)
+        self.assertNotIn("open(", source)
+        writes = []
+        roots = (os.path.realpath(contract.MRES_ROOT), os.path.realpath(contract.RNAGENESIS_ROOT))
+        original_open = open
+
+        def guarded_open(file, mode="r", *args, **kwargs):
+            if isinstance(mode, str) and any(flag in mode for flag in ("w", "a", "x", "+")):
+                raw = file if isinstance(file, str) else getattr(file, "name", "")
+                if isinstance(raw, str) and raw:
+                    resolved = os.path.realpath(raw)
+                    if any(resolved == root or resolved.startswith(root + os.sep) for root in roots):
+                        writes.append(resolved)
+            return original_open(file, mode, *args, **kwargs)
+
+        previous = os.getcwd()
+        try:
+            builtins_open = __builtins__["open"] if isinstance(__builtins__, dict) else __builtins__.open
+            if isinstance(__builtins__, dict):
+                __builtins__["open"] = guarded_open
+            else:
+                __builtins__.open = guarded_open
+            os.chdir(self.temp)
+            with self.assertRaises(contract.M6PilotError):
+                runner.assert_production_worker_directory()
+            os.chdir(contract.RNAGENESIS_ROOT)
+            self.assertEqual(runner.assert_production_worker_directory(), os.path.realpath(contract.RNAGENESIS_ROOT))
+            self.test_production_spawn_uses_pinned_rnagenesis_cwd()
+            self.test_relative_decoder_paths_resolve_to_hashed_rnagenesis_assets()
+        finally:
+            if isinstance(__builtins__, dict):
+                __builtins__["open"] = builtins_open
+            else:
+                __builtins__.open = builtins_open
+            os.chdir(previous)
+        self.assertEqual(writes, [])
+        self.assertEqual(self._porcelain(contract.MRES_ROOT), before[contract.MRES_ROOT])
+        self.assertEqual(self._porcelain(contract.RNAGENESIS_ROOT), before[contract.RNAGENESIS_ROOT])
+
+    def _run_production_worker(self, name):
+        config = active_from(self.inactive, self.temp, name=name)
+        authorisation = contract.validate_active_execution(config, self.observation, self.temp)
+        directory = contract.consume_bound_output_directory(authorisation, self.temp)
+        runner._create_isolated_caches(directory)
+        env = contract.isolation_environment(self._parent_environ(), authorisation["physical_gpu_index"], directory)
+        saved = {key: os.environ.get(key) for key in env}
+        os.environ.update(env)
+        try:
+            runner.worker_main(
+                directory,
+                authorisation["authorization_commit"],
+                config_loader=lambda: config,
+                observation_loader=lambda _loaded: self._consumed_observation(),
+            )
+        except contract.M6PilotError as exc:
+            return exc, config
+        finally:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+        self.fail("production worker returned")
+
+    def _assigned_string(self, path, name):
+        tree = ast.parse(self._read_text(path))
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    value = ast.literal_eval(node.value)
+                    self.assertIsInstance(value, str)
+                    return value
+        self.fail(name + " is missing")
+
+    def _read_text(self, path):
+        with open(path, "r", encoding="utf-8") as handle:
+            return handle.read()
+
+    def _porcelain(self, repo):
+        return runner.subprocess.check_output(
+            ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+            cwd=repo,
+            text=True,
+        )
 
 
 class _Version(object):
