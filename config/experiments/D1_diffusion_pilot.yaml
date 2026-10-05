@@ -1,12 +1,13 @@
-# M6_AUTHORISED_FOR_SINGLE_USE_EXECUTION
-# Single-use unconsumed D1 pilot authorisation.
-# Consumption is creation of the bound output directory.
-# This file has no authorization-commit field.
-# The runner records the live HEAD SHA at runtime.
-# Historical M4 approval is retained below and does not broaden this scope.
+# M6_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
+# This file is the authoritative inactive D1 pilot configuration.
+# It must not be consumed by an executable workflow.
+# It binds no GPU, no output directory, and no authorisation.
+# Historical M4 approval is retained below and does not authorise M6.
+# The tracked file does not store authorization_commit. A later
+# authorisation commit records that SHA only at runtime.
 
-document_status: M6_AUTHORISED_FOR_SINGLE_USE_EXECUTION
-consumable_by_executable_workflow: true
+document_status: M6_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
+consumable_by_executable_workflow: false
 schema_version: m6-pilot-config-1
 manifest_schema_version: m6-pilot-manifest-1
 experiment_id: D1_diffusion_pilot
@@ -16,67 +17,47 @@ rnagenesis_branch: mres-d1-diffusion-finetune
 rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
 
 execution:
-  authorised: true
-  biological_paths_permitted: true
-  gpu_identity_bound: true
-  output_directory: /home/laura/rnagenesis-mres-runs/m6_d1_diffusion_pilot_4a2fd6f7e578_gpu1_attempt1
-  evidence_directory: /home/laura/rnagenesis-mres-runs/m6_d1_diffusion_pilot_4a2fd6f7e578_gpu1_attempt1
-  authorisation_id: m6_d1_diffusion_pilot_4a2fd6f7e578_gpu1_attempt1
-  authorization_parent_commit: 4a2fd6f7e5784ad5c116949c5ee59814dc959f7c
-  executing_implementation_commit: 4a2fd6f7e5784ad5c116949c5ee59814dc959f7c
+  authorised: false
+  biological_paths_permitted: false
+  gpu_identity_bound: false
+  output_directory: null
+  evidence_directory: null
+  authorisation_id: null
+  authorization_parent_commit: null
+  executing_implementation_commit: null
 
 pilot_execution_authorisation:
-  authorisation_id: m6_d1_diffusion_pilot_4a2fd6f7e578_gpu1_attempt1
-  activation_status: active_unconsumed
+  authorisation_id: null
+  activation_status: inactive_no_authorisation
   consumed: false
   single_use: true
   reuse_permitted: false
-  authorization_parent_commit: 4a2fd6f7e5784ad5c116949c5ee59814dc959f7c
-  executing_implementation_commit: 4a2fd6f7e5784ad5c116949c5ee59814dc959f7c
-  phase: M6_D1_diffusion_pilot
-  permitted_roles:
-    - B1_INITIALISATION
-    - FROZEN_ENCDEC
-    - TRAIN_TEXT
-    - VALIDATION_ARTIFACT
-    - VALIDATION_CSV
-  logical_device: cuda:0
-  physical_gpu_index: 1
-  gpu_uuid: GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f
-  pci_bus: "00000000:61:00.0"
-  cuda_visible_devices: "1"
-  output_directory: /home/laura/rnagenesis-mres-runs/m6_d1_diffusion_pilot_4a2fd6f7e578_gpu1_attempt1
-  evidence_directory: /home/laura/rnagenesis-mres-runs/m6_d1_diffusion_pilot_4a2fd6f7e578_gpu1_attempt1
-  train_text_path: /home/laura/rnagenesis-mres-data/development/corpus_final.txt
-  train_text_sha256: d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d
-  train_record_count: 669
-  validation_csv_path: /home/laura/rnagenesis-mres-data/development/ft_validation.csv
-  validation_csv_sha256: cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd
-  validation_record_count: 95
-  validation_artifact_directory: /home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1
-  validation_artifact_sha256:
-    draw_manifest: b4e8d6d7cf7298d201062986419797e7fc322f2e88066764d4332a432a0d0d49
-    noise: 6be13ab704ce4b3f21e6ab5787eb18e77943d52540b517de46f41b47b083ccdc
-    order_artifact: df445b617adf5165f3361412bb5c7bc5d2a05b31a98eb6d2f6d17f4b329de248
-    sequence_order: eb18fd48e305e86f8000bdc82e9175437d478bd624ea57aef8094497534bda3a
-    timesteps: 9009b50b26ec126978236e6c86ed8d639634a8b211a3fb842ddf8ad9ea38fe07
-  b1_relative_path: configs/rnagenesis/diffusion
-  b1_weight_sha256: c268021b6cab37423e3bffd495b139bb69698d8d11c7b96477fbfb239b0cff26
-  b1_unet_config_sha256: 3a9975ff165bbd5ca82923e6ed1c5ed7eb383a23f4f3f55db713c995031f8ee3
-  implementation_file_hashes:
-    scripts/modelling/build_validation_artifacts.py: 0bcf9214ab82e05d12c94344a14d045b730cda1829a1689234d2616486a76466
-    scripts/modelling/m6_pilot_contract.py: 4d80866c95c97eaeda8193325dba01acdc72cd81e7722f088b77ee9e7750b114
-    scripts/modelling/m6_pilot_runner.py: 50886f56c3a3c52ba95e824a951f52e82e9805755bbb58521ed73714c02bae00
-    tests/modelling/test_m6_pilot_authorised.py: 61dec3f3b2f447d26a65ac99129bdf54ead4fd89ad97a2804748fab37f17eb93
-    tests/modelling/test_m6_pilot_contract.py: ce7081281ad66525490a0b729c1fd5911fb96691cda2df2546ff6a15f259fe10
-    tests/modelling/test_m6_pilot_runner_mocked.py: 3e5b6018e532024e249ed37c1c6f73e4768517266bda7fbcc419433ed6100d83
-  authorisation_timestamp: "2026-10-05T14:50:57+11:00"
-  scope: single_use_m6_d1_pilot
+  authorization_parent_commit: null
+  executing_implementation_commit: null
+  phase: null
+  permitted_roles: []
+  logical_device: null
+  output_directory: null
+  evidence_directory: null
+  train_text_path: null
+  train_text_sha256: null
+  train_record_count: null
+  validation_csv_path: null
+  validation_csv_sha256: null
+  validation_record_count: null
+  validation_artifact_directory: null
+  validation_artifact_sha256: null
+  b1_relative_path: null
+  b1_weight_sha256: null
+  b1_unet_config_sha256: null
+  implementation_file_hashes: null
+  authorisation_timestamp: null
+  scope: null
   session:
     pattern: m5_single_use_timestamp_and_scope
     wall_clock_expiry: null
     resume_permitted: false
-    consumption_event: bound_output_directory_creation
+    consumption_event: null
 
 pilot_decisions:
   initialization: immutable_B1_generic_diffusion_checkpoint

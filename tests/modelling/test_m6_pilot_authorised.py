@@ -35,6 +35,8 @@ HEAD = "a" * 40
 PARENT = "b" * 40
 GPU_UUID = "GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f"
 PCI = "00000000:61:00.0"
+RNA_MESSAGE = "ACGUACGUACGUACGU"
+ORDINARY_DETAIL = "authorized worker failed; exception_class=RuntimeError"
 
 
 def load_module(name, path):
@@ -499,6 +501,32 @@ def production_manifest():
         "rotary_caches_excluded_from_persistent_buffer_digest": True,
     }
     return manifest
+
+
+def _pilot_assets():
+    """Accepted asset and runtime records. This does not open model files."""
+    m5 = contract.m5_contract()
+    assets = {}
+    for relative, file_digest, size, role in m5.REQUIRED_MODEL_FILES:
+        assets[role] = _asset_record(role, os.path.join(str(m5.RNAGENESIS_ROOT), relative), size, file_digest)
+    assets["diffusers_normalization_patch"] = _asset_record(
+        "diffusers_normalization_patch",
+        m5.DIFFUSERS_PATCH_PATH,
+        m5.DIFFUSERS_PATCH_SIZE,
+        m5.DIFFUSERS_PATCH_SHA256,
+    )
+    versions = m5.ACCEPTED_RUNTIME_VERSIONS
+    runtime = {
+        "accelerate": versions["accelerate"],
+        "diffusers": versions["diffusers"],
+        "evidence_origin": "observed",
+        "executable": m5.PINNED_PYTHON,
+        "observation_method": "module_attribute",
+        "python": versions["python"],
+        "torch": versions["torch"],
+        "transformers": versions["transformers"],
+    }
+    return assets, runtime
 
 
 def _asset_record(role, path, size, file_digest):
@@ -1707,6 +1735,326 @@ class AuthorisedPathTests(unittest.TestCase):
         parsed = json.loads(raw.decode("utf-8"))
         self.assertEqual(contract.canonical_json(parsed), raw)
         contract.validate_production_success_manifest(parsed, binding())
+
+    def _assert_ordinary_failure(self, config, exc, stage, update=None, microbatch=None):
+        self.assertEqual(exc.code, "incomplete_evidence_or_manifest")
+        self.assertEqual(exc.detail, ORDINARY_DETAIL)
+        self.assertEqual(exc.stage, stage)
+        self.assertEqual(exc.update, update)
+        self.assertEqual(exc.microbatch, microbatch)
+        failure = self._failure_document(config)
+        self.assertEqual(failure["failure_code"], "incomplete_evidence_or_manifest")
+        self.assertEqual(failure["fired_stop_condition"], "incomplete_evidence_or_manifest")
+        self.assertEqual(failure["detail"], ORDINARY_DETAIL)
+        self.assertEqual(failure["stage"], stage)
+        self.assertEqual(failure["update"], update)
+        self.assertEqual(failure["microbatch"], microbatch)
+        self.assertEqual(failure["completion_state"], "consumed_failed")
+        self.assertEqual(failure["consumption_state"], "consumed_failed")
+        self.assertTrue(failure["non_resumable"])
+        self.assertFalse(failure["resume_supported"])
+        self.assertFalse(failure["pilot_completed"])
+        self.assertFalse(failure["scientific_run_completed"])
+        self.assertFalse(failure["manifest_written"])
+        self.assertFalse(failure["retained_checkpoints_exist"])
+        rendered = json.dumps(failure)
+        self.assertNotIn(RNA_MESSAGE, rendered)
+        self.assertNotIn(RNA_MESSAGE, exc.detail)
+        self.assertNotIn("Traceback", rendered)
+        directory = config["execution"]["output_directory"]
+        self.assertFalse(os.path.exists(os.path.join(directory, contract.SUCCESS_MANIFEST_NAME)))
+        for _root, _dirs, filenames in os.walk(directory):
+            for filename in filenames:
+                self.assertNotIn("traceback", filename.lower())
+        return failure
+
+    def _install_input_stubs(self, authorisation, bound):
+        original_verify = contract.verify_bound_file
+        original_artifacts = contract.verify_artifact_directory
+
+        def verify_bound(path, role, expected_sha256, expected_count, bound_path, reader):
+            if bound is not None:
+                return bound(path, role, expected_sha256, expected_count, bound_path, reader)
+            return {
+                "byte_size": 8,
+                "count": expected_count,
+                "evidence_origin": "observed",
+                "expected_count": expected_count,
+                "expected_sha256": expected_sha256,
+                "observation_method": "streamed_sha256",
+                "opened": ["ACGUACGU"] * expected_count,
+                "path": os.path.abspath(path),
+                "role": role,
+                "sha256": expected_sha256,
+            }
+
+        def verify_artifacts(path, bound_path, expected_hashes, loader):
+            observed = {}
+            for index, name in enumerate(contract.VALIDATION_ARTIFACT_FILES, start=1):
+                observed[name] = _asset_record(name, os.path.join(path, name), 1000 + index, expected_hashes[name])
+            return {
+                "loaded": {
+                    "manifest": {
+                        "validation_sequence_order_sha256": authorisation["validation_artifact_sha256"]["sequence_order"]
+                    },
+                    "noise": torch.zeros(contract.VALIDATION_NOISE_SHAPE),
+                    "timesteps": torch.zeros(contract.VALIDATION_TIMESTEP_SHAPE, dtype=torch.int64),
+                },
+                "observed_files": observed,
+            }
+
+        contract.verify_bound_file = verify_bound
+        contract.verify_artifact_directory = verify_artifacts
+        return original_verify, original_artifacts
+
+    def _restore_input_stubs(self, originals):
+        contract.verify_bound_file, contract.verify_artifact_directory = originals
+
+    def test_generic_runtime_identity_failure_records_class_and_stage(self):
+        config = active_from(self.inactive, self.temp, name="m6-generic-runtime")
+        authorisation = contract.validate_active_execution(config, self.observation, self.temp)
+        directory = config["execution"]["output_directory"]
+
+        class Stack(object):
+            production_identities = True
+            cpu_stand_in = True
+
+            def torch(self):
+                with open(os.path.join(directory, contract.SUCCESS_MANIFEST_NAME), "wb") as handle:
+                    handle.write(b"{}\n")
+                raise RuntimeError(RNA_MESSAGE)
+
+        with self.assertRaises(contract.M6PilotError) as caught:
+            runner.execute_authorized_worker(authorisation, Stack(), run_root=self.temp)
+        failure = self._assert_ordinary_failure(config, caught.exception, "runtime_identity")
+        failure_path = os.path.join(directory, contract.FAILURE_RECORD_NAME)
+        with open(failure_path, "rb") as handle:
+            preserved = handle.read()
+        with self.assertRaises(contract.M6PilotError) as reuse:
+            runner.execute_authorized_worker(authorisation, Stack(), run_root=self.temp)
+        self.assertEqual(reuse.exception.code, "authorization_reuse")
+        with open(failure_path, "rb") as handle:
+            self.assertEqual(handle.read(), preserved)
+        self.assertEqual(failure["stage"], "runtime_identity")
+        self.assertIsNone(failure["update"])
+        self.assertIsNone(failure["microbatch"])
+
+    def test_generic_asset_and_biological_input_failures_keep_their_stage(self):
+        assets, runtime = _pilot_assets()
+
+        class AssetStack(object):
+            production_identities = True
+            cpu_stand_in = True
+
+            def torch(self):
+                return torch
+
+            def observe_assets(self):
+                raise RuntimeError(RNA_MESSAGE)
+
+        asset_config = active_from(self.inactive, self.temp, name="m6-generic-assets")
+        asset_auth = contract.validate_active_execution(asset_config, self.observation, self.temp)
+        with self.assertRaises(contract.M6PilotError) as asset_caught:
+            runner.execute_authorized_worker(asset_auth, AssetStack(), run_root=self.temp)
+        self._assert_ordinary_failure(asset_config, asset_caught.exception, "asset_identity")
+
+        class BiologicalStack(object):
+            production_identities = True
+            cpu_stand_in = True
+
+            def torch(self):
+                return torch
+
+            def observe_assets(self):
+                return assets
+
+            def observe_runtime(self):
+                return runtime
+
+            def read_train_sequences(self, path):
+                raise AssertionError("biological reader was called")
+
+            def read_validation_cores(self, path):
+                raise AssertionError("biological reader was called")
+
+            def load_verified_artifacts(self, path):
+                raise AssertionError("artifact loader was called")
+
+        biological_config = active_from(self.inactive, self.temp, name="m6-generic-biological")
+        biological_auth = contract.validate_active_execution(biological_config, self.observation, self.temp)
+
+        def reject_bound(*_args):
+            raise RuntimeError(RNA_MESSAGE)
+
+        originals = self._install_input_stubs(biological_auth, reject_bound)
+        try:
+            with self.assertRaises(contract.M6PilotError) as biological_caught:
+                runner.execute_authorized_worker(biological_auth, BiologicalStack(), run_root=self.temp)
+        finally:
+            self._restore_input_stubs(originals)
+        self._assert_ordinary_failure(biological_config, biological_caught.exception, "biological_inputs")
+
+    def test_generic_model_load_and_microbatch_failures_keep_context(self):
+        assets, runtime = _pilot_assets()
+
+        class ModelStack(object):
+            production_identities = True
+            cpu_stand_in = True
+
+            def torch(self):
+                return torch
+
+            def observe_assets(self):
+                return assets
+
+            def observe_runtime(self):
+                return runtime
+
+            def read_train_sequences(self, path):
+                raise AssertionError("biological reader was called")
+
+            def read_validation_cores(self, path):
+                raise AssertionError("biological reader was called")
+
+            def load_verified_artifacts(self, path):
+                raise AssertionError("artifact loader was called")
+
+            def load_frozen_encdec(self, path):
+                raise RuntimeError(RNA_MESSAGE)
+
+        model_config = active_from(self.inactive, self.temp, name="m6-generic-model")
+        model_auth = contract.validate_active_execution(model_config, self.observation, self.temp)
+        originals = self._install_input_stubs(model_auth, None)
+        try:
+            with self.assertRaises(contract.M6PilotError) as model_caught:
+                runner.execute_authorized_worker(model_auth, ModelStack(), run_root=self.temp)
+        finally:
+            self._restore_input_stubs(originals)
+        self._assert_ordinary_failure(model_config, model_caught.exception, "model_load")
+
+        class MicrobatchStack(_CpuStandIn):
+            enforce_runtime_isolation = False
+
+            def denoising_mse(self, model, scheduler, latents, noise, timesteps):
+                if model.training:
+                    raise RuntimeError(RNA_MESSAGE)
+                return _CpuStandIn.denoising_mse(self, model, scheduler, latents, noise, timesteps)
+
+        micro_config = active_from(self.inactive, self.temp, name="m6-generic-microbatch")
+        micro_auth = contract.validate_active_execution(micro_config, self.observation, self.temp)
+        originals = self._install_input_stubs(micro_auth, None)
+        try:
+            with self.assertRaises(contract.M6PilotError) as micro_caught:
+                runner.execute_authorized_worker(
+                    micro_auth,
+                    MicrobatchStack(assets, runtime),
+                    run_root=self.temp,
+                )
+        finally:
+            self._restore_input_stubs(originals)
+        self._assert_ordinary_failure(micro_config, micro_caught.exception, "microbatch", update=1, microbatch=1)
+
+    def test_precise_pilot_error_context_is_not_rewritten(self):
+        config = active_from(self.inactive, self.temp, name="m6-precise-context")
+        authorisation = contract.validate_active_execution(config, self.observation, self.temp)
+
+        class Stack(object):
+            production_identities = True
+
+            def torch(self):
+                raise contract.M6PilotError(
+                    "identity_mismatch",
+                    "the bound runtime identity drifted",
+                    stage="runtime_identity",
+                    update=9,
+                    microbatch=3,
+                )
+
+        with self.assertRaises(contract.M6PilotError) as caught:
+            runner.execute_authorized_worker(authorisation, Stack(), run_root=self.temp)
+        self.assertEqual(caught.exception.code, "identity_mismatch")
+        self.assertEqual(caught.exception.detail, "the bound runtime identity drifted")
+        self.assertEqual(caught.exception.stage, "runtime_identity")
+        self.assertEqual(caught.exception.update, 9)
+        self.assertEqual(caught.exception.microbatch, 3)
+        failure = self._failure_document(config)
+        self.assertEqual(failure["failure_code"], "identity_mismatch")
+        self.assertEqual(failure["fired_stop_condition"], "identity_mismatch")
+        self.assertEqual(failure["detail"], "the bound runtime identity drifted")
+        self.assertEqual(failure["stage"], "runtime_identity")
+        self.assertEqual(failure["update"], 9)
+        self.assertEqual(failure["microbatch"], 3)
+        self.assertNotIn("exception_class=", failure["detail"])
+        self.assertNotIn(RNA_MESSAGE, json.dumps(failure))
+        self.assertFalse(os.path.exists(os.path.join(config["execution"]["output_directory"], contract.SUCCESS_MANIFEST_NAME)))
+
+    def test_parent_preserves_child_generic_failure_record(self):
+        config = active_from(self.inactive, self.temp, name="m6-child-generic")
+
+        def stack_loader(_authorisation):
+            class Stack(object):
+                cpu_stand_in = True
+
+                def torch(self):
+                    raise RuntimeError(RNA_MESSAGE)
+
+            return Stack()
+
+        def worker(directory, commit):
+            runner.worker_main(
+                directory,
+                commit,
+                config_loader=lambda: config,
+                observation_loader=lambda _loaded: self._consumed_observation(),
+                stack_loader=stack_loader,
+            )
+
+        captured = {}
+
+        def spawn(argv, env, cwd):
+            saved = {key: os.environ.get(key) for key in env}
+            os.environ.update(env)
+            try:
+                try:
+                    worker(argv[-2], argv[-1])
+                    return type("Completed", (), {"returncode": 0})()
+                except contract.M6PilotError:
+                    path = os.path.join(argv[-2], contract.FAILURE_RECORD_NAME)
+                    with open(path, "rb") as handle:
+                        captured["record"] = handle.read()
+                    return type("Completed", (), {"returncode": 1})()
+            finally:
+                for key, value in saved.items():
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
+
+        caught, launched = self._launch("m6-child-generic", spawn)
+        directory = launched["execution"]["output_directory"]
+        failure_path = os.path.join(directory, contract.FAILURE_RECORD_NAME)
+        with open(failure_path, "rb") as handle:
+            preserved = handle.read()
+        self.assertEqual(preserved, captured["record"])
+        self.assertEqual(caught.code, "incomplete_evidence_or_manifest")
+        self.assertEqual(caught.detail, ORDINARY_DETAIL)
+        self.assertEqual(caught.stage, "runtime_identity")
+        self.assertIsNone(caught.update)
+        self.assertIsNone(caught.microbatch)
+        self.assertNotEqual(caught.detail, "worker exited without a passing manifest")
+        self.assertNotEqual(caught.stage, "worker_launch")
+        failure = json.loads(preserved.decode("utf-8"))
+        self.assertEqual(failure["failure_code"], "incomplete_evidence_or_manifest")
+        self.assertEqual(failure["detail"], ORDINARY_DETAIL)
+        self.assertEqual(failure["stage"], "runtime_identity")
+        self.assertIsNone(failure["update"])
+        self.assertIsNone(failure["microbatch"])
+        self.assertNotIn(RNA_MESSAGE, preserved.decode("utf-8"))
+        self.assertNotIn("Traceback", preserved.decode("utf-8"))
+        self.assertFalse(os.path.exists(os.path.join(directory, contract.SUCCESS_MANIFEST_NAME)))
+        for _root, _dirs, filenames in os.walk(directory):
+            for filename in filenames:
+                self.assertNotIn("traceback", filename.lower())
 
     def test_final_cuda_rng_read_fails_closed(self):
         proxy_cuda = _RaisingCuda()

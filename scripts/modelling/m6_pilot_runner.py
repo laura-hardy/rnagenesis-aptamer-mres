@@ -11,7 +11,10 @@ worker. Synthetic tests call ``run_synthetic_control_flow`` or pass an
 in-process worker. Neither path is reachable from the CLI or from
 environment variables. A zero child exit is accepted only after the parent
 reopens and validates the success manifest. The final production CUDA RNG
-read fails closed and does not reuse the initial state.
+read fails closed and does not reuse the initial state. An ordinary
+exception after consumption keeps the latest stage, update, and microbatch,
+and records only the exception class. It does not record the exception
+message or a traceback.
 
 Position 22 is recorded as the next unapplied schedule position. The worker
 does not step a PyTorch learning-rate scheduler and does not store that
@@ -545,19 +548,58 @@ def _remove_claimed_success_manifest(directory):
     os.remove(manifest_path)
 
 
+def _controlled_exception_class_name(exc):
+    """Return a safe exception class token. The message and traceback are not used."""
+    name = getattr(type(exc), "__name__", "")
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_"
+    if not isinstance(name, str) or not 1 <= len(name) <= 128 or name[0].isdigit():
+        return "Exception"
+    if name[0] not in alphabet or any(character not in alphabet for character in name):
+        return "Exception"
+    if contract.BODY_PATTERN.fullmatch(name) is not None:
+        return "Exception"
+    return name
+
+
+def _controlled_exception_detail(exc):
+    return "authorized worker failed; exception_class=" + _controlled_exception_class_name(exc)
+
+
 def _record_consumed_failure(directory, exc, authorisation, progress):
-    """Write a precise failure record. An existing child record is kept."""
+    """Write one consumed failure. An existing child record stays authoritative.
+
+    A precise ``M6PilotError`` keeps its code, detail, and context. An ordinary
+    exception is recorded as ``incomplete_evidence_or_manifest`` with the latest
+    stage, update, and microbatch, and with its class name only. The exception
+    message, traceback, and any sequence or tensor payload are not serialized.
+    A claimed success manifest cannot remain beside the failure record.
+    """
     _remove_claimed_success_manifest(directory)
-    if isinstance(exc, contract.M6PilotError) and exc.stage is None and progress is not None:
-        exc.stage = progress.get("stage")
-        exc.update = progress.get("update")
-        exc.microbatch = progress.get("microbatch")
+    if isinstance(exc, contract.M6PilotError):
+        if exc.stage is None and progress is not None:
+            exc.stage = progress.get("stage")
+            exc.update = progress.get("update")
+            exc.microbatch = progress.get("microbatch")
+        recorded = exc
+    else:
+        recorded = contract.M6PilotError(
+            "incomplete_evidence_or_manifest",
+            _controlled_exception_detail(exc),
+            stage=None if progress is None else progress.get("stage"),
+            update=None if progress is None else progress.get("update"),
+            microbatch=None if progress is None else progress.get("microbatch"),
+        )
     failure_path = os.path.join(directory, contract.FAILURE_RECORD_NAME)
     if os.path.islink(failure_path):
         os.remove(failure_path)
     if not os.path.isfile(failure_path):
         retained = [] if progress is None else list(progress.get("retained_checkpoints", []))
-        contract.write_failure_record(directory, exc, authorisation=authorisation, retained_checkpoints=retained)
+        contract.write_failure_record(
+            directory,
+            recorded,
+            authorisation=authorisation,
+            retained_checkpoints=retained,
+        )
 
 
 def _error_from_preserved_failure(directory):
@@ -595,7 +637,7 @@ def _raise_consumed_failure(directory, exc, fallback_stage):
         raise exc from None
     raise contract.M6PilotError(
         "incomplete_evidence_or_manifest",
-        "authorized worker failed",
+        _controlled_exception_detail(exc),
         stage=fallback_stage,
     ) from None
 
@@ -778,8 +820,8 @@ def _cuda_device_count(stack, torch_module):
 
 def run_authorized_pilot(authorisation, stack, directory):
     """One non-resumable pilot. Identity is closed before any biological open."""
-    torch = stack.torch()
     _progress_stage(stack, "runtime_identity")
+    torch = stack.torch()
     if getattr(stack, "cpu_stand_in", False) is not True and torch.cuda.is_available() is not True:
         raise contract.M6PilotError(
             "identity_mismatch",
