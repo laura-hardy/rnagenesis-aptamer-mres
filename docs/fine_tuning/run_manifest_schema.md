@@ -2,7 +2,7 @@
 
 **APPROVED_FOR_M4_IMPLEMENTATION_NOT_EXECUTION**
 
-This document must not be consumed by an executable workflow. It translates implementation-plan section 14 into a versioned schema description. It does not create a run directory, and this stage creates no evidence directory. Formal M4 is COMPLETE / GO for M5 planning only. This schema does not authorise M5 execution or D1 training. Formal M5 is COMPLETE / GO — 3 October 2026, for M6 planning only. That acceptance does not authorise M6 execution, biological TRAIN or VALIDATION access, D1 training, GPU use, REF, EVAL, or a new run.
+This document must not be consumed by an executable workflow. It translates implementation-plan section 14 into a versioned schema description. It does not create a run directory, and this stage creates no evidence directory. Formal M4 is COMPLETE / GO for M5 planning only. This schema does not authorise M5 execution or D1 training. Formal M5 is COMPLETE / GO — 3 October 2026, for M6 planning only. That acceptance does not authorise M6 execution, biological TRAIN or VALIDATION access, D1 training, GPU use, REF, EVAL, or a new run. Section 8 defines the inactive M6 manifest. It does not authorise execution.
 
 Schema version: `m4-stage1-draft-1`.
 
@@ -383,6 +383,60 @@ The sole accepted run is `/home/laura/rnagenesis-mres-runs/m5_synthetic_smoke_e8
 
 Closed manifest identities, used as recorded and not re-hashed for this acceptance: resume sidecar `bb22ab79dc04f56d10d8593a1c3cf317900173c59f4f58297ea329be217c0380`; checkpoint `model_index.json` `05ac20f9fd3bd818ec88b37ff35e482ac80c5f5329666ecdfbe9227aa045b70e`; `scheduler/scheduler_config.json` `6b470b030031daa7c812ef9a6dfe49f14fa695c17a939406f1c780bad6a91396`; `unet/config.json` `42c864c81e35ef1a0c7964a3642492fba95c9e24a153407f9fd98855b20d9d70`; `unet/diffusion_pytorch_model.safetensors` `cc5be013fca86125292855e61af8be28a64c1f97f95499958363b4eda89b989e`.
 
-Physical GPU 1 was `GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, NVIDIA H200 NVL. Physical microbatch 8, gradient accumulation 4, and observed effective batch 32 were the FP32 correctness path. Physical microbatch 8, gradient accumulation 4, and FP32 are M5-supported observations. EMA was disabled and smoke generation used raw weights. Those observations form a conservative M6 proposal only and are not automatically accepted M6 production decisions. Loss and gradients were finite. The gradient norm was 5.4995274281909055. The denoiser update max absolute delta was 3.0040740966796875e-05. The encoder, Q-Former, query tokens, latent projection, and decoder remained frozen after backward, update, and generation. Checkpoint fresh reload, AdamW state, scheduler, global step, RNG restoration, and the subsequent resumed update passed. The tiny overfit losses were 0.6921789050102234, 0.6151523590087891, 0.5786029696464539, 0.5625630617141724, and 0.5575369596481323. Generation reloaded the immutable one-update checkpoint after the training objects were released. Training peak allocated was 42,046,809,088 bytes and training peak reserved was 42,563,796,992 bytes. Overall peak allocated was 72,871,646,208 bytes and overall peak reserved was 73,614,229,504 bytes. Total wall time was 193.7824976965785 seconds. TRAIN, VALIDATION, REF, and EVAL were not accessed.
+Physical GPU 1 was `GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f`, PCI `00000000:61:00.0`, NVIDIA H200 NVL. Physical microbatch 8, gradient accumulation 4, and observed effective batch 32 were the FP32 correctness path. Physical microbatch 8, gradient accumulation 4, and FP32 are M5-supported observations. EMA was disabled and smoke generation used raw weights. Those observations were a conservative M6 proposal at M5 acceptance. The inactive M6 package now records them as bounded pilot decisions and does not authorise a run. Loss and gradients were finite. The gradient norm was 5.4995274281909055. The denoiser update max absolute delta was 3.0040740966796875e-05. The encoder, Q-Former, query tokens, latent projection, and decoder remained frozen after backward, update, and generation. Checkpoint fresh reload, AdamW state, scheduler, global step, RNG restoration, and the subsequent resumed update passed. The tiny overfit losses were 0.6921789050102234, 0.6151523590087891, 0.5786029696464539, 0.5625630617141724, and 0.5575369596481323. Generation reloaded the immutable one-update checkpoint after the training objects were released. Training peak allocated was 42,046,809,088 bytes and training peak reserved was 42,563,796,992 bytes. Overall peak allocated was 72,871,646,208 bytes and overall peak reserved was 73,614,229,504 bytes. Total wall time was 193.7824976965785 seconds. TRAIN, VALIDATION, REF, and EVAL were not accessed.
 
-BF16 is an observation only: FP32 paired loss 0.8125295639038086, BF16 paired loss 0.8128108978271484, absolute difference 0.00028133392333984375, relative difference 0.0003462445378457017. It was finite. No acceptance tolerance was applied. It does not select production precision. Production numerical precision, production gradient accumulation and batch policy, EMA policy and raw-versus-EMA generation policy, the final D1 seed count, and biological training authorisation remain unresolved. Both smoke generation strings contain a leading `1` followed by 32 A/C/G/U characters. That is a decoder and control-token format observation, not a biologically valid sequence claim. Production generation or biological interpretation requires explicit output normalisation and nucleotide-alphabet validation.
+BF16 is an observation only: FP32 paired loss 0.8125295639038086, BF16 paired loss 0.8128108978271484, absolute difference 0.00028133392333984375, relative difference 0.0003462445378457017. It was finite. No acceptance tolerance was applied. It does not select production precision. The inactive M6 pilot now records FP32, physical microbatch 8, gradient accumulation 4, disabled EMA, and raw weights for that bounded pilot. The final D1 seed count and biological training authorisation remain unresolved. Both smoke generation strings contain a leading `1` followed by 32 A/C/G/U characters. That is a decoder and control-token format observation, not a biologically valid sequence claim. Production generation or biological interpretation requires the M6 exact-prefix rule in section 8. M5's single leading `1` does not broaden it.
+
+## 8. M6 pilot manifest
+
+Schema version for the JSON manifest: `m6-pilot-manifest-1`. The configuration schema version is `m6-pilot-config-1`. This section does not authorise M6 execution, GPU use, biological TRAIN or VALIDATION access, diagnostic generation, or D1 training. The checked-in pilot configuration stays inactive and non-consumable. `resume_supported` is false. An interrupted attempt is failed. Restart requires a new output directory and a new single-use authorisation. Weight reload is not training resume. Update 0 references immutable B1 and does not copy it.
+
+A manifest is written only after a separately authorised run completes. This repository does not contain one. Canonical JSON uses sorted keys, compact separators, ASCII escaping, and one trailing LF. Validation rejects a missing key and an unexpected key. Sequence text is forbidden.
+
+```text
+MANIFEST_FIELD_ORDER
+applied_learning_rate_trace
+authorisation
+b1_identity
+completion_state
+config_version
+data_roles
+denoiser_update_evidence
+deviations
+diagnostic_generation_status
+environment
+experiment_id
+failure_state
+frozen_state
+gpu
+manifest_schema_version
+memory
+microbatch_accounting
+optimizer
+post_update_21_scheduler_position
+production_identities
+ref_eval_access
+repository
+restart_policy
+resume_supported
+rng
+run_id
+schema_version
+stop_conditions
+timing
+train_update_observations
+validation_artifacts
+validation_observations
+validation_review
+warnings
+weight_checkpoints
+END_MANIFEST_FIELD_ORDER
+```
+
+The applied learning-rate trace is the 21 nonzero values from `learning_rate_multiplier` in `scripts/modelling/m6_pilot_contract.py`, recorded before each optimizer step. The post-update-21 scheduler position is 22 and its multiplier is 0. That position is the next unapplied schedule position. It is not a PyTorch scheduler `last_epoch`, and it is not applied. `diagnostic_generation_status` is `not_performed_requires_separate_authorisation` until a later authorisation. `memory` records peak allocated bytes and peak reserved bytes separately. `stop_conditions` records whether each automatic technical failure fired. A finite pre-clip gradient norm above 1.0 is clipped and is not one of those failures. Finite validation worsening is a human-review signal in `validation_review`, with no numeric cutoff and no automatic learning-rate change.
+
+`validate_success_manifest` accepts only the synthetic completion state `synthetic_control_flow_completed`. `validate_production_success_manifest` accepts only `pilot_completed` when `production_identities` is true. It validates every top-level section and every exact nested key. The required observations are the live authorisation commit, consumed single-use state, repository and GPU observations, opened TRAIN and VALIDATION identities, opened validation-artifact hashes and shapes, unopened REF and EVAL, package versions, distinct permutation and diffusion RNG streams, 21 update records with a denoiser-element change, four validation observations, three tensor-safe checkpoint reload proofs, frozen EncDec digests, and no failure state. A synthetic manifest does not satisfy the production validator. Numeric strings must be finite, and byte counts and timing strings must be nonnegative. The tracked configuration does not store `authorization_commit`; the success manifest records the runtime HEAD under that name.
+
+The 5 October 2026 remediation keeps that schema and tightens the nested evidence. Model and environment assets, the Diffusers normalization patch, TRAIN, VALIDATION, and every physical validation-artifact file, including the hash-report file, carry a streamed SHA-256 and a measured byte size. The logical sequence-order hash is the value loaded from the artifact manifest, with source `loaded_manifest`. Expected pins and observed measurements are separate fields even when the hex strings are equal. Runtime versions are module attributes, so torch is `2.1.2+cu121`. `timing.training_update_seconds` has 21 durations whose sum is `training_seconds`. `timing.validation_update_seconds` covers updates 0, 7, 14, and 21 and sums to `validation_seconds`. Checkpoint save and reload time is recorded separately and is excluded from both aggregates. `frozen_state` stores EncDec parameter digests and EncDec persistent-buffer digests at initialization and after updates 7, 14, and 21. Rotary runtime caches are named and excluded from the buffer digest. A failure record identifies the authorisation and implementation commits when those values have been validated, plus stage, update or microbatch when available, failure code, fired stop condition, non-resumable state, and whether retained checkpoints exist. It does not claim `pilot_completed` and it does not contain sequence text. The parent reopens a claimed success manifest after a zero child exit and accepts it only as a regular non-symlink canonical JSON file that passes `validate_production_success_manifest`, with no failure record present. Final CUDA RNG observation fails closed at `rng_final_observation` and is not replaced by the initial CUDA state. Child failures before training keep their precise code and stage. `STOP_CONDITION_CODES` is the exhaustive active-path registry: a success manifest records every code with `fired: false`, and a failure's `fired_stop_condition` must be registered. `cli_argument_rejected` and `environment_injection_rejected` stay outside that registry because they fire before a directory is consumed. Nested validation evidence is cross-checked: update 0 has a null relative record; updates 7, 14, and 21 match the review-item schema and the aggregate MSE values; worsening flags equal `later > initial`; and `validation_review.observations` match those relative records. Checkpoint configuration and state digests are SHA-256, equality flags match the digests, `configuration_compatible` matches normalized equality, and the ordered state aggregate and parameter-name digest are recomputed from `entry_digests`.
+
+REF and EVAL stay closed. Their contract hashes may appear as metadata. Their opened flags are false. The manifest does not contain an output directory until a future authorisation commit binds one, and this checked-in schema does not supply that path.
