@@ -17,6 +17,7 @@ import stat
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -2152,6 +2153,154 @@ class AuthorisedPathTests(unittest.TestCase):
         self.assertNotIn("torch_cuda_final_digest", json.dumps(failure))
         self.assertFalse(os.path.exists(os.path.join(directory, contract.SUCCESS_MANIFEST_NAME)))
 
+    def test_pinned_adapter_rejects_strings_at_every_path_boundary(self):
+        trainer = _PathRejectingTrainer()
+        artifacts = _ConvertingArtifactLoader("a" * 64)
+        stack = runner.PinnedTrainingStack(trainer, artifacts, object())
+        root = Path(self.temp) / "adapter-boundary"
+        samples = {
+            "read_train_sequences": root / "train.txt",
+            "read_validation_cores": root / "validation.csv",
+            "load_frozen_encdec": root / "encdec",
+            "load_b1_denoiser": root / "b1",
+            "load_scheduler": root / "scheduler",
+            "save_diffusers_checkpoint": root / "checkpoint",
+            "reload_denoiser": root / "reload",
+            "load_verified_artifacts": root / "artifacts",
+        }
+        stack.read_train_sequences(str(samples["read_train_sequences"]))
+        stack.read_validation_cores(str(samples["read_validation_cores"]))
+        stack.load_frozen_encdec(str(samples["load_frozen_encdec"]))
+        stack.load_b1_denoiser(str(samples["load_b1_denoiser"]))
+        stack.load_scheduler(str(samples["load_scheduler"]))
+        stack.save_checkpoint(object(), object(), str(samples["save_diffusers_checkpoint"]))
+        reloaded = stack.reload_denoiser(str(samples["reload_denoiser"]))
+        loaded = stack.load_verified_artifacts(str(samples["load_verified_artifacts"]))
+        self.assertIs(stack.load_verified_artifacts.__func__, _ConvertingArtifactLoader.load_verified_artifacts)
+        self.assertIs(stack.load_verified_artifacts.__self__, artifacts)
+        self.assertEqual(loaded, {"converted": True})
+        self.assertIsInstance(reloaded, _TinyDenoiser)
+        self.assertEqual(
+            [item[0] for item in trainer.received],
+            [
+                "read_train_sequences",
+                "read_validation_cores",
+                "load_frozen_encdec",
+                "load_b1_denoiser",
+                "load_scheduler",
+                "save_diffusers_checkpoint",
+                "TransformerDenoiser.from_pretrained",
+            ],
+        )
+        for name, received in (
+            ("read_train_sequences", trainer.received[0]),
+            ("read_validation_cores", trainer.received[1]),
+            ("load_frozen_encdec", trainer.received[2]),
+            ("load_b1_denoiser", trainer.received[3]),
+            ("load_scheduler", trainer.received[4]),
+            ("save_diffusers_checkpoint", trainer.received[5]),
+            ("TransformerDenoiser.from_pretrained", trainer.received[6]),
+        ):
+            self.assertIsInstance(received[1], Path)
+            self.assertEqual(received[1], samples[name if name != "TransformerDenoiser.from_pretrained" else "reload_denoiser"])
+        self.assertEqual(trainer.received[0][2], True)
+        self.assertEqual(trainer.received[1][2], True)
+        self.assertEqual(trainer.received[6][2], "unet")
+        self.assertEqual(artifacts.converted, [samples["load_verified_artifacts"]])
+        self.assertIsInstance(artifacts.converted[0], Path)
+        with self.assertRaises(AttributeError):
+            trainer.read_train_sequences(str(samples["read_train_sequences"]), True)
+        with self.assertRaises(AttributeError):
+            trainer.read_validation_cores(str(samples["read_validation_cores"]), True)
+        with self.assertRaises(AttributeError):
+            trainer.load_frozen_encdec(str(samples["load_frozen_encdec"]))
+        with self.assertRaises(AttributeError):
+            trainer.load_b1_denoiser(str(samples["load_b1_denoiser"]))
+        with self.assertRaises(AttributeError):
+            trainer.load_scheduler(str(samples["load_scheduler"]))
+        with self.assertRaises(AttributeError):
+            trainer.save_diffusers_checkpoint(object(), object(), str(samples["save_diffusers_checkpoint"]))
+        with self.assertRaises(AttributeError):
+            trainer.TransformerDenoiser.from_pretrained(str(samples["reload_denoiser"]), subfolder="unet")
+        stack.load_verified_artifacts(samples["load_verified_artifacts"])
+        self.assertEqual(artifacts.converted[-1], samples["load_verified_artifacts"])
+        self.assertEqual(trainer.opened_paths, [])
+
+    def test_mocked_pilot_reaches_checkpoint_save_with_path_objects(self):
+        config = active_from(self.inactive, self.temp, name="m6-path-boundary")
+        authorisation = contract.validate_active_execution(config, self.observation, self.temp)
+        directory = contract.consume_bound_output_directory(authorisation, self.temp)
+        assets, runtime = _pilot_assets()
+        trainer = _PathRejectingTrainer()
+        artifacts = _ConvertingArtifactLoader(authorisation["validation_artifact_sha256"]["sequence_order"])
+        stack = _PathBoundaryStack(trainer, artifacts, assets, runtime)
+        caches = contract.m5_contract().runtime_isolation_paths(directory)
+        previous = {key: os.environ.get(key) for key in caches}
+        for key, value in caches.items():
+            os.environ[key] = value
+        original_verify = contract.verify_bound_file
+        original_artifacts = contract.verify_artifact_directory
+
+        def verify_bound(path, role, expected_sha256, expected_count, bound_path, reader):
+            opened = reader(path)
+            self.assertEqual(len(opened), expected_count)
+            return {
+                "byte_size": 424242 if role == "TRAIN_TEXT" else 434343,
+                "count": expected_count,
+                "evidence_origin": "observed",
+                "expected_count": expected_count,
+                "expected_sha256": expected_sha256,
+                "observation_method": "streamed_sha256",
+                "opened": opened,
+                "path": os.path.abspath(path),
+                "role": role,
+                "sha256": expected_sha256,
+            }
+
+        def verify_artifacts(path, bound_path, expected_hashes, loader):
+            loaded = loader(path)
+            observed = {}
+            for index, name in enumerate(contract.VALIDATION_ARTIFACT_FILES, start=1):
+                observed[name] = _asset_record(name, os.path.join(path, name), 1000 + index, expected_hashes[name])
+            return {"loaded": loaded, "observed_files": observed}
+
+        contract.verify_bound_file = verify_bound
+        contract.verify_artifact_directory = verify_artifacts
+        try:
+            manifest = runner.run_authorized_pilot(authorisation, stack, directory)
+        finally:
+            contract.verify_bound_file = original_verify
+            contract.verify_artifact_directory = original_artifacts
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+        contract.validate_production_success_manifest(manifest, binding())
+        self.assertEqual(
+            [item[0] for item in trainer.received[:5]],
+            [
+                "read_train_sequences",
+                "read_validation_cores",
+                "load_frozen_encdec",
+                "load_b1_denoiser",
+                "load_scheduler",
+            ],
+        )
+        saves = [item for item in trainer.received if item[0] == "save_diffusers_checkpoint"]
+        reloads = [item for item in trainer.received if item[0] == "TransformerDenoiser.from_pretrained"]
+        self.assertEqual(len(saves), 3)
+        self.assertEqual(len(reloads), 3)
+        for item in trainer.received:
+            self.assertIsInstance(item[1], Path)
+        self.assertEqual(trainer.received[0][2], True)
+        self.assertEqual(trainer.received[1][2], True)
+        self.assertTrue(all(item[2] == "unet" for item in reloads))
+        self.assertEqual(artifacts.converted, [Path(authorisation["validation_artifact_directory"])])
+        self.assertEqual(trainer.opened_paths, [])
+        self.assertEqual(len(manifest["weight_checkpoints"]), 3)
+        self.assertFalse(os.path.exists(os.path.join(directory, contract.FAILURE_RECORD_NAME)))
+
 
 class _Version(object):
     def __init__(self, version):
@@ -2325,6 +2474,169 @@ class _FakeClock(object):
         self.syncs += 1
         self.now += 1.0
         return self.now
+
+
+class _PathRejectingTrainer(object):
+    """Pinned-interface stand-in. Path methods reject strings and record the object."""
+
+    def __init__(self):
+        self.received = []
+        self.opened_paths = []
+        self.denoiser = _TinyDenoiser()
+        self.encdec = _TinyEncDec()
+        self.training_sizes = []
+        self.validation_flags = []
+        self.training_flags = []
+        outer = self
+
+        class TransformerDenoiser(object):
+            @staticmethod
+            def from_pretrained(directory, subfolder=None):
+                outer._require_path(directory)
+                outer.received.append(("TransformerDenoiser.from_pretrained", directory, subfolder))
+                fresh = _TinyDenoiser()
+                fresh.load_state_dict(outer.denoiser.state_dict())
+                fresh.config = {"_name_or_path": "saved", "_class_name": "UNet", "layers": 2}
+                return fresh
+
+        self.TransformerDenoiser = TransformerDenoiser
+
+    def _require_path(self, path):
+        if not isinstance(path, Path):
+            path.is_absolute()
+            raise TypeError("pinned path was not pathlib.Path")
+
+    def read_train_sequences(self, path, enforce_frozen_hash):
+        self._require_path(path)
+        self.received.append(("read_train_sequences", path, enforce_frozen_hash))
+        return ["ACGUACGU"] * contract.TRAIN_RECORD_COUNT
+
+    def read_validation_cores(self, path, enforce_frozen_hash):
+        self._require_path(path)
+        self.received.append(("read_validation_cores", path, enforce_frozen_hash))
+        return ["ACGUACGU"] * contract.VALIDATION_SEQUENCE_COUNT
+
+    def load_frozen_encdec(self, path):
+        self._require_path(path)
+        self.received.append(("load_frozen_encdec", path))
+        return self.encdec
+
+    def load_b1_denoiser(self, path):
+        self._require_path(path)
+        self.received.append(("load_b1_denoiser", path))
+        return self.denoiser
+
+    def load_scheduler(self, path):
+        self._require_path(path)
+        self.received.append(("load_scheduler", path))
+        return type("Scheduler", (), {"config": type("Config", (), {"num_train_timesteps": 1000})()})()
+
+    def save_diffusers_checkpoint(self, denoiser, scheduler, directory):
+        if not isinstance(directory, Path):
+            directory.mkdir(parents=True, exist_ok=True)
+        self.received.append(("save_diffusers_checkpoint", directory))
+        for name in contract.CHECKPOINT_MEMBERS:
+            target = directory.joinpath(name)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(name.encode("ascii"))
+
+    def build_adamw(self, denoiser, learning_rate):
+        return torch.optim.AdamW(
+            denoiser.parameters(),
+            lr=learning_rate,
+            betas=(contract.ADAMW_BETA1, contract.ADAMW_BETA2),
+            eps=contract.ADAMW_EPSILON,
+            weight_decay=contract.ADAMW_WEIGHT_DECAY,
+        )
+
+    def assert_optimizer_membership(self, optimizer, denoiser, encdec):
+        return True
+
+    def collate_sequences(self, examples, tokenizer):
+        size = len(examples)
+        if size != 1:
+            self.training_sizes.append(size)
+        return {
+            "input_ids": torch.zeros(size, 4, dtype=torch.long),
+            "attention_mask": torch.ones(size, 4, dtype=torch.bool),
+        }
+
+    def extract_latents(self, encdec, input_ids, attention_mask):
+        encdec.decoder._cos_cached.add_(1)
+        return torch.ones(input_ids.shape[0], 32, 160)
+
+    def sample_train_diffusion(self, batch_size, generator, num_train_timesteps, device):
+        timesteps = torch.zeros(batch_size, dtype=torch.long)
+        noise = torch.zeros(batch_size, 32, 160)
+        return timesteps, noise
+
+    def denoising_mse(self, model, scheduler, latents, noise, timesteps, dtype=None):
+        if model.training:
+            self.training_flags.append(torch.is_grad_enabled())
+        else:
+            self.validation_flags.append((torch.is_grad_enabled(), bool(model.training)))
+        if latents.dtype != torch.float32 or noise.dtype != torch.float32 or timesteps.dtype != torch.int64:
+            raise AssertionError("validation dtype drifted")
+        prediction = latents.float() * (model.w1.sum() + model.w2.sum() + model.w3.sum() + model.w4.sum())
+        return torch.nn.functional.mse_loss(prediction, noise.float())
+
+
+class _ConvertingArtifactLoader(object):
+    """Stand-in for the loader's existing ``Path(directory)`` conversion."""
+
+    def __init__(self, sequence_order):
+        self.sequence_order = sequence_order
+        self.converted = []
+
+    def load_verified_artifacts(self, directory, expected_source_sha256=None):
+        root = Path(directory)
+        self.converted.append(root)
+        if self.sequence_order == "a" * 64:
+            return {"converted": True}
+        return {
+            "manifest": {"validation_sequence_order_sha256": self.sequence_order},
+            "noise": torch.zeros(contract.VALIDATION_NOISE_SHAPE),
+            "timesteps": torch.zeros(contract.VALIDATION_TIMESTEP_SHAPE, dtype=torch.int64),
+        }
+
+
+class _PathBoundaryStack(runner.PinnedTrainingStack):
+    """Real path adapter with CPU stand-ins for assets, runtime, and CUDA."""
+
+    cpu_stand_in = True
+
+    def __init__(self, trainer, artifacts, assets, runtime):
+        super().__init__(trainer, artifacts, object())
+        self._assets = assets
+        self._runtime = runtime
+        self.fake_clock = _FakeClock()
+
+    def torch(self):
+        return torch
+
+    def clock(self):
+        return self.fake_clock
+
+    def observe_assets(self):
+        return self._assets
+
+    def observe_runtime(self):
+        return self._runtime
+
+    def cuda_device_count(self):
+        return 1
+
+    def place(self, tensor, device):
+        return tensor
+
+    def cuda_rng_state(self):
+        return torch.zeros(4, dtype=torch.uint8)
+
+    def accelerator(self):
+        return _Accelerator()
+
+    def load_tokenizer(self):
+        return object()
 
 
 class _RaisingCuda(object):

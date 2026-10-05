@@ -31,6 +31,7 @@ import random
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 MRES_ROOT = "/home/laura/rnagenesis-aptamer-mres"
 CONFIG_PATH = os.path.join(MRES_ROOT, "config/experiments/D1_diffusion_pilot.yaml")
@@ -218,6 +219,19 @@ def load_artifact_loader():
     return module
 
 
+def _pinned_path(path):
+    """Return a pathlib.Path for one pinned RNAGenesis path argument.
+
+    The pinned readers call ``path.is_absolute()``, B1 loading calls
+    ``path.resolve()``, and checkpoint save calls ``directory.mkdir()``.
+    A string has none of those methods. The remaining pinned path arguments
+    accept ``Path`` through ``str()`` or ``os.PathLike``.
+    """
+    if isinstance(path, Path):
+        return path
+    return Path(path)
+
+
 def _import_pinned_training_stack():
     """Import RNAGenesis and the artifact loader. Called only after the gate and isolation."""
     root = contract.RNAGENESIS_ROOT
@@ -245,10 +259,10 @@ class PinnedTrainingStack(object):
         self.load_verified_artifacts = artifacts.load_verified_artifacts
 
     def read_train_sequences(self, path):
-        return self.trainer.read_train_sequences(path, True)
+        return self.trainer.read_train_sequences(_pinned_path(path), True)
 
     def read_validation_cores(self, path):
-        return self.trainer.read_validation_cores(path, True)
+        return self.trainer.read_validation_cores(_pinned_path(path), True)
 
     def load_tokenizer(self):
         tokens = importlib.import_module("models.autoencoder.encoder.biomap.rna_tokens")
@@ -261,13 +275,13 @@ class PinnedTrainingStack(object):
         return self.trainer.SequenceIndexDataset(sequences)
 
     def load_frozen_encdec(self, path):
-        return self.trainer.load_frozen_encdec(path)
+        return self.trainer.load_frozen_encdec(_pinned_path(path))
 
     def load_b1_denoiser(self, path):
-        return self.trainer.load_b1_denoiser(path)
+        return self.trainer.load_b1_denoiser(_pinned_path(path))
 
     def load_scheduler(self, path):
-        return self.trainer.load_scheduler(path)
+        return self.trainer.load_scheduler(_pinned_path(path))
 
     def build_adamw(self, denoiser, learning_rate):
         optimizer = self.trainer.build_adamw(denoiser, learning_rate)
@@ -287,10 +301,10 @@ class PinnedTrainingStack(object):
         return self.trainer.denoising_mse(model, scheduler, latents, noise, timesteps, dtype=self.torch().float32)
 
     def save_checkpoint(self, denoiser, scheduler, directory):
-        return self.trainer.save_diffusers_checkpoint(denoiser, scheduler, directory)
+        return self.trainer.save_diffusers_checkpoint(denoiser, scheduler, _pinned_path(directory))
 
     def reload_denoiser(self, directory):
-        denoiser = self.trainer.TransformerDenoiser.from_pretrained(str(directory), subfolder="unet")
+        denoiser = self.trainer.TransformerDenoiser.from_pretrained(_pinned_path(directory), subfolder="unet")
         if denoiser is None:
             raise contract.M6PilotError("checkpoint_save_reload_incompatibility", "fresh denoiser reload returned nothing")
         return denoiser
