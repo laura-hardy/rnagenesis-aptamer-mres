@@ -11466,3 +11466,51 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Deferred:** The verification-to-consumption window for TRAIN, VALIDATION, and validation artifacts; `st_nlink` on checkpoint leaves; a directory `fsync` after the atomic replace.
 
 **Boundary:** Nothing in this remediation was staged, committed, or pushed. The M6 pilot was not executed. No attempt-6 configuration, timestamp, or output directory was created. No GPU was used. REF and EVAL were not accessed. Attempts 1 through 5 were not modified. The bytecode-disabled CPU/mock suite was run with CUDA hidden. Attempt 6 was not prepared.
+
+---
+
+## 2026-10-06 — Record M6 attempt 6 as the accepted training pilot and prepare update-21 diagnostic generation
+
+**Stage:** Aim 2 / modelling / M6 D1 diffusion pilot
+
+**Status:** Attempt 6 is the accepted successful training pilot. **M6 is not complete.** Update-21 diagnostic generation is pending and needs a separate authorisation. This record does not authorise diagnostic generation, M7, REF, EVAL, GPU use, TRAIN or VALIDATION access, or any new run.
+
+**Preflight:** MRes branch `main`. Local HEAD `15f49a17081f573970495891e9283a17fc5c3dc2`, the unpushed and consumed attempt-6 authorization commit. Its single parent, and local and live `origin/main`, is `6fd611589d7a3365b793c2ca64cf13c29ef5bfc1`. The index was empty and the working tree clean. RNAGenesis stayed read-only on `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c` and was not fetched.
+
+**Evidence:** `/home/laura/rnagenesis-mres-runs/m6_d1_diffusion_pilot_6fd611589d7a_gpu1_attempt6`. `m6_pilot_manifest.json` is 159,013 bytes, SHA-256 `4b24d5bf5bc392a8f6ee4b8af91adb3582e3a17cac459559632494ec64f8ae52`, canonical JSON, `pilot_completed`, `consumed_successfully`. `authorization_consumption.json` is 560 bytes, SHA-256 `ec822747cca4916331fd7a79dd504a54c425bc7699457ca6d85e9b0c446f0874`. No `authorization_failure.json`. Both small files were re-hashed and matched. The checkpoint weights were not opened or hashed. Their identities are the closed manifest's: update 7 `7f1cdbd854c1d26c5b8bfe68469bc7e59f5d7293c4a105d724c1c63c83a32f10`, update 14 `0a2fa065f962adaf54e63b797974367915a6552382a8db76c3fbd0c6a0078901`, update 21 `47b2dc9b392ea766eee7e947f0f92f5a039c42ac714326104e719352d20b5924`. The evidence was not rewritten, moved, or deleted.
+
+**Result:** Fixed-draw VALIDATION MSE was `0.1404131591699728` at update 0, `0.10955412184224482` at update 7 (−21.977%), `0.10202736076728462` at update 14 (−27.338%), and `0.10076265001606723` at update 21 (−28.238%). All 21 updates changed the denoiser. All losses and gradients were finite. Only update 6 was clipped (pre-clip norm `1.0183641910552979`, applied 1.0). Peak allocated memory was 42,045,783,552 bytes and peak reserved 42,633,003,008 bytes. The EncDec was unchanged. Updates 7, 14, and 21 each passed fresh reload, configuration compatibility, and exact comparison of 366 state entries. No stop condition fired and no warning was recorded. REF and EVAL were not opened. The figures above were cross-checked against the closed manifest.
+
+**Decision boundary:** The `3e-5` pilot passed and no reduction to `1e-5` is proposed. FP32, microbatch 8, accumulation 4, effective batch 32, EMA disabled, and raw weights remain the conservative supported configuration. The complete M7 configuration is not frozen. Updates 7 and 14 stay learning-curve evidence only. Update 21 is the sole D1 pilot checkpoint for the pending comparison, which reuses the accepted B1 pool.
+
+**Configuration:** `config/experiments/D1_diffusion_pilot.yaml` is restored to the inactive blob `4c0ef9b700f0c4566e1fdaa71dc68c25370712f0` (SHA-256 `1d31b4bca55c2c22c477220449781bb7b494bd6f26a3f575b547012566e3fe9f`) from `6fd611589d7a3365b793c2ca64cf13c29ef5bfc1`.
+
+**Prepared, inactive:** `config/experiments/D1_update21_diagnostic_generation.yaml`, `scripts/modelling/m6_diagnostic_generation.py`, and `tests/modelling/test_m6_diagnostic_generation.py`. The design reuses the accepted B1 development-pool runner, the M4 metrics module, the M6 contract, and the approved M1 cleaner, each pinned by hash. It generates exactly 1,000 raw attempts from the raw update-21 checkpoint on the accepted schedule (`0f527d44…1702f0`, length vector `7e6cb523…bd3c`). It compares against the accepted B1 pool without regenerating it, keeps raw and normalised text together, and keeps every invalid, empty, duplicate, early-EOS, and length-mismatched attempt in its denominator. The five hard guardrails keep their approved thresholds. Requested-length exact-hit rates are reported, not enforced. Nearest-TRAIN edit distance, maximum TRAIN identity, nucleotide and dinucleotide distributions, MFE, MFE per nucleotide, paired fraction, and length-stratified results are report-only. TRAIN is opened for exact-copy and nearest-TRAIN diagnostics only. VALIDATION is not requested. REF and EVAL are refused before open. The document binds no GPU, output directory, timestamp, or authorisation, and the entry point accepts only `--help`. Details are in [M6 pilot implementation](fine_tuning/m6_pilot_implementation.md) section 11.
+
+**Finding for review:** The accepted B1 pool has 39 of 1,000 early-EOS attempts with a trailing `2`. They are valid under the approved M1 cleaner. The stricter exact-`11`, no-suffix helper in the M6 contract would reject them, and the accepted B1 pool would then fail the 0.99 valid-fraction guardrail itself. The diagnostic uses the M1 cleaner and reports the stricter helper only as a sensitivity count. This is an open decision for the reviewer.
+
+**Tests:** CPU/mock only, CUDA hidden, bytecode disabled, offline controls, caches outside both repositories, pinned Python 3.8.13. `tests/modelling`: 232 tests passed, of which 69 are the new file. `tests/test_b1_development_pool_runner.py` 30, `tests/test_b1_generic_runner.py` 62, `tests/test_b1_phase_b_runner.py` 35, and `tests/test_null_model.py` 54 passed, each in its own process. `tests/data_preparation` and `tests/test_stage1_hard_filter.py` cannot run here because no interpreter has pytest, which is unchanged.
+
+**Boundary:** Nothing was executed on a GPU. No diagnostic generation, output directory, or checkpoint load occurred. TRAIN, VALIDATION, REF, and EVAL were not opened. B1 was not regenerated. M7 was not started. RNAGenesis and every accepted evidence directory were not modified. Nothing was staged, committed, or pushed.
+
+---
+
+## 2026-10-06 — Revise the inactive update-21 diagnostic package after archive review
+
+**Stage:** Aim 2 / modelling / M6 D1 diffusion pilot
+
+**Status:** The inactive package was revised in place. M6 is not complete. No diagnostic authorisation, output directory, GPU execution, TRAIN access, checkpoint access, M7, REF, or EVAL occurred, and nothing was staged, committed, or pushed.
+
+**Decided policy:** The approved M1 cleaner is the primary normalisation authority. The exact-`11`, no-suffix helper is sensitivity only. VALIDATION stays unopened, and REF and EVAL stay structurally denied. The frozen EncDec assets are rehashed. `maximum_identity_to_train` was renamed `maximum_edit_similarity_to_train`, defined as one minus the minimum Levenshtein distance divided by the longer sequence length, and never called sequence identity. The frozen approved files `config/modelling/validation_metrics_v1.yaml` and `config/experiments/generator_evaluation.yaml`, the plan, and two earlier reports still use the older wording and were not touched.
+
+**Changes:** The output directory and consumption record are now created before TRAIN is opened or the checkpoint is read, hashed, or loaded. Catchable `KeyboardInterrupt` and `SystemExit` after consumption become a message-safe failure record before propagating. `authorization_failure.json` now records the schema, status, code, controlled detail, identities, output directory, consumption state, GPU binding, stage, invocation index, checkpoint state, and the non-resumable and not-complete flags. Success-manifest validation is exhaustive with exact nested key sets and cross-field checks. The written manifest is reopened, must be canonical, is validated independently, and every emitted file is verified against the manifest, or the manifest is withdrawn. Active-authorisation validation now requires the basename to equal `authorisation_id`, the offset timestamp format, and symlink-free run-root and output ancestry. The launch script must fetch `origin/main` and compare the live remote before the authorisation commit and immediately before launch.
+
+**Tests:** CPU/mock only, CUDA hidden, bytecode disabled, offline controls, caches outside both repositories. `tests/modelling` 255 passed, including 92 in the diagnostic file. The B1 development-pool (30), generic (62), phase B (35), and null-model (54) suites passed, each in its own process.
+
+---
+
+## 2026-10-06 — Final evidence hardening of the inactive update-21 diagnostic package
+
+**Status:** Revision 3 of the inactive package. M6 is not complete. No authorisation, real output directory, TRAIN or checkpoint access, GPU use, M7, REF, or EVAL occurred. Nothing was staged, committed, or pushed. All rev2 policy and execution behaviour is preserved.
+
+**Changes:** Success-manifest provenance is bound to the active authorisation, the measured provenance, and the pinned generation-input and EncDec/patch inventories. Written-evidence reverification reruns the pinned M4 metrics and five guardrails from the audited ledger and the pinned TRAIN cores, including `exact_train_match_rate`, and requires equality with the metrics file, the guardrail file, the manifest, and both sides of the comparison (B1 against the recomputed accepted reference). The report and hash report receive the regular, non-symlink, exact-size check. Output ancestry must be real directories. Adversarial regression tests cover each case.

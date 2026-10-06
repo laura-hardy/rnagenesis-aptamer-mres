@@ -1700,6 +1700,10 @@ For this 21-update pilot the recorded decisions are: immutable B1 initialisation
 
 The M4 approval recorded in the pilot YAML remains historical. It does not make this implementation executable.
 
+**Training pilot outcome — 6 October 2026.** Attempt 6, `/home/laura/rnagenesis-mres-runs/m6_d1_diffusion_pilot_6fd611589d7a_gpu1_attempt6`, is the accepted successful training pilot (manifest SHA-256 `4b24d5bf5bc392a8f6ee4b8af91adb3582e3a17cac459559632494ec64f8ae52`, `pilot_completed`, `consumed_successfully`, no failure record). Fixed-draw VALIDATION MSE fell from `0.1404131591699728` to `0.10955412184224482` (update 7), `0.10202736076728462` (update 14), and `0.10076265001606723` (update 21), a 28.238% reduction. All 21 updates changed the denoiser, all losses and gradients were finite, only update 6 was clipped, and the frozen EncDec was unchanged. The `3e-5` pilot passed and no reduction to `1e-5` is proposed. FP32, microbatch 8, accumulation 4, effective batch 32, EMA disabled, and raw weights remain the conservative supported configuration. This does not freeze the complete M7 configuration.
+
+**M6 is not COMPLETE.** The human gate (freezing the final D1 training configuration) has not been taken. Update-21 diagnostic generation is pending and needs its own separate authorisation. Update 21 is the sole D1 pilot checkpoint for it. Updates 7 and 14 remain learning-curve evidence only. The accepted B1 development pool is reused and not regenerated. M6 stays open until the update-21 generated-sample guardrails are reviewed. M7, REF, and EVAL remain unauthorised. The inactive diagnostic package is `config/experiments/D1_update21_diagnostic_generation.yaml` with `scripts/modelling/m6_diagnostic_generation.py`, described in [M6 pilot implementation](fine_tuning/m6_pilot_implementation.md) section 11.
+
 ---
 
 ### M7 — Final D1 replicate training
@@ -2070,13 +2074,13 @@ The MRes RNAGenesis modelling implementation is complete when:
 
 ## 22. Immediate next actions
 
-M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 2026. M2 is COMPLETE / GO — 28 September 2026. M3 is COMPLETE / GO — 29 September 2026, as recorded in [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c`. M4 is COMPLETE / GO — 2 October 2026, for M5 planning only. M5 is COMPLETE / GO — 3 October 2026, for M6 planning only. The M6 pilot package is ready for review and is not authorised. Biological fine-tuning is not authorised. M6 execution is not authorised. This does not authorise biological TRAIN or VALIDATION access, D1 training, GPU use, REF, EVAL, or a new run.
+M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 2026. M2 is COMPLETE / GO — 28 September 2026. M3 is COMPLETE / GO — 29 September 2026, as recorded in [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c`. M4 is COMPLETE / GO — 2 October 2026, for M5 planning only. M5 is COMPLETE / GO — 3 October 2026, for M6 planning only. The M6 training pilot (attempt 6) is accepted, M6 is not complete, and update-21 diagnostic generation is pending separate authorisation. Biological fine-tuning beyond the accepted pilot is not authorised. M7 is not authorised. This does not authorise biological TRAIN or VALIDATION access, D1 training, GPU use, REF, EVAL, or a new run.
 
 Proceed in this order:
 
-1. Review the inactive M6 package. Do not execute M6, do not access biological TRAIN or VALIDATION, and do not begin D1 training;
-2. a biological D1 pilot only after a later, separate execution authorisation;
-3. M7 and later only after those gates pass.
+1. Review the inactive update-21 diagnostic-generation package. Do not execute it, do not access TRAIN, VALIDATION, REF, or EVAL, and do not start M7;
+2. update-21 diagnostic generation only after a later, separate execution authorisation;
+3. review the generated-sample guardrails and take the M6 human gate before M7 and later.
 
 ---
 

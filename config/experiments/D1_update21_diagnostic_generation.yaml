@@ -1,0 +1,223 @@
+# M6_UPDATE21_DIAGNOSTIC_READY_FOR_REVIEW_NOT_AUTHORISED
+# This file is the inactive configuration for the single update-21
+# diagnostic-generation stage that M6 still requires. It must not be
+# consumed by an executable workflow. It binds no GPU, no output directory,
+# no timestamp, and no authorisation. The tracked file does not store
+# authorization_commit: a later authorisation-only commit may change only
+# this file, and the runner reads that commit from live HEAD.
+# Update 21 is the sole D1 pilot checkpoint for this comparison. Updates 7
+# and 14 stay learning-curve evidence only. The accepted B1 pool is read as
+# evidence and is never regenerated. M6 stays open until the generated-sample
+# guardrails are reviewed. This file does not authorise M7, REF, or EVAL.
+
+document_status: M6_UPDATE21_DIAGNOSTIC_READY_FOR_REVIEW_NOT_AUTHORISED
+consumable_by_executable_workflow: false
+schema_version: m6-diagnostic-config-1
+manifest_schema_version: m6-diagnostic-manifest-1
+experiment_id: D1_update21_diagnostic_generation
+mres_branch: main
+rnagenesis_branch: mres-d1-diffusion-finetune
+rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
+execution:
+  authorised: false
+  biological_paths_permitted: false
+  gpu_identity_bound: false
+  output_directory: null
+  evidence_directory: null
+  authorisation_id: null
+  authorization_parent_commit: null
+  executing_implementation_commit: null
+diagnostic_generation_authorisation:
+  authorisation_id: null
+  activation_status: inactive_no_authorisation
+  consumed: false
+  single_use: true
+  reuse_permitted: false
+  authorization_parent_commit: null
+  executing_implementation_commit: null
+  phase: null
+  permitted_roles: []
+  logical_device: null
+  physical_gpu_index: null
+  gpu_uuid: null
+  pci_bus: null
+  cuda_visible_devices: null
+  output_directory: null
+  evidence_directory: null
+  implementation_file_hashes: null
+  authorisation_timestamp: null
+  scope: null
+  session:
+    pattern: m5_single_use_timestamp_and_scope
+    wall_clock_expiry: null
+    resume_permitted: false
+    consumption_event: null
+pinned_inputs:
+  training_evidence:
+    directory: /home/laura/rnagenesis-mres-runs/m6_d1_diffusion_pilot_6fd611589d7a_gpu1_attempt6
+    run_id: m6_d1_diffusion_pilot_6fd611589d7a_gpu1_attempt6
+    authorization_commit: 15f49a17081f573970495891e9283a17fc5c3dc2
+    executing_implementation_commit: 6fd611589d7a3365b793c2ca64cf13c29ef5bfc1
+    manifest:
+      name: m6_pilot_manifest.json
+      sha256: 4b24d5bf5bc392a8f6ee4b8af91adb3582e3a17cac459559632494ec64f8ae52
+      bytes: 159013
+    consumption:
+      name: authorization_consumption.json
+      sha256: ec822747cca4916331fd7a79dd504a54c425bc7699457ca6d85e9b0c446f0874
+      bytes: 560
+  checkpoint:
+    update: 21
+    directory: /home/laura/rnagenesis-mres-runs/m6_d1_diffusion_pilot_6fd611589d7a_gpu1_attempt6/D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-42__update-21__git-6fd611589d7a3365b793c2ca64cf13c29ef5bfc1
+    members:
+      model_index.json:
+        sha256: 05ac20f9fd3bd818ec88b37ff35e482ac80c5f5329666ecdfbe9227aa045b70e
+        bytes: 217
+      scheduler/scheduler_config.json:
+        sha256: 6b470b030031daa7c812ef9a6dfe49f14fa695c17a939406f1c780bad6a91396
+        bytes: 492
+      unet/config.json:
+        sha256: 42c864c81e35ef1a0c7964a3642492fba95c9e24a153407f9fd98855b20d9d70
+        bytes: 560
+      unet/diffusion_pytorch_model.safetensors:
+        sha256: 47b2dc9b392ea766eee7e947f0f92f5a039c42ac714326104e719352d20b5924
+        bytes: 7847725416
+  schedule:
+    directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_schedule_d2b2041520d1
+    length_vector:
+      name: ordered_train_length_vector.json
+      sha256: 7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c
+      bytes: 2022
+    schedule:
+      name: development_pool_schedule.json
+      sha256: 0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0
+      bytes: 30125
+    attempts: 1000
+    invocations: 112
+  b1_pool:
+    directory: /home/laura/rnagenesis-mres-runs/m4_b1_development_pool_d2b2041520d1_gpu1_attempt1
+    files:
+      development_pool_audited_attempts.jsonl:
+        sha256: 3aad5a0cd59405aca52a9800c47c1fe8f70e474d68b8a602e5fb1b8f5e14e150
+        bytes: 530720
+      development_pool_raw_attempts.jsonl:
+        sha256: 086d26458fc2363017c812dc65cb0440185ad6b4f8cfe4fc3377dfa74c5f292a
+        bytes: 222388
+      development_pool_metrics.json:
+        sha256: 5c927839c94d78d575d787392da137c28f1310ef637b57bbb8b500e7dbf9b3ea
+        bytes: 76776
+      development_pool_manifest.json:
+        sha256: 6a3e3be9d589443e82f2f8b0321c445e96f0f989b4984ec8c25ce10db48927c8
+        bytes: 82416
+  train:
+    path: /home/laura/rnagenesis-mres-data/development/corpus_final.txt
+    sha256: d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d
+    bytes: 37700
+    count: 669
+diagnostic_design:
+  checkpoint_update: 21
+  weight_variant: raw
+  ema_weights: false
+  other_checkpoint_updates_loaded: false
+  raw_attempts: 1000
+  invocation_count: 112
+  schedule_sha256: 0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0
+  length_vector_sha256: 7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c
+  target_length_sampling_seed: 43000
+  generation_seed_base: 44000
+  max_chunk_size: 16
+  batch_num: 1
+  max_seq_len_rule: requested_length_plus_1
+  ddim_steps: 50
+  schedule_reused_not_regenerated: true
+  b1_pool: accepted_evidence_read_only_never_regenerated
+  normalisation:
+    authority: approved_m1_cleaner
+    cleaner_sha256: 4d0c56a7d931a2c3c5c049cfeabd4937134b3d1125ef7a68b10472527d2fd2a2
+    rule: leading_and_trailing_runs_of_1_and_2_removed_then_nonempty_ACGU_required
+    raw_text_retained_beside_normalised_text: true
+    additional_trimming: false
+    padding: false
+    suffix_removal_beyond_the_approved_cleaner: false
+    rejection: false
+    replacement: false
+    resampling: false
+    dropping: false
+  denominators:
+    valid_nonempty_acgu_fraction: raw_attempts
+    empty_or_unparseable_fraction: raw_attempts
+    unique_fraction: valid_outputs
+    exact_train_match_rate: valid_outputs
+    largest_duplicate_share: valid_outputs
+    requested_length_exact_hit_rate: raw_attempts
+  invalid_empty_duplicate_early_eos_and_length_mismatched_attempts_remain_counted: true
+hard_guardrails:
+  rules:
+  - id: valid_nonempty_acgu_fraction
+    comparison: minimum
+    threshold: 0.99
+    denominator: raw_attempts
+  - id: empty_or_unparseable_fraction
+    comparison: maximum
+    threshold: 0.01
+    denominator: raw_attempts
+  - id: unique_fraction
+    comparison: minimum
+    threshold: 0.95
+    denominator: valid_outputs
+  - id: exact_train_match_rate
+    comparison: maximum
+    threshold: 0.01
+    denominator: valid_outputs
+  - id: largest_duplicate_share
+    comparison: maximum
+    threshold: 0.01
+    denominator: valid_outputs
+  requested_length_exact_hit_rate_is_a_threshold: false
+  historical_0_90_and_0_50_enforced: false
+  any_failure_makes_the_checkpoint_ineligible_for_m7: true
+  failure_triggers_automatic_rerun: false
+  failure_triggers_automatic_learning_rate_fallback: false
+report_only_diagnostics:
+  items:
+  - requested_length_exact_hit_rate
+  - per_requested_length_exact_hit_rate
+  - nearest_train_normalized_edit_distance
+  - maximum_edit_similarity_to_train
+  - nucleotide_distribution
+  - dinucleotide_distribution
+  - mfe
+  - mfe_per_nucleotide
+  - paired_fraction
+  - full_length_stratified_results
+  thresholds_defined: false
+  optimised_against: false
+  deferred:
+  - clustering_identity_threshold
+  - clustering_dependent_claims
+  - frozen_representation_or_embedding_metrics
+  clustering_or_embedding_metrics_introduced: false
+roles:
+  permitted:
+  - ACCEPTED_B1_POOL_EVIDENCE
+  - ACCEPTED_SCHEDULE
+  - FROZEN_ENCDEC
+  - TRAIN_TEXT_DIAGNOSTIC_ONLY
+  - UPDATE21_CHECKPOINT
+  train_text: exact_copy_and_nearest_train_diagnostics_only
+  validation: not_requested
+  denied:
+  - REF
+  - EVAL
+  - VALIDATION_CSV
+  - VALIDATION_ARTIFACT
+  ref_eval_structurally_unreachable: true
+closed_gates:
+  m6_complete: false
+  m6_closed_by_this_package: false
+  m7_authorised: false
+  ref_authorised: false
+  eval_authorised: false
+  updates_7_and_14_selectable_or_generated: false
+  b1_regeneration_authorised: false
+  human_review_of_generated_sample_required_before_m6_closure: true

@@ -175,7 +175,7 @@ B2 attempt 2 is completed accepted evidence at `/home/laura/rnagenesis-mres-runs
 Report, and do not threshold-optimize:
 
 - nearest-TRAIN normalized edit distance;
-- maximum identity to TRAIN;
+- maximum edit similarity to TRAIN (one minus the minimum Levenshtein distance divided by the longer sequence length; not a sequence identity);
 - nucleotide and dinucleotide distributions;
 - MFE and MFE per nucleotide;
 - paired fraction;
@@ -278,3 +278,15 @@ On 3 October 2026 formal M5 became COMPLETE / GO for M6 planning only. The accou
 On 3 October 2026 the inactive M6 package is `M6_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This is not `M6_IMPLEMENTED_NOT_AUTHORISED`, and it does not authorise execution. The checked-in pilot YAML stays non-consumable and binds no GPU or output directory. The Python implementation contains the authorised worker, accumulation rule, tensor-safe checkpoint comparison, and production-manifest validator described in [M6 pilot implementation](m6_pilot_implementation.md). A later authorisation-only commit would be required before that path can run. Sections 8 through 10 above remain the M4 and M5 history. This addendum does not change them and does not authorise biological TRAIN or VALIDATION access, D1 training, GPU use, REF, EVAL, or a new run. The final D1 seed count remains unresolved for M7.
 
 On 5 October 2026 the same inactive status was corrected in place. Fixed-draw validation uses the prepared denoiser in evaluation mode, inside `torch.no_grad()` and without autocast, and then restores the training state. EncDec evidence is the parameter digest and the persistent-buffer digest at initialization and after updates 7, 14, and 21, with the documented rotary runtime caches excluded. Validation time is the sum of the synchronized durations at updates 0, 7, 14, and 21. The production manifest cross-checks that evidence: update 0 has a null relative record, updates 7, 14, and 21 match the review-item schema and the recorded aggregate MSE, worsening flags equal `later > initial`, and `validation_review.observations` match those relative records. The status remains `M6_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED`.
+
+## 12. M6 attempt 6 and the pending update-21 diagnostic comparison
+
+On 6 October 2026 the M6 attempt-6 training pilot (`/home/laura/rnagenesis-mres-runs/m6_d1_diffusion_pilot_6fd611589d7a_gpu1_attempt6`) was accepted as the successful training attempt. Its fixed-draw VALIDATION MSE fell from `0.1404131591699728` at update 0 to `0.10955412184224482` at update 7, `0.10202736076728462` at update 14, and `0.10076265001606723` at update 21. The `3e-5` pilot passed, and no reduction to `1e-5` is proposed. **M6 is not complete.** The generated-sample guardrails in section 5 have not been evaluated for any D1 weights, and M6 stays open until they are generated and reviewed.
+
+Update 21 is the sole D1 pilot checkpoint for the pending diagnostic comparison. Updates 7 and 14 stay learning-curve evidence and receive no generation, as section 8 already records. The comparison reuses the accepted B1 development pool in place of a new B1 run: the accepted schedule (`0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0`, length vector `7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c`), the accepted B1 ledgers, and the accepted B1 metrics. B1 is read only and is not regenerated.
+
+The guardrails, denominators, and report-only diagnostics are exactly those of section 5. Requested-length exact-hit rates are reported, overall and per length, and the historical 0.90 and 0.50 values are not enforced. TRAIN may be opened only for exact-copy and nearest-TRAIN diagnostics. VALIDATION is not requested by this comparison. REF and EVAL are not reachable.
+
+Normalisation uses the approved M1 cleaner of section 5, the same code that produced the accepted B1 pool. In that pool 39 of 1,000 attempts have a trailing `2` (early EOS) and are valid under the cleaner. The stricter exact-`11`, no-suffix helper in the M6 contract would reject them, and the accepted B1 pool would then fail the 0.99 valid-fraction guardrail itself. The diagnostic therefore reports that helper only as a sensitivity count. This policy is decided; see [M6 pilot implementation](m6_pilot_implementation.md) section 6.
+
+The inactive implementation is described in [M6 pilot implementation](m6_pilot_implementation.md) section 11. It does not authorise generation, a GPU, TRAIN access, M7, REF, or EVAL.
