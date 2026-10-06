@@ -7,6 +7,7 @@ directories, or a GPU. Torch is used only for tiny CPU tensors.
 from __future__ import annotations
 
 import ast
+import contextlib
 import copy
 import hashlib
 import importlib.util
@@ -17,6 +18,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -3050,6 +3052,796 @@ class _FailingFinalCuda(_CpuStandIn):
 
     def torch(self):
         return self.proxy
+
+
+
+# ---------------------------------------------------------------------------
+# Attempt-5 remediation: checkpoint configuration evidence, proof ordering,
+# substage failures, tree validation, streaming digests, atomic JSON.
+# ---------------------------------------------------------------------------
+
+import errno
+import hashlib as _hashlib
+from unittest import mock
+
+CHECKPOINT_SUBSTAGES = (
+    "checkpoint_directory",
+    "checkpoint_save",
+    "checkpoint_inventory",
+    "checkpoint_hash",
+    "checkpoint_reload",
+    "checkpoint_config_proof",
+    "checkpoint_state_proof",
+)
+CHECKPOINT_DETAIL = "checkpoint operation failed; exception_class=RuntimeError"
+
+_REAL_DIFFUSERS = {}
+
+
+def _real_diffusers_tiny():
+    """A tiny model built on the pinned real Diffusers 0.25.0 ConfigMixin."""
+    if "tiny" not in _REAL_DIFFUSERS:
+        import diffusers
+        from diffusers import ConfigMixin, ModelMixin
+        from diffusers.configuration_utils import register_to_config
+
+        class TinyDenoiser(ModelMixin, ConfigMixin):
+            config_name = "config.json"
+
+            @register_to_config
+            def __init__(self, width: int = 4, depth: int = 2, activation_fn: str = "geglu", dropout: float = 0.1):
+                super().__init__()
+                self.first = torch.nn.Linear(width, width)
+                self.second = torch.nn.Linear(width, width)
+                self.register_buffer("scale", torch.ones(width))
+
+        _REAL_DIFFUSERS["tiny"] = TinyDenoiser
+        _REAL_DIFFUSERS["version"] = diffusers.__version__
+    return _REAL_DIFFUSERS["tiny"]
+
+
+def _legacy_entry_digest(name, value):
+    """Reference implementation of the earlier digest. Slow by design, small inputs only."""
+    payload = {"dtype": str(value.dtype), "kind": "tensor", "name": name, "shape": [int(dim) for dim in value.shape]}
+    cpu = value.detach().to(device="cpu").contiguous()
+    raw = bytes(cpu.untyped_storage())
+    offset = int(cpu.storage_offset()) * int(cpu.element_size())
+    return _hashlib.sha256(contract.canonical_json(payload) + raw[offset:offset + int(cpu.nbytes)]).hexdigest()
+
+
+class _PathLikeReturning(object):
+    def __init__(self, value):
+        self.value = value
+
+    def __fspath__(self):
+        return self.value
+
+
+class _PathRealDiffusersTrainer(object):
+    """Pinned-interface stand-in that saves and reloads with real Diffusers objects."""
+
+    def __init__(self, tiny):
+        self.TransformerDenoiser = tiny
+
+    def save_diffusers_checkpoint(self, denoiser, scheduler, directory):
+        if not isinstance(directory, Path):
+            raise TypeError("pinned path was not pathlib.Path")
+        directory.mkdir(parents=True, exist_ok=True)
+        denoiser.save_pretrained(str(directory / "unet"))
+        scheduler.save_pretrained(str(directory / "scheduler"))
+        (directory / "model_index.json").write_text(json.dumps({"_class_name": "TinyPipeline", "unet": ["tiny", "TinyDenoiser"]}))
+
+
+class _RemediationBase(unittest.TestCase):
+    def setUp(self):
+        self.inactive = load_inactive()
+        self.hashes = file_hashes()
+        self.temp = tempfile.mkdtemp(prefix="m6-remediation-")
+        self.observation = observation(self.inactive, self.hashes)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp)
+
+
+class ConfigurationEvidenceTests(_RemediationBase):
+    def _config(self, **overrides):
+        base = {"_class_name": "T", "_diffusers_version": "0.25.0", "layers": 2, "_name_or_path": "/a"}
+        base.update(overrides)
+        return base
+
+    def test_top_level_pathlike_is_converted_to_a_string_only_there(self):
+        original = self._config(_name_or_path=Path("/one/place"))
+        reloaded = self._config(_name_or_path=Path("/two/place"))
+        record = contract.assert_configuration_compatible(original, reloaded)
+        self.assertEqual(record["ignored_top_level_keys"], ["_name_or_path"])
+        self.assertTrue(record["configuration_compatible"])
+        self.assertTrue(record["normalized_sha256_equal"])
+        self.assertFalse(record["raw_sha256_equal"])
+        converted = contract.config_evidence_mapping(original)
+        self.assertIs(type(converted["_name_or_path"]), str)
+        self.assertEqual(converted["_name_or_path"], "/one/place")
+        self.assertIsInstance(original["_name_or_path"], Path)
+        self.assertEqual(record["original_raw_sha256"], contract.sha256_bytes(contract.canonical_json(self._config(_name_or_path="/one/place"))))
+
+    def test_string_and_path_of_the_same_location_have_the_same_raw_hash(self):
+        as_path = contract.assert_configuration_compatible(self._config(_name_or_path=Path("/same")), self._config(_name_or_path="/same"))
+        self.assertTrue(as_path["raw_sha256_equal"])
+
+    def test_pathlike_returning_bytes_or_other_values_is_rejected(self):
+        for value in (b"/bytes", 7, None):
+            with self.subTest(value=repr(value)):
+                with self.assertRaises(contract.M6PilotError) as caught:
+                    contract.assert_configuration_compatible(self._config(_name_or_path=_PathLikeReturning(value)), self._config())
+                self.assertEqual(caught.exception.code, "checkpoint_save_reload_incompatibility")
+        with self.assertRaises(contract.M6PilotError):
+            contract.config_evidence_mapping({"_name_or_path": _PathLikeReturning(b"x")})
+
+    def test_pathlike_under_any_other_key_is_rejected(self):
+        for config in (
+            self._config(other=Path("/x")),
+            self._config(nested={"inner": Path("/x")}),
+            self._config(items=[Path("/x")]),
+            self._config(nested={"_name_or_path": Path("/x")}),
+        ):
+            with self.subTest(config=sorted(config)):
+                with self.assertRaises(contract.M6PilotError) as caught:
+                    contract.assert_configuration_compatible(config, copy.deepcopy(self._config()))
+                self.assertEqual(caught.exception.code, "checkpoint_save_reload_incompatibility")
+                self.assertNotIn("/x", caught.exception.detail)
+                with self.assertRaises(contract.M6PilotError):
+                    contract.normalized_config_sha256(config)
+
+    def test_nested_name_or_path_stays_covered_by_the_compatibility_check(self):
+        first = self._config(nested={"_name_or_path": "one"})
+        second = self._config(nested={"_name_or_path": "two"})
+        with self.assertRaises(contract.M6PilotError) as caught:
+            contract.assert_configuration_compatible(first, second)
+        self.assertEqual(caught.exception.detail, "reloaded denoiser configuration is incompatible")
+        self.assertNotEqual(contract.normalized_config_sha256(first), contract.normalized_config_sha256(second))
+
+    def test_ignore_list_is_the_single_top_level_key_and_other_keys_are_compared(self):
+        self.assertEqual(contract.CONFIGURATION_IGNORED_TOP_LEVEL_KEYS, ("_name_or_path",))
+        with self.assertRaises(contract.M6PilotError):
+            contract.assert_configuration_compatible(self._config(layers=2), self._config(layers=3))
+
+    def test_serialisation_is_not_widened(self):
+        source = inspect.getsource(contract.canonical_json) + inspect.getsource(contract._config_sha256)
+        self.assertNotIn("default=", source)
+        with self.assertRaises(TypeError):
+            contract.canonical_json({"value": Path("/x")})
+
+    def test_real_diffusers_reload_through_a_path_reproduces_and_clears_the_defect(self):
+        tiny = _real_diffusers_tiny()
+        self.assertEqual(_REAL_DIFFUSERS["version"], contract.m5_contract().ACCEPTED_RUNTIME_VERSIONS["diffusers"])
+        root = Path(self.temp) / "real"
+        tiny().save_pretrained(str(root / "b1" / "unet"))
+        original = tiny.from_pretrained(str(root / "b1"), subfolder="unet")
+        with torch.no_grad():
+            original.first.weight.add_(0.5)
+        original.save_pretrained(str(root / "saved" / "unet"))
+        reloaded = tiny.from_pretrained(root / "saved", subfolder="unet")
+        original_config = runner._config_mapping(original)
+        reloaded_config = runner._config_mapping(reloaded)
+        self.assertIs(type(original_config["_name_or_path"]), str)
+        self.assertIsInstance(reloaded_config["_name_or_path"], Path)
+        with self.assertRaises(TypeError) as defect:
+            contract.canonical_json(reloaded_config)
+        self.assertIn("PosixPath", str(defect.exception))
+        record = contract.assert_configuration_compatible(original_config, reloaded_config)
+        self.assertTrue(record["configuration_compatible"])
+        self.assertFalse(record["raw_sha256_equal"])
+        self.assertEqual(record["original_normalized_sha256"], record["reloaded_normalized_sha256"])
+        self.assertEqual(contract.config_evidence_mapping(reloaded_config)["_name_or_path"], str(root / "saved"))
+
+    def test_real_diffusers_original_and_reload_as_different_path_objects(self):
+        tiny = _real_diffusers_tiny()
+        root = Path(self.temp) / "both-paths"
+        tiny().save_pretrained(str(root / "b1" / "unet"))
+        original = tiny.from_pretrained(root / "b1", subfolder="unet")
+        original.save_pretrained(str(root / "saved" / "unet"))
+        reloaded = tiny.from_pretrained(root / "saved", subfolder="unet")
+        original_config = runner._config_mapping(original)
+        reloaded_config = runner._config_mapping(reloaded)
+        self.assertIsInstance(original_config["_name_or_path"], Path)
+        self.assertIsInstance(reloaded_config["_name_or_path"], Path)
+        self.assertNotEqual(original_config["_name_or_path"], reloaded_config["_name_or_path"])
+        record = contract.assert_configuration_compatible(original_config, reloaded_config)
+        self.assertTrue(record["configuration_compatible"])
+        self.assertFalse(record["raw_sha256_equal"])
+
+    def test_real_diffusers_save_and_reload_through_the_pinned_adapter(self):
+        tiny = _real_diffusers_tiny()
+        from diffusers import DDIMScheduler
+
+        root = Path(self.temp) / "adapter"
+        tiny().save_pretrained(str(root / "b1" / "unet"))
+        model = tiny.from_pretrained(str(root / "b1"), subfolder="unet")
+        with torch.no_grad():
+            model.second.bias.add_(1.0)
+        config = active_from(self.inactive, self.temp, name="m6-real-diffusers")
+        authorisation = contract.validate_active_execution(config, self.observation, self.temp)
+        directory = contract.consume_bound_output_directory(authorisation, self.temp)
+        stack = runner.PinnedTrainingStack(_PathRealDiffusersTrainer(tiny), _ConvertingArtifactLoader("a" * 64), object())
+        proof = runner._save_and_reload(stack, model, DDIMScheduler(), directory, 7, model, "a" * 40)
+        self.assertTrue(proof["configuration"]["configuration_compatible"])
+        self.assertFalse(proof["configuration"]["raw_sha256_equal"])
+        self.assertTrue(proof["state_comparison"]["complete_state_equal"])
+        self.assertEqual(proof["state_comparison"]["compared_parameter_count"], 5)
+        self.assertEqual(sorted(proof["saved_hashes"]), sorted(contract.CHECKPOINT_MEMBERS))
+
+
+class ProofOrderingTests(_RemediationBase):
+    def _proof(self, original_config=None, reloaded_config=None, saved=True):
+        original = {name: torch.arange(4, dtype=torch.float32) for name in ("a", "b", "c", "d")}
+        reloaded = {name: tensor.clone() for name, tensor in original.items()}
+        return {
+            "fresh_object_constructed": True,
+            "labelled_as_resume": False,
+            "original_config": {"_name_or_path": "x", "k": 1} if original_config is None else original_config,
+            "original_object_id": 1,
+            "original_state": original,
+            "reloaded_config": {"_name_or_path": "y", "k": 1} if reloaded_config is None else reloaded_config,
+            "reloaded_object_id": 2,
+            "reloaded_state": reloaded,
+            "saved_hashes": {name: "a" * 64 for name in contract.CHECKPOINT_MEMBERS} if saved else {},
+            "selection": "complete",
+            "update": 7,
+        }
+
+    def _spy(self):
+        calls = []
+        original = contract.compare_complete_denoiser_state
+
+        def spy(*args, **kwargs):
+            calls.append(args)
+            return original(*args, **kwargs)
+
+        return calls, mock.patch.object(contract, "compare_complete_denoiser_state", spy)
+
+    def test_state_comparison_is_not_called_when_configuration_fails(self):
+        for reloaded in ({"_name_or_path": "y", "k": 2}, {"_name_or_path": "y", "k": Path("/p")}, {"_name_or_path": _PathLikeReturning(b"x"), "k": 1}):
+            with self.subTest(reloaded=repr(reloaded)):
+                calls, patch = self._spy()
+                with patch:
+                    with self.assertRaises(contract.M6PilotError) as caught:
+                        contract.prove_weight_reload(self._proof(reloaded_config=reloaded))
+                self.assertEqual(caught.exception.code, "checkpoint_save_reload_incompatibility")
+                self.assertEqual(calls, [])
+
+    def test_state_comparison_is_not_called_when_structure_or_inventory_fails(self):
+        for mutate in (
+            lambda proof: proof.update(fresh_object_constructed=False),
+            lambda proof: proof.update(reloaded_object_id=1),
+            lambda proof: proof.update(update=5),
+            lambda proof: proof.update(saved_hashes={}),
+        ):
+            proof = self._proof(reloaded_config={"k": 2})
+            mutate(proof)
+            calls, patch = self._spy()
+            config_calls = []
+            with patch, mock.patch.object(contract, "assert_configuration_compatible", lambda *a: config_calls.append(a)):
+                with self.assertRaises(contract.M6PilotError):
+                    contract.prove_weight_reload(proof)
+            self.assertEqual(calls, [])
+            self.assertEqual(config_calls, [])
+
+    def test_success_path_still_runs_the_complete_state_comparison_after_configuration(self):
+        order = []
+        original_config = contract.assert_configuration_compatible
+        original_state = contract.compare_complete_denoiser_state
+        with mock.patch.object(contract, "assert_configuration_compatible", lambda *a: order.append("config") or original_config(*a)):
+            with mock.patch.object(contract, "compare_complete_denoiser_state", lambda *a: order.append("state") or original_state(*a)):
+                proved = contract.prove_weight_reload(self._proof(), stage_hook=order.append)
+        self.assertEqual(order, ["checkpoint_config_proof", "config", "checkpoint_state_proof", "state"])
+        self.assertTrue(proved["state_comparison"]["complete_state_equal"])
+        self.assertEqual(proved["state_comparison"]["compared_parameter_count"], 4)
+        with self.assertRaises(contract.M6PilotError) as caught:
+            proof = self._proof()
+            proof["reloaded_state"]["d"] = proof["reloaded_state"]["d"] + 1
+            contract.prove_weight_reload(proof)
+        self.assertIn("denoiser state mismatch", caught.exception.detail)
+
+
+class _SubstageStack(_CpuStandIn):
+    cpu_stand_in = True
+    enforce_runtime_isolation = False
+    failing_save = False
+    failing_reload = False
+    extra_after_save = None
+
+    def save_checkpoint(self, denoiser, scheduler, directory):
+        if self.failing_save:
+            raise RuntimeError(RNA_MESSAGE)
+        _CpuStandIn.save_checkpoint(self, denoiser, scheduler, directory)
+        if self.extra_after_save is not None:
+            self.extra_after_save(directory)
+
+    def reload_denoiser(self, directory):
+        if self.failing_reload:
+            raise RuntimeError(RNA_MESSAGE)
+        return _CpuStandIn.reload_denoiser(self, directory)
+
+
+class CheckpointSubstageFailureTests(_RemediationBase):
+    _install_input_stubs = AuthorisedPathTests._install_input_stubs
+    _restore_input_stubs = AuthorisedPathTests._restore_input_stubs
+    _failure_document = AuthorisedPathTests._failure_document
+
+    def _run(self, name, stack_attrs=None, patches=()):
+        assets, runtime = _pilot_assets()
+        config = active_from(self.inactive, self.temp, name=name)
+        authorisation = contract.validate_active_execution(config, self.observation, self.temp)
+        directory = config["execution"]["output_directory"]
+        stack = _SubstageStack(assets, runtime)
+        for key, value in (stack_attrs or {}).items():
+            setattr(stack, key, value)
+        originals = self._install_input_stubs(authorisation, None)
+        try:
+            with contextlib.ExitStack() as exits:
+                for item in patches:
+                    exits.enter_context(item)
+                with self.assertRaises(contract.M6PilotError) as caught:
+                    runner.execute_authorized_worker(authorisation, stack, run_root=self.temp)
+        finally:
+            self._restore_input_stubs(originals)
+        return config, authorisation, directory, stack, caught.exception
+
+    def _assert_controlled(self, config, authorisation, directory, stack, exc, stage, detail=CHECKPOINT_DETAIL, code="checkpoint_save_reload_incompatibility"):
+        self.assertEqual(exc.code, code)
+        self.assertEqual(exc.stage, stage)
+        self.assertEqual(exc.update, 7)
+        self.assertIsNone(exc.microbatch)
+        if detail is not None:
+            self.assertEqual(exc.detail, detail)
+        failure = self._failure_document(config)
+        self.assertEqual(failure["failure_code"], code)
+        self.assertEqual(failure["fired_stop_condition"], code)
+        self.assertEqual(failure["stage"], stage)
+        self.assertEqual(failure["update"], 7)
+        self.assertIsNone(failure["microbatch"])
+        self.assertEqual(failure["retained_checkpoint_updates"], [])
+        self.assertFalse(failure["retained_checkpoints_exist"])
+        self.assertEqual(stack.pilot_progress["retained_checkpoints"], [])
+        self.assertTrue(failure["non_resumable"])
+        self.assertFalse(failure["resume_supported"])
+        self.assertFalse(failure["pilot_completed"])
+        self.assertFalse(failure["scientific_run_completed"])
+        self.assertFalse(failure["manifest_written"])
+        self.assertFalse(os.path.lexists(os.path.join(directory, contract.SUCCESS_MANIFEST_NAME)))
+        rendered = json.dumps(failure)
+        self.assertNotIn(RNA_MESSAGE, rendered)
+        self.assertNotIn("Traceback", rendered)
+        self.assertNotIn(self.temp, rendered)
+        with open(os.path.join(directory, contract.CONSUMPTION_RECORD_NAME), "rb") as handle:
+            consumed = json.loads(handle.read().decode("utf-8"))
+        self.assertEqual(consumed["consumption_state"], "consumed_output_created")
+        self.assertFalse(consumed["reuse_permitted"])
+        with self.assertRaises(contract.M6PilotError) as again:
+            contract.consume_bound_output_directory(authorisation, self.temp)
+        self.assertEqual(again.exception.code, "authorization_reuse")
+        with self.assertRaises(contract.M6PilotError):
+            contract.assert_restart_refused(True, True)
+
+    def _boom(self, *_args, **_kwargs):
+        raise RuntimeError(RNA_MESSAGE)
+
+    def test_checkpoint_directory_substage(self):
+        patch = mock.patch.object(contract, "create_checkpoint_directory_exclusive", self._boom)
+        outcome = self._run("m6-sub-directory", patches=[patch])
+        self._assert_controlled(*outcome[:4], outcome[4], "checkpoint_directory")
+
+    def test_checkpoint_save_substage(self):
+        outcome = self._run("m6-sub-save", stack_attrs={"failing_save": True})
+        self._assert_controlled(*outcome[:4], outcome[4], "checkpoint_save")
+
+    def test_checkpoint_inventory_substage(self):
+        patch = mock.patch.object(contract, "observe_checkpoint_tree", self._boom)
+        outcome = self._run("m6-sub-inventory", patches=[patch])
+        self._assert_controlled(*outcome[:4], outcome[4], "checkpoint_inventory")
+
+    def test_checkpoint_hash_substage(self):
+        original = contract.sha256_file
+
+        def failing(path):
+            if "__update-" in path:
+                raise RuntimeError(RNA_MESSAGE)
+            return original(path)
+
+        patch = mock.patch.object(contract, "sha256_file", failing)
+        outcome = self._run("m6-sub-hash", patches=[patch])
+        self._assert_controlled(*outcome[:4], outcome[4], "checkpoint_hash")
+
+    def test_checkpoint_reload_substage(self):
+        outcome = self._run("m6-sub-reload", stack_attrs={"failing_reload": True})
+        self._assert_controlled(*outcome[:4], outcome[4], "checkpoint_reload")
+
+    def test_checkpoint_config_proof_substage(self):
+        patch = mock.patch.object(contract, "assert_configuration_compatible", self._boom)
+        outcome = self._run("m6-sub-config", patches=[patch])
+        self._assert_controlled(*outcome[:4], outcome[4], "checkpoint_config_proof")
+
+    def test_checkpoint_state_proof_substage(self):
+        patch = mock.patch.object(contract, "compare_complete_denoiser_state", self._boom)
+        outcome = self._run("m6-sub-state", patches=[patch])
+        self._assert_controlled(*outcome[:4], outcome[4], "checkpoint_state_proof")
+
+    def test_every_substage_is_reachable_in_order_on_the_success_path(self):
+        assets, runtime = _pilot_assets()
+        config = active_from(self.inactive, self.temp, name="m6-sub-order")
+        authorisation = contract.validate_active_execution(config, self.observation, self.temp)
+        directory = contract.consume_bound_output_directory(authorisation, self.temp)
+        stack = _SubstageStack(assets, runtime)
+        stack.pilot_progress = {"microbatch": None, "retained_checkpoints": [], "stage": "consumed", "update": None}
+        seen = []
+        original = runner._progress_stage
+
+        def record(stack_, name, update=None, microbatch=None):
+            if name.startswith("checkpoint") and update == 7:
+                seen.append(name)
+            return original(stack_, name, update=update, microbatch=microbatch)
+
+        originals = self._install_input_stubs(authorisation, None)
+        try:
+            with mock.patch.object(runner, "_progress_stage", record):
+                runner.run_authorized_pilot(authorisation, stack, directory)
+        finally:
+            self._restore_input_stubs(originals)
+        self.assertEqual(stack.pilot_progress["retained_checkpoints"], [7, 14, 21])
+        self.assertEqual(
+            seen,
+            ["checkpoint", "checkpoint_directory", "checkpoint_save", "checkpoint_inventory", "checkpoint_hash",
+             "checkpoint_reload", "checkpoint_inventory", "checkpoint_config_proof", "checkpoint_state_proof"],
+        )
+        self.assertEqual(sorted(set(seen) - {"checkpoint"}), sorted(CHECKPOINT_SUBSTAGES))
+
+    def test_precise_errors_keep_their_code_and_gain_the_substage(self):
+        def extra(directory):
+            with open(os.path.join(directory, "unexpected.bin"), "wb") as handle:
+                handle.write(b"x")
+
+        outcome = self._run("m6-sub-extra", stack_attrs={"extra_after_save": extra})
+        config, authorisation, directory, stack, exc = outcome
+        self._assert_controlled(config, authorisation, directory, stack, exc, "checkpoint_inventory", detail="checkpoint tree has an unexpected or missing entry")
+        self.assertNotIn("unexpected.bin", json.dumps(self._failure_document(config)))
+
+    def test_existing_checkpoint_directory_keeps_the_overwrite_code(self):
+        original = contract.create_checkpoint_directory_exclusive
+
+        def existing(path, bound=None):
+            os.mkdir(path)
+            return original(path, bound)
+
+        patch = mock.patch.object(contract, "create_checkpoint_directory_exclusive", existing)
+        config, authorisation, directory, stack, exc = self._run("m6-sub-overwrite", patches=[patch])
+        self._assert_controlled(config, authorisation, directory, stack, exc, "checkpoint_directory", detail=None, code="checkpoint_overwrite_risk")
+
+
+class CheckpointTreeTests(_RemediationBase):
+    def _tree(self, name="ckpt"):
+        root = os.path.join(self.temp, name)
+        os.mkdir(root)
+        for member in contract.CHECKPOINT_MEMBERS:
+            target = os.path.join(root, member)
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with open(target, "wb") as handle:
+                handle.write(member.encode("ascii"))
+        return root
+
+    def _assert_rejected(self, root):
+        with self.assertRaises(contract.M6PilotError) as caught:
+            contract.observe_checkpoint_tree(root)
+        self.assertEqual(caught.exception.code, "checkpoint_save_reload_incompatibility")
+        self.assertNotIn(self.temp, caught.exception.detail)
+        return caught.exception
+
+    def test_exact_tree_is_accepted_and_signed(self):
+        root = self._tree()
+        signatures = contract.observe_checkpoint_tree(root)
+        self.assertEqual(sorted(signatures), sorted(contract.CHECKPOINT_MEMBERS))
+        self.assertEqual(contract.observe_checkpoint_tree(root), signatures)
+        with open(os.path.join(root, "unet/config.json"), "ab") as handle:
+            handle.write(b" ")
+        self.assertNotEqual(contract.observe_checkpoint_tree(root), signatures)
+
+    def test_every_missing_member_fails(self):
+        for member in contract.CHECKPOINT_MEMBERS:
+            with self.subTest(member=member):
+                root = self._tree("missing-" + member.replace("/", "-"))
+                os.remove(os.path.join(root, member))
+                self._assert_rejected(root)
+
+    def test_missing_intermediate_directories_fail(self):
+        for directory in ("unet", "scheduler"):
+            with self.subTest(directory=directory):
+                root = self._tree("nodir-" + directory)
+                shutil.rmtree(os.path.join(root, directory))
+                self._assert_rejected(root)
+
+    def test_extra_entries_fail(self):
+        def top_file(root):
+            open(os.path.join(root, "extra.txt"), "wb").close()
+
+        def top_directory(root):
+            os.mkdir(os.path.join(root, "extra_dir"))
+
+        def unet_file(root):
+            open(os.path.join(root, "unet", "extra.bin"), "wb").close()
+
+        def scheduler_directory(root):
+            os.mkdir(os.path.join(root, "scheduler", "nested"))
+
+        def hidden_file(root):
+            open(os.path.join(root, ".hidden"), "wb").close()
+
+        def top_symlink(root):
+            os.symlink(os.path.join(root, "model_index.json"), os.path.join(root, "alias.json"))
+
+        for builder in (top_file, top_directory, unet_file, scheduler_directory, hidden_file, top_symlink):
+            with self.subTest(builder=builder.__name__):
+                root = self._tree("extra-" + builder.__name__)
+                builder(root)
+                self._assert_rejected(root)
+
+    def test_symlinked_intermediate_directories_fail(self):
+        for directory in ("unet", "scheduler"):
+            with self.subTest(directory=directory):
+                root = self._tree("link-" + directory)
+                real = os.path.join(self.temp, "elsewhere-" + directory)
+                shutil.move(os.path.join(root, directory), real)
+                os.symlink(real, os.path.join(root, directory))
+                self._assert_rejected(root)
+
+    def test_symlinked_leaf_directory_leaf_and_special_files_fail(self):
+        for member in contract.CHECKPOINT_MEMBERS:
+            with self.subTest(kind="symlink", member=member):
+                root = self._tree("leaf-link-" + member.replace("/", "-"))
+                target = os.path.join(self.temp, "outside-" + member.replace("/", "-"))
+                shutil.move(os.path.join(root, member), target)
+                os.symlink(target, os.path.join(root, member))
+                self._assert_rejected(root)
+            with self.subTest(kind="directory", member=member):
+                root = self._tree("leaf-dir-" + member.replace("/", "-"))
+                os.remove(os.path.join(root, member))
+                os.mkdir(os.path.join(root, member))
+                self._assert_rejected(root)
+            with self.subTest(kind="fifo", member=member):
+                root = self._tree("leaf-fifo-" + member.replace("/", "-"))
+                os.remove(os.path.join(root, member))
+                os.mkfifo(os.path.join(root, member))
+                self._assert_rejected(root)
+
+    def test_root_must_be_a_real_directory(self):
+        root = self._tree()
+        link = os.path.join(self.temp, "root-link")
+        os.symlink(root, link)
+        self._assert_rejected(link)
+        file_root = os.path.join(self.temp, "root-file")
+        open(file_root, "wb").close()
+        self._assert_rejected(file_root)
+        with self.assertRaises(contract.M6PilotError):
+            contract.observe_checkpoint_tree(os.path.join(self.temp, "absent"))
+
+    def test_tree_change_after_reload_is_rejected_at_the_inventory_stage(self):
+        class MutatingStack(_SubstageStack):
+            def reload_denoiser(self, directory):
+                with open(os.path.join(directory, "unet", "config.json"), "ab") as handle:
+                    handle.write(b" ")
+                return _SubstageStack.reload_denoiser(self, directory)
+
+        assets, runtime = _pilot_assets()
+        config = active_from(self.inactive, self.temp, name="m6-tree-change")
+        authorisation = contract.validate_active_execution(config, self.observation, self.temp)
+        directory = contract.consume_bound_output_directory(authorisation, self.temp)
+        stack = MutatingStack(assets, runtime)
+        with self.assertRaises(contract.M6PilotError) as caught:
+            runner._save_and_reload(stack, stack.denoiser, object(), directory, 7, stack.denoiser, "a" * 40)
+        self.assertEqual(caught.exception.stage, "checkpoint_inventory")
+        self.assertEqual(caught.exception.update, 7)
+        self.assertEqual(caught.exception.detail, "checkpoint tree changed during hashing or reload")
+
+
+class StateDigestTests(unittest.TestCase):
+    KNOWN = {
+        "f32_contig": "4f56d792039284dab7e0545d3d82ddaa96dfc4080471cf71fce3c9f34e505617",
+        "f16": "35cee7bcac61d7ccae224fc720fd55fa6a209d3374f61903bef93daa5d8d1fbc",
+        "bf16": "98104c367b25a1e81e6690de8b95ba76e0164415f05865775e22d4d5f9e96e10",
+        "i64": "d470e62e9c1d71f09421bddd7c3157150b0ca52bd6b31738abdeeb18868afbb7",
+        "bool": "2ff0873f9b1fbb3cd85f4e8aa486e2ae7b53e01afb314ad191461a266a0243f8",
+        "f32_transposed": "56bfa5f8aeac5321a79408ad6a8098c4e8f072230b428bf6fe525b98e003cedd",
+        "f32_offset": "ad81b59ce04d4045a44c8960b5cb9ba213c80bde8b13b77605dfab686d3b53b3",
+        "f32_empty": "6e68a1c9c53cbbd9030faf2b723b0f4a7153f15497bfea004dfd5fb7258acef9",
+        "f32_zero_dim": "50342b250fd0e3243dbe9d6ab78b68ff9832e97892e6d1da4f4ef61ffe337f1d",
+    }
+
+    @staticmethod
+    def _base():
+        return torch.arange(24, dtype=torch.float32).reshape(4, 6)
+
+    def test_digests_equal_values_recorded_from_the_earlier_implementation(self):
+        base = self._base()
+        cases = {
+            "f32_contig": base,
+            "f16": base.half(),
+            "bf16": base.bfloat16(),
+            "i64": (base * 3 - 7).long(),
+            "bool": base % 3 == 0,
+            "f32_transposed": base.t(),
+            "f32_offset": base.reshape(-1)[5:19],
+            "f32_empty": base[:0],
+            "f32_zero_dim": torch.tensor(1.5),
+        }
+        for label, tensor in cases.items():
+            with self.subTest(label=label):
+                self.assertEqual(contract.state_entry_digest("w", tensor), self.KNOWN[label])
+                self.assertEqual(_legacy_entry_digest("w", tensor), self.KNOWN[label])
+        self.assertEqual(
+            contract.state_entry_digest("r", torch.arange(16, dtype=torch.uint8)),
+            "eb9398c8e5b67e43d180d7682596b72bcbcec3f749124adde211c757d004d5e6",
+        )
+
+    def test_digest_matches_the_reference_across_dtypes_and_layouts(self):
+        generator = torch.Generator().manual_seed(3)
+        for dtype in (torch.float32, torch.float16, torch.bfloat16, torch.float64, torch.int64, torch.int32, torch.int16, torch.int8, torch.uint8, torch.bool):
+            raw = torch.randint(-100, 100, (96,), generator=generator)
+            base = (raw > 0) if dtype is torch.bool else raw.to(dtype)
+            layouts = {
+                "contiguous": base[:64],
+                "two_d": base[:64].reshape(8, 8),
+                "non_contiguous": base[:64].reshape(8, 8).t(),
+                "strided": base[::3],
+                "nonzero_offset": base[7:50],
+                "empty": base[:0],
+                "empty_nonzero_offset": base[5:5],
+                "larger_storage": base[:6],
+                "zero_dim": base[10],
+                "expanded": base[:4].expand(3, 4),
+                "sliced_columns": base[:64].reshape(8, 8)[:, 2:5],
+            }
+            for label, tensor in layouts.items():
+                with self.subTest(dtype=str(dtype), layout=label):
+                    self.assertEqual(contract.state_entry_digest("w", tensor), _legacy_entry_digest("w", tensor))
+        complex_tensor = torch.complex(torch.arange(6.0), torch.arange(6.0) * 2)
+        self.assertEqual(contract.state_entry_digest("c", complex_tensor), _legacy_entry_digest("c", complex_tensor))
+
+    def test_chunked_bytes_equal_the_reference_bytes_for_every_chunk_size(self):
+        base = self._base()
+        for tensor in (base, base.t(), base.reshape(-1)[5:19], base[:0], torch.tensor(2.0), base.half()):
+            cpu = tensor.contiguous()
+            offset = cpu.storage_offset() * cpu.element_size()
+            expected = bytes(cpu.untyped_storage())[offset:offset + cpu.nbytes]
+            for chunk_bytes in (1, 3, 7, 64, 10 ** 6):
+                joined = b"".join(bytes(chunk) for chunk in contract._tensor_cpu_byte_chunks(tensor, chunk_bytes))
+                self.assertEqual(joined, expected)
+
+    def test_larger_backing_storage_is_not_materialised_or_hashed(self):
+        backing = torch.arange(1_000_000, dtype=torch.float32)
+        view = backing[10:12]
+        chunks = list(contract._tensor_cpu_byte_chunks(view))
+        self.assertEqual(sum(len(chunk) for chunk in chunks), 8)
+        self.assertEqual(contract.state_entry_digest("w", view), contract.state_entry_digest("w", view.clone()))
+
+    def test_extraction_is_not_a_python_level_byte_loop(self):
+        tensor = torch.zeros(2 * 1024 * 1024, dtype=torch.float32)
+        start = time.perf_counter()
+        contract.state_entry_digest("w", tensor)
+        self.assertLess(time.perf_counter() - start, 5.0)
+
+    def test_tensor_subclasses_are_hashed_by_bytes_not_by_repr(self):
+        values = torch.arange(5000, dtype=torch.float32)
+        parameter = torch.nn.Parameter(values.clone())
+
+        class Subclass(torch.Tensor):
+            pass
+
+        subclass = values.clone().as_subclass(Subclass)
+        self.assertTrue(contract._is_tensor(parameter))
+        self.assertTrue(contract._is_tensor(subclass))
+        plain = contract.state_entry_digest("w", values)
+        self.assertEqual(contract.state_entry_digest("w", parameter), plain)
+        self.assertEqual(contract.state_entry_digest("w", subclass), plain)
+        other = values.clone()
+        other[2500] += 1
+        self.assertNotEqual(contract.state_entry_digest("w", torch.nn.Parameter(other)), plain)
+        self.assertTrue(contract._state_values_equal(parameter, values.clone()))
+        self.assertFalse(contract._is_tensor([1, 2]))
+
+    def test_non_tensor_entries_keep_their_digest(self):
+        for value in ("text", 3, 2.5, True, None, (1, 2)):
+            with self.subTest(value=repr(value)):
+                encoded = value if isinstance(value, (str, int, float, bool)) or value is None else repr(value)
+                payload = {"kind": "value", "name": "n", "type": type(value).__name__, "value": encoded}
+                self.assertEqual(contract.state_entry_digest("n", value), contract.sha256_bytes(contract.canonical_json(payload)))
+
+    def test_complete_state_comparison_covers_views_and_detects_one_element(self):
+        left = {"a": torch.arange(8.0)[2:6], "b": torch.ones(3, 3).t(), "c": torch.tensor([True, False]), "d": torch.arange(4, dtype=torch.int64)}
+        right = {name: tensor.clone() for name, tensor in left.items()}
+        result = contract.compare_complete_denoiser_state(left, right)
+        self.assertEqual(result["entry_digests"]["a"], contract.state_entry_digest("a", left["a"]))
+        right["a"][0] += 1
+        with self.assertRaises(contract.M6PilotError):
+            contract.compare_complete_denoiser_state(left, right)
+
+
+class AtomicJsonTests(_RemediationBase):
+    def _paths(self):
+        target = os.path.join(self.temp, "record.json")
+        return target, target + ".partial"
+
+    def test_short_writes_are_continued_until_complete(self):
+        real = os.write
+        sizes = []
+
+        def short(descriptor, data):
+            sizes.append(len(data))
+            return real(descriptor, bytes(data[:5]))
+
+        payload = {"key": "x" * 100}
+        with mock.patch.object(contract.os, "write", short):
+            target = contract.write_atomic_json(self.temp, "record.json", payload)
+        with open(target, "rb") as handle:
+            self.assertEqual(handle.read(), contract.canonical_json(payload))
+        self.assertGreater(len(sizes), 1)
+        self.assertFalse(os.path.lexists(target + ".partial"))
+
+    def test_write_without_progress_fails_and_cleans_up(self):
+        target, partial = self._paths()
+        with mock.patch.object(contract.os, "write", lambda descriptor, data: 0):
+            with self.assertRaises(OSError):
+                contract.write_atomic_json(self.temp, "record.json", {"a": 1})
+        self.assertFalse(os.path.lexists(target))
+        self.assertFalse(os.path.lexists(partial))
+
+    def test_write_error_after_a_partial_write_leaves_neither_file(self):
+        target, partial = self._paths()
+        real = os.write
+        calls = []
+
+        def flaky(descriptor, data):
+            calls.append(1)
+            if len(calls) > 1:
+                raise OSError(errno.ENOSPC, "no space")
+            return real(descriptor, bytes(data[:3]))
+
+        with mock.patch.object(contract.os, "write", flaky):
+            with self.assertRaises(OSError):
+                contract.write_atomic_json(self.temp, "record.json", {"a": "y" * 50})
+        self.assertFalse(os.path.lexists(target))
+        self.assertFalse(os.path.lexists(partial))
+
+    def test_fsync_failure_cleans_up_and_keeps_the_previous_target(self):
+        target, partial = self._paths()
+        contract.write_atomic_json(self.temp, "record.json", {"old": True})
+        with open(target, "rb") as handle:
+            previous = handle.read()
+        with mock.patch.object(contract.os, "fsync", mock.Mock(side_effect=OSError(errno.EIO, "io"))):
+            with self.assertRaises(OSError):
+                contract.write_atomic_json(self.temp, "record.json", {"new": True})
+        self.assertFalse(os.path.lexists(partial))
+        with open(target, "rb") as handle:
+            self.assertEqual(handle.read(), previous)
+
+    def test_replace_failure_cleans_up_and_keeps_the_previous_target(self):
+        target, partial = self._paths()
+        contract.write_atomic_json(self.temp, "record.json", {"old": True})
+        with open(target, "rb") as handle:
+            previous = handle.read()
+        with mock.patch.object(contract.os, "replace", mock.Mock(side_effect=OSError(errno.EXDEV, "xdev"))):
+            with self.assertRaises(OSError):
+                contract.write_atomic_json(self.temp, "record.json", {"new": True})
+        self.assertFalse(os.path.lexists(partial))
+        with open(target, "rb") as handle:
+            self.assertEqual(handle.read(), previous)
+        contract.write_atomic_json(self.temp, "record.json", {"new": True})
+        with open(target, "rb") as handle:
+            self.assertEqual(handle.read(), contract.canonical_json({"new": True}))
+
+    def test_stale_temporary_still_blocks_an_exclusive_write(self):
+        target, partial = self._paths()
+        open(partial, "wb").close()
+        with self.assertRaises(FileExistsError):
+            contract.write_atomic_json(self.temp, "record.json", {"a": 1})
+        self.assertTrue(os.path.exists(partial))
+        self.assertFalse(os.path.lexists(target))
 
 
 if __name__ == "__main__":

@@ -1041,23 +1041,86 @@ def refuse_existing_checkpoint_directory(exists):
     return True
 
 
-def normalized_config_sha256(config):
+def config_evidence_mapping(config):
+    """Return the configuration mapping that is hashed as checkpoint evidence.
+
+    Diffusers records the load location as top-level ``_name_or_path``. When the
+    caller supplied a ``pathlib.Path``, Diffusers keeps that object, which JSON
+    cannot encode. Only that one top-level key is converted, with ``os.fspath``,
+    and the result must be ``str``. Every other value, including a nested
+    ``_name_or_path``, is left unchanged, so an unencodable value elsewhere is
+    still rejected when the mapping is hashed.
+    """
     config = _require_mapping(config, "checkpoint_save_reload_incompatibility", "denoiser config must be a mapping")
+    key = "_name_or_path"
+    if key in config and isinstance(config[key], os.PathLike):
+        try:
+            text = os.fspath(config[key])
+        except Exception:
+            raise M6PilotError("checkpoint_save_reload_incompatibility", "denoiser configuration load location cannot be converted to a string")
+        if type(text) is not str:
+            raise M6PilotError("checkpoint_save_reload_incompatibility", "denoiser configuration load location is not a string")
+        converted = dict(config)
+        converted[key] = text
+        return converted
+    return config
+
+
+def _config_sha256(config):
+    try:
+        return sha256_bytes(canonical_json(config))
+    except (TypeError, ValueError, OverflowError):
+        raise M6PilotError("checkpoint_save_reload_incompatibility", "denoiser configuration is not JSON-serializable evidence")
+
+
+def normalized_config_sha256(config):
+    config = config_evidence_mapping(config)
     copied = {key: value for key, value in config.items() if key not in CONFIGURATION_IGNORED_TOP_LEVEL_KEYS}
-    return sha256_bytes(canonical_json(copied))
+    return _config_sha256(copied)
+
+
+STATE_DIGEST_CHUNK_BYTES = 64 * 1024 * 1024
 
 
 def _is_tensor(value):
+    """Recognise a torch tensor, including a subclass such as ``Parameter``.
+
+    A subclass must not fall through to the ``repr`` digest, which summarises
+    large tensors. Duck-typed objects named ``Tensor`` keep their earlier
+    acceptance for the CPU stand-ins.
+    """
+    import sys
+
+    torch = sys.modules.get("torch")
+    tensor_class = getattr(torch, "Tensor", None)
+    if isinstance(tensor_class, type) and isinstance(value, tensor_class):
+        return True
     return type(value).__name__ == "Tensor" and hasattr(value, "dtype") and hasattr(value, "shape") and hasattr(value, "detach")
 
 
-def _tensor_cpu_bytes(value):
+def _tensor_cpu_byte_chunks(value, chunk_bytes=STATE_DIGEST_CHUNK_BYTES):
+    """Yield the logical row-major bytes of a tensor without copying its storage.
+
+    This is the byte sequence the earlier ``bytes(untyped_storage())`` slice
+    produced: the contiguous CPU tensor's storage, from its storage offset, for
+    ``nbytes``. A uint8 view over that same storage is hashed in bounded chunks.
+    Iterating ``bytes(untyped_storage())`` costs a Python-level step per byte,
+    and it materialised the complete backing storage even for a small view.
+    """
+    import sys
+
     cpu = value.detach().to(device="cpu").contiguous()
-    storage = cpu.untyped_storage()
-    raw = bytes(storage)
-    offset = int(cpu.storage_offset()) * int(cpu.element_size())
     size = int(cpu.nbytes)
-    return raw[offset:offset + size]
+    if size == 0:
+        return
+    torch = sys.modules.get("torch")
+    if torch is None or not hasattr(torch, "empty"):
+        raise M6PilotError("checkpoint_save_reload_incompatibility", "tensor digest requires torch")
+    offset = int(cpu.storage_offset()) * int(cpu.element_size())
+    raw = torch.empty(0, dtype=torch.uint8).set_(cpu.untyped_storage(), offset, (size,), (1,))
+    buffer = raw.numpy()
+    for start in range(0, size, chunk_bytes):
+        yield memoryview(buffer[start:start + chunk_bytes])
 
 
 def state_entry_digest(name, value):
@@ -1069,7 +1132,11 @@ def state_entry_digest(name, value):
             "name": name,
             "shape": [int(dim) for dim in value.shape],
         }
-        return sha256_bytes(canonical_json(payload) + _tensor_cpu_bytes(value))
+        hasher = hashlib.sha256()
+        hasher.update(canonical_json(payload))
+        for chunk in _tensor_cpu_byte_chunks(value):
+            hasher.update(chunk)
+        return hasher.hexdigest()
     if isinstance(value, (str, int, float, bool)) or value is None:
         encoded = value
     else:
@@ -1160,6 +1227,50 @@ def compare_complete_denoiser_state(original, reloaded, selection="complete"):
     }
 
 
+def observe_checkpoint_tree(checkpoint_dir):
+    """Require the exact checkpoint tree with ``lstat`` and return leaf signatures.
+
+    The root and each expected intermediate directory must be a real directory,
+    not a symlink. Each expected leaf must be a regular non-symlink file. A
+    missing member, an extra entry of any kind, or a special file fails. Messages
+    do not name the offending entry. The signature of each leaf (size, mtime,
+    inode, device) lets a later call detect a change.
+    """
+    import stat
+
+    def kind(path):
+        try:
+            return os.lstat(path)
+        except FileNotFoundError:
+            raise M6PilotError("checkpoint_save_reload_incompatibility", "checkpoint tree is missing a member")
+
+    root = kind(checkpoint_dir)
+    if not stat.S_ISDIR(root.st_mode):
+        raise M6PilotError("checkpoint_save_reload_incompatibility", "checkpoint root is not a real directory")
+    expected = {}
+    for member in CHECKPOINT_MEMBERS:
+        head, _, tail = member.rpartition("/")
+        expected.setdefault(head, []).append(tail)
+    top = set(expected.get("", [])) | {name for name in expected if name != ""}
+    if set(os.listdir(checkpoint_dir)) != top:
+        raise M6PilotError("checkpoint_save_reload_incompatibility", "checkpoint tree has an unexpected or missing entry")
+    signatures = {}
+    for head in sorted(expected):
+        base = checkpoint_dir if head == "" else os.path.join(checkpoint_dir, head)
+        if head != "":
+            if not stat.S_ISDIR(kind(base).st_mode):
+                raise M6PilotError("checkpoint_save_reload_incompatibility", "checkpoint subdirectory is not a real directory")
+            if set(os.listdir(base)) != set(expected[head]):
+                raise M6PilotError("checkpoint_save_reload_incompatibility", "checkpoint subdirectory has an unexpected or missing entry")
+        for leaf in expected[head]:
+            measured = kind(os.path.join(base, leaf))
+            if not stat.S_ISREG(measured.st_mode):
+                raise M6PilotError("checkpoint_save_reload_incompatibility", "checkpoint member is not a regular file")
+            member = leaf if head == "" else head + "/" + leaf
+            signatures[member] = (int(measured.st_size), int(measured.st_mtime_ns), int(measured.st_ino), int(measured.st_dev))
+    return signatures
+
+
 def assert_checkpoint_inventory(saved_hashes):
     saved_hashes = _exact_keys(saved_hashes, CHECKPOINT_MEMBERS, "checkpoint_save_reload_incompatibility")
     for name in CHECKPOINT_MEMBERS:
@@ -1169,13 +1280,15 @@ def assert_checkpoint_inventory(saved_hashes):
 
 
 def assert_configuration_compatible(original_config, reloaded_config):
-    original_raw = sha256_bytes(canonical_json(original_config))
-    reloaded_raw = sha256_bytes(canonical_json(reloaded_config))
-    original_norm = normalized_config_sha256(original_config)
-    reloaded_norm = normalized_config_sha256(reloaded_config)
     ignored = list(CONFIGURATION_IGNORED_TOP_LEVEL_KEYS)
     if ignored != ["_name_or_path"]:
         raise M6PilotError("checkpoint_save_reload_incompatibility", "configuration allowlist drifted")
+    original_config = config_evidence_mapping(original_config)
+    reloaded_config = config_evidence_mapping(reloaded_config)
+    original_raw = _config_sha256(original_config)
+    reloaded_raw = _config_sha256(reloaded_config)
+    original_norm = normalized_config_sha256(original_config)
+    reloaded_norm = normalized_config_sha256(reloaded_config)
     compatible = original_norm == reloaded_norm
     record = {
         "ignored_top_level_keys": ignored,
@@ -1192,7 +1305,15 @@ def assert_configuration_compatible(original_config, reloaded_config):
     return record
 
 
-def prove_weight_reload(proof):
+def prove_weight_reload(proof, stage_hook=None):
+    """Validate a checkpoint reload proof, cheapest checks first.
+
+    The order is proof structure and fresh-object identity, update and checkpoint
+    inventory, configuration compatibility, then the complete state comparison
+    and digests. A configuration failure therefore never pays for the state
+    comparison. ``stage_hook``, when given, is called with the substage name
+    before the configuration and state proofs.
+    """
     proof = _require_mapping(proof, "checkpoint_save_reload_incompatibility", "reload proof is missing")
     if proof.get("fresh_object_constructed") is not True:
         raise M6PilotError("checkpoint_save_reload_incompatibility", "reload did not construct a fresh object")
@@ -1205,8 +1326,12 @@ def prove_weight_reload(proof):
     if proof.get("update") == 0:
         raise M6PilotError("checkpoint_overwrite_risk", "update 0 must reference immutable B1 and must not copy it")
     inventory = assert_checkpoint_inventory(proof.get("saved_hashes"))
-    comparison = compare_complete_denoiser_state(proof.get("original_state"), proof.get("reloaded_state"), proof.get("selection", "complete"))
+    if stage_hook is not None:
+        stage_hook("checkpoint_config_proof")
     configuration = assert_configuration_compatible(proof.get("original_config"), proof.get("reloaded_config"))
+    if stage_hook is not None:
+        stage_hook("checkpoint_state_proof")
+    comparison = compare_complete_denoiser_state(proof.get("original_state"), proof.get("reloaded_state"), proof.get("selection", "complete"))
     return {
         "configuration": configuration,
         "fresh_load_succeeded": True,
@@ -2324,16 +2449,34 @@ def verify_artifact_directory(path, bound_path, expected_hashes, loader):
 
 
 def write_atomic_json(directory, name, payload):
+    """Write canonical JSON through an exclusive temporary file and one replace.
+
+    ``os.write`` may write fewer bytes than requested, so the loop continues until
+    every byte is written. If the write, ``fsync``, or replace fails, the
+    temporary file is removed and the target is never left half written.
+    """
     target = os.path.join(directory, name)
     temporary = target + ".partial"
     blob = canonical_json(payload)
     descriptor = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
     try:
-        os.write(descriptor, blob)
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-    os.replace(temporary, target)
+        try:
+            view = memoryview(blob)
+            while len(view) > 0:
+                written = os.write(descriptor, view)
+                if written <= 0:
+                    raise OSError("short write made no progress")
+                view = view[written:]
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        os.replace(temporary, target)
+    except BaseException:
+        try:
+            os.remove(temporary)
+        except OSError:
+            pass
+        raise
     return target
 
 

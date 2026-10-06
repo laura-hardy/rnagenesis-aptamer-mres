@@ -1203,34 +1203,83 @@ def _validation_aggregate(stack, accelerator, denoiser, encdec, scheduler, seque
     return contract.aggregate_pair_mse(pair_losses)
 
 
+class _CheckpointStages(object):
+    """Track the checkpoint substage and translate unexpected failures.
+
+    A precise ``M6PilotError`` keeps its code and detail and gains the substage
+    and update when it has none. Any other exception becomes
+    ``checkpoint_save_reload_incompatibility`` with the exception class name only.
+    The exception message, traceback, tensor values, and paths are not recorded.
+    """
+
+    def __init__(self, stack, update):
+        self.stack = stack
+        self.update = update
+        self.current = "checkpoint"
+
+    def enter(self, name):
+        if name == self.current:
+            return
+        self.current = name
+        _progress_stage(self.stack, name, update=self.update)
+
+    def translate(self, exc):
+        if isinstance(exc, contract.M6PilotError):
+            if exc.stage is None:
+                exc.stage = self.current
+            if exc.update is None:
+                exc.update = self.update
+            return exc
+        return contract.M6PilotError(
+            "checkpoint_save_reload_incompatibility",
+            "checkpoint operation failed; exception_class=" + _controlled_exception_class_name(exc),
+            stage=self.current,
+            update=self.update,
+        )
+
+
 def _save_and_reload(stack, model, scheduler, directory, update, training_object, implementation_commit):
-    checkpoint_dir = os.path.join(directory, contract.checkpoint_child_name(update, implementation_commit))
-    contract.create_checkpoint_directory_exclusive(checkpoint_dir, directory)
-    stack.save_checkpoint(model, scheduler, checkpoint_dir)
-    saved = {}
-    for name in contract.CHECKPOINT_MEMBERS:
-        file_path = os.path.join(checkpoint_dir, name)
-        if os.path.islink(file_path) or not os.path.isfile(file_path):
-            raise contract.M6PilotError("checkpoint_save_reload_incompatibility", "checkpoint member is not a regular file")
-        saved[name] = contract.sha256_file(file_path)
-    reloaded = stack.reload_denoiser(checkpoint_dir)
-    if reloaded is training_object or id(reloaded) == id(training_object):
-        raise contract.M6PilotError("checkpoint_save_reload_incompatibility", "reload reused the training object")
-    proof = contract.prove_weight_reload(
-        {
-            "fresh_object_constructed": True,
-            "labelled_as_resume": False,
-            "original_config": _config_mapping(model),
-            "original_object_id": id(training_object),
-            "original_state": model.state_dict(),
-            "reloaded_config": _config_mapping(reloaded),
-            "reloaded_object_id": id(reloaded),
-            "reloaded_state": reloaded.state_dict(),
-            "saved_hashes": saved,
-            "selection": "complete",
-            "update": update,
-        }
-    )
+    stages = _CheckpointStages(stack, update)
+    try:
+        stages.enter("checkpoint_directory")
+        checkpoint_dir = os.path.join(directory, contract.checkpoint_child_name(update, implementation_commit))
+        contract.create_checkpoint_directory_exclusive(checkpoint_dir, directory)
+        stages.enter("checkpoint_save")
+        stack.save_checkpoint(model, scheduler, checkpoint_dir)
+        stages.enter("checkpoint_inventory")
+        tree = contract.observe_checkpoint_tree(checkpoint_dir)
+        stages.enter("checkpoint_hash")
+        saved = {}
+        for name in contract.CHECKPOINT_MEMBERS:
+            saved[name] = contract.sha256_file(os.path.join(checkpoint_dir, name))
+        stages.enter("checkpoint_reload")
+        reloaded = stack.reload_denoiser(checkpoint_dir)
+        if reloaded is training_object or id(reloaded) == id(training_object):
+            raise contract.M6PilotError("checkpoint_save_reload_incompatibility", "reload reused the training object")
+        original_state = model.state_dict()
+        reloaded_state = reloaded.state_dict()
+        stages.enter("checkpoint_inventory")
+        if contract.observe_checkpoint_tree(checkpoint_dir) != tree:
+            raise contract.M6PilotError("checkpoint_save_reload_incompatibility", "checkpoint tree changed during hashing or reload")
+        stages.enter("checkpoint_config_proof")
+        proof = contract.prove_weight_reload(
+            {
+                "fresh_object_constructed": True,
+                "labelled_as_resume": False,
+                "original_config": _config_mapping(model),
+                "original_object_id": id(training_object),
+                "original_state": original_state,
+                "reloaded_config": _config_mapping(reloaded),
+                "reloaded_object_id": id(reloaded),
+                "reloaded_state": reloaded_state,
+                "saved_hashes": saved,
+                "selection": "complete",
+                "update": update,
+            },
+            stage_hook=stages.enter,
+        )
+    except Exception as exc:
+        raise stages.translate(exc) from None
     proof["evidence_origin"] = "observed"
     return proof
 
