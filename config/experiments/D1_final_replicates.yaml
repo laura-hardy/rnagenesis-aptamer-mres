@@ -1,0 +1,287 @@
+# M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
+# Authoritative inactive M7 final-replicate configuration (seeds 43 and 44).
+# This file must not be consumed by an executable workflow. It binds no GPU, no
+# output directory, no biological path, no timestamp and no authorisation. Its
+# entry point accepts --help, --schema and --authorisation-id <id>; the last refuses
+# (execution_not_authorised) while this file is inactive.
+# A later authorisation-only commit may change only this file: it may flip the
+# three execution flags, the document status, the consumable flag, and fill
+# `authorisation_entries` with one or two independently consumable entries (one
+# per seed). The tracked file never stores authorization_commit.
+# Historical M6 evidence does not authorise M7. M6 updates 7, 14 and 21 are
+# forbidden initialisation and resume inputs.
+
+document_status: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
+consumable_by_executable_workflow: false
+schema_version: m7-replicate-config-1
+manifest_schema_version: m7-replicate-manifest-1
+experiment_id: D1_final_replicates
+condition_manifest_label: D1_mres_curated_aptamer_diffusion_adapted
+created_against_mres_commit: a58528d61c775cb5208ddb7efb3988dc3bd3fe88
+rnagenesis_branch: mres-d1-diffusion-finetune
+rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
+
+execution:
+  authorised: false
+  biological_paths_permitted: false
+  gpu_identity_bound: false
+
+# Inactive: no entry. An active document carries one or two entries, one per seed.
+authorisation_entries: []
+
+authorisation_schema:
+  entries_min: 1
+  entries_max: 2
+  entry_seeds:
+  - 43
+  - 44
+  one_entry_per_seed: true
+  single_authorisation_only_commit: true
+  independent_consumption: true
+  consuming_one_entry_never_consumes_another: true
+  launcher_accepts_only: authorisation_id
+  scientific_parameters_from_cli: false
+  retry_requires_new_entry: true
+  permitted_changed_files:
+  - config/experiments/D1_final_replicates.yaml
+  entry_keys:
+  - activation_status
+  - applied_learning_rate_trace_sha256
+  - authorisation_id
+  - authorisation_timestamp
+  - authorization_parent_commit
+  - b1_relative_path
+  - b1_unet_config_sha256
+  - b1_weight_sha256
+  - consumed
+  - cuda_visible_devices
+  - evidence_directory
+  - executing_implementation_commit
+  - expected_checkpoint_names
+  - expected_epochs
+  - expected_update_counts
+  - forbidden_initialisation_weight_sha256
+  - gpu_uuid
+  - implementation_config_sha256
+  - implementation_file_hashes
+  - interpreter
+  - ld_library_path
+  - logical_device
+  - output_directory
+  - pci_bus
+  - permitted_roles
+  - phase
+  - physical_gpu_index
+  - reuse_permitted
+  - scope
+  - seed
+  - session
+  - single_use
+  - train_record_count
+  - train_text_path
+  - train_text_sha256
+  - validation_artifact_directory
+  - validation_artifact_sha256
+  - validation_csv_path
+  - validation_csv_sha256
+  - validation_record_count
+  entry_binds:
+  - authorisation_id
+  - seed
+  - implementation_commit
+  - physical_and_logical_gpu_identity
+  - exact_output_directory
+  - configuration_and_artifact_hashes
+  - expected_epoch_and_checkpoint_universe
+  - exact_ld_library_path_value_or_none
+  - pinned_interpreter_path_and_executable_identity
+  - branch_remote_and_permitted_changed_file_set
+  active_entries_present_in_this_package: false
+
+seed_plan:
+  target_seeds:
+  - 43
+  - 44
+  excluded_seeds:
+  - 42
+  pilot_seed_42_excluded: true
+  validation_draw_seed: 1
+  validation_draw_seed_is_separate: true
+  minimum_permitted_completed_seeds: 1
+  one_seed_only_via_sealed_operational_deviation: true
+  independent_b1_initialisation_per_seed: true
+  fresh_model_optimizer_scheduler_rng_per_seed_and_subprocess: true
+  m6_checkpoint_updates_forbidden_as_initialisation_or_resume:
+  - 7
+  - 14
+  - 21
+  forbidden_initialisation_weight_sha256:
+    update_7: 7f1cdbd854c1d26c5b8bfe68469bc7e59f5d7293c4a105d724c1c63c83a32f10
+    update_14: 0a2fa065f962adaf54e63b797974367915a6552382a8db76c3fbd0c6a0078901
+    update_21: 47b2dc9b392ea766eee7e947f0f92f5a039c42ac714326104e719352d20b5924
+
+replicate_decisions:
+  initialization: immutable_B1_generic_diffusion_checkpoint
+  encdec_frozen: complete
+  trainable: full_denoiser
+  precision: fp32
+  epochs: 5
+  fresh_permutation_each_epoch: true
+  physical_microbatch: 8
+  gradient_accumulation: 4
+  intended_effective_batch: 32
+  train_records: 669
+  microbatches_per_epoch: 84
+  optimizer_updates_per_epoch: 21
+  total_optimizer_updates_per_seed: 105
+  final_window_microbatch_sizes_every_epoch:
+  - 8
+  - 8
+  - 8
+  - 5
+  accumulation_weighting: example_weighted_contributions_sum_to_one
+  optimizer_name: AdamW
+  learning_rate: 3.0e-05
+  beta1: 0.95
+  beta2: 0.999
+  weight_decay: 1.0e-06
+  epsilon: 1.0e-08
+  gradient_clip_norm: 1.0
+  ema_enabled: false
+  validation_and_diagnostics_use: raw_denoiser_weights
+  automatic_learning_rate_change: false
+  learning_rate_sweep: false
+  resume_supported: false
+  technical_retry: same_seed_and_configuration_from_B1_new_immutable_attempt_directory_new_authorisation
+  candidate_diagnostics_in_replicate_runner: false
+  selection_in_replicate_runner: false
+
+schedule:
+  name: explicit_applied_update_cosine
+  diffusers_constructor_used: false
+  base_learning_rate: 3.0e-05
+  applied_optimizer_updates: 105
+  warmup_updates: 10
+  update_1_multiplier: 0.1
+  post_schedule_position: 106
+  post_schedule_multiplier: 0.0
+  applied_learning_rate_may_be_zero: false
+  applied_learning_rate_trace_length: 105
+  applied_learning_rate_trace_sha256: 37013ac0a50290dbb476f4cdec806f058b8fb3347d967ac2d6e59b6e07aeae50
+  authority: scripts/modelling/m7_replicate_contract.py:learning_rate_multiplier
+
+validation:
+  validation_updates:
+  - 0
+  - 21
+  - 42
+  - 63
+  - 84
+  - 105
+  update_0_provenance_only: true
+  candidate_epochs:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  candidate_updates:
+  - 21
+  - 42
+  - 63
+  - 84
+  - 105
+  update_0_selectable: false
+  artifacts: accepted_m4_four_draw_artifacts_unchanged
+  artifacts_regenerated: false
+  ranking_rule: fixed_draw_validation_mse_ascending_then_earlier_epoch_on_exact_tie
+  ranking_is_not_a_selection: true
+
+checkpoints:
+  saved_every_epoch: true
+  retained_epochs:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  weight_variant: raw
+  reload_and_complete_state_dict_equality_required: true
+  persistent_buffers_covered: true
+  exact_inventory_members:
+  - model_index.json
+  - scheduler/scheduler_config.json
+  - unet/config.json
+  - unet/diffusion_pytorch_model.safetensors
+  leaf_link_count: 1
+  same_device_required_where_supported: true
+  symlink_safe_ancestry_required: true
+  save_optimizer_moments: false
+  resumable_training_sidecar: false
+  retention_minimum_date: '2026-11-01'
+  deletion_implemented: false
+  naming_pattern: D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-{seed}__epoch-{epoch}__update-{update}__git-{commit}
+
+data:
+  open_permitted: false
+  ref_access: false
+  eval_access: false
+  fitting_role: TRAIN_TEXT
+  development_evaluation_role: VALIDATION_fixed_draw
+  train_text_sha256: d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d
+  train_core_count: 669
+  validation_csv_sha256: cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd
+  validation_core_count: 95
+  validation_sequence_order_sha256: eb18fd48e305e86f8000bdc82e9175437d478bd624ea57aef8094497534bda3a
+  validation_order_artifact_sha256: df445b617adf5165f3361412bb5c7bc5d2a05b31a98eb6d2f6d17f4b329de248
+  validation_draw_manifest_sha256: b4e8d6d7cf7298d201062986419797e7fc322f2e88066764d4332a432a0d0d49
+  validation_hash_report_sha256: bc6c7587e4a22892d84d1e901939bf988304957da778d49afb00cdea552ea075
+  validation_timesteps_sha256: 9009b50b26ec126978236e6c86ed8d639634a8b211a3fb842ddf8ad9ea38fe07
+  validation_noise_sha256: 6be13ab704ce4b3f21e6ab5787eb18e77943d52540b517de46f41b47b083ccdc
+  accepted_validation_artifact_directory: /home/laura/rnagenesis-mres-runs/m4_validation_draw_artifacts_d2b2041520d1
+  future_train_text_path: /home/laura/rnagenesis-mres-data/development/corpus_final.txt
+  future_validation_csv_path: /home/laura/rnagenesis-mres-data/development/ft_validation.csv
+  ref_hash_metadata_only: 531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23
+  eval_hash_metadata_only: ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015
+  ref_path: null
+  eval_path: null
+
+model:
+  initialisation_relative_path: configs/rnagenesis/diffusion
+  prohibited_initialisation:
+  - checkpoints/Aptamer/diffusion
+  - any_m6_attempt_checkpoint
+  b1_weight_sha256: c268021b6cab37423e3bffd495b139bb69698d8d11c7b96477fbfb239b0cff26
+  b1_unet_config_sha256: 3a9975ff165bbd5ca82923e6ed1c5ed7eb383a23f4f3f55db713c995031f8ee3
+  encdec_relative_path: configs/rnagenesis/autoencoder
+  evaluated_weight_variant: raw
+
+candidate_guardrail_boundary:
+  configuration: config/experiments/D1_candidate_guardrails.yaml
+  candidate_order: sealed_validation_ranking
+  evaluation: lazy_until_first_passing_candidate
+  attempts_per_candidate: 1000
+  schedule_sha256: 0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0
+  no_candidate_passes: record_no_eligible_checkpoint_do_not_change_lr_thresholds_architecture_or_seed
+
+m8_boundary:
+  implemented_in_this_package: false
+  total_raw_d1_attempts: 30000
+  one_seed_attempts: 30000
+  two_seed_attempts_each: 15000
+  two_seed_split: deterministic_and_balanced_within_requested_length_strata
+
+operational_cutoff:
+  recorded_not_automated: true
+  stretch_target: '2026-10-07T18:00:00+11:00'
+  hard_target: '2026-10-08T17:00:00+11:00'
+  seed_44_proceeds_only_if: current_time + 1.25 x measured_seed_43_end_to_end_execution_time + 2_hours <= hard_target
+  time_factor: 1.25
+  buffer_hours: 2
+  decision_is_operational_only: true
+  may_depend_on_seed_43_scientific_results: false
+  one_seed_deviation_sealed_before_m8_generation: true
+
+residual_limitations:
+- hash_to_open_toctou_not_closed
+- gpu_identity_collector_not_exercised_without_a_gpu

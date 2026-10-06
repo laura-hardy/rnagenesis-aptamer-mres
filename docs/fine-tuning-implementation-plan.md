@@ -1726,28 +1726,36 @@ TRAIN text was opened for exact-copy and nearest-TRAIN diagnostics only. VALIDAT
 
 ### M7 — Final D1 replicate training
 
+**M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED** (6 October 2026). The inactive package is described in [M7 final replicates implementation](fine_tuning/m7_final_replicates_implementation.md). No biological data or weights were accessed, no GPU was used, no run or evidence directory was created, no M7 authorisation exists, seeds 43 and 44 have not run, and **M7 is not complete**.
+
 **Objective**  
 Run the approved single MRes adaptation strategy reproducibly.
 
 **Inputs**
 
 - complete TRAIN only;
-- frozen D1 config from M6.
+- frozen D1 config from M6 (the accepted M6 values, with the approved M7 schedule below);
+- the accepted M4 fixed-draw VALIDATION artifacts, unchanged.
 
-**Plan**
+**Approved M7 decisions (implemented in the inactive package)**
 
-- target three prespecified independent seeds;
-- maximum five epochs per run unless M6 justifies a lower fixed limit;
-- save every epoch;
-- evaluate fixed-draw VALIDATION after every epoch;
-- calculate diagnostic generated-sample metrics at prespecified checkpoints;
-- retain full logs/manifests/checkpoint hashes.
+- target training seeds `43` and `44`; the pilot seed `42` is excluded; the validation-draw seed `1` stays separate. One completed seed is permitted only through a separately recorded, sealed operational time-limit deviation;
+- every seed initialises independently from the generic B1 checkpoint. The M6 update-7, update-14 and update-21 checkpoints are forbidden initialisation and resume inputs;
+- five epochs per seed, 84 microbatches and 21 optimizer updates per epoch (105 per seed), physical microbatch 8, accumulation 4, effective batch 32, example-weighted final window `[8, 8, 8, 5]` at every epoch boundary, FP32, AdamW with LR `3e-5`, betas `(0.95, 0.999)`, epsilon `1e-8`, weight decay `1e-6`, clip norm 1.0, EMA disabled, raw weights;
+- the M6 explicit applied-update LR convention generalised to ten warm-up updates and cosine decay over all 105 updates (update 1 applies `0.1 x LR`; no applied update has a zero rate; the 105-value trace and its hash are recorded);
+- fixed-draw VALIDATION at update 0 (provenance only) and after every epoch (candidates 1 through 5); one raw-weight checkpoint saved, reloaded and proved after every epoch;
+- candidate ranking by fixed-draw VALIDATION MSE ascending, then the earlier epoch on an exact tie; candidate diagnostics are lazy, evaluated in ranking order until the first passing checkpoint, each on the accepted 1,000-attempt M6 schedule with the approved cleaner and the five numerical guardrails (requested-length matching, early EOS and gross length behaviour stay report-only). If no candidate passes, the outcome is `no_eligible_checkpoint` and the learning rate, thresholds, architecture and seed are not changed automatically;
+- resume is unsupported. A technical retry uses the same seed and configuration, starts again from B1, uses a new immutable attempt directory and needs a new authorisation. All five checkpoints per executed seed are retained through at least 1 November 2026, and no deletion is implemented.
+
+**Frozen M8 boundary.** M8 will generate 30,000 raw D1 attempts in total: 30,000 for one seed, or 15,000 each for two seeds with a deterministic split balanced within requested-length strata. M8 generation is not implemented in the M7 package.
+
+**Operational cutoff (recorded, not automated).** Stretch target 18:00 AEDT, 7 October 2026; hard target 17:00 AEDT, 8 October 2026. Seed 44 proceeds only if `current time + 1.25 x measured seed-43 end-to-end execution time + 2 hours` is no later than the hard target. The decision is operational only and may not depend on seed-43 scientific results. If seed 44 is omitted, the deviation must be sealed before M8 generation.
 
 **Checkpoint selection**
 
-Within each seed, select by lowest fixed-draw VALIDATION diffusion loss subject to hard guardrails.
+Within each seed, select by lowest fixed-draw VALIDATION diffusion loss subject to hard guardrails, as the lazy, ranked evaluation above. The final model condition is the prespecified replicate set of selected seed-specific checkpoints; do not cherry-pick one seed based on downstream EVAL. The earlier plan text targeted three seeds and a maximum of five epochs; the approved decisions above supersede it.
 
-The final model condition is the prespecified replicate ensemble/set of selected seed-specific checkpoints; do not cherry-pick one seed based on downstream EVAL.
+**Evidence separation.** A replicate manifest holds one seed and no selection or guardrail claim. A candidate-guardrail manifest binds one seed, epoch and checkpoint. The final-selection manifest (`m7-final-selection-manifest-2`) binds the successful replicate manifests, the seed plan, any one-seed deviation, the candidate table with every checkpoint member hash, the rankings with recomputable hashes, the lazy traces and the selected checkpoint hashes, and records `human_gate_required: true` and `m7_complete: false`. The selection stage has an authorisation-bound CPU-only launcher (revision 4) that reads the bound sealed manifests only; the checked-in configuration stays inactive and non-consumable.
 
 **Human gate**  
 Review seed consistency and freeze D1 training.
@@ -1756,7 +1764,10 @@ Review seed consistency and freeze D1 training.
 
 - no EVAL;
 - no REF;
-- no post-hoc architecture changes.
+- no post-hoc architecture changes;
+- no M7 execution, GPU use, biological access, or authorisation until a separate authorisation-only package is reviewed.
+
+**Current status: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED — 6 October 2026. M7 is not complete.**
 
 ---
 
@@ -2096,9 +2107,9 @@ M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 
 
 Proceed in this order:
 
-1. Plan M7 (final D1 replicate training) using the selected raw update-21 checkpoint evidence. Planning only: do not train, generate, use a GPU, or open TRAIN, VALIDATION, REF, or EVAL;
-2. freeze the complete M7 configuration, seed count, and execution authorisation in a later, separate review;
-3. M7 execution only after that separate authorisation.
+1. Review the inactive M7 package (`M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED`, 6 October 2026). It does not authorise execution, biological access, GPU use, or a run directory, and seeds 43 and 44 have not run;
+2. a later, separate authorisation-only package binds one or two independently consumable entries (one per seed). It does not exist yet;
+3. M7 execution only after that separate authorisation. M7 is not complete.
 
 ---
 

@@ -1,0 +1,180 @@
+# M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
+# Authoritative inactive M7 candidate-guardrail configuration.
+# This file must not be consumed by an executable workflow. It binds no GPU, no
+# output directory, no checkpoint path, no biological path and no authorisation.
+# Its entry point accepts --help, --schema and --authorisation-id <id> (refused while
+# this file is inactive). A later authorisation-only
+# commit may change only this file, adding one entry per candidate evaluated, in
+# the order of the sealed validation ranking. The production generation
+# callable is implemented; this inactive file binds no value for it to use,
+# including no LD_LIBRARY_PATH value.
+
+document_status: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
+consumable_by_executable_workflow: false
+schema_version: m7-candidate-guardrail-config-1
+manifest_schema_version: m7-candidate-guardrail-manifest-1
+experiment_id: D1_candidate_guardrails
+created_against_mres_commit: a58528d61c775cb5208ddb7efb3988dc3bd3fe88
+rnagenesis_branch: mres-d1-diffusion-finetune
+rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
+
+execution:
+  authorised: false
+  biological_paths_permitted: false
+  gpu_identity_bound: false
+
+# Inactive: no entry.
+authorisation_entries: []
+
+authorisation_schema:
+  entries_per_authorisation_only_commit: one_per_candidate_to_be_evaluated
+  independent_consumption: true
+  launcher_accepts_only: authorisation_id
+  scientific_parameters_from_cli: false
+  retry_requires_new_entry: true
+  permitted_changed_files:
+  - config/experiments/D1_candidate_guardrails.yaml
+  entry_keys:
+  - activation_status
+  - authorisation_id
+  - authorisation_timestamp
+  - authorization_parent_commit
+  - candidate_epoch
+  - candidate_seed
+  - candidate_update
+  - checkpoint_directory
+  - checkpoint_member_sha256
+  - checkpoint_relative_name
+  - checkpoint_weight_sha256
+  - consumed
+  - cuda_visible_devices
+  - evidence_directory
+  - executing_implementation_commit
+  - expected_schedule_sha256
+  - gpu_uuid
+  - implementation_config_sha256
+  - implementation_file_hashes
+  - interpreter
+  - ld_library_path
+  - logical_device
+  - output_directory
+  - pci_bus
+  - permitted_roles
+  - phase
+  - physical_gpu_index
+  - preceding_candidates
+  - ranking_position
+  - replicate_manifest_bytes
+  - replicate_manifest_path
+  - replicate_manifest_sha256
+  - reuse_permitted
+  - scope
+  - session
+  - single_use
+  - validation_ranking_sha256
+  entry_binds:
+  - authorisation_id
+  - seed_and_epoch
+  - ranking_position_and_failed_earlier_candidates
+  - checkpoint_directory_and_member_hashes
+  - replicate_manifest_hash
+  - physical_and_logical_gpu_identity
+  - exact_output_directory
+  - exact_ld_library_path_value_or_none
+  - pinned_interpreter_path_and_executable_identity
+  - replicate_manifest_path_bytes_and_sha256
+  - update_checkpoint_relative_name_and_weight_hash
+  - branch_remote_and_permitted_changed_file_set
+  active_entries_present_in_this_package: false
+
+candidate_plan:
+  candidates_per_seed: 5
+  candidate_epochs:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  update_0_is_a_candidate: false
+  candidate_order: sealed_validation_ranking_of_the_seed_replicate_manifest
+  ranking_rule: fixed_draw_validation_mse_ascending_then_earlier_epoch_on_exact_tie
+  evaluation: lazy_until_first_passing_candidate
+  evaluated_candidates_form_a_prefix_of_the_ranking: true
+  select_first_passing_candidate: true
+  no_candidate_passes: record_no_eligible_checkpoint
+  automatic_learning_rate_threshold_architecture_or_seed_change: false
+  one_entry_per_candidate: true
+  later_entry_binds_failed_earlier_manifests: true
+
+diagnostic_design:
+  raw_attempts: 1000
+  invocation_count: 112
+  schedule_sha256: 0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0
+  schedule_reused_not_regenerated: true
+  weight_variant: raw
+  ema_weights: false
+  cleaner: approved_m1_cleaner
+  cleaner_sha256: 4d0c56a7d931a2c3c5c049cfeabd4937134b3d1125ef7a68b10472527d2fd2a2
+  raw_text_retained_beside_normalised_text: true
+  b1_pool: accepted_evidence_read_only_never_regenerated
+  production_generation_callable_implemented_in_this_package: true
+  invocation_seed_base: 44000
+  invalid_empty_duplicate_early_eos_and_length_mismatched_attempts_remain_counted: true
+  resampling_replacement_truncation_padding_dropping_or_deduplication: false
+
+hard_guardrails:
+- comparison: minimum
+  id: valid_nonempty_acgu_fraction
+  threshold: 0.99
+- comparison: maximum
+  id: empty_or_unparseable_fraction
+  threshold: 0.01
+- comparison: minimum
+  id: unique_fraction
+  threshold: 0.95
+- comparison: maximum
+  id: exact_train_match_rate
+  threshold: 0.01
+- comparison: maximum
+  id: largest_duplicate_share
+  threshold: 0.01
+
+report_only:
+  items:
+  - diagnostics
+  - early_eos_count
+  - gross_length_behaviour
+  - requested_length_exact_hit_rate
+  - requested_length_matching
+  diagnostic_items:
+  - requested_length_exact_hit_rate
+  - early_eos_and_length_mismatch_accounting
+  - nearest_train_normalized_edit_distance
+  - maximum_edit_similarity_to_train
+  - nucleotide_distribution_distance
+  - dinucleotide_distribution_distance
+  - mfe
+  - mfe_per_nucleotide
+  - paired_fraction
+  - length_stratified_summaries
+  diagnostics_implementation: accepted_m6_report_only_diagnostics_reused_unchanged
+  diagnostics_affect_ranking_or_thresholds: false
+  edit_similarity_is_sequence_identity: false
+  requested_length_matching_is_a_threshold: false
+  early_eos_is_a_threshold: false
+  gross_length_behaviour_is_a_threshold: false
+  exact_hit_rate_is_an_eligibility_threshold: false
+
+data:
+  open_permitted: false
+  ref_access: false
+  eval_access: false
+  validation_csv_access: false
+  train_text_use: copying_and_novelty_diagnostic_only
+  train_text_sha256: d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d
+  ref_hash_metadata_only: 531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23
+  eval_hash_metadata_only: ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015
+
+retention:
+  checkpoints_retained_through: '2026-11-01'
+  deletion_implemented: false

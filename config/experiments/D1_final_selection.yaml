@@ -1,0 +1,239 @@
+# M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
+# Authoritative inactive M7 final-selection configuration (CPU-only).
+# This file must not be consumed by an executable workflow. It binds no GPU, no
+# output directory, no manifest path, no biological path, no deviation record and
+# no authorisation: authorisation_entries is empty and authorised is false. Its
+# entry point accepts only --help, --schema and --authorisation-id <id>; the last
+# reads only this file and refuses (execution_not_authorised) while it is inactive.
+# A later authorisation-only commit may change only this file, and only
+# authorisation_entries, consumable_by_executable_workflow, document_status and
+# execution.authorised, to bind one single-use entry (authorisation_schema lists
+# its exact keys). The selection stage reads the bound sealed manifests only,
+# never biological data, checkpoints or weights, REF or EVAL.
+
+document_status: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
+consumable_by_executable_workflow: false
+schema_version: m7-final-selection-config-2
+manifest_schema_version: m7-final-selection-manifest-2
+experiment_id: D1_final_selection
+created_against_mres_commit: a58528d61c775cb5208ddb7efb3988dc3bd3fe88
+rnagenesis_branch: mres-d1-diffusion-finetune
+rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
+execution:
+  authorised: false
+  biological_paths_permitted: false
+  gpu_identity_bound: false
+authorisation_entries: []
+authorisation_schema:
+  active_entries_present_in_this_package: false
+  cpu_only: true
+  entries_exactly: 1
+  entry_binds:
+  - authorisation_id
+  - authorisation_parent_and_executing_implementation_commit
+  - implementation_file_and_parent_config_hashes
+  - exact_new_output_and_evidence_directory
+  - one_or_two_replicate_manifests_with_seed_path_bytes_and_sha256
+  - every_evaluated_guardrail_manifest_with_seed_epoch_path_bytes_and_sha256
+  - no_deviation_for_seeds_43_and_44_or_the_sealed_deviation_for_seed_43_alone
+  - single_use_session_and_non_resume_policy
+  entry_keys:
+  - activation_status
+  - authorisation_id
+  - authorisation_timestamp
+  - authorization_parent_commit
+  - consumed
+  - deviation
+  - evidence_directory
+  - executing_implementation_commit
+  - guardrail_manifests
+  - implementation_config_sha256
+  - implementation_file_hashes
+  - output_directory
+  - permitted_roles
+  - phase
+  - replicate_manifests
+  - reuse_permitted
+  - scope
+  - session
+  - single_use
+  guardrail_manifest_row_keys:
+  - bytes
+  - epoch
+  - path
+  - seed
+  - sha256
+  independent_consumption: true
+  launcher_accepts_only: authorisation_id
+  permitted_activation_paths:
+  - authorisation_entries
+  - consumable_by_executable_workflow
+  - document_status
+  - execution.authorised
+  permitted_changed_files:
+  - config/experiments/D1_final_selection.yaml
+  reads: bound_sealed_manifests_only
+  replicate_manifest_row_keys:
+  - bytes
+  - path
+  - seed
+  - sha256
+  retry_requires_new_entry: true
+  scientific_parameters_from_cli: false
+allowed_seed_plan:
+  excluded_seeds:
+  - 42
+  minimum_completed_seeds: 1
+  one_seed_requires_sealed_operational_deviation: true
+  target_seeds:
+  - 43
+  - 44
+  validation_draw_seed: 1
+selection_rules:
+  accepted_inputs:
+  - seeds_43_and_44
+  - seed_43_alone_with_sealed_operational_deviation
+  rejected_inputs:
+  - seed_44_alone
+  - missing_seed_without_deviation
+  - duplicate_seed
+  - unexpected_seed
+  - mismatched_b1_initial_state_digest
+  - inconsistent_validation_artifact_identity
+  - extra_missing_or_duplicate_epoch_candidate
+  - selection_from_update_0
+  - selection_from_unevaluated_or_failed_guardrail_candidate
+  - non_prefix_lazy_guardrail_evaluation
+  - ref_or_eval_derived_input
+  ranking_rule: fixed_draw_validation_mse_ascending_then_earlier_epoch_on_exact_tie
+  select_first_passing_candidate_of_the_sealed_ranking: true
+  no_candidate_passes: record_no_eligible_checkpoint
+  automatic_learning_rate_threshold_architecture_or_seed_change: false
+  selection_uses_ref_eval_or_downstream_results: false
+operational_deviation:
+  schema_version: m7-operational-deviation-1
+  kind: seed_44_omitted_operational_time_limit
+  keys:
+  - completed_seeds
+  - decision_time
+  - depends_on_scientific_results
+  - deviation_id
+  - deviation_sha256
+  - kind
+  - m8_generation_started
+  - measured_seed_43_end_to_end_seconds
+  - omitted_seed
+  - projected_completion_time
+  - projected_exceeds_hard_target
+  - recorded_before_m8_generation
+  - rule
+  - schema_version
+  - sealed
+  - sealed_at
+  - sealed_by
+  - seed_43_replicate_manifest_sha256
+  rule:
+    buffer_hours: 2
+    decision_is_operational_only: true
+    hard_target: '2026-10-08T17:00:00+11:00'
+    stretch_target: '2026-10-07T18:00:00+11:00'
+    time_factor: 1.25
+  may_depend_on_scientific_results: false
+  sealed_before_m8_generation: true
+  automation: none_human_scheduling_rule_recorded_only
+final_manifest:
+  keys:
+  - allowed_seed_plan
+  - candidate_table
+  - closure
+  - completed_seeds
+  - config_version
+  - deviation
+  - experiment_id
+  - guardrail_manifests
+  - lazy_evaluation_traces
+  - m8_allocation
+  - m8_boundary
+  - manifest_schema_version
+  - ref_eval_access
+  - replicate_manifests
+  - schema_version
+  - seed_records
+  - selected_set
+  - selected_set_sha256
+  - selection_outcome
+  - validation_rankings
+  nested_keys:
+    candidate_guardrail:
+    - evaluated
+    - manifest_sha256
+    - passed
+    candidate_row:
+    - checkpoint_name
+    - epoch
+    - guardrail
+    - members_sha256
+    - rank
+    - seed
+    - update
+    - validation_mse
+    - weight_sha256
+    guardrail_index_row:
+    - epoch
+    - seed
+    - sha256
+    ranking_row:
+    - ranked_epochs
+    - ranking_sha256
+    - rule
+    - seed
+    replicate_index_row:
+    - seed
+    - sha256
+    seed_record:
+    - lazy_state
+    - replicate_manifest_sha256
+    - seed
+    - selected_epoch
+    - status
+    selected_row:
+    - checkpoint_name
+    - epoch
+    - members_sha256
+    - seed
+    - update
+    - validation_mse
+    - weight_sha256
+    trace_container:
+    - seed
+    - trace
+    trace_row:
+    - epoch
+    - evaluated
+    - guardrail_manifest_sha256
+    - outcome
+    - rank
+  binds:
+  - one_or_two_successful_replicate_manifests
+  - allowed_seed_plan
+  - any_one_seed_operational_deviation
+  - complete_candidate_table_with_checkpoint_member_hashes
+  - validation_rankings_with_recomputed_ranking_hashes
+  - lazy_evaluation_traces
+  - selected_checkpoint_member_hashes
+  - deterministic_selected_set_hash
+  closure:
+    eval_opened: false
+    human_gate_required: true
+    m7_complete: false
+    m8_generation_performed: false
+    ref_opened: false
+    validation_csv_opened: false
+  canonical_bytes_independent_of_input_order: true
+  selected_set_sha256_is_a_content_hash_not_an_authenticity_mechanism: true
+m8_boundary:
+  implemented_in_this_package: false
+  one_seed_attempts: 30000
+  total_raw_d1_attempts: 30000
+  two_seed_attempts_each: 15000
+  two_seed_split: deterministic_and_balanced_within_requested_length_strata
