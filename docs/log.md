@@ -11473,7 +11473,7 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 **Stage:** Aim 2 / modelling / M6 D1 diffusion pilot
 
-**Status:** Attempt 6 is the accepted successful training pilot. **M6 is not complete.** Update-21 diagnostic generation is pending and needs a separate authorisation. This record does not authorise diagnostic generation, M7, REF, EVAL, GPU use, TRAIN or VALIDATION access, or any new run.
+**Status:** Attempt 6 is the accepted successful training pilot. At that stage, **M6 was not complete** and update-21 diagnostic generation was then pending and needed a separate authorisation (both resolved by the closure entry below). This record did not authorise diagnostic generation, M7, REF, EVAL, GPU use, TRAIN or VALIDATION access, or any new run.
 
 **Preflight:** MRes branch `main`. Local HEAD `15f49a17081f573970495891e9283a17fc5c3dc2`, the unpushed and consumed attempt-6 authorization commit. Its single parent, and local and live `origin/main`, is `6fd611589d7a3365b793c2ca64cf13c29ef5bfc1`. The index was empty and the working tree clean. RNAGenesis stayed read-only on `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c` and was not fetched.
 
@@ -11499,7 +11499,7 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 **Stage:** Aim 2 / modelling / M6 D1 diffusion pilot
 
-**Status:** The inactive package was revised in place. M6 is not complete. No diagnostic authorisation, output directory, GPU execution, TRAIN access, checkpoint access, M7, REF, or EVAL occurred, and nothing was staged, committed, or pushed.
+**Status:** The inactive package was revised in place. At that stage, M6 was not complete. No diagnostic authorisation, output directory, GPU execution, TRAIN access, checkpoint access, M7, REF, or EVAL occurred, and nothing was staged, committed, or pushed.
 
 **Decided policy:** The approved M1 cleaner is the primary normalisation authority. The exact-`11`, no-suffix helper is sensitivity only. VALIDATION stays unopened, and REF and EVAL stay structurally denied. The frozen EncDec assets are rehashed. `maximum_identity_to_train` was renamed `maximum_edit_similarity_to_train`, defined as one minus the minimum Levenshtein distance divided by the longer sequence length, and never called sequence identity. The frozen approved files `config/modelling/validation_metrics_v1.yaml` and `config/experiments/generator_evaluation.yaml`, the plan, and two earlier reports still use the older wording and were not touched.
 
@@ -11511,6 +11511,28 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 ## 2026-10-06 — Final evidence hardening of the inactive update-21 diagnostic package
 
-**Status:** Revision 3 of the inactive package. M6 is not complete. No authorisation, real output directory, TRAIN or checkpoint access, GPU use, M7, REF, or EVAL occurred. Nothing was staged, committed, or pushed. All rev2 policy and execution behaviour is preserved.
+**Status:** Revision 3 of the inactive package. At that stage, M6 was not complete. No authorisation, real output directory, TRAIN or checkpoint access, GPU use, M7, REF, or EVAL occurred. Nothing was staged, committed, or pushed. All rev2 policy and execution behaviour is preserved.
 
 **Changes:** Success-manifest provenance is bound to the active authorisation, the measured provenance, and the pinned generation-input and EncDec/patch inventories. Written-evidence reverification reruns the pinned M4 metrics and five guardrails from the audited ledger and the pinned TRAIN cores, including `exact_train_match_rate`, and requires equality with the metrics file, the guardrail file, the manifest, and both sides of the comparison (B1 against the recomputed accepted reference). The report and hash report receive the regular, non-symlink, exact-size check. Output ancestry must be real directories. Adversarial regression tests cover each case.
+
+---
+
+## 2026-10-06 — Accept the update-21 diagnostic and close M6
+
+**Stage:** Aim 2 / modelling / M6 D1 diffusion pilot
+
+**Status:** M6 is COMPLETE / GO for M7 planning only. On 6 October 2026 the human gate approved: "Approve M6 closure and update-21 checkpoint selection for M7 planning only." The raw update-21 checkpoint is selected. This record does not authorise M7 execution, additional training or generation, GPU use, biological-data access, VALIDATION, REF, or EVAL, and the complete M7 configuration is not frozen.
+
+**Preflight:** MRes branch `main`. Local HEAD was `0682185758eb62d9401706b1e37e02468c4c9fbb`, the single-use authorization commit, not yet pushed at that time, with the single parent `6953687e2e9e36bb1670a7b2b9faaa18849c3711` and changing only the diagnostic YAML. Local and live `origin/main` were `6953687e2e9e36bb1670a7b2b9faaa18849c3711`. The index and worktree were clean. RNAGenesis stayed on `mres-d1-diffusion-finetune` at `e3b855bbf4d1af376f43747643fa30afd662828c`, unmodified and not fetched.
+
+**Evidence:** The update-21 diagnostic generation was executed once under the single-use authorisation `m6_d1_update21_diagnostic_6953687e2e9_gpu0_attempt1` on physical GPU 0 (UUID `GPU-b3c42ea9-ec47-c854-e469-cd78e443c76b`, PCI `00000000:41:00.0`, `CUDA_VISIBLE_DEVICES=0`, logical `cuda:0`). The authorization commit is `0682185758eb62d9401706b1e37e02468c4c9fbb`. Its sole parent and the executing implementation commit are `6953687e2e9e36bb1670a7b2b9faaa18849c3711`. Immediately before authorization and throughout execution and closure review, local and live `origin/main` remained `6953687e2e9e36bb1670a7b2b9faaa18849c3711`; the authorization commit had not yet been pushed. The evidence directory is `/home/laura/rnagenesis-mres-runs/m6_d1_update21_diagnostic_6953687e2e9_gpu0_attempt1`. `m6_diagnostic_manifest.json` is 86,206 bytes, SHA-256 `95074f0d76ab11cf43146e672bc75399da56dd9b2ffeef8fa14a39c7f8acd959`, canonical JSON, authorisation state `consumed_successfully`. No `authorization_failure.json` exists. The compact review summary is `/home/laura/m6-review-archives/m6_update21_diagnostic_attempt1_compact_summary.txt` (7,906 bytes, SHA-256 `7795371f2815370d1387dd4245b66a436d734dfba9c4d427bf4af0ede9c230bc`). All 112 scheduled invocations completed, giving 1,000 raw attempts, 1,000 parsed and valid outputs, 0 invalid or empty outputs, 1,000 unique valid outputs, and 0 duplicates. The exact-length hits were 971 (rate `0.971`, report-only), and 29 early-EOS observations and length mismatches were retained in their denominators. The checkpoint weights were identical before and after generation. Raw update-21 weights were used, EMA was not used, and no other checkpoint update and no B1 diffusion weights were loaded. All five preregistered hard guardrails passed:
+
+**Guardrails:** all five passed: valid fraction `1.0`, empty fraction `0.0`, unique fraction `1.0`, exact TRAIN match rate `0.0`, largest duplicate share `0.001`.
+
+**Interpretation:** descriptive only. D1 against B1: exact-hit rate `0.971` against `0.961`, early EOS 29 against 39, maximum edit similarity to TRAIN `0.6571428571428571` against `0.6666666666666667`, mean nearest-TRAIN normalized edit distance `0.4447902555859842` against `0.44196911254273263`, nucleotide total variation `0.0378592381533492` against `0.05944973828983485`, dinucleotide total variation `0.08128290946173325` against `0.08459451208560434`, mean MFE `-10.997260006524623` against `-10.294600009977817`, mean MFE per nucleotide `-0.17954261954423192` against `-0.16933682358738514`, mean paired fraction `0.44445466775022013` against `0.4447719803195546`. This is not a paired significance test. No statistical significance, biological-quality improvement, clustering, embedding, or downstream performance is claimed.
+
+**Closure review:** read-only. Every top-level evidence file and all 112 raw invocation files were re-hashed. The hash report, every manifest ledger binding, metrics, guardrails, report comparison, report hash, identities and accounting were verified, and the pinned M4 metrics were recomputed from the audited ledger. TRAIN, the checkpoint, model assets, and B1 evidence were not reopened. The run directory and all earlier evidence were not modified.
+
+**Configuration:** `config/experiments/D1_update21_diagnostic_generation.yaml` is restored to the exact inactive blob `d33a0284b7edf81b922364eb4838b9f52a551d57` (SHA-256 `a7b1055d6dc3fc07419313a7226321e1648ebd23477b290c5b0cc9000e3da2db`), non-consumable and unauthorised. Production code and tests were not changed.
+
+**Boundary:** Nothing was staged, committed, or pushed. No M7 authorisation or output directory, no tmux session, no GPU use, and no scientific workflow ran.

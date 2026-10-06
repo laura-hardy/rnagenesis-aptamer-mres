@@ -1,12 +1,17 @@
-# M6_UPDATE21_DIAGNOSTIC_AUTHORISED_FOR_SINGLE_USE_EXECUTION
-# Single-use unconsumed update-21 diagnostic-generation authorisation.
-# Consumption is creation of the bound output directory.
-# This file has no authorization-commit field.
-# The runner records the live HEAD SHA at runtime.
-# It does not authorise M7, REF, EVAL, VALIDATION access, or any other update.
+# M6_UPDATE21_DIAGNOSTIC_READY_FOR_REVIEW_NOT_AUTHORISED
+# This file is the inactive configuration for the single update-21
+# diagnostic-generation stage that M6 still requires. It must not be
+# consumed by an executable workflow. It binds no GPU, no output directory,
+# no timestamp, and no authorisation. The tracked file does not store
+# authorization_commit: a later authorisation-only commit may change only
+# this file, and the runner reads that commit from live HEAD.
+# Update 21 is the sole D1 pilot checkpoint for this comparison. Updates 7
+# and 14 stay learning-curve evidence only. The accepted B1 pool is read as
+# evidence and is never regenerated. M6 stays open until the generated-sample
+# guardrails are reviewed. This file does not authorise M7, REF, or EVAL.
 
-document_status: M6_UPDATE21_DIAGNOSTIC_AUTHORISED_FOR_SINGLE_USE_EXECUTION
-consumable_by_executable_workflow: true
+document_status: M6_UPDATE21_DIAGNOSTIC_READY_FOR_REVIEW_NOT_AUTHORISED
+consumable_by_executable_workflow: false
 schema_version: m6-diagnostic-config-1
 manifest_schema_version: m6-diagnostic-manifest-1
 experiment_id: D1_update21_diagnostic_generation
@@ -14,51 +19,39 @@ mres_branch: main
 rnagenesis_branch: mres-d1-diffusion-finetune
 rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
 execution:
-  authorised: true
-  biological_paths_permitted: true
-  gpu_identity_bound: true
-  output_directory: /home/laura/rnagenesis-mres-runs/m6_d1_update21_diagnostic_6953687e2e9_gpu0_attempt1
-  evidence_directory: /home/laura/rnagenesis-mres-runs/m6_d1_update21_diagnostic_6953687e2e9_gpu0_attempt1
-  authorisation_id: m6_d1_update21_diagnostic_6953687e2e9_gpu0_attempt1
-  authorization_parent_commit: 6953687e2e9e36bb1670a7b2b9faaa18849c3711
-  executing_implementation_commit: 6953687e2e9e36bb1670a7b2b9faaa18849c3711
+  authorised: false
+  biological_paths_permitted: false
+  gpu_identity_bound: false
+  output_directory: null
+  evidence_directory: null
+  authorisation_id: null
+  authorization_parent_commit: null
+  executing_implementation_commit: null
 diagnostic_generation_authorisation:
-  authorisation_id: m6_d1_update21_diagnostic_6953687e2e9_gpu0_attempt1
-  activation_status: active_unconsumed
+  authorisation_id: null
+  activation_status: inactive_no_authorisation
   consumed: false
   single_use: true
   reuse_permitted: false
-  authorization_parent_commit: 6953687e2e9e36bb1670a7b2b9faaa18849c3711
-  executing_implementation_commit: 6953687e2e9e36bb1670a7b2b9faaa18849c3711
-  phase: M6_D1_update21_diagnostic_generation
-  permitted_roles:
-  - ACCEPTED_B1_POOL_EVIDENCE
-  - ACCEPTED_SCHEDULE
-  - FROZEN_ENCDEC
-  - TRAIN_TEXT_DIAGNOSTIC_ONLY
-  - UPDATE21_CHECKPOINT
-  logical_device: cuda:0
-  physical_gpu_index: 0
-  gpu_uuid: GPU-b3c42ea9-ec47-c854-e469-cd78e443c76b
-  pci_bus: '00000000:41:00.0'
-  cuda_visible_devices: '0'
-  output_directory: /home/laura/rnagenesis-mres-runs/m6_d1_update21_diagnostic_6953687e2e9_gpu0_attempt1
-  evidence_directory: /home/laura/rnagenesis-mres-runs/m6_d1_update21_diagnostic_6953687e2e9_gpu0_attempt1
-  implementation_file_hashes:
-    config/modelling/validation_metrics_v1.yaml: d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb
-    scripts/b1_development_pool_runner.py: 622684b254f911ca4d00db8af20d0d0c67eeebf46007e3fe84995e1e11db2341
-    scripts/modelling/m4_diagnostic_metrics.py: eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56
-    scripts/modelling/m5_smoke_contract.py: cbb9ff275149315c6a7cb227fafe5c2a0cd3d9b0a5375b296861945f0666ce3a
-    scripts/modelling/m6_diagnostic_generation.py: 83f299bea7ec69406c898ad0e971bebf06056beb58649de0c25a5cc6d7195726
-    scripts/modelling/m6_pilot_contract.py: 525b7ff424b7b934792bf3b092526d2f5f6a85cc6e789116615f4a2d1059a21f
-    tests/modelling/test_m6_diagnostic_generation.py: c4da599137564f00303c51ab4337f9e1fd47a8de793883c1121b3348ebfacfc3
-  authorisation_timestamp: '2026-10-06T15:02:40+11:00'
-  scope: single_use_m6_d1_update21_diagnostic
+  authorization_parent_commit: null
+  executing_implementation_commit: null
+  phase: null
+  permitted_roles: []
+  logical_device: null
+  physical_gpu_index: null
+  gpu_uuid: null
+  pci_bus: null
+  cuda_visible_devices: null
+  output_directory: null
+  evidence_directory: null
+  implementation_file_hashes: null
+  authorisation_timestamp: null
+  scope: null
   session:
     pattern: m5_single_use_timestamp_and_scope
     wall_clock_expiry: null
     resume_permitted: false
-    consumption_event: bound_output_directory_creation
+    consumption_event: null
 pinned_inputs:
   training_evidence:
     directory: /home/laura/rnagenesis-mres-runs/m6_d1_diffusion_pilot_6fd611589d7a_gpu1_attempt6
