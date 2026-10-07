@@ -1,0 +1,1048 @@
+{
+  "schema_version": "generator-eval-metric-spec-gep1-draft-r1",
+  "package_id": "GEP-1",
+  "freeze_status": "draft",
+  "aggregate_generator_quality_score": false,
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
+    "sha256": "e6193d0d14245049c218b4da0ef8059fb63b2f31e4885b3457cd44e41b76c50c",
+    "version": "3.0",
+    "revision_date": "7 October 2026"
+  },
+  "field_schema": [
+    "metric_id",
+    "display_name",
+    "implementation_symbol",
+    "data_source",
+    "reference_role",
+    "scientific_role",
+    "calculation_summary",
+    "numerator",
+    "denominator_and_filters",
+    "units",
+    "expected_range",
+    "direction",
+    "length_treatment",
+    "seed_or_block_treatment",
+    "condition_scope",
+    "missing_failure_handling",
+    "code_revision",
+    "config_revision",
+    "freeze_status"
+  ],
+  "scientific_role_enum": [
+    "accounting",
+    "outcome",
+    "closeness",
+    "guardrail",
+    "descriptor"
+  ],
+  "direction_enum": [
+    "higher",
+    "lower",
+    "two_sided",
+    "not_applicable"
+  ],
+  "metrics": [
+    {
+      "metric_id": "raw_attempts",
+      "display_name": "Raw attempts",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "accounting",
+      "calculation_summary": "Count of attempt-ledger rows. Invalid and duplicate attempts remain in the count.",
+      "numerator": "attempt-ledger rows",
+      "denominator_and_filters": "Not a ratio. No row is removed before the count.",
+      "units": "count",
+      "expected_range": "nonnegative integer",
+      "direction": "not_applicable",
+      "length_treatment": "Not length-normalized. Every requested length stays in the same count; per-length counts are separate.",
+      "missing_failure_handling": "An empty ledger yields zero counts. A row that violates the attempt-ledger schema raises DiagnosticMetricError and is not dropped or imputed.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "parsed_outputs",
+      "display_name": "Parsed outputs",
+      "implementation_symbol": "m4_diagnostic_metrics.validate_attempt_record",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "accounting",
+      "calculation_summary": "Count of attempts for which raw_decoded_text is nonempty, or cleaned_sequence is nonempty, or raw_length is 0. A schema-valid ledger has raw_length equal to the length of raw_decoded_text, so this predicate is true for every accepted row, including empty unparseable text. It is not a successful-parse count.",
+      "numerator": "ledger rows meeting that predicate",
+      "denominator_and_filters": "Not a ratio. Schema-invalid rows are rejected rather than counted as unparsed.",
+      "units": "count",
+      "expected_range": "nonnegative integer; equals raw_attempts on a schema-valid ledger",
+      "direction": "not_applicable",
+      "length_treatment": "Not length-normalized.",
+      "missing_failure_handling": "An empty ledger yields zero counts. A row that violates the attempt-ledger schema raises DiagnosticMetricError and is not dropped or imputed. See blocking item parsed_outputs_predicate_versus_successful_parse.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "valid_outputs",
+      "display_name": "Valid A/C/G/U outputs",
+      "implementation_symbol": "m4_diagnostic_metrics.recomputed_validity",
+      "data_source": "cleaned sequence on the generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "accounting",
+      "calculation_summary": "Count of attempts whose cleaned body matches ^[ACGU]+$. Validity is recomputed. A stored validity flag that disagrees is a ledger failure, not a silent correction.",
+      "numerator": "attempts with a nonempty canonical A/C/G/U cleaned body",
+      "denominator_and_filters": "Not a ratio. Empty, unparseable, and other invalid attempts are excluded from this count and remain in raw_attempts.",
+      "units": "count",
+      "expected_range": "nonnegative integer",
+      "direction": "not_applicable",
+      "length_treatment": "The pattern requires a nonempty body. It does not apply a length cutoff.",
+      "missing_failure_handling": "An empty ledger yields zero counts. A row that violates the attempt-ledger schema raises DiagnosticMetricError and is not dropped or imputed.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "invalid_outputs",
+      "display_name": "Invalid outputs",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "accounting",
+      "calculation_summary": "raw_attempts minus valid_outputs. Includes empty, unparseable, and nonempty alphabet failures.",
+      "numerator": "attempts that fail recomputed_validity",
+      "denominator_and_filters": "Not a ratio. Invalid attempts are retained in the ledger.",
+      "units": "count",
+      "expected_range": "nonnegative integer",
+      "direction": "not_applicable",
+      "length_treatment": "Not length-normalized.",
+      "missing_failure_handling": "An empty ledger yields zero counts. A row that violates the attempt-ledger schema raises DiagnosticMetricError and is not dropped or imputed.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "empty_or_unparseable_outputs",
+      "display_name": "Empty or unparseable outputs",
+      "implementation_symbol": "m4_diagnostic_metrics.validate_attempt_record",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "accounting",
+      "calculation_summary": "Invalid attempts whose cleaned body is empty or whose raw text is empty. A nonempty alphabet-invalid body is invalid but is not in this count.",
+      "numerator": "invalid attempts with empty cleaned text or empty raw text",
+      "denominator_and_filters": "Not a ratio. Nonempty alphabet failures stay in invalid_outputs and out of this count.",
+      "units": "count",
+      "expected_range": "nonnegative integer",
+      "direction": "not_applicable",
+      "length_treatment": "Empty bodies are length 0. No other length filter is applied.",
+      "missing_failure_handling": "An empty ledger yields zero counts. A row that violates the attempt-ledger schema raises DiagnosticMetricError and is not dropped or imputed.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "exact_length_hits",
+      "display_name": "Exact length hits",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "accounting",
+      "calculation_summary": "Valid attempts whose cleaned length equals requested_target_length. Invalid and unparseable attempts are non-hits. The count is taken before filtering.",
+      "numerator": "valid attempts with cleaned length equal to the requested biological length",
+      "denominator_and_filters": "Not the approved rate. Non-hits remain in the ledger.",
+      "units": "count",
+      "expected_range": "nonnegative integer",
+      "direction": "not_applicable",
+      "length_treatment": "Equality of cleaned length and requested biological length. No nucleotide cutoff is applied.",
+      "missing_failure_handling": "An empty ledger yields zero counts. A row that violates the attempt-ledger schema raises DiagnosticMetricError and is not dropped or imputed.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "exact_hit_rate",
+      "display_name": "Exact-hit rate",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "exact_length_hits divided by raw_attempts. The rate is 0.0 when raw_attempts is 0. It is computed before filtering. It is not an execution-success requirement and not an eligibility threshold. The report-only name requested_length_exact_hit_rate is this quantity, not a second metric.",
+      "numerator": "exact_length_hits",
+      "denominator_and_filters": "raw_attempts, before filtering. Invalid and unparseable accounted attempts remain in the denominator and are non-hits.",
+      "units": "fraction",
+      "expected_range": "[0, 1]",
+      "direction": "not_applicable",
+      "length_treatment": "Uses cleaned length versus the requested biological length. Do not pool B0 into a matched-length B1/D1 estimate.",
+      "condition_scope": "Defined on a requested-length attempt ledger. It is not a B2 eligibility rule and not a B0 checkpoint-eligibility rule. Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast.",
+      "missing_failure_handling": "Zero raw attempts yields 0.0 and does not fail the diagnostic summary. Schema-invalid ledgers raise.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit."
+    },
+    {
+      "metric_id": "exact_hit_rate_valid_outputs_diagnostic",
+      "display_name": "Valid-only exact-hit diagnostic",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "exact_length_hits divided by valid_outputs, labelled valid_outputs_only_diagnostic_not_the_approved_metric. replaces_approved_raw_attempt_metric is false.",
+      "numerator": "exact_length_hits",
+      "denominator_and_filters": "valid_outputs only. This diagnostic must not replace exact_hit_rate.",
+      "units": "fraction",
+      "expected_range": "[0, 1]",
+      "direction": "not_applicable",
+      "length_treatment": "Same hit definition as exact_hit_rate, with a valid-only denominator.",
+      "missing_failure_handling": "The rate is 0.0 when valid_outputs is 0. That value still does not replace the raw-attempt rate.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "eos_marker_observations",
+      "display_name": "EOS marker observations",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "generation attempt ledger flag eos_marker_observed",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "Count of attempts whose eos_marker_observed flag is true.",
+      "numerator": "attempts with eos_marker_observed true",
+      "denominator_and_filters": "Not a ratio. The flag must be a boolean or the ledger is rejected.",
+      "units": "count",
+      "expected_range": "nonnegative integer",
+      "direction": "not_applicable",
+      "length_treatment": "The flag itself is not a length. Early EOS is a separate metric.",
+      "missing_failure_handling": "An empty ledger yields zero counts. A row that violates the attempt-ledger schema raises DiagnosticMetricError and is not dropped or imputed.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "early_eos_observations",
+      "display_name": "Early EOS observations",
+      "implementation_symbol": "m4_diagnostic_metrics.validate_attempt_record",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "Count of attempts whose early_eos flag is true. The ledger requires that flag to equal valid AND eos_marker_observed AND cleaned length less than requested length. An early EOS is not an exact hit.",
+      "numerator": "attempts with early_eos true",
+      "denominator_and_filters": "Not a ratio. A flag that disagrees with validity, EOS, and length rejects the ledger.",
+      "units": "count",
+      "expected_range": "nonnegative integer",
+      "direction": "not_applicable",
+      "length_treatment": "Requires cleaned length strictly below the requested biological length, together with validity and an EOS marker.",
+      "missing_failure_handling": "An empty ledger yields zero counts. A row that violates the attempt-ledger schema raises DiagnosticMetricError and is not dropped or imputed.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "cleaned_length_distribution",
+      "display_name": "Cleaned-length distribution",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "cleaned_length on every attempt",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "Multiset of cleaned lengths over every attempt, including invalid rows, as value/count pairs sorted by length.",
+      "numerator": "attempts at each cleaned length",
+      "denominator_and_filters": "Not a ratio. No attempt is removed.",
+      "units": "count per cleaned length",
+      "expected_range": "nonnegative counts over nonnegative integer lengths",
+      "direction": "not_applicable",
+      "length_treatment": "This is the cleaned-length distribution. It does not define a short/long cutoff.",
+      "missing_failure_handling": "An empty ledger yields an empty distribution.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "length_shortfall_distribution",
+      "display_name": "Length-shortfall distribution",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "Distribution of requested length minus cleaned length for attempts whose cleaned length is shorter than requested.",
+      "numerator": "short attempts at each positive shortfall",
+      "denominator_and_filters": "Attempts that are not short are omitted from this distribution and remain in raw_attempts.",
+      "units": "count per shortfall in nucleotides",
+      "expected_range": "nonnegative counts over positive integer shortfalls",
+      "direction": "not_applicable",
+      "length_treatment": "Shortfall is requested biological length minus cleaned length. Exact hits and excesses are not shortfalls.",
+      "missing_failure_handling": "No short attempts yields an empty distribution.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "length_excess_distribution",
+      "display_name": "Length-excess distribution",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "Distribution of cleaned length minus requested length for attempts whose cleaned length is longer than requested.",
+      "numerator": "long attempts at each positive excess",
+      "denominator_and_filters": "Attempts that are not long are omitted from this distribution and remain in raw_attempts.",
+      "units": "count per excess in nucleotides",
+      "expected_range": "nonnegative counts over positive integer excesses",
+      "direction": "not_applicable",
+      "length_treatment": "Excess is cleaned length minus requested biological length.",
+      "missing_failure_handling": "No long attempts yields an empty distribution.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "unique_valid_outputs",
+      "display_name": "Unique valid outputs",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "valid cleaned sequences",
+      "reference_role": "none",
+      "scientific_role": "outcome",
+      "calculation_summary": "Number of distinct valid cleaned sequences. This is an outcome count, not a closeness vote and not an aggregate generator-quality score. Clustering diversity remains deferred.",
+      "numerator": "distinct valid cleaned sequences",
+      "denominator_and_filters": "Not a ratio. Invalid sequences are excluded. unique_fraction uses valid_outputs as its denominator.",
+      "units": "count",
+      "expected_range": "nonnegative integer",
+      "direction": "not_applicable",
+      "length_treatment": "Sequence identity is exact string equality of the cleaned body. No length bin is applied.",
+      "missing_failure_handling": "No valid outputs yields 0.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "duplicates",
+      "display_name": "Duplicate valid outputs",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "valid cleaned sequences",
+      "reference_role": "none",
+      "scientific_role": "accounting",
+      "calculation_summary": "valid_outputs minus unique_valid_outputs. Each extra copy of a valid sequence contributes one.",
+      "numerator": "extra copies beyond the first occurrence of each valid sequence",
+      "denominator_and_filters": "Not a ratio. Invalid sequences are excluded.",
+      "units": "count",
+      "expected_range": "nonnegative integer",
+      "direction": "not_applicable",
+      "length_treatment": "Not length-normalized.",
+      "missing_failure_handling": "No valid outputs yields 0.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "largest_duplicate_multiplicity",
+      "display_name": "Largest duplicate multiplicity",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "valid cleaned sequences",
+      "reference_role": "none",
+      "scientific_role": "accounting",
+      "calculation_summary": "Largest number of times one valid cleaned sequence occurs. Zero when there are no valid outputs.",
+      "numerator": "count of the most frequent valid cleaned sequence",
+      "denominator_and_filters": "Not a ratio. The share uses valid_outputs and is a separate metric.",
+      "units": "count",
+      "expected_range": "nonnegative integer",
+      "direction": "not_applicable",
+      "length_treatment": "Not length-normalized.",
+      "missing_failure_handling": "No valid outputs yields 0.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "largest_duplicate_share",
+      "display_name": "Largest duplicate share",
+      "implementation_symbol": "m4_diagnostic_metrics.evaluate_hard_guardrails",
+      "data_source": "valid cleaned sequences",
+      "reference_role": "none",
+      "scientific_role": "guardrail",
+      "calculation_summary": "Count of the most frequent valid output divided by valid_outputs. The approved comparison is maximum 0.01. This is a guardrail, not a closeness vote.",
+      "numerator": "count_of_the_most_frequent_valid_output",
+      "denominator_and_filters": "valid_outputs. Invalid attempts are excluded from both the numerator and the denominator.",
+      "units": "fraction",
+      "expected_range": "null when valid_outputs is 0; otherwise in (0, 1]",
+      "direction": "lower",
+      "length_treatment": "Not length-stratified.",
+      "missing_failure_handling": "When valid_outputs is 0 the share is null, the decision passed flag is false, and the status is undefined_empty_valid_denominator. The share is not imputed as 0 for the pass rule.",
+      "approved_threshold": {
+        "comparison": "maximum",
+        "threshold": 0.01
+      },
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "valid_nonempty_acgu_fraction",
+      "display_name": "Valid nonempty A/C/G/U fraction",
+      "implementation_symbol": "m4_diagnostic_metrics.evaluate_hard_guardrails",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "guardrail",
+      "calculation_summary": "valid_outputs divided by raw_attempts. The approved comparison is minimum 0.99. A failed guardrail makes a checkpoint ineligible in the M4 rule. GEP-1 does not apply that decision.",
+      "numerator": "valid_outputs",
+      "denominator_and_filters": "raw_attempts. Invalid attempts remain in the denominator.",
+      "units": "fraction",
+      "expected_range": "[0, 1]",
+      "direction": "higher",
+      "length_treatment": "Not length-stratified.",
+      "missing_failure_handling": "When raw_attempts is 0, _rate returns 0.0 and the decision is not applicable: passed is false and status is undefined_empty_valid_denominator.",
+      "approved_threshold": {
+        "comparison": "minimum",
+        "threshold": 0.99
+      },
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "empty_or_unparseable_fraction",
+      "display_name": "Empty or unparseable fraction",
+      "implementation_symbol": "m4_diagnostic_metrics.evaluate_hard_guardrails",
+      "data_source": "generation attempt ledger",
+      "reference_role": "none",
+      "scientific_role": "guardrail",
+      "calculation_summary": "empty_or_unparseable_outputs divided by raw_attempts. The approved comparison is maximum 0.01. Nonempty alphabet failures are not in the numerator.",
+      "numerator": "empty_or_unparseable_outputs",
+      "denominator_and_filters": "raw_attempts.",
+      "units": "fraction",
+      "expected_range": "[0, 1]",
+      "direction": "lower",
+      "length_treatment": "Not length-stratified.",
+      "missing_failure_handling": "When raw_attempts is 0, _rate returns 0.0 and the decision is not applicable: passed is false and status is undefined_empty_valid_denominator.",
+      "approved_threshold": {
+        "comparison": "maximum",
+        "threshold": 0.01
+      },
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "unique_fraction",
+      "display_name": "Unique fraction",
+      "implementation_symbol": "m4_diagnostic_metrics.evaluate_hard_guardrails",
+      "data_source": "valid cleaned sequences",
+      "reference_role": "none",
+      "scientific_role": "guardrail",
+      "calculation_summary": "unique_valid_outputs divided by valid_outputs. The approved comparison is minimum 0.95.",
+      "numerator": "unique_valid_outputs",
+      "denominator_and_filters": "valid_outputs. Invalid attempts are excluded.",
+      "units": "fraction",
+      "expected_range": "[0, 1] when the denominator is positive; otherwise the decision is undefined",
+      "direction": "higher",
+      "length_treatment": "Not length-stratified.",
+      "missing_failure_handling": "When valid_outputs is 0, _rate returns 0.0 and the decision is not applicable: passed is false and status is undefined_empty_valid_denominator.",
+      "approved_threshold": {
+        "comparison": "minimum",
+        "threshold": 0.95
+      },
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "exact_train_match_rate",
+      "display_name": "Exact TRAIN match rate",
+      "implementation_symbol": "m4_diagnostic_metrics.evaluate_hard_guardrails",
+      "data_source": "valid cleaned sequences compared with caller-supplied TRAIN cores",
+      "reference_role": "TRAIN cores as an exact copying reference",
+      "scientific_role": "guardrail",
+      "calculation_summary": "Valid attempts whose cleaned sequence is exactly in the supplied TRAIN core set, divided by valid_outputs. The approved comparison is maximum 0.01. This is a copying guardrail, not closeness to EVAL. GEP-1 does not load TRAIN.",
+      "numerator": "valid outputs exactly equal to a supplied TRAIN core",
+      "denominator_and_filters": "valid_outputs. Matching uses exact string equality. Invalid attempts are excluded.",
+      "units": "fraction",
+      "expected_range": "[0, 1] when the denominator is positive; otherwise the decision is undefined",
+      "direction": "lower",
+      "length_treatment": "Exact full-string equality. No length normalization and no partial match.",
+      "missing_failure_handling": "When valid_outputs is 0 the decision is not applicable, passed is false, and status is undefined_empty_valid_denominator. A missing or non-canonical TRAIN reference raises train_reference_invalid. GEP-1 does not supply that reference.",
+      "approved_threshold": {
+        "comparison": "maximum",
+        "threshold": 0.01
+      },
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "per_requested_length_exact_hit_rate",
+      "display_name": "Per-requested-length exact-hit rate",
+      "implementation_symbol": "m4_diagnostic_metrics.summarise_attempts",
+      "data_source": "generation attempt ledger stratified by requested_target_length",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "For each requested_target_length, exact_length_hits divided by raw_attempts at that requested length. The same non-hit and pre-filter rules as exact_hit_rate apply inside the stratum. The historical provisional per-length reference is not an implemented pass/fail decision.",
+      "numerator": "exact_length_hits within one requested_target_length",
+      "denominator_and_filters": "raw_attempts for that requested_target_length. Invalid accounted attempts at that length remain and are non-hits.",
+      "units": "fraction",
+      "expected_range": "[0, 1] for each requested length present in the ledger",
+      "direction": "not_applicable",
+      "length_treatment": "Stratified by the requested biological length. No additional short/long boundary is defined.",
+      "missing_failure_handling": "A requested length with zero rows is absent. The within-stratum rate is 0.0 only when its own raw-attempt count is 0, which that stratum does not emit.",
+      "code_revision": {
+        "path": "scripts/modelling/m4_diagnostic_metrics.py",
+        "sha256": "eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "nearest_train_normalized_edit_distance",
+      "display_name": "Nearest-TRAIN normalized edit distance",
+      "implementation_symbol": "m6_diagnostic_generation.nearest_train",
+      "data_source": "valid cleaned sequences and caller-supplied TRAIN cores",
+      "reference_role": "TRAIN cores as a nearest-edit reference",
+      "scientific_role": "outcome",
+      "calculation_summary": "For each valid row, the minimum over TRAIN cores of Levenshtein distance divided by the length of the longer sequence. The distance is computed once per distinct valid sequence and then repeated for every valid row of that sequence. The reported value is the implemented quantile summary. thresholds_defined is false. This is not an EVAL closeness metric and not a binding result. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Directions on nearest_train_normalized_edit_distance and maximum_edit_similarity_to_train describe novelty only and are not extra votes for overall generator quality.",
+      "numerator": "Levenshtein distance to the nearest supplied TRAIN core",
+      "denominator_and_filters": "Length of the longer of the valid sequence and that TRAIN core. Quantiles are taken over valid rows. Invalid rows are excluded.",
+      "units": "normalized edit distance",
+      "expected_range": "null when there are no valid rows; otherwise quantiles of values in [0, 1]",
+      "direction": "higher",
+      "length_treatment": "Normalized by the longer sequence length. No short/long stratum is required for the overall summary. The length-stratified report is separate.",
+      "missing_failure_handling": "No valid rows yields a null quantile summary. GEP-1 does not load TRAIN and does not execute this metric.",
+      "code_revision": {
+        "path": "scripts/modelling/m6_diagnostic_generation.py",
+        "sha256": "83f299bea7ec69406c898ad0e971bebf06056beb58649de0c25a5cc6d7195726"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast.",
+      "novelty_direction_only": true
+    },
+    {
+      "metric_id": "maximum_edit_similarity_to_train",
+      "display_name": "Maximum edit similarity to TRAIN",
+      "implementation_symbol": "m6_diagnostic_generation.report_only_diagnostics",
+      "data_source": "nearest-TRAIN normalized edit distances of valid rows",
+      "reference_role": "TRAIN cores as a nearest-edit reference",
+      "scientific_role": "outcome",
+      "calculation_summary": "1 minus the minimum nearest-TRAIN normalized edit distance when any valid row exists; otherwise null. The implemented definition is an edit-based similarity, not a sequence identity. The configuration token maximum_identity_to_TRAIN is not this identifier. Directions on nearest_train_normalized_edit_distance and maximum_edit_similarity_to_train describe novelty only and are not extra votes for overall generator quality.",
+      "numerator": "1 minus the minimum normalized Levenshtein distance to TRAIN",
+      "denominator_and_filters": "Valid rows only. The minimum is over those rows' nearest-TRAIN distances.",
+      "units": "edit similarity",
+      "expected_range": "null when there are no valid rows; otherwise a float in [0, 1]",
+      "direction": "lower",
+      "length_treatment": "Inherits the longer-sequence normalization of the edit distance. Not a sequence-identity percentage.",
+      "missing_failure_handling": "No valid rows yields null. GEP-1 does not load TRAIN and does not execute this metric.",
+      "code_revision": {
+        "path": "scripts/modelling/m6_diagnostic_generation.py",
+        "sha256": "83f299bea7ec69406c898ad0e971bebf06056beb58649de0c25a5cc6d7195726"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast.",
+      "novelty_direction_only": true
+    },
+    {
+      "metric_id": "nucleotide_distribution",
+      "display_name": "Nucleotide distribution",
+      "implementation_symbol": "m6_diagnostic_generation.composition",
+      "data_source": "valid cleaned sequences, with duplicate rows retained",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "Counts and fractions of A, C, G, and U over valid rows. Each row contributes every base. A fraction is null when the base total is 0. No separate GC metric is implemented. Total variation against TRAIN is computed by the same function and is an unresolved membership item, not this metric.",
+      "numerator": "count of each base",
+      "denominator_and_filters": "Total bases across valid rows. Invalid rows are excluded. Duplicate valid rows are retained.",
+      "units": "count and fraction",
+      "expected_range": "fractions in [0, 1] or null when there are no bases; the four fractions sum to 1 when the total is positive",
+      "direction": "not_applicable",
+      "length_treatment": "Each base contributes equally. The distribution is not length-stratified here.",
+      "missing_failure_handling": "No bases yields null fractions. GEP-1 reports the specification and does not execute a TRAIN comparison.",
+      "code_revision": {
+        "path": "scripts/modelling/m6_diagnostic_generation.py",
+        "sha256": "83f299bea7ec69406c898ad0e971bebf06056beb58649de0c25a5cc6d7195726"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "dinucleotide_distribution",
+      "display_name": "Dinucleotide distribution",
+      "implementation_symbol": "m6_diagnostic_generation.composition",
+      "data_source": "valid cleaned sequences, with duplicate rows retained",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "Counts and fractions of the 16 overlapping A/C/G/U dinucleotides over valid rows. A sequence shorter than 2 contributes no pairs. A fraction is null when the pair total is 0. Total variation against TRAIN is an unresolved membership item, not this metric.",
+      "numerator": "count of each overlapping dinucleotide",
+      "denominator_and_filters": "Total overlapping dinucleotides across valid rows of length at least 2. Invalid rows are excluded.",
+      "units": "count and fraction",
+      "expected_range": "fractions in [0, 1] or null when there are no pairs",
+      "direction": "not_applicable",
+      "length_treatment": "Overlapping pairs within each valid sequence. Sequences shorter than 2 add no pairs. No short/long cutoff is defined.",
+      "missing_failure_handling": "No pairs yields null fractions.",
+      "code_revision": {
+        "path": "scripts/modelling/m6_diagnostic_generation.py",
+        "sha256": "83f299bea7ec69406c898ad0e971bebf06056beb58649de0c25a5cc6d7195726"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "mfe",
+      "display_name": "Minimum free energy",
+      "implementation_symbol": "m6_diagnostic_generation.structure_features",
+      "data_source": "caller-supplied fold of each distinct valid sequence, repeated on valid rows",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "Quantiles of the fold-returned MFE float. The code stores float(mfe) and does not rescale it. More negative MFE is not inherently better. thresholds_defined is false. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined.",
+      "numerator": "fold-returned MFE",
+      "denominator_and_filters": "Not a ratio. Quantiles are over valid rows. Invalid rows are excluded. A structure length that differs from the sequence raises fold_invalid.",
+      "units": "fold-returned MFE float (ViennaRNA convention is kcal/mol; this code does not convert the value)",
+      "expected_range": "null when there are no valid rows; otherwise quantiles of unconstrained floats",
+      "direction": "not_applicable",
+      "length_treatment": "Not divided by length. mfe_per_nt is a separate metric. The stratified report repeats the summary by requested length.",
+      "missing_failure_handling": "No valid rows yields a null quantile summary. A bad fold raises. GEP-1 does not call a fold.",
+      "code_revision": {
+        "path": "scripts/modelling/m6_diagnostic_generation.py",
+        "sha256": "83f299bea7ec69406c898ad0e971bebf06056beb58649de0c25a5cc6d7195726"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "mfe_per_nt",
+      "display_name": "MFE per nucleotide",
+      "implementation_symbol": "m6_diagnostic_generation.structure_features",
+      "data_source": "caller-supplied fold of each distinct valid sequence, repeated on valid rows",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "Quantiles of float(mfe) divided by the sequence length. The code key is mfe_per_nt. The configuration token mfe_per_nucleotide is not a second metric. More negative MFE per nucleotide is not a selection score. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined.",
+      "numerator": "fold-returned MFE",
+      "denominator_and_filters": "Sequence length in nucleotides. Quantiles are over valid rows. Division by zero is not reached because valid sequences are nonempty.",
+      "units": "fold-returned MFE float per nucleotide",
+      "expected_range": "null when there are no valid rows; otherwise quantiles of unconstrained floats",
+      "direction": "not_applicable",
+      "length_treatment": "Divides MFE by the valid sequence length. It does not define a short/long regime.",
+      "missing_failure_handling": "No valid rows yields a null quantile summary. GEP-1 does not call a fold.",
+      "code_revision": {
+        "path": "scripts/modelling/m6_diagnostic_generation.py",
+        "sha256": "83f299bea7ec69406c898ad0e971bebf06056beb58649de0c25a5cc6d7195726"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "paired_fraction",
+      "display_name": "Paired fraction",
+      "implementation_symbol": "m6_diagnostic_generation.structure_features",
+      "data_source": "dot-bracket string returned by the caller-supplied fold",
+      "reference_role": "none",
+      "scientific_role": "descriptor",
+      "calculation_summary": "Quantiles of (count of '(' plus count of ')') divided by the sequence length. Unpaired positions are not added to the numerator. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined.",
+      "numerator": "paired parentheses in the fold structure",
+      "denominator_and_filters": "Sequence length. The structure length must equal the sequence length. Quantiles are over valid rows.",
+      "units": "fraction",
+      "expected_range": "null when there are no valid rows; otherwise quantiles of values in [0, 1] for a consistent dot-bracket",
+      "direction": "not_applicable",
+      "length_treatment": "Normalized by sequence length. No short/long cutoff is defined.",
+      "missing_failure_handling": "No valid rows yields a null quantile summary. A structure of the wrong length raises fold_invalid. GEP-1 does not call a fold.",
+      "code_revision": {
+        "path": "scripts/modelling/m6_diagnostic_generation.py",
+        "sha256": "83f299bea7ec69406c898ad0e971bebf06056beb58649de0c25a5cc6d7195726"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    },
+    {
+      "metric_id": "full_length_stratified_results",
+      "display_name": "Full length-stratified results",
+      "implementation_symbol": "m6_diagnostic_generation.report_only_diagnostics",
+      "data_source": "generation attempt ledger grouped by requested_target_length",
+      "reference_role": "none for the grouping; stratum blocks use the same TRAIN and fold references as the unstratified diagnostics",
+      "scientific_role": "descriptor",
+      "calculation_summary": "The by_requested_length list. Each requested length repeats the report-only block for its valid rows and adds raw_attempts, exact_length_hits, and exact_hit_rate for every attempt at that length. This is a stratification, not an aggregate generator-quality score, and it does not define a new length boundary.",
+      "numerator": "the unstratified report-only numerators, restricted to one requested length",
+      "denominator_and_filters": "The unstratified denominators, restricted to that requested length. Attempts at other lengths are reported in their own strata.",
+      "units": "the units of the stratified metrics",
+      "expected_range": "one stratum per requested length present in the ledger",
+      "direction": "not_applicable",
+      "length_treatment": "Grouped by requested_target_length only. B0 is not pooled into a matched-length B1/D1 contrast by this grouping.",
+      "missing_failure_handling": "An empty ledger yields an empty stratum list. A stratum with no valid rows carries null structure and distance summaries and a defined attempt count.",
+      "code_revision": {
+        "path": "scripts/modelling/m6_diagnostic_generation.py",
+        "sha256": "83f299bea7ec69406c898ad0e971bebf06056beb58649de0c25a5cc6d7195726"
+      },
+      "config_revision": {
+        "path": "config/modelling/validation_metrics_v1.yaml",
+        "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
+      },
+      "freeze_status": "draft",
+      "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
+      "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
+    }
+  ],
+  "blocking_items": [
+    {
+      "id": "parsed_outputs_predicate_versus_successful_parse",
+      "status": "unresolved",
+      "related_names": [
+        "parsed_outputs"
+      ],
+      "statement": "On a schema-valid ledger, parsed_outputs equals raw_attempts, including empty unparseable rows. Thesis wording that treats parsed as successfully parsed is not the same predicate. GEP-1 also reports the synthetic contract field parsed_status and does not rename parsed_outputs."
+    },
+    {
+      "id": "alias_requested_length_exact_hit_rate",
+      "status": "unresolved",
+      "related_names": [
+        "requested_length_exact_hit_rate"
+      ],
+      "statement": "m6 REPORT_ONLY_ITEMS names requested_length_exact_hit_rate. The implemented metric id is exact_hit_rate. The public freeze of the alias is unresolved, so it is not a second metric."
+    },
+    {
+      "id": "alias_maximum_identity_to_train",
+      "status": "unresolved",
+      "related_names": [
+        "maximum_identity_to_TRAIN"
+      ],
+      "statement": "generator_evaluation.yaml names maximum_identity_to_TRAIN. The implemented key is maximum_edit_similarity_to_train, and the code states that this is an edit-based similarity, not a sequence identity. Those tokens are not frozen as synonyms."
+    },
+    {
+      "id": "alias_mfe_per_nucleotide",
+      "status": "unresolved",
+      "related_names": [
+        "mfe_per_nucleotide"
+      ],
+      "statement": "The configuration and report-only token is mfe_per_nucleotide. The implemented result key is mfe_per_nt. The public token is not frozen, so GEP-1 keeps the code key and does not create a second metric."
+    },
+    {
+      "id": "per_length_exact_hit_floor_not_a_decision",
+      "status": "unresolved",
+      "related_names": [
+        "per_length_exact_hit_floor",
+        "requested_length_exact_hit_rate"
+      ],
+      "statement": "validation_metrics_v1.yaml records historical provisional references for requested-length and per-length exact-hit rates. m4_diagnostic_metrics.py does not implement those references as pass/fail decisions, and exact_hit_rate_is_an_eligibility_threshold is false."
+    },
+    {
+      "id": "gc_fraction_not_implemented",
+      "status": "unresolved",
+      "related_names": [
+        "gc_fraction",
+        "GC"
+      ],
+      "statement": "No separate GC-fraction metric is implemented. Nucleotide fractions are the implemented composition descriptor."
+    },
+    {
+      "id": "clustering_diversity_deferred",
+      "status": "unresolved",
+      "related_names": [
+        "clustering_identity_threshold",
+        "generated_cluster_concentration",
+        "cluster_count",
+        "singleton_fraction",
+        "largest_cluster_share",
+        "shannon_diversity",
+        "effective_cluster_count"
+      ],
+      "statement": "Clustering-dependent diversity metrics are deferred beyond M4. No identity threshold is implemented. GEP-1 does not invent one."
+    },
+    {
+      "id": "representation_metrics_deferred",
+      "status": "unresolved",
+      "related_names": [
+        "frozen_representation_metrics",
+        "frozen_representation_or_embedding_metrics",
+        "representation_aggregation_rules"
+      ],
+      "statement": "Frozen representation or embedding metrics are not implemented. GEP-1 does not add one."
+    },
+    {
+      "id": "eval_closeness_not_implemented",
+      "status": "unresolved",
+      "related_names": [
+        "eval_distance",
+        "eval_closeness"
+      ],
+      "statement": "No EVAL distance or closeness metric is implemented. Generated-distribution similarity, were it later measured, would not demonstrate binding, affinity, selectivity, inhibition, or NDM-1-specific learning."
+    },
+    {
+      "id": "nucleotide_total_variation_membership_unresolved",
+      "status": "unresolved",
+      "related_names": [
+        "nucleotide_total_variation_to_train"
+      ],
+      "statement": "composition and total_variation can emit nucleotide_total_variation_to_train. Whether that comparison is a separate frozen thesis metric, rather than part of nucleotide_distribution, is unresolved. It is not EVAL closeness."
+    },
+    {
+      "id": "dinucleotide_total_variation_membership_unresolved",
+      "status": "unresolved",
+      "related_names": [
+        "dinucleotide_total_variation_to_train"
+      ],
+      "statement": "The same function can emit dinucleotide_total_variation_to_train. Separate thesis membership is unresolved. It is not EVAL closeness."
+    },
+    {
+      "id": "confidence_intervals_not_specified_in_gep1",
+      "status": "unresolved",
+      "related_names": [
+        "confidence_interval",
+        "bootstrap"
+      ],
+      "statement": "No generator-evaluation confidence interval, hypothesis test, or bootstrap is specified by the implemented metric functions. GEP-1 does not invent one. With fewer than two D1 training seeds, uncertainty excludes training-run variability."
+    },
+    {
+      "id": "train_reference_not_loaded_in_gep1",
+      "status": "unresolved",
+      "related_names": [
+        "exact_train_match_rate",
+        "nearest_train_normalized_edit_distance"
+      ],
+      "statement": "TRAIN-reference metrics are specified from the implemented functions. GEP-1 does not load TRAIN and does not compute them."
+    },
+    {
+      "id": "structure_metrics_not_executed_in_gep1",
+      "status": "unresolved",
+      "related_names": [
+        "mfe",
+        "mfe_per_nt",
+        "paired_fraction"
+      ],
+      "statement": "MFE and paired fraction are implemented behind a caller-supplied fold. GEP-1 does not call ViennaRNA or any other fold."
+    },
+    {
+      "id": "production_matched_chunk_schedule_not_wired",
+      "status": "unresolved",
+      "related_names": [
+        "invocation_index",
+        "batch_position",
+        "requested_target_length",
+        "max_seq_len",
+        "invocation_seed",
+        "generation_chunk_id"
+      ],
+      "statement": "The implemented matched B1/D1 provenance is the shared schedule compared by m6_diagnostic_generation.assert_pairing: invocation_index, batch_position, requested_target_length, max_seq_len, and invocation_seed, together with the shared length-schedule provenance from build_schedule (target_length_sampling_seed, length-vector identity, generation_seed_base, seed formula, and max_seq_len formula). GEP-1 checks those fields on synthetic rows. A shared generation_chunk_id is not sufficient. The production schedule and pool artefacts are not loaded."
+    },
+    {
+      "id": "b2_generic_seed_field_disambiguated",
+      "status": "unresolved",
+      "related_names": [
+        "seed",
+        "empirical_null_seed"
+      ],
+      "statement": "The B2 raw record uses a generic seed field. GEP-1 rejects that ambiguous field. The single B2 sampler seed is empirical_null_seed and is not a training replicate. A production mapping from the B2 manifest field is not wired."
+    }
+  ],
+  "novelty_direction_statement": "Directions on nearest_train_normalized_edit_distance and maximum_edit_similarity_to_train describe novelty only and are not extra votes for overall generator quality.",
+  "revision_schema": {
+    "code_revision": [
+      "path",
+      "sha256"
+    ],
+    "config_revision": [
+      "path",
+      "sha256"
+    ],
+    "governing_plan": [
+      "path",
+      "sha256",
+      "version",
+      "revision_date"
+    ]
+  }
+}

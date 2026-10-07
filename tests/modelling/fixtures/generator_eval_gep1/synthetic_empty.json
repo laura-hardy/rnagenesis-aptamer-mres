@@ -1,0 +1,6 @@
+{
+  "fixture_role": "SYNTHETIC",
+  "chunk_id_namespace": "synthetic_stand_in_for_m4_m6_invocation_index",
+  "note": "Obviously artificial GEP-1 rows. Not taken from any corpus, pool, checkpoint, or model output. B0 seeds are synthetic, not historical production seeds.",
+  "records": []
+}
