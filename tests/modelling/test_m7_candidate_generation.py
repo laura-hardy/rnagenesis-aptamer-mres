@@ -1180,7 +1180,7 @@ class LdLibraryPathCandidateTests(WorldCase):
         for call in world.calls:
             self.assertEqual(call["env"]["LD_LIBRARY_PATH"], LD_VALUE)
             permitted = set(common.ENVIRONMENT_ALLOW_LIST) | set(common.OFFLINE_CONTROLS) | set(common.isolated_paths(world.output(2)))
-            permitted |= {"LD_LIBRARY_PATH", "PATH", "PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER"}
+            permitted |= set(common.FIXED_CHILD_ENVIRONMENT_CONTROLS) | {"LD_LIBRARY_PATH", "PATH", "PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER"}
             self.assertTrue(set(call["env"]) <= permitted, sorted(set(call["env"]) - permitted))
             self.assertEqual(call["env"]["PATH"], common.FIXED_CHILD_PATH)
         record = manifest["environment"]["ld_library_path"]

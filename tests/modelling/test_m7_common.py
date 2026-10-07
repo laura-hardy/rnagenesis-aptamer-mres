@@ -576,7 +576,7 @@ class EnvironmentTests(_TempCase):
         for key in ("HOME", "TMPDIR", "TEMP", "TMP", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "HF_HOME", "TORCH_HOME", "PYTHONPYCACHEPREFIX"):
             self.assertEqual(child[key], paths[key])
             self.assertTrue(child[key].startswith(output + os.sep))
-        allowed = set(common.ENVIRONMENT_ALLOW_LIST) | set(common.OFFLINE_CONTROLS) | set(paths) | {
+        allowed = set(common.ENVIRONMENT_ALLOW_LIST) | set(common.OFFLINE_CONTROLS) | set(paths) | set(common.FIXED_CHILD_ENVIRONMENT_CONTROLS) | {
             "PATH",
             "PYTHONDONTWRITEBYTECODE",
             "PYTHONNOUSERSITE",
@@ -671,7 +671,7 @@ class LdLibraryPathTests(_TempCase):
         self.assertEqual(parent, before)
         self.assertEqual(child["LD_LIBRARY_PATH"], self.VALUE)
         paths = common.isolated_paths(output)
-        allowed = set(common.ENVIRONMENT_ALLOW_LIST) | set(common.OFFLINE_CONTROLS) | set(paths) | {
+        allowed = set(common.ENVIRONMENT_ALLOW_LIST) | set(common.OFFLINE_CONTROLS) | set(paths) | set(common.FIXED_CHILD_ENVIRONMENT_CONTROLS) | {
             "PATH", "PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER", "LD_LIBRARY_PATH",
         }
         self.assertTrue(set(child) <= allowed, sorted(set(child) - allowed))
@@ -808,6 +808,123 @@ class LdLibraryPathTests(_TempCase):
         ):
             with self.assertRaises(M7Error, msg=str(bad)):
                 common.assert_ld_library_path_record(bad)
+
+
+class CudaModuleLoadingControlTests(_TempCase):
+    """The child sets ``CUDA_MODULE_LOADING=LAZY`` itself. A parent value never does."""
+
+    def output(self):
+        output = os.path.join(self.temp, "m7_unit_seed43")
+        os.makedirs(output, exist_ok=True)
+        return output
+
+    def parent(self, **extra):
+        parent = {"PATH": "/tmp/hostile:/usr/bin", "LANG": "C.UTF-8", "LC_ALL": "C"}
+        parent.update(extra)
+        return parent
+
+    def child(self, **parent_extra):
+        return common.build_child_environment(self.parent(**parent_extra), 1, self.output(), None)
+
+    def reject(self, environ):
+        with self.assertRaises(M7Error) as caught:
+            common.assert_child_environment(environ, self.output())
+        self.assertEqual(caught.exception.code, "environment_rejected")
+        return caught.exception.detail
+
+    def test_the_constructed_child_environment_fixes_cuda_module_loading_to_lazy(self):
+        child = self.child()
+        self.assertEqual(common.FIXED_CHILD_ENVIRONMENT_CONTROLS, {"CUDA_MODULE_LOADING": "LAZY"})
+        self.assertEqual(common.CUDA_MODULE_LOADING_VALUE, "LAZY")
+        self.assertNotIn("CUDA_MODULE_LOADING", common.ENVIRONMENT_ALLOW_LIST)
+        self.assertEqual(child["CUDA_MODULE_LOADING"], "LAZY")
+        self.assertEqual(child["PATH"], common.FIXED_CHILD_PATH)
+        self.assertEqual(child["CUDA_VISIBLE_DEVICES"], "1")
+        self.assertEqual(child["CUDA_DEVICE_ORDER"], "PCI_BUS_ID")
+        self.assertNotIn("LD_LIBRARY_PATH", child)
+        for key, value in common.OFFLINE_CONTROLS.items():
+            self.assertEqual(child[key], value)
+        for key, value in common.isolated_paths(self.output()).items():
+            self.assertEqual(child[key], value)
+        self.assertTrue(common.assert_child_environment(child, self.output()))
+        with open(os.path.join(ROOT, "scripts/modelling/m7_common.py")) as handle:
+            source = handle.read()
+        function = source[source.index("def build_child_environment"):source.index("def assert_fixed_child_environment_controls")]
+        self.assertNotIn('parent["CUDA_MODULE_LOADING"]', function)
+        self.assertNotIn('parent.get("CUDA_MODULE_LOADING"', function)
+        self.assertIn("FIXED_CHILD_ENVIRONMENT_CONTROLS", function)
+
+    def test_an_ambient_parent_value_cannot_control_or_replace_the_fixed_child_value(self):
+        for ambient in ("EAGER", "lazy", "Lazy", "LAZY", "", "LAZY ", " DEFAULT", "1"):
+            parent = self.parent(CUDA_MODULE_LOADING=ambient, LD_LIBRARY_PATH="/lib/ambient")
+            before = dict(parent)
+            child = common.build_child_environment(parent, 1, self.output(), None)
+            self.assertEqual(parent, before, ambient)
+            self.assertEqual(child["CUDA_MODULE_LOADING"], "LAZY", ambient)
+            self.assertNotIn("LD_LIBRARY_PATH", child, ambient)
+            self.assertEqual(child["PATH"], common.FIXED_CHILD_PATH, ambient)
+            self.assertTrue(common.assert_child_environment(child, self.output()), ambient)
+
+    def test_injected_fault_missing_control_is_rejected(self):
+        child = self.child()
+        del child["CUDA_MODULE_LOADING"]
+        detail = self.reject(child)
+        self.assertEqual(detail, "fixed child control is missing: CUDA_MODULE_LOADING")
+
+    def test_injected_fault_empty_control_is_rejected(self):
+        detail = self.reject(dict(self.child(), CUDA_MODULE_LOADING=""))
+        self.assertEqual(detail, "fixed child control is empty: CUDA_MODULE_LOADING")
+        self.assertNotIn("LAZY", detail)
+
+    def test_injected_fault_non_text_control_is_rejected(self):
+        detail = self.reject(dict(self.child(), CUDA_MODULE_LOADING=7))
+        self.assertEqual(detail, "fixed child control is not text: CUDA_MODULE_LOADING")
+        self.assertNotIn("7", detail)
+
+    def test_injected_fault_differently_cased_value_is_rejected(self):
+        for value in ("lazy", "Lazy", "lAzY"):
+            detail = self.reject(dict(self.child(), CUDA_MODULE_LOADING=value))
+            self.assertEqual(detail, "fixed child control differs in case: CUDA_MODULE_LOADING", value)
+            self.assertNotIn(value, detail)
+
+    def test_injected_fault_alternative_value_is_rejected(self):
+        for value in ("EAGER", "DEFAULT", "LAZY ", " LAZY", "LAZY\n"):
+            detail = self.reject(dict(self.child(), CUDA_MODULE_LOADING=value))
+            self.assertEqual(detail, "fixed child control is not the required value: CUDA_MODULE_LOADING", repr(value))
+            self.assertNotIn(value, detail)
+
+    def test_injected_fault_differently_cased_name_is_rejected(self):
+        child = self.child()
+        del child["CUDA_MODULE_LOADING"]
+        child["cuda_module_loading"] = "LAZY"
+        detail = self.reject(child)
+        self.assertEqual(detail, "fixed child control is missing: CUDA_MODULE_LOADING")
+        self.assertNotIn("cuda_module_loading", detail)
+
+    def test_injected_fault_safe_stray_names_are_sorted_and_value_free(self):
+        secret = "ambient-secret-value-9f3a"
+        stray = dict(self.child(), ZEBRA_NAME=secret, ALPHA_NAME=secret)
+        detail = self.reject(stray)
+        self.assertEqual(detail, "the worker environment holds 2 names outside the allow-list: ALPHA_NAME,ZEBRA_NAME")
+        self.assertNotIn(secret, detail)
+
+    def test_injected_fault_unsafe_names_are_omitted_and_the_list_is_bounded(self):
+        secret = "zz-secret-value"
+        child = self.child()
+        child["!" + secret] = secret
+        child["ACGUACGUACGU"] = secret
+        for index in range(9):
+            child["N%02d" % index] = secret
+        detail = self.reject(child)
+        self.assertTrue(detail.startswith("the worker environment holds 11 names outside the allow-list: "))
+        self.assertNotIn(secret, detail)
+        self.assertNotIn("!" + secret, detail)
+        self.assertNotIn("ACGUACGUACGU", detail)
+        listed = detail.split(": ", 1)[1].split(" +")[0].split(",")
+        self.assertEqual(len(listed), common.UNEXPECTED_ENVIRONMENT_NAME_LIMIT)
+        self.assertIn("<omitted-name>", listed)
+        self.assertTrue(detail.endswith(" +3"))
+        self.assertNotIn("N08", detail.split(" +")[0])
 
 
 class GpuBindingTests(unittest.TestCase):

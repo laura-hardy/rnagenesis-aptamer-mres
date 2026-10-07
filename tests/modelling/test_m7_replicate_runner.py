@@ -723,7 +723,7 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(env["CUDA_DEVICE_ORDER"], "PCI_BUS_ID")
         self.assertTrue(env["HOME"].startswith(directory + os.sep))
         self.assertTrue(env["TMPDIR"].startswith(directory + os.sep))
-        self.assertTrue(set(env) <= set(common.ENVIRONMENT_ALLOW_LIST) | set(common.OFFLINE_CONTROLS) | set(common.isolated_paths(directory)) | {"PATH", "PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER"})
+        self.assertTrue(set(env) <= set(common.ENVIRONMENT_ALLOW_LIST) | set(common.OFFLINE_CONTROLS) | set(common.isolated_paths(directory)) | set(common.FIXED_CHILD_ENVIRONMENT_CONTROLS) | {"PATH", "PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER"})
         self.assertEqual(env["PATH"], common.FIXED_CHILD_PATH)
         self.assertEqual(self.seen, {"assets": 1, "python": 1})
         self.assertFalse(os.path.lexists(self.harness.entries[44]["output_directory"]))
@@ -881,7 +881,7 @@ class LdLibraryPathLauncherTests(unittest.TestCase):
         env = captured["env"]
         self.assertEqual(env["LD_LIBRARY_PATH"], self.VALUE)
         permitted = set(common.ENVIRONMENT_ALLOW_LIST) | set(common.OFFLINE_CONTROLS) | set(common.isolated_paths(directory))
-        permitted |= {"LD_LIBRARY_PATH", "PATH", "PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER"}
+        permitted |= set(common.FIXED_CHILD_ENVIRONMENT_CONTROLS) | {"LD_LIBRARY_PATH", "PATH", "PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER"}
         self.assertTrue(set(env) <= permitted, sorted(set(env) - permitted))
         self.assertEqual(env["PATH"], common.FIXED_CHILD_PATH)
         with open(os.path.join(directory, contract.SUCCESS_MANIFEST_NAME), "rb") as handle:
@@ -951,6 +951,100 @@ class LdLibraryPathLauncherTests(unittest.TestCase):
             with self.assertRaises(M7Error) as caught:
                 contract.validate_replicate_manifest(manifest, dict(binding, ld_library_path_sha256=wrong))
             self.assertEqual(caught.exception.code, "environment_rejected")
+
+
+class IntroducingClock(object):
+    """Stand-in for ``SynchronizedClock.stamp`` introducing the pinned runtime variable."""
+
+    def __init__(self, extra=None):
+        self.extra = extra
+        self.calls = 0
+        self.value_before = None
+
+    def stamp(self):
+        self.calls += 1
+        if self.calls == 1:
+            self.value_before = os.environ.get("CUDA_MODULE_LOADING")
+        os.environ.setdefault("CUDA_MODULE_LOADING", "LAZY")
+        if self.extra is not None:
+            name, value = self.extra
+            os.environ[name] = value
+        return float(self.calls)
+
+
+class SilentClock(object):
+    """A clock that does not repair the environment."""
+
+    def stamp(self):
+        return 1.0
+
+
+class CudaModuleLoadingRuntimeTests(unittest.TestCase):
+    """The second isolation check accepts the fixed control and still rejects a stray name."""
+
+    def setUp(self):
+        self.harness = support.Harness()
+        self.addCleanup(self.harness.close)
+
+    def test_a_clock_that_introduces_lazy_no_longer_fails_the_second_isolation_check(self):
+        entry, directory, env = self.harness.consume(43)
+        self.assertEqual(env["CUDA_MODULE_LOADING"], "LAZY")
+        clock = IntroducingClock()
+        stack = self.harness.make_stack(43)
+        stack.clock = lambda clock=clock: clock
+        progress = common.new_progress(43, "replicate")
+        runner.reset_process_claim_for_tests()
+        with self.harness.patched(env):
+            manifest = runner.run_authorised_replicate(entry, stack, directory, progress=progress)
+        self.assertEqual(clock.value_before, "LAZY")
+        self.assertGreaterEqual(clock.calls, 1)
+        self.assertEqual(manifest["seed"], 43)
+        self.assertEqual(manifest["environment"]["stray_environment_names"], 0)
+        self.assertTrue(self.harness.verify_calls)
+
+    def test_injected_fault_missing_or_altered_values_still_fail_the_second_check(self):
+        cases = (
+            ("missing", SilentClock(), lambda env: env.pop("CUDA_MODULE_LOADING"), "fixed child control is missing: CUDA_MODULE_LOADING"),
+            ("empty", IntroducingClock(), lambda env: env.__setitem__("CUDA_MODULE_LOADING", ""), "fixed child control is empty: CUDA_MODULE_LOADING"),
+            ("case", IntroducingClock(), lambda env: env.__setitem__("CUDA_MODULE_LOADING", "lazy"), "fixed child control differs in case: CUDA_MODULE_LOADING"),
+            ("alternative", IntroducingClock(), lambda env: env.__setitem__("CUDA_MODULE_LOADING", "EAGER"), "fixed child control is not the required value: CUDA_MODULE_LOADING"),
+        )
+        for name, clock, mutate, detail in cases:
+            harness = support.Harness()
+            self.addCleanup(harness.close)
+            entry, directory, env = harness.consume(43)
+            mutate(env)
+            stack = harness.make_stack(43)
+            stack.clock = lambda clock=clock: clock
+            progress = common.new_progress(43, "replicate")
+            runner.reset_process_claim_for_tests()
+            with harness.patched(env):
+                with self.assertRaises(M7Error, msg=name) as caught:
+                    runner.run_authorised_replicate(entry, stack, directory, progress=progress)
+            self.assertEqual(caught.exception.code, "environment_rejected", name)
+            self.assertEqual(caught.exception.detail, detail, name)
+            self.assertEqual(progress["stage"], "runtime_identity", name)
+            self.assertEqual(harness.verify_calls, [], name)
+            self.assertNotIn("EAGER", str(caught.exception), name)
+            self.assertNotIn("lazy", str(caught.exception), name)
+
+    def test_a_stray_variable_introduced_beside_the_fixed_control_is_still_rejected(self):
+        entry, directory, env = self.harness.consume(43)
+        secret = "clock-secret-value-not-reported"
+        clock = IntroducingClock(extra=("STRAY_FROM_CLOCK", secret))
+        stack = self.harness.make_stack(43)
+        stack.clock = lambda clock=clock: clock
+        progress = common.new_progress(43, "replicate")
+        runner.reset_process_claim_for_tests()
+        with self.harness.patched(env):
+            with self.assertRaises(M7Error) as caught:
+                runner.run_authorised_replicate(entry, stack, directory, progress=progress)
+        self.assertEqual(clock.value_before, "LAZY")
+        self.assertEqual(caught.exception.code, "environment_rejected")
+        self.assertEqual(progress["stage"], "runtime_identity")
+        self.assertEqual(caught.exception.detail, "the worker environment holds 1 names outside the allow-list: STRAY_FROM_CLOCK")
+        self.assertNotIn(secret, str(caught.exception))
+        self.assertEqual(self.harness.verify_calls, [])
 
 
 if __name__ == "__main__":

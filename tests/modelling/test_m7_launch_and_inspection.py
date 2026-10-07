@@ -281,6 +281,35 @@ class InactiveRefusalTests(WiredLauncherBase):
             self.assertEqual(runner.main(["--authorisation-id", "m7_unit_seed43_gpu1"]), 2)
         self.nothing_created()
 
+    def test_the_inactive_launcher_refuses_before_environment_repository_gpu_interpreter_asset_or_weight_access(self):
+        reached = []
+
+        def refuse(name):
+            def raiser(*arguments, **keywords):
+                reached.append(name)
+                raise AssertionError("inactive launcher reached " + name)
+
+            return raiser
+
+        config_bytes = self.inactive_bytes()
+        with mock.patch.object(common, "assert_parent_environment", refuse("environment")), \
+                mock.patch.object(common, "build_child_environment", refuse("child-environment")), \
+                mock.patch.object(runner, "live_repository_observation", refuse("repository")), \
+                mock.patch.object(common, "live_gpu_probe", refuse("gpu")), \
+                mock.patch.object(common, "observe_interpreter", refuse("interpreter")), \
+                mock.patch.object(runner.m6, "observe_required_assets", refuse("asset")), \
+                mock.patch.object(common, "hash_regular_file", refuse("weight")):
+            with self.assertRaises(M7Error) as caught:
+                runner.launch_authorised_entry(
+                    "m7_unit_seed43_gpu1",
+                    run_root=self.harness.temp,
+                    environ={"CUDA_MODULE_LOADING": "EAGER", "LD_LIBRARY_PATH": "/tmp/not-used", "PATH": "/tmp/hostile"},
+                    config_bytes=config_bytes,
+                )
+        self.assertEqual(caught.exception.code, "execution_not_authorised")
+        self.assertEqual(reached, [])
+        self.nothing_created()
+
     def test_the_command_line_parses_the_id_and_refuses_it_while_inactive(self):
         path = os.path.join(ROOT, "scripts/modelling/m7_replicate_runner.py")
         refused = subprocess.run([sys.executable, "-B", path, "--authorisation-id", "m7_unit_seed43_gpu1"], capture_output=True, text=True, cwd="/tmp")
