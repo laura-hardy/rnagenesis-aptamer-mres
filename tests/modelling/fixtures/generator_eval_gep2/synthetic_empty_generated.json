@@ -1,0 +1,17 @@
+{
+  "fixture_role": "SYNTHETIC",
+  "reference_role": "synthetic_eval_stand_in",
+  "reference_id": "gep2-synthetic-reference",
+  "train_collection_role": "synthetic_train_stand_in",
+  "synthetic_train_cores": [
+    "UUUUUUUU"
+  ],
+  "synthetic_reference_sequences": [
+    {
+      "sequence_id": "ref-a",
+      "sequence": "ACGUACGU"
+    }
+  ],
+  "stratified": false,
+  "records": []
+}

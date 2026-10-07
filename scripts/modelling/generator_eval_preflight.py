@@ -75,17 +75,20 @@ IMPLEMENTED_MAX_CHUNK_SIZE = 16
 IMPLEMENTED_BATCH_NUM = 1
 M4_METRICS_RELATIVE = "scripts/modelling/m4_diagnostic_metrics.py"
 M6_DIAGNOSTIC_RELATIVE = "scripts/modelling/m6_diagnostic_generation.py"
+ANALYSIS_RELATIVE = "scripts/modelling/generator_eval_analysis.py"
 METRICS_CONFIG_RELATIVE = "config/modelling/validation_metrics_v1.yaml"
 GOVERNING_PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan.md"
 ALLOWED_REVISION_PATHS = (
     M4_METRICS_RELATIVE,
     M6_DIAGNOSTIC_RELATIVE,
+    ANALYSIS_RELATIVE,
     METRICS_CONFIG_RELATIVE,
     GOVERNING_PLAN_RELATIVE,
 )
 CODE_PATH_BY_MODULE = {
     "m4_diagnostic_metrics": M4_METRICS_RELATIVE,
     "m6_diagnostic_generation": M6_DIAGNOSTIC_RELATIVE,
+    "generator_eval_analysis": ANALYSIS_RELATIVE,
 }
 CONTROLLED_COMPARISON_KIND = "matched_b1_d1_controlled_comparison"
 
@@ -178,6 +181,66 @@ ADDITIONAL_IMPLEMENTED_METRIC_IDS = (
     "paired_fraction",
     "full_length_stratified_results",
 )
+GEP2_IMPLEMENTED_METRIC_IDS = (
+    "successfully_parsed_outputs",
+    "pooled_gc_fraction",
+    "nearest_reference_normalized_edit_distance",
+    "nucleotide_total_variation_to_reference",
+    "dinucleotide_total_variation_to_reference",
+)
+GEP2_CLOSENESS_METRIC_IDS = (
+    "nearest_reference_normalized_edit_distance",
+    "nucleotide_total_variation_to_reference",
+    "dinucleotide_total_variation_to_reference",
+)
+SYNTHETIC_REFERENCE_ROLE = "synthetic_eval_stand_in"
+FORBIDDEN_REFERENCE_ROLES = ("EVAL", "REF", "VALIDATION", "TRAIN")
+FORBIDDEN_METRIC_ALIASES = (
+    "requested_length_exact_hit_rate",
+    "maximum_identity_to_TRAIN",
+    "maximum_identity_to_train",
+    "mfe_per_nucleotide",
+    "mfe_per_nt_median",
+    "nucleotide_total_variation_to_train",
+    "dinucleotide_total_variation_to_train",
+    "nucleotide_distribution_distance",
+    "dinucleotide_distribution_distance",
+    "gc_fraction",
+    "combined_quality_score",
+    "combined_closeness_score",
+    "aggregate_generator_quality_score",
+    "generator_quality_score",
+    "confidence_interval",
+    "mixed",
+)
+OPTIONAL_RECORD_FIELDS = (
+    "s6_length_stratum",
+    "s6_assignment_provenance",
+)
+RESOLVED_BLOCKING_IDS = (
+    "parsed_outputs_predicate_versus_successful_parse",
+    "alias_requested_length_exact_hit_rate",
+    "alias_maximum_identity_to_train",
+    "alias_mfe_per_nucleotide",
+    "per_length_exact_hit_floor_not_a_decision",
+    "gc_fraction_not_implemented",
+    "eval_closeness_not_implemented",
+    "nucleotide_total_variation_membership_unresolved",
+    "dinucleotide_total_variation_membership_unresolved",
+    "b2_generic_seed_field_disambiguated",
+)
+RESOLVED_REQUIRED_PHRASES = {
+    "parsed_outputs_predicate_versus_successful_parse": "successfully_parsed_outputs counts nonempty extracted sequences before A/C/G/U filtering",
+    "alias_requested_length_exact_hit_rate": "exact_hit_rate is the only requested-length exact-hit metric",
+    "alias_maximum_identity_to_train": "maximum_identity_to_TRAIN is retired and is not an alias. maximum_edit_similarity_to_train remains the code metric",
+    "alias_mfe_per_nucleotide": "mfe_per_nt remains the generator metric. It is not the AptaRank normalized-MFE component.",
+    "per_length_exact_hit_floor_not_a_decision": "0.90 and 0.50 are historical references, not decisions. B0 exact hit is not_applicable.",
+    "gc_fraction_not_implemented": "pooled_gc_fraction",
+    "eval_closeness_not_implemented": "formal M9C unlock supplies unique EVAL cores",
+    "nucleotide_total_variation_membership_unresolved": "nested descriptive output",
+    "dinucleotide_total_variation_membership_unresolved": "nested descriptive output",
+    "b2_generic_seed_field_disambiguated": "does not assume that a production run used seed 42",
+}
 BLOCKING_IDS = (
     "parsed_outputs_predicate_versus_successful_parse",
     "alias_requested_length_exact_hit_rate",
@@ -394,11 +457,23 @@ def _validate_metric_revisions(metric, problems):
     _validate_path_sha256(metric.get("config_revision"), metric_id + " config_revision", METRICS_CONFIG_RELATIVE, problems)
 
 
+def _analysis_implements(symbol):
+    if not isinstance(symbol, str) or "." not in symbol:
+        return False
+    module_name, func_name = symbol.split(".", 1)
+    if module_name != "generator_eval_analysis":
+        return False
+    module = _load_module("generator_eval_analysis.py", "gep2_analysis_for_spec")
+    function = getattr(module, func_name, None)
+    return callable(function)
+
+
 def validate_metric_spec(spec, require_draft=True):
     """Return the spec when it matches the implemented metric ids.
 
-    Closeness is an allowed role word for later packages. This package
-    rejects it because no EVAL closeness metric is implemented.
+    A closeness row is accepted only for an implemented GEP-2 metric whose
+    reference role is exactly synthetic_eval_stand_in. Runtime role EVAL is
+    refused. The spec stays draft and has no aggregate score.
     """
     metrics_module = _load_module("m4_diagnostic_metrics.py", "gep1_m4_metrics")
     report_module = _load_module("m6_diagnostic_generation.py", "gep1_m6_report")
@@ -430,10 +505,21 @@ def validate_metric_spec(spec, require_draft=True):
         if metric_id in seen:
             problems.append(_problem("metric_spec_invalid", "duplicate metric_id " + metric_id))
         seen.append(metric_id)
+        if metric_id in FORBIDDEN_METRIC_ALIASES:
+            problems.append(_problem("unknown_metric_alias", metric_id + " is not a metric id"))
+        if metric["reference_role"] in FORBIDDEN_REFERENCE_ROLES:
+            problems.append(_problem("reference_role_refused", metric_id + " labels a reference as " + metric["reference_role"]))
         if metric["scientific_role"] not in SCIENTIFIC_ROLES:
             problems.append(_problem("metric_spec_invalid", metric_id + " has an unknown scientific role"))
         if metric["scientific_role"] == "closeness":
-            problems.append(_problem("closeness_metric_not_implemented", metric_id + " claims EVAL closeness"))
+            if metric_id not in GEP2_CLOSENESS_METRIC_IDS or not _analysis_implements(metric.get("implementation_symbol")):
+                problems.append(_problem("closeness_metric_not_implemented", metric_id + " claims closeness without the synthetic implementation"))
+            elif metric["reference_role"] != SYNTHETIC_REFERENCE_ROLE:
+                problems.append(_problem("closeness_runtime_role_refused", metric_id + " closeness role is not synthetic_eval_stand_in"))
+            elif metric["direction"] != "lower":
+                problems.append(_problem("metric_spec_invalid", metric_id + " closeness direction must be lower"))
+        elif metric_id in GEP2_IMPLEMENTED_METRIC_IDS and not _analysis_implements(metric.get("implementation_symbol")):
+            problems.append(_problem("implementation_missing", metric_id + " has no analysis implementation"))
         if metric["direction"] not in DIRECTIONS:
             problems.append(_problem("metric_spec_invalid", metric_id + " has an unknown direction"))
         if metric["freeze_status"] not in ("draft", "frozen"):
@@ -455,7 +541,12 @@ def validate_metric_spec(spec, require_draft=True):
                 problems.append(_problem("metric_threshold_drift", metric_id + " threshold does not match the implemented guardrail"))
         elif "approved_threshold" in metric:
             problems.append(_problem("metric_threshold_invented", metric_id + " declares a threshold the implementation does not"))
-    expected_ids = set(metrics_module.IMPLEMENTED_METRIC_IDS) | set(metrics_module.HARD_GUARDRAIL_IDS) | set(ADDITIONAL_IMPLEMENTED_METRIC_IDS)
+    expected_ids = (
+        set(metrics_module.IMPLEMENTED_METRIC_IDS)
+        | set(metrics_module.HARD_GUARDRAIL_IDS)
+        | set(ADDITIONAL_IMPLEMENTED_METRIC_IDS)
+        | set(GEP2_IMPLEMENTED_METRIC_IDS)
+    )
     if set(seen) != expected_ids:
         missing_ids = sorted(expected_ids - set(seen))
         extra_ids = sorted(set(seen) - expected_ids)
@@ -467,16 +558,26 @@ def validate_metric_spec(spec, require_draft=True):
     if not isinstance(blocking, list):
         problems.append(_problem("metric_spec_invalid", "blocking items are missing"))
         blocking = []
-    blocking_ids = []
+    resolved_ids = []
+    unresolved_ids = []
     for item in blocking:
-        if not isinstance(item, dict) or not _nonempty_text(item.get("id")) or item.get("status") != "unresolved":
+        if not isinstance(item, dict) or not _nonempty_text(item.get("id")) or item.get("status") not in ("resolved", "unresolved"):
             problems.append(_problem("metric_spec_invalid", "a blocking item is incomplete"))
             continue
         if not _nonempty_text(item.get("statement")) or not isinstance(item.get("related_names"), list):
             problems.append(_problem("metric_spec_invalid", item["id"] + " lacks a statement or related names"))
-        blocking_ids.append(item["id"])
-    if set(blocking_ids) != set(BLOCKING_IDS):
-        problems.append(_problem("blocking_item_drift", "blocking items do not match the GEP-1 unresolved set"))
+            continue
+        if item["status"] == "resolved":
+            phrase = RESOLVED_REQUIRED_PHRASES.get(item["id"])
+            if phrase is None or phrase not in item["statement"]:
+                problems.append(_problem("blocking_decision_missing", item["id"] + " does not record the reviewed decision"))
+            resolved_ids.append(item["id"])
+        else:
+            unresolved_ids.append(item["id"])
+    if set(resolved_ids) != set(RESOLVED_BLOCKING_IDS) or set(unresolved_ids) != set(BLOCKING_IDS) - set(RESOLVED_BLOCKING_IDS):
+        problems.append(_problem("blocking_item_drift", "blocking items do not match the reviewed resolved and unresolved sets"))
+    if len(resolved_ids) != len(set(resolved_ids)) or len(unresolved_ids) != len(set(unresolved_ids)):
+        problems.append(_problem("blocking_item_drift", "a blocking item id is duplicated"))
     covered = set(seen)
     for name in report_module.REPORT_ONLY_ITEMS:
         if name in covered:
@@ -655,7 +756,7 @@ def _one_record(record, index):
         return [_problem("record_invalid", prefix + " is not an object")], None
     if "seed" in record:
         problems.append(_problem("ambiguous_seed_field", prefix + " uses a generic seed field"))
-    unexpected = sorted(set(record) - set(RECORD_KEYS))
+    unexpected = sorted(set(record) - set(RECORD_KEYS) - set(OPTIONAL_RECORD_FIELDS))
     if unexpected:
         problems.append(_problem("unexpected_field", prefix + " has " + ", ".join(unexpected)))
     missing = [key for key in RECORD_KEYS if key not in record]
@@ -1251,7 +1352,9 @@ def run_preflight(records, metadata=None, mode=None):
     seeds = _seed_structure(rows)
     chunks = matched_schedule_structure(rows)
     reconciliation = m4_reconciliation(rows)
-    warnings = ["unresolved: %s: %s" % (item["id"], item["statement"]) for item in spec["blocking_items"]]
+    unresolved_items = [item for item in spec["blocking_items"] if item.get("status") == "unresolved"]
+    resolved_items = [item for item in spec["blocking_items"] if item.get("status") == "resolved"]
+    warnings = ["unresolved: %s: %s" % (item["id"], item["statement"]) for item in unresolved_items]
     if namespace is None:
         warnings.append("chunk_id_namespace_unspecified: matched ids are not a loaded production schedule")
     if not rows:
@@ -1302,6 +1405,9 @@ def run_preflight(records, metadata=None, mode=None):
         "metric_spec_validation_status": "valid_draft_with_unresolved_items",
         "metric_count": len(spec["metrics"]),
         "metric_ids": [metric["metric_id"] for metric in spec["metrics"]],
+        "unresolved_item_count": len(unresolved_items),
+        "resolved_item_ids": [item["id"] for item in resolved_items],
+        "eval_access": "locked",
         "aggregate_generator_quality_score": False,
         "synthetic_input_counts_by_condition": {condition: accounting[condition]["attempted"] for condition in CONDITIONS},
         "accounting_by_condition": accounting,
@@ -1345,15 +1451,19 @@ def run_preflight(records, metadata=None, mode=None):
 
 def render_preflight_text(report):
     lines = [
-        "GEP-1 revision 1 generator-evaluation preflight",
+        "GEP-2 synthetic generator-evaluation preflight",
         "status: " + report["status"],
         "mode: " + report["mode"],
+        "EVAL access: locked",
+        "only synthetic TRAIN/reference fixtures used",
+        "no EVAL, REF or VALIDATION data loaded",
         "git_head: " + report["package_revision"]["git_head"],
         "git_branch: " + report["package_revision"]["git_branch"],
         "preflight_module_sha256: " + report["package_revision"]["preflight_module_sha256"],
         "metric_spec_sha256: " + report["package_revision"]["metric_spec_sha256"],
         "metric_spec_validation_status: " + report["metric_spec_validation_status"],
         "metric_count: %d" % report["metric_count"],
+        "unresolved_item_count: %d" % report["unresolved_item_count"],
         report["no_eval_statement"],
         report["no_ref_or_validation_statement"],
         "synthetic_input_counts_by_condition:",
@@ -1404,6 +1514,9 @@ def render_preflight_text(report):
     lines.append("b0_observed_cleaned_lengths: " + json.dumps(report["b0_observed_cleaned_lengths"]))
     lines.append("b0_historical_generation_seeds_are_training_replicates: " + json.dumps(report["b0_historical_generation_seeds_are_training_replicates"]))
     lines.append("m4_reconciliation: " + report["m4_reconciliation"]["status"])
+    lines.append("resolved_items:")
+    for item_id in report["resolved_item_ids"]:
+        lines.append("  resolved: " + item_id)
     lines.append("warnings: %d" % len(report["warnings"]))
     for warning in report["warnings"]:
         lines.append("  warning: " + warning)

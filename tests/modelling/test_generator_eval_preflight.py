@@ -44,7 +44,12 @@ class MetricSpecTests(unittest.TestCase):
         report = gep1._load_module("m6_diagnostic_generation.py", "gep1_test_m6")
         spec = gep1.load_metric_spec()
         found = [metric["metric_id"] for metric in spec["metrics"]]
-        expected = set(metrics.IMPLEMENTED_METRIC_IDS) | set(metrics.HARD_GUARDRAIL_IDS) | set(gep1.ADDITIONAL_IMPLEMENTED_METRIC_IDS)
+        expected = (
+            set(metrics.IMPLEMENTED_METRIC_IDS)
+            | set(metrics.HARD_GUARDRAIL_IDS)
+            | set(gep1.ADDITIONAL_IMPLEMENTED_METRIC_IDS)
+            | set(gep1.GEP2_IMPLEMENTED_METRIC_IDS)
+        )
         self.assertEqual(set(found), expected)
         self.assertEqual(len(found), len(expected))
         self.assertEqual(
@@ -82,7 +87,15 @@ class MetricSpecTests(unittest.TestCase):
         self.assertIn("not extra votes for overall generator quality", spec["novelty_direction_statement"])
         self.assertTrue(all(metric["freeze_status"] == "draft" for metric in spec["metrics"]))
         self.assertEqual(spec["freeze_status"], "draft")
-        self.assertNotIn("closeness", [metric["scientific_role"] for metric in spec["metrics"]])
+        closeness = [metric for metric in spec["metrics"] if metric["scientific_role"] == "closeness"]
+        self.assertEqual([metric["metric_id"] for metric in closeness], list(gep1.GEP2_CLOSENESS_METRIC_IDS))
+        for metric in closeness:
+            self.assertEqual(metric["reference_role"], "synthetic_eval_stand_in")
+            self.assertEqual(metric["direction"], "lower")
+            self.assertIn("formal M9C unlock supplies unique EVAL cores", metric["calculation_summary"])
+        self.assertEqual(by_id["successfully_parsed_outputs"]["scientific_role"], "accounting")
+        self.assertEqual(by_id["pooled_gc_fraction"]["scientific_role"], "descriptor")
+        self.assertEqual(by_id["pooled_gc_fraction"]["direction"], "not_applicable")
         self.assertFalse(spec["aggregate_generator_quality_score"])
         for metric in spec["metrics"]:
             self.assertEqual(set(metric["code_revision"]), {"path", "sha256"})
