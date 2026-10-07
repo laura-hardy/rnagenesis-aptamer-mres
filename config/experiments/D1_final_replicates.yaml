@@ -1,15 +1,12 @@
-# Proposed seed-43 single-use active M7 final-replicate configuration.
+# Proposed seed-44 single-use active M7 final-replicate configuration.
 # Document status: M7_REPLICATES_AUTHORISED_FOR_SINGLE_USE_EXECUTION.
 # This candidate is a review proposal. It acquires authority only if this exact
-# file is later approved and committed. It binds one unconsumed seed-43 entry
-# for a fresh technical retry from immutable B1 initialisation. It does not
-# resume or reuse the consumed failed attempt. It does not authorise seed 44,
-# and it does not decide whether seed 44 will be omitted. That decision remains
-# the approved operational time rule after seed-43 runtime is measured, and it
-# must not depend on seed-43 scientific results. authorisation_timestamp is the
-# proposed package-construction timestamp. Historical M6 evidence does not
-# authorise M7. M6 updates 7, 14 and 21 are forbidden initialisation and
-# resume inputs.
+# file is later approved and committed. It binds one unconsumed seed-44 entry
+# for attempt 1. It does not resume. It does not reuse the consumed seed-43
+# authorisation or output directory. It does not authorise candidate guardrails
+# or final selection. authorisation_timestamp is the proposed package-construction
+# timestamp. Historical M6 evidence does not authorise M7. M6 updates 7, 14 and
+# 21 are forbidden initialisation and resume inputs.
 document_status: M7_REPLICATES_AUTHORISED_FOR_SINGLE_USE_EXECUTION
 consumable_by_executable_workflow: true
 schema_version: m7-replicate-config-1
@@ -25,26 +22,26 @@ execution:
   biological_paths_permitted: true
   gpu_identity_bound: true
 
-# Proposed single seed-43 entry for attempt 2. This package does not contain a seed-44 entry.
+# Proposed single seed-44 entry for attempt 1. This package does not contain a seed-43 entry.
 authorisation_entries:
 - activation_status: 'active_unconsumed'
   applied_learning_rate_trace_sha256: '37013ac0a50290dbb476f4cdec806f058b8fb3347d967ac2d6e59b6e07aeae50'
-  authorisation_id: 'm7_d1_final_replicate_seed43_c150894b9982_gpu1_attempt2'
-  authorisation_timestamp: '2026-10-07T12:18:47+11:00'
-  authorization_parent_commit: 'c150894b9982d7afebfb2b3390b0797a4da146b5'
+  authorisation_id: 'm7_d1_final_replicate_seed44_2cb1b6a26391_gpu1_attempt1'
+  authorisation_timestamp: '2026-10-07T14:43:54+11:00'
+  authorization_parent_commit: '2cb1b6a26391ed36754ec21685a4501d659d50ef'
   b1_relative_path: 'configs/rnagenesis/diffusion'
   b1_unet_config_sha256: '3a9975ff165bbd5ca82923e6ed1c5ed7eb383a23f4f3f55db713c995031f8ee3'
   b1_weight_sha256: 'c268021b6cab37423e3bffd495b139bb69698d8d11c7b96477fbfb239b0cff26'
   consumed: false
   cuda_visible_devices: '1'
-  evidence_directory: '/home/laura/rnagenesis-mres-runs/m7_d1_final_replicate_seed43_c150894b9982_gpu1_attempt2'
-  executing_implementation_commit: 'c150894b9982d7afebfb2b3390b0797a4da146b5'
+  evidence_directory: '/home/laura/rnagenesis-mres-runs/m7_d1_final_replicate_seed44_2cb1b6a26391_gpu1_attempt1'
+  executing_implementation_commit: '2cb1b6a26391ed36754ec21685a4501d659d50ef'
   expected_checkpoint_names:
-    - 'D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-1__update-21__git-c150894b9982d7afebfb2b3390b0797a4da146b5'
-    - 'D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-2__update-42__git-c150894b9982d7afebfb2b3390b0797a4da146b5'
-    - 'D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-3__update-63__git-c150894b9982d7afebfb2b3390b0797a4da146b5'
-    - 'D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-4__update-84__git-c150894b9982d7afebfb2b3390b0797a4da146b5'
-    - 'D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-5__update-105__git-c150894b9982d7afebfb2b3390b0797a4da146b5'
+    - 'D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-44__epoch-1__update-21__git-2cb1b6a26391ed36754ec21685a4501d659d50ef'
+    - 'D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-44__epoch-2__update-42__git-2cb1b6a26391ed36754ec21685a4501d659d50ef'
+    - 'D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-44__epoch-3__update-63__git-2cb1b6a26391ed36754ec21685a4501d659d50ef'
+    - 'D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-44__epoch-4__update-84__git-2cb1b6a26391ed36754ec21685a4501d659d50ef'
+    - 'D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-44__epoch-5__update-105__git-2cb1b6a26391ed36754ec21685a4501d659d50ef'
   expected_epochs:
     - 1
     - 2
@@ -62,7 +59,7 @@ authorisation_entries:
     - '47b2dc9b392ea766eee7e947f0f92f5a039c42ac714326104e719352d20b5924'
     - '7f1cdbd854c1d26c5b8bfe68469bc7e59f5d7293c4a105d724c1c63c83a32f10'
   gpu_uuid: 'GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f'
-  implementation_config_sha256: 'be4af21865f1561471ae5e63dd6231269adace8470f0fcd8bfede7847b89bdd6'
+  implementation_config_sha256: 'd65b78ac72bd4dccd8d7dd52be5914d8227c34f0759315064f8d3fe3c649be35'
   implementation_file_hashes:
     scripts/modelling/build_validation_artifacts.py: '0bcf9214ab82e05d12c94344a14d045b730cda1829a1689234d2616486a76466'
     scripts/modelling/m5_smoke_contract.py: 'cbb9ff275149315c6a7cb227fafe5c2a0cd3d9b0a5375b296861945f0666ce3a'
@@ -81,7 +78,7 @@ authorisation_entries:
     size: 15035704
   ld_library_path: null
   logical_device: 'cuda:0'
-  output_directory: '/home/laura/rnagenesis-mres-runs/m7_d1_final_replicate_seed43_c150894b9982_gpu1_attempt2'
+  output_directory: '/home/laura/rnagenesis-mres-runs/m7_d1_final_replicate_seed44_2cb1b6a26391_gpu1_attempt1'
   pci_bus: '00000000:61:00.0'
   permitted_roles:
     - 'B1_INITIALISATION'
@@ -92,8 +89,8 @@ authorisation_entries:
   phase: 'M7_D1_final_replicate'
   physical_gpu_index: 1
   reuse_permitted: false
-  scope: 'single_use_m7_d1_replicate_seed_43'
-  seed: 43
+  scope: 'single_use_m7_d1_replicate_seed_44'
+  seed: 44
   session:
     consumption_event: 'bound_output_directory_creation'
     pattern: 'm5_single_use_timestamp_and_scope'
@@ -113,7 +110,6 @@ authorisation_entries:
   validation_csv_path: '/home/laura/rnagenesis-mres-data/development/ft_validation.csv'
   validation_csv_sha256: 'cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd'
   validation_record_count: 95
-
 authorisation_schema:
   entries_min: 1
   entries_max: 2
