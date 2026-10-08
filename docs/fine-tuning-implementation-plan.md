@@ -1749,7 +1749,7 @@ Run the approved single MRes adaptation strategy reproducibly.
 - candidate ranking by fixed-draw VALIDATION MSE ascending, then the earlier epoch on an exact tie; candidate diagnostics are lazy, evaluated in ranking order until the first passing checkpoint, each on the accepted 1,000-attempt M6 schedule with the approved cleaner and the five numerical guardrails (requested-length matching, early EOS and gross length behaviour stay report-only). If no candidate passes, the outcome is `no_eligible_checkpoint` and the learning rate, thresholds, architecture and seed are not changed automatically;
 - resume is unsupported. A technical retry uses the same seed and configuration, starts again from B1, uses a new immutable attempt directory and needs a new authorisation. All five checkpoints per executed seed are retained through at least 1 November 2026, and no deletion is implemented.
 
-**Frozen M8 boundary.** M8 will generate 30,000 raw D1 attempts in total: 30,000 for one seed, or 15,000 each for two seeds with a deterministic split balanced within requested-length strata. M8 generation is not implemented in the M7 package.
+**Frozen M8 boundary.** Both final seeds completed, so the approved M8 allocation is 15,000 raw attempts from the seed-43 checkpoint and 15,000 from the seed-44 checkpoint. The one-seed alternative is historical and is not executable. M8 generation is not implemented in the M7 package and is not authorised by this closure.
 
 **Operational cutoff (recorded, not automated).** Stretch target 18:00 AEDT, 7 October 2026; hard target 17:00 AEDT, 8 October 2026. Seed 44 proceeds only if `current time + 1.25 x measured seed-43 end-to-end execution time + 2 hours` is no later than the hard target. The decision is operational only and may not depend on seed-43 scientific results. If seed 44 is omitted, the deviation must be sealed before M8 generation.
 
@@ -1777,48 +1777,37 @@ Review seed consistency and freeze D1 training.
 
 ---
 
-### M8 — Final development generation and VALIDATION comparison
+### M8 — Raw B1 and D1 generation
+
+**Status: M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED.** The inactive proposal is [M8 raw generation](fine_tuning/m8_raw_generation.md). No M8 execution is authorised. The checked-in configuration binds no GPU, interpreter, library path, timestamp, or output directory.
 
 **Objective**  
-Generate the full B1 and D1 pools and complete development-time generator analysis.
+Produce and seal raw B1 and D1 pools only. Parsing, filtering, clustering, representation analysis, and the four-condition comparison occur later under a common frozen evaluation protocol. They are not part of M8.
 
-**Conditions**
+**Approved generation**
 
-- B1 generic released RNAGenesis;
-- B2 TRAIN-matched empirical RNA null;
-- D1 MRes curated-aptamer diffusion-adapted RNAGenesis;
-- B0 existing released aptamer-adapted RNAGenesis as external comparator.
+- B1: exactly 30,000 raw attempts from the generic released checkpoint.
+- D1: exactly 30,000 raw attempts, 15,000 from the selected training seed 43 and 15,000 from the selected training seed 44.
+- The M4 and M7 1,000-attempt pools are excluded.
+- Two D1 training seeds are the approved final set. The absent third seed is a resource and time limitation. The one-seed M8 alternative is historical and is not executable, because both final seeds completed.
+- Fixed raw-attempt accounting supersedes rejection and resampling language. There is no replenishment, replacement, rejection sampling, deduplication, truncation, padding, or dropping.
+- No cleaner-derived validity or acceptance classification is performed. Exact raw bytes remain authoritative in the retained, hashed raw invocation files. `raw_decoded_text` is the deterministic UTF-8-else-Latin-1 decoded representation stored in canonical JSON, and assembly verifies it against those raw bytes.
+- Generation seeds are unique within a block and are intentionally reused across the paired B1/D1 arm. Attempts are generated draws, not independent model-training replicates. D1 has two training replicates. The training seed is tied to the technical block, whose length allocations are 830,348 nt and 830,404 nt. Later evaluation must not treat 30,000 attempts as 30,000 independent model replicates.
+- The planning assumption is approximately 6.4–10.4 GPU-hours for all four arms, with a practical 12–16 hour reservation including verification and overhead. Actual runtime is recorded later from the manifests. Checkpoint weights are not copied. Expected evidence storage is modest, and a launch still requires a fresh free-space check.
 
-**Primary generation target**
+**Later comparison, outside M8**
 
-```text
-30,000 raw attempts per new condition
-```
+The four conditions remain B1, B2, D1, and B0. B1 versus D1 is the primary controlled comparison. B2 is the non-neural null. B0 remains the external comparator and keeps its existing 30,080 attempts. TRAIN copying and novelty checks, VALIDATION distribution comparison, clustering, and representation analysis belong to that later protocol. REF and EVAL stay prohibited.
 
-B0 retains its existing 30,080 attempts.
-
-**Primary controlled comparison**
-
-```text
-B1 vs D1
-```
-
-with B2 as the non-neural null.
-
-B0 is a separately interpreted external aptamer-adapted comparator because its existing pool uses the 37-nt released aptamer sampling regime.
-
-**Reference use**
-
-- TRAIN: copying/novelty only;
-- VALIDATION: held-out development distribution comparison;
-- REF: prohibited;
-- EVAL: prohibited.
+**Launch binding, still inactive.** A future authorization commit is live HEAD. `repository_identity.mres_commit` records that commit. `proposal_base_commit` keeps `d0f9a397b536c64ca1b22662cc9ae36aea0101f6` separately. Every commit after the executing implementation commit must be linear, must contain no merge, and may change only `config/experiments/M8_raw_generation.yaml`. The controller observation reads the running process, including `/proc/self/exe` where available. A child interpreter probe runs before consumption and does not import the model stack or query CUDA. Production path preflight refuses a symlinked run root, a symlinked checkpoint or source directory, and a raw file that does not resolve inside its arm. Assembly stores `active_configuration_raw_sha256` from the exact YAML bytes and validates the nested arm manifest, including D1 `selected_set_evidence`. After consumption and before the first generation subprocess, isolated `HOME`, `TMPDIR`, cache, and pycache directories are created inside the output. `TMPDIR` must exist. This paragraph describes validators that remain unauthorised.
 
 **Human gate**  
-Freeze generator checkpoint(s), generation settings and generator-level analysis.
+Review this inactive implementation before any authorisation-only package. That package does not exist. M8 execution does not start from this proposal.
 
 **Must not happen yet**
 
+- no M8 generation, assembly, GPU use, or run directory;
+- no parsing, cleaning, or filtering of an M8 pool;
 - no AptaRank tuning from TRAIN;
 - no REF use for RNAGenesis decisions;
 - no EVAL.
@@ -2029,7 +2018,7 @@ This yields the final held-out estimate of the generator/ranking pipeline select
 | EVAL contamination | Blocker | role guards + physical absence | no EVAL transfer until M10 |
 | B0 mislabelled as unadapted | High | condition registry/review | fixed terminology in Section 4 |
 | B0 37-nt pool compared naively with length-matched conditions | High | metric review | treat B0 as external comparator; normalize/stratify length-sensitive metrics |
-| B1 length matching fails due early EOS | Medium | M4 length experiment | documented matching/resampling design before 30k generation |
+| B1 length matching fails due early EOS | Medium | M4 length experiment | historical M4 note; for M8 this is superseded by fixed raw-attempt accounting with no replenishment |
 | Existing B2 implementation differs from frozen protocol | Medium | code audit | correct/reuse before regeneration; record diff |
 | Modified chemistry overinterpreted | Medium | methods review | model base sequence only; preserve chemistry metadata; explicit wording |
 | AdaLayerNorm patch omitted after environment rebuild | High | startup verification | automated patch/hash check |
@@ -2113,8 +2102,8 @@ M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 
 
 Proceed in this order:
 
-1. The M7 human gate is closed by the 8 October 2026 record. No further M7 execution is authorised. The candidate-guardrail and final-selection documents are inactive. The replicate document remains the consumed seed-44 authorisation and is not a new run.
-2. M8 planning may use the accepted checkpoints and the 15,000/15,000 allocation. M8 generation does not start from this closure.
+1. The M7 human gate is closed by the 8 October 2026 record. No further M7 execution is authorised. M7 completion is that human closure. Sealed M7 manifest bytes remain unchanged. The candidate-guardrail and final-selection documents are inactive. `D1_final_replicates.yaml` remains historical M7 state, including the live seed-44 authorisation, and is not M8 authority.
+2. The inactive M8 raw-generation proposal is ready for review. It seals raw B1 and D1 pools only. It does not authorise execution. A future authorisation commit is a later one-entry change to the M8 configuration and is not this proposal.
 3. M8 execution only after a separate authorisation-only package is reviewed. That package does not exist yet.
 
 ---

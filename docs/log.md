@@ -11679,3 +11679,45 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 **Boundary:** Nothing in this review was staged, committed, or pushed. No M8 authorisation or output directory was created, no sequence was generated, and no scientific workflow was launched.
 
+---
+
+## 2026-10-08 — M8 raw-generation proposal ready for review (inactive; not applied)
+
+**Stage:** Aim 2 / modelling / M8 raw B1 and D1 generation
+
+**Status:** `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This log text belongs to the inactive proposal. It is not an authorisation, and this task does not apply it as a live commit. The checked-in configuration `config/experiments/M8_raw_generation.yaml` is non-consumable, every execution flag is false, and both authorisation lists are empty. No GPU, interpreter, `LD_LIBRARY_PATH`, timestamp, or output directory is bound.
+
+**What M8 seals.** Raw pools only. B1 is 30,000 raw attempts. D1 is 30,000 raw attempts, 15,000 from training seed 43 and 15,000 from training seed 44. The M4 and M7 1,000-attempt pools are excluded. Parsing, filtering, clustering, representation analysis, and the four-condition comparison are later work under a common frozen evaluation protocol. The cleaner is not invoked. Exact raw bytes in the retained invocation files are authoritative. `raw_decoded_text` is the deterministic UTF-8-else-Latin-1 representation stored in canonical JSON and checked against those bytes.
+
+**Seeds and accounting.** Two D1 training seeds are the approved final set. The absent third seed is a resource and time limitation. The one-seed M8 alternative is historical and is not executable, because both final seeds completed. Fixed raw-attempt accounting supersedes rejection and resampling. There is no replenishment.
+
+**M7 boundary.** M7 completion is the human closure recorded above. Sealed M7 manifest bytes remain unchanged. The live seed-44 replicate YAML is historical M7 state and is not M8 authority. M8 refuses an M7 configuration path, an M7 schema version, an `m7_` authorisation id, and that live seed-44 id.
+
+**Boundary:** No M8 execution is authorised. This proposal was prepared in an isolated tree. It was not staged, committed, pushed, or copied onto the live checkout.
+
+## 2026-10-08 — M8 inactive proposal revision (not applied)
+
+**Stage:** Aim 2 / modelling / M8 raw B1 and D1 generation
+
+**Status:** `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This revision stays inactive. It does not authorise an arm, bind a GPU, choose an `LD_LIBRARY_PATH`, choose free-memory or free-space thresholds, or create a run directory.
+
+**Scientific design.** The 30,000/30,000 attempt totals, the 15,000/15,000 D1 seed split, the paired blocks, the six schedule hashes, `max_seq_len = requested biological length + 1`, and the no-filter accounting are unchanged. Attempts are generated draws. Generation seeds are unique within a block and reused across paired B1/D1 arms. They are not 30,000 independent training replicates. The absent third training seed remains a resource and time limitation.
+
+**Implementation corrections.** Active generation and active assembly now have separate exact validators. A future authorization commit binds its parent, the executing implementation commit, the three implementation-file hashes, and the active configuration identity. Live HEAD is that authorization commit, not the proposal base. The interpreter path, resolved `python3.8`, and interpreter SHA-256 are bound for a future generation entry. GPU identity, compute-process absence, and storage thresholds are preflight predicates and do not move or terminate a process. Evidence writes use the complete-write, fsync, and interruption-cleanup pattern. Assembly rechecks canonical arm paths, single-link files, and every schedule field, and it has the same consume-once failure lifecycle.
+
+**Planning assumption.** Approximately 6.4–10.4 GPU-hours for all four arms, with a practical 12–16 hour reservation including verification and overhead. Actual runtime is recorded later from the manifests. Checkpoint weights are not copied. Expected evidence storage is modest, and a launch still requires a fresh free-space check.
+
+## 2026-10-08 — M8 inactive proposal revision, second pass (not applied)
+
+**Stage:** Aim 2 / modelling / M8 raw B1 and D1 generation
+
+**Status:** `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This second revision stays inactive. It does not authorise an arm, assemble a pool, query a GPU, or create a run directory.
+
+**Provenance.** The public assembly launcher hashes the exact YAML bytes it parsed. Consumption, failure, and success records store that digest as `active_configuration_raw_sha256`, separately from `active_configuration_sha256`. A missing raw digest is refused. `repository_identity.mres_commit` is the live authorization commit. `proposal_base_commit` keeps `d0f9a397b536c64ca1b22662cc9ae36aea0101f6`.
+
+**Runtime identity and history.** The controller observation inspects the running process, including `/proc/self/exe` where available. A restricted child probe returns the bound interpreter path, resolved executable, hash, and Python version before consumption, without importing the model stack or querying CUDA. Every commit after the executing implementation commit must be linear and confined to `config/experiments/M8_raw_generation.yaml`. Launch does not import `m6_pilot_contract.py`.
+
+**Paths and evidence.** Production preflight refuses a symlinked run root, checkpoint directory, arm directory, or raw directory that escapes its arm. Assembly validates the nested arm manifest, including sampler, sequence access, asset inventory, both schedule hashes, interpreter and GPU and storage claims, timestamps, and D1 `selected_set_evidence`. B1 uses an explicit not-applicable selected-set record. Isolated `HOME`, `TMPDIR`, cache, and pycache directories are created inside the consumed output before the first generation subprocess. `TMPDIR` must exist.
+
+**Boundary:** This revision was prepared in an isolated tree. It was not staged, committed, pushed, or copied onto either live checkout.
+
