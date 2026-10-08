@@ -11658,3 +11658,24 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Why the training commits differ.** Sequential single-use authorisations give the two replicates different training commit ids. Seed 43 is sealed to `c150894b9982d7afebfb2b3390b0797a4da146b5`. Seed 44 is sealed to `2cb1b6a26391ed36754ec21685a4501d659d50ef`, the authorisation commit of seed 43. The only Git change between those commits is the authorisation-bearing replicate YAML. The sealed training implementation-file hashes are identical. Each manifest's raw `implementation_config_sha256` differs because that hash covers the parent YAML, including its authorisation state.
 
 **Correction.** Checkpoint provenance is checked within each seed. A guardrail must carry that seed's own training commit. It must not carry the other seed's. Cross-seed selection does not require the training commit ids, the authorisation commits, or the raw authorisation-bearing configuration hashes to be equal. Comparability is the sealed implementation content and protocol: implementation-file hashes, B1 identity, architecture, the learning-rate schedule and fixed training protocol, TRAIN and VALIDATION identities, validation artifacts, and non-seed hyperparameters. An ancestor relationship is not used as a substitute for those content identities. An authorisation-only Git difference is not a scientific training difference. No shared training commit is synthesized. Checkpoint names keep each replicate's own training commit.
+
+---
+
+## 2026-10-08 — Accept the M7 selected set and close M7
+
+**Stage:** Aim 2 / modelling / M7 final D1 replicates
+
+**Status:** M7 is COMPLETE / GO for M8 planning only. On 8 October 2026 the human gate accepts the two-seed selected set. This record does not authorise M8 generation, further training, GPU use, biological-data access, VALIDATION, REF, or EVAL.
+
+**Preflight:** MRes branch `main`. HEAD and `origin/main` were `0761f866c97e8f9372b0f224fb413dcc0995c6e9`, the single-use final-selection authorisation, with the single parent `b5de24327ed5d3c601597d1f1c886e2c253916dd`. The index and worktree were clean. The closure review did not query a GPU, did not open a weight file or a biological dataset, and did not modify a run directory.
+
+**Evidence:** Final selection ran once under `m7_d1_final_selection_b5de24327ed5_attempt1`. The directory contains `authorization_consumption.json` (503 bytes, SHA-256 `29df8fdc56a0198b53b32ee6918b3f158a283c0f4d05a893ce70bd9ea2f00c5d`, `consumed_output_created`, `reuse_permitted: false`) and `m7_final_selection_manifest.json` (13,124 bytes, SHA-256 `49b218e3df74825e1931148e2f65b25aae057c822e2ab32d44c2960b1587c91c`). No failure record exists. The outcome is `selected_set_complete` for seeds 43 and 44. The selected-set SHA-256 is `af0c0e555a8b878feadeb17fcbde18d8b780819a42d9e0cc547d2fc0c6895f8f`. Rebuilding from the four sealed manifests reproduced the manifest bytes and the allocation of 15,000 sequences for each seed. The selected checkpoints are seed 43 epoch 5 update 105 `D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-5__update-105__git-c150894b9982d7afebfb2b3390b0797a4da146b5` and seed 44 epoch 5 update 105 `D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-44__epoch-5__update-105__git-2cb1b6a26391ed36754ec21685a4501d659d50ef`.
+
+**Attempts:** Seed 43 attempt 1 remains the consumed `runtime_identity` failure at `/home/laura/rnagenesis-mres-runs/m7_d1_final_replicate_seed43_e682cb6064a5_gpu1_attempt1` and is not accepted training evidence. Seed 43 attempt 2 is the accepted replicate, manifest SHA-256 `f59bb4a236e3d1ac532dd83d524d8e7ceb51cbf2b9010741206169577d1acecc`. Seed 44 attempt 1 is the accepted replicate, manifest SHA-256 `900182689f3e133d395b45dd58a987e91b767e005fc00e744e1eacedeffa3fa6`.
+
+**Limitation and retention:** The accepted set is seeds 43 and 44 only. Seed 42 stays excluded, no third seed was trained, and no one-seed deviation was used. All five epoch checkpoints of each executed seed are retained through at least 1 November 2026. Deletion is not implemented.
+
+**Configuration:** `D1_candidate_guardrails.yaml` is restored to inactive blob `e04fb083073f780959b24f335f81c61961607625`. `D1_final_selection.yaml` is restored to inactive blob `544b79bbf4e98f8770c8a788e3990473a1f010fa`. `D1_final_replicates.yaml` is unchanged at blob `3d8238da0158c9157fbbcb14645822a3cb6e340d`, the seed-44 authorisation. The validators have no consumed document status, and the tests require that live replicate file. The sealed manifests keep `m7_complete: false`. They are not the milestone-status authority. This closure is not a new executable authorisation.
+
+**Boundary:** Nothing in this review was staged, committed, or pushed. No M8 authorisation or output directory was created, no sequence was generated, and no scientific workflow was launched.
+

@@ -1,16 +1,18 @@
-# Proposed single-use M7 final-selection authorisation.
-# Document status: M7_FINAL_SELECTION_AUTHORISED_FOR_SINGLE_USE_EXECUTION.
-# This candidate is a review proposal. It acquires authority only if this exact
-# file is later approved and committed. It binds one unconsumed two-seed entry
-# for seeds 43 and 44. It does not resume and it does not bind a GPU, an
-# interpreter, a checkpoint, a weight, or a biological path.
-# execution.biological_paths_permitted and execution.gpu_identity_bound stay
-# false. deviation is null. authorisation_timestamp is the package-construction
-# timestamp. The selection stage reads the four bound sealed manifests only,
+# M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
+# Authoritative inactive M7 final-selection configuration (CPU-only).
+# This file must not be consumed by an executable workflow. It binds no GPU, no
+# output directory, no manifest path, no biological path, no deviation record and
+# no authorisation: authorisation_entries is empty and authorised is false. Its
+# entry point accepts only --help, --schema and --authorisation-id <id>; the last
+# reads only this file and refuses (execution_not_authorised) while it is inactive.
+# A later authorisation-only commit may change only this file, and only
+# authorisation_entries, consumable_by_executable_workflow, document_status and
+# execution.authorised, to bind one single-use entry (authorisation_schema lists
+# its exact keys). The selection stage reads the bound sealed manifests only,
 # never biological data, checkpoints or weights, REF or EVAL.
 
-document_status: M7_FINAL_SELECTION_AUTHORISED_FOR_SINGLE_USE_EXECUTION
-consumable_by_executable_workflow: true
+document_status: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
+consumable_by_executable_workflow: false
 schema_version: m7-final-selection-config-2
 manifest_schema_version: m7-final-selection-manifest-2
 experiment_id: D1_final_selection
@@ -18,66 +20,10 @@ created_against_mres_commit: a58528d61c775cb5208ddb7efb3988dc3bd3fe88
 rnagenesis_branch: mres-d1-diffusion-finetune
 rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
 execution:
-  authorised: true
+  authorised: false
   biological_paths_permitted: false
   gpu_identity_bound: false
-# Proposed two-seed entry. deviation is null. No GPU, interpreter, or biological path is bound.
-authorisation_entries:
-- activation_status: 'active_unconsumed'
-  authorisation_id: 'm7_d1_final_selection_b5de24327ed5_attempt1'
-  authorisation_timestamp: '2026-10-08T16:18:19+11:00'
-  authorization_parent_commit: 'b5de24327ed5d3c601597d1f1c886e2c253916dd'
-  consumed: false
-  deviation: null
-  evidence_directory: '/home/laura/rnagenesis-mres-runs/m7_d1_final_selection_b5de24327ed5_attempt1'
-  executing_implementation_commit: 'b5de24327ed5d3c601597d1f1c886e2c253916dd'
-  guardrail_manifests:
-  - bytes: 9008
-    epoch: 5
-    path: '/home/laura/rnagenesis-mres-runs/m7_d1_candidate_guardrail_seed43_rank1_epoch5_44a8db783caa_gpu1_attempt1/m7_candidate_guardrail_manifest.json'
-    seed: 43
-    sha256: '988e21546e5d8dc8a5c7a6683de228b5f7afcd7cf0b9de4007e995219bc42c1e'
-  - bytes: 9023
-    epoch: 5
-    path: '/home/laura/rnagenesis-mres-runs/m7_d1_candidate_guardrail_seed44_rank1_epoch5_0772597d615b_gpu1_attempt1/m7_candidate_guardrail_manifest.json'
-    seed: 44
-    sha256: '51bd0436fe7d53bd0ec1c43f767bb728e5608405d425c357f4aff105a243e26b'
-  implementation_config_sha256: '8fd9c7e676cd5adeb76f13c416f13d72a0bab67a686f1d87fd0f3d3c74e390cd'
-  implementation_file_hashes:
-    'config/modelling/validation_metrics_v1.yaml': 'd30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb'
-    'scripts/b1_development_pool_runner.py': '622684b254f911ca4d00db8af20d0d0c67eeebf46007e3fe84995e1e11db2341'
-    'scripts/modelling/m4_diagnostic_metrics.py': 'eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56'
-    'scripts/modelling/m5_smoke_contract.py': 'cbb9ff275149315c6a7cb227fafe5c2a0cd3d9b0a5375b296861945f0666ce3a'
-    'scripts/modelling/m6_diagnostic_generation.py': '83f299bea7ec69406c898ad0e971bebf06056beb58649de0c25a5cc6d7195726'
-    'scripts/modelling/m6_pilot_contract.py': '525b7ff424b7b934792bf3b092526d2f5f6a85cc6e789116615f4a2d1059a21f'
-    'scripts/modelling/m7_candidate_guardrails.py': '5f72b77740795e85b642c3e1d28553d10a9b7c10d148c3510c22a749bb5533a2'
-    'scripts/modelling/m7_common.py': '408b9b8fd8abb9e963ffc9723fc5e0c1fe24da0e9853767d2e43b43a3bbfe9c3'
-    'scripts/modelling/m7_replicate_contract.py': 'dd251f665446d3c0c9c52e96f228a402eb7a65d050d93196896a31abb2d24c97'
-    'scripts/modelling/m7_selection.py': '96917b781fca116a682941ffade64428406196d2e351b39085d27c83f1ac3e58'
-    'tests/modelling/test_m7_selection.py': '559e28bcbde6b402f4dce05ffe09f19f66b56c0987b39d1e00c9bb58b2f0e9dc'
-    'tests/modelling/test_m7_selection_launch.py': '78c2e69da798c7cef007e266314d5f73041841cbcb43c75734302677273fcc69'
-  output_directory: '/home/laura/rnagenesis-mres-runs/m7_d1_final_selection_b5de24327ed5_attempt1'
-  permitted_roles:
-  - 'SEALED_GUARDRAIL_MANIFEST'
-  - 'SEALED_REPLICATE_MANIFEST'
-  phase: 'M7_D1_final_selection'
-  replicate_manifests:
-  - bytes: 287982
-    path: '/home/laura/rnagenesis-mres-runs/m7_d1_final_replicate_seed43_c150894b9982_gpu1_attempt2/m7_replicate_manifest.json'
-    seed: 43
-    sha256: 'f59bb4a236e3d1ac532dd83d524d8e7ceb51cbf2b9010741206169577d1acecc'
-  - bytes: 287982
-    path: '/home/laura/rnagenesis-mres-runs/m7_d1_final_replicate_seed44_2cb1b6a26391_gpu1_attempt1/m7_replicate_manifest.json'
-    seed: 44
-    sha256: '900182689f3e133d395b45dd58a987e91b767e005fc00e744e1eacedeffa3fa6'
-  reuse_permitted: false
-  scope: 'single_use_m7_d1_final_selection'
-  session:
-    consumption_event: 'bound_output_directory_creation'
-    pattern: 'm5_single_use_timestamp_and_scope'
-    resume_permitted: false
-    wall_clock_expiry: null
-  single_use: true
+authorisation_entries: []
 authorisation_schema:
   active_entries_present_in_this_package: false
   cpu_only: true

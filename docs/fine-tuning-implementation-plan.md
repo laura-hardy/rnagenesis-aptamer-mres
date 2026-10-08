@@ -1726,7 +1726,9 @@ TRAIN text was opened for exact-copy and nearest-TRAIN diagnostics only. VALIDAT
 
 ### M7 — Final D1 replicate training
 
-**M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED** (6 October 2026). The inactive package is described in [M7 final replicates implementation](fine_tuning/m7_final_replicates_implementation.md). No biological data or weights were accessed, no GPU was used, no run or evidence directory was created, no M7 authorisation exists, seeds 43 and 44 have not run, and **M7 is not complete**.
+**M7 COMPLETE / GO for M8 planning only — 8 October 2026.** The human gate accepts the two-seed selected set. Section 14 of [M7 final replicates implementation](fine_tuning/m7_final_replicates_implementation.md) is the account. M8 generation has not been performed and is not authorised.
+
+**Historical status, 6 October 2026: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED.** The inactive package is described in [M7 final replicates implementation](fine_tuning/m7_final_replicates_implementation.md). At that date no biological data or weights had been accessed for M7, no GPU had been used, no run or evidence directory had been created, no M7 authorisation existed, seeds 43 and 44 had not run, and M7 was not complete.
 
 **Objective**  
 Run the approved single MRes adaptation strategy reproducibly.
@@ -1767,7 +1769,11 @@ Review seed consistency and freeze D1 training.
 - no post-hoc architecture changes;
 - no M7 execution, GPU use, biological access, or authorisation until a separate authorisation-only package is reviewed.
 
-**Current status: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED — 6 October 2026. M7 is not complete.**
+**Historical current-status line, 6 October 2026: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED. M7 was not complete.**
+
+**Closure — 8 October 2026.** The human gate accepts the selected set from `/home/laura/rnagenesis-mres-runs/m7_d1_final_selection_b5de24327ed5_attempt1`. The manifest SHA-256 is `49b218e3df74825e1931148e2f65b25aae057c822e2ab32d44c2960b1587c91c`, `selection_outcome: selected_set_complete`, selected-set SHA-256 `af0c0e555a8b878feadeb17fcbde18d8b780819a42d9e0cc547d2fc0c6895f8f`. Seed 43 and seed 44 each contribute the epoch-5 update-105 checkpoint named in section 14 of the M7 implementation record. The M8 allocation is 15,000 raw attempts for each checkpoint, 30,000 in total. Seed 43 attempt 1 remains the consumed `runtime_identity` failure. Seed 43 attempt 2 and seed 44 attempt 1 are the accepted replicates. The result is limited to these two seeds: seed 42 stays excluded, no third seed was trained, and no one-seed deviation was used. All five epoch checkpoints of each executed seed are retained through at least 1 November 2026, and no deletion is implemented. The sealed manifests keep `m7_complete: false` and `m8_generation_performed: false`; those run-time flags are not rewritten. `D1_candidate_guardrails.yaml` and `D1_final_selection.yaml` are restored to their inactive documents. `D1_final_replicates.yaml` stays the seed-44 authorisation document because that is the state the tests require and because the validators accept no consumed document status. This closure is not a new executable authorisation and does not authorise M8 generation.
+
+**Current status: COMPLETE / GO — 8 October 2026, for M8 planning only.**
 
 ---
 
@@ -2103,13 +2109,13 @@ The MRes RNAGenesis modelling implementation is complete when:
 
 ## 22. Immediate next actions
 
-M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 2026. M2 is COMPLETE / GO — 28 September 2026. M3 is COMPLETE / GO — 29 September 2026, as recorded in [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c`. M4 is COMPLETE / GO — 2 October 2026, for M5 planning only. M5 is COMPLETE / GO — 3 October 2026, for M6 planning only. M6 is COMPLETE / GO — 6 October 2026, for M7 planning only: the attempt-6 training pilot and the update-21 diagnostic are accepted and the raw update-21 checkpoint is selected. M7 is not authorised. This does not authorise M7 execution, additional training or generation, biological TRAIN or VALIDATION access, GPU use, REF, EVAL, or a new run.
+M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 2026. M2 is COMPLETE / GO — 28 September 2026. M3 is COMPLETE / GO — 29 September 2026, as recorded in [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c`. M4 is COMPLETE / GO — 2 October 2026, for M5 planning only. M5 is COMPLETE / GO — 3 October 2026, for M6 planning only. M6 is COMPLETE / GO — 6 October 2026, for M7 planning only: the attempt-6 training pilot and the update-21 diagnostic are accepted and the raw update-21 checkpoint is selected. M7 is COMPLETE / GO — 8 October 2026, for M8 planning only: the two-seed selected set is accepted, seed 43 at epoch 5 update 105 and seed 44 at epoch 5 update 105, with 15,000 raw D1 attempts allocated to each. This does not authorise M8 generation, further training, biological TRAIN or VALIDATION access, GPU use, REF, EVAL, or a new run.
 
 Proceed in this order:
 
-1. Review the inactive M7 package (`M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED`, 6 October 2026). It does not authorise execution, biological access, GPU use, or a run directory, and seeds 43 and 44 have not run;
-2. a later, separate authorisation-only package binds one or two independently consumable entries (one per seed). It does not exist yet;
-3. M7 execution only after that separate authorisation. M7 is not complete.
+1. The M7 human gate is closed by the 8 October 2026 record. No further M7 execution is authorised. The candidate-guardrail and final-selection documents are inactive. The replicate document remains the consumed seed-44 authorisation and is not a new run.
+2. M8 planning may use the accepted checkpoints and the 15,000/15,000 allocation. M8 generation does not start from this closure.
+3. M8 execution only after a separate authorisation-only package is reviewed. That package does not exist yet.
 
 ---
 

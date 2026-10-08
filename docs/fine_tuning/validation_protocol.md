@@ -299,7 +299,7 @@ All five approved hard guardrails passed (valid fraction `1.0`, empty fraction `
 
 ## 14. M7 validation, candidates and lazy guardrails (inactive package)
 
-**M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED** (6 October 2026). This section describes how the inactive M7 package validates and selects. It authorises no execution, no biological access, no GPU use, no run directory, and no M7 authorisation exists. Seeds 43 and 44 have not run, and M7 is not complete. See [M7 final replicates implementation](m7_final_replicates_implementation.md).
+**Historical status, 6 October 2026: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED.** This section describes how the inactive M7 package validates and selects. At that date it authorised no execution, no biological access, no GPU use, and no run directory, no M7 authorisation existed, seeds 43 and 44 had not run, and M7 was not complete. The closure is section 15. See [M7 final replicates implementation](m7_final_replicates_implementation.md).
 
 **Fixed-draw validation.** Each replicate validates the raw denoiser on the unchanged accepted M4 four-draw artifacts (95 sequences, four draws, 380 pairs, equal weight per pair, the seed-1 draws loaded and never regenerated) at update 0 and after every epoch, so at updates 0, 21, 42, 63, 84 and 105. Update 0 is provenance only and is never a candidate. Updates 21 through 105 (epochs 1 through 5) are the five candidates of that seed. VALIDATION is read only through those fixed draws.
 
@@ -316,3 +316,11 @@ All five approved hard guardrails passed (valid fraction `1.0`, empty fraction `
 **Fixed `PATH`.** Child processes receive the constant `PATH` `<pinned environment>/bin:/usr/bin:/bin`, never parent text; `git` and `nvidia-smi` are started only by their absolute, `lstat`-validated paths `/usr/bin/git` and `/usr/bin/nvidia-smi` in a fresh environment; the child interpreter is the absolute pinned Python.
 
 **Not decided here.** Nothing in this section changes REF or EVAL handling: both stay unopened, and no REF- or EVAL-derived value may enter an M7 manifest.
+
+## 15. M7 closure and the selected set
+
+On 8 October 2026 the human gate accepts the selected set in `/home/laura/rnagenesis-mres-runs/m7_d1_final_selection_b5de24327ed5_attempt1`. `m7_final_selection_manifest.json` is 13,124 bytes, SHA-256 `49b218e3df74825e1931148e2f65b25aae057c822e2ab32d44c2960b1587c91c`, `selection_outcome: selected_set_complete`. The selected-set SHA-256 is `af0c0e555a8b878feadeb17fcbde18d8b780819a42d9e0cc547d2fc0c6895f8f`. Completed seeds are 43 and 44. Each selected checkpoint is epoch 5, update 105. The M8 allocation is 15,000 raw attempts for seed 43 and 15,000 for seed 44. The manifest closure stays `human_gate_required: true`, `m7_complete: false`, and `m8_generation_performed: false`, and it is not rewritten. Those flags are the run-time gate. This section is the milestone-status authority for acceptance, together with section 14 of [M7 final replicates implementation](m7_final_replicates_implementation.md).
+
+Seed 43 attempt 1 remains a consumed failure at `runtime_identity` and is not accepted training evidence. Seed 43 attempt 2 and seed 44 attempt 1 are the accepted replicates. The result is the two-seed set only. Seed 42 stays excluded, no third seed was trained, and no operational deviation was required. All five epoch checkpoints of each executed seed are retained through at least 1 November 2026. No deletion is implemented.
+
+`D1_candidate_guardrails.yaml` and `D1_final_selection.yaml` return to their inactive documents. `D1_final_replicates.yaml` remains the seed-44 authorisation because the tests require that live file and the configuration classifier has no consumed status. Closing M7 does not create an executable authorisation. M8 generation, GPU use, TRAIN, VALIDATION, REF, and EVAL remain unauthorised.
