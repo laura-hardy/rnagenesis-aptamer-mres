@@ -176,11 +176,17 @@ class InterpreterInEntriesTests(unittest.TestCase):
         del missing["interpreter"]
         with self.assertRaises(M7Error):
             contract.assert_active_entry(missing, temp)
-        for name in ("D1_final_replicates.yaml", "D1_candidate_guardrails.yaml"):
-            with open(os.path.join(ROOT, "config/experiments", name), "rb") as handle:
-                text = handle.read().decode("utf-8")
-            self.assertNotIn("interpreter:", text)
-            self.assertIn("  - interpreter\n", text)
+        with open(os.path.join(ROOT, "config/experiments/D1_candidate_guardrails.yaml"), "rb") as handle:
+            guardrail_text = handle.read().decode("utf-8")
+        self.assertNotIn("interpreter:", guardrail_text)
+        self.assertIn("  - interpreter\n", guardrail_text)
+        inactive_replicate = helpers.inactive_replicate_bytes().decode("utf-8")
+        self.assertNotIn("interpreter:", inactive_replicate)
+        self.assertIn("  - interpreter\n", inactive_replicate)
+        with open(os.path.join(ROOT, "config/experiments/D1_final_replicates.yaml"), "rb") as handle:
+            live_replicate = handle.read().decode("utf-8")
+        self.assertIn("authorisation_id:", live_replicate)
+        self.assertIn("seed44", live_replicate)
         self.assertIn("interpreter", contract.ACTIVE_ENTRY_KEYS)
         self.assertIn("interpreter", guardrails.ACTIVE_ENTRY_KEYS)
         raw, inactive = helpers.load_inactive()
@@ -253,8 +259,7 @@ class WiredLauncherBase(unittest.TestCase):
 
 class InactiveRefusalTests(WiredLauncherBase):
     def inactive_bytes(self):
-        with open(os.path.join(ROOT, "config/experiments/D1_final_replicates.yaml"), "rb") as handle:
-            return handle.read()
+        return helpers.inactive_replicate_bytes()
 
     def test_the_inactive_configuration_refuses_before_anything_is_created_or_touched(self):
         def refuse(name):
@@ -263,6 +268,9 @@ class InactiveRefusalTests(WiredLauncherBase):
 
             return raiser
 
+        # The inactive replicate fixture is read with git before subprocess is sealed.
+        # The launch itself must not call git.
+        inactive = self.inactive_bytes()
         with mock.patch.object(os, "mkdir", refuse("mkdir")), mock.patch.object(os, "makedirs", refuse("makedirs")), \
                 mock.patch.object(runner, "live_repository_observation", refuse("repository")), \
                 mock.patch.object(runner.m6, "observe_required_assets", refuse("assets")), \
@@ -272,13 +280,16 @@ class InactiveRefusalTests(WiredLauncherBase):
                 mock.patch.object(subprocess, "run", refuse("subprocess")), mock.patch.object(subprocess, "check_output", refuse("git")):
             for identifier in ("m7_unit_seed43_gpu1", "m7_unit_seed44_gpu1", "m7_unit_seed43_anything"):
                 with self.assertRaises(M7Error, msg=identifier) as caught:
-                    runner.launch_authorised_entry(identifier, run_root=self.harness.temp, environ={}, config_bytes=self.inactive_bytes())
+                    runner.launch_authorised_entry(identifier, run_root=self.harness.temp, environ={}, config_bytes=inactive)
                 self.assertEqual(caught.exception.code, "execution_not_authorised")
             for bad in ("", "bad", "m7_seed42_x", "m7_unit_seed45_gpu1", None, 7):
                 with self.assertRaises(M7Error) as caught:
-                    runner.launch_authorised_entry(bad, run_root=self.harness.temp, environ={}, config_bytes=self.inactive_bytes())
+                    runner.launch_authorised_entry(bad, run_root=self.harness.temp, environ={}, config_bytes=inactive)
                 self.assertEqual(caught.exception.code, "cli_argument_rejected", bad)
-            self.assertEqual(runner.main(["--authorisation-id", "m7_unit_seed43_gpu1"]), 2)
+            # The process entry point reads the live replicate authorisation, which is
+            # seed 44. This unit id is therefore not the inactive gate; the fixture
+            # bytes above are. The live lookup must still fail closed and create nothing.
+            self.assertEqual(runner.main(["--authorisation-id", "m7_unit_seed43_gpu1"]), 1)
         self.nothing_created()
 
     def test_the_inactive_launcher_refuses_before_environment_repository_gpu_interpreter_asset_or_weight_access(self):
@@ -312,9 +323,13 @@ class InactiveRefusalTests(WiredLauncherBase):
 
     def test_the_command_line_parses_the_id_and_refuses_it_while_inactive(self):
         path = os.path.join(ROOT, "scripts/modelling/m7_replicate_runner.py")
+        output = os.path.join(common.RUN_ROOT, "m7_unit_seed43_gpu1")
+        existed = os.path.lexists(output)
         refused = subprocess.run([sys.executable, "-B", path, "--authorisation-id", "m7_unit_seed43_gpu1"], capture_output=True, text=True, cwd="/tmp")
-        self.assertEqual(refused.returncode, 2)
-        self.assertTrue(refused.stderr.startswith("execution_not_authorised"), refused.stderr)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertEqual(refused.stdout, "")
+        self.assertFalse(refused.stderr.startswith("execution_not_authorised"), refused.stderr)
+        self.assertEqual(os.path.lexists(output), existed)
         for arguments in (["--authorisation-id"], ["--authorisation-id", "bad"], ["--authorisation-id", "m7_unit_seed43_gpu1", "--seed", "44"], ["--seed", "43"], ["--gpu", "1"], ["--learning-rate", "1e-3"]):
             completed = subprocess.run([sys.executable, "-B", path] + arguments, capture_output=True, text=True, cwd="/tmp")
             self.assertEqual(completed.returncode, 2, arguments)

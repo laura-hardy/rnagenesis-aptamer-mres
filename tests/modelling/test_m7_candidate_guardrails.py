@@ -53,10 +53,11 @@ def file_hashes():
     return {path: digest(path) for path in guardrails.IMPLEMENTATION_FILE_PATHS}
 
 
-def entry_for(root, seed=43, epoch=3, position=1, preceding=(), commit=PARENT, ld_library_path=None):
+def entry_for(root, seed=43, epoch=3, position=1, preceding=(), commit=PARENT, training_commit=None, ld_library_path=None):
     name = "m7_unit_seed%d_epoch%d_candidate" % (seed, epoch)
     output = root.rstrip("/") + "/" + name
-    checkpoint = "%s/m7_unit_seed%d_gpu1/%s" % (root.rstrip("/"), seed, contract.checkpoint_child_name(seed, epoch, commit))
+    training = commit if training_commit is None else training_commit
+    checkpoint = "%s/m7_unit_seed%d_gpu1/%s" % (root.rstrip("/"), seed, contract.checkpoint_child_name(seed, epoch, training))
     return {
         "activation_status": "active_unconsumed",
         "authorisation_id": name,
@@ -68,6 +69,7 @@ def entry_for(root, seed=43, epoch=3, position=1, preceding=(), commit=PARENT, l
         "checkpoint_directory": checkpoint,
         "checkpoint_member_sha256": {member: digest(member) for member in common.CHECKPOINT_MEMBERS},
         "checkpoint_relative_name": os.path.basename(checkpoint),
+        "checkpoint_training_implementation_commit": training,
         "checkpoint_weight_sha256": digest(common.WEIGHT_MEMBER),
         "consumed": False,
         "cuda_visible_devices": "1",
@@ -310,6 +312,35 @@ class ActiveEntryTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "provenance_mismatch")
         self.assertIn("ld_library_path", guardrails.ACTIVE_ENTRY_KEYS)
         self.assertIn("implementation_config_sha256", guardrails.ACTIVE_ENTRY_KEYS)
+        self.assertIn("checkpoint_training_implementation_commit", guardrails.ACTIVE_ENTRY_KEYS)
+
+    def test_training_provenance_is_separate_from_the_guardrail_execution_commit(self):
+        training = "c150894b9982d7afebfb2b3390b0797a4da146b5"
+        execution = "d" * 40
+        entry = entry_for(self.root, commit=execution, training_commit=training)
+        self.assertEqual(entry["authorization_parent_commit"], execution)
+        self.assertEqual(entry["executing_implementation_commit"], execution)
+        self.assertEqual(entry["checkpoint_training_implementation_commit"], training)
+        self.assertNotEqual(training, execution)
+        self.assertTrue(guardrails.assert_active_entry(entry, self.root))
+        self.assertIn(training, entry["checkpoint_relative_name"])
+        self.assertNotIn(execution, entry["checkpoint_relative_name"])
+        for bad in ("", "abc", "G" * 40, "c150894", None, execution + "ff"):
+            changed = entry_for(self.root, commit=execution, training_commit=training)
+            changed["checkpoint_training_implementation_commit"] = bad
+            with self.assertRaises(M7Error, msg=repr(bad)) as caught:
+                guardrails.assert_active_entry(changed, self.root)
+            self.assertIn(caught.exception.code, ("provenance_mismatch", "authorisation_scope_invalid", "authorisation_shape_invalid"))
+        missing = entry_for(self.root, commit=execution, training_commit=training)
+        del missing["checkpoint_training_implementation_commit"]
+        with self.assertRaises(M7Error) as caught:
+            guardrails.assert_active_entry(missing, self.root)
+        self.assertEqual(caught.exception.code, "authorisation_shape_invalid")
+        mismatched_parent = entry_for(self.root, commit=execution, training_commit=training)
+        mismatched_parent["authorization_parent_commit"] = "e" * 40
+        with self.assertRaises(M7Error) as caught:
+            guardrails.assert_active_entry(mismatched_parent, self.root)
+        self.assertEqual(caught.exception.code, "authorisation_commit_invalid")
 
     def test_one_entry_per_candidate_in_an_active_document(self):
         with open(os.path.join(ROOT, "config/experiments/D1_candidate_guardrails.yaml"), "rb") as handle:

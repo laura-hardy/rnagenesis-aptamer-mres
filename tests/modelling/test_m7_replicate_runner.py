@@ -814,8 +814,7 @@ class LauncherTests(unittest.TestCase):
             with self.assertRaises(M7Error) as caught:
                 self.launch(43, spawn, environ=dict(self.parent, **extra))
             self.assertEqual(caught.exception.code, "environment_rejected", extra)
-        with open(os.path.join(ROOT, "config/experiments/D1_final_replicates.yaml"), "rb") as handle:
-            inactive = handle.read()
+        inactive = support.helpers.inactive_replicate_bytes()
         with self.assertRaises(M7Error) as caught:
             self.launch(43, spawn, config_bytes=inactive)
         self.assertEqual(caught.exception.code, "execution_not_authorised")

@@ -164,12 +164,14 @@ def inactive_config():
 class World(object):
     """A temporary run root, a sealed replicate manifest, five tiny checkpoints, and a fake generator."""
 
-    def __init__(self, seed=43, ld_library_path=None, mode="clean", ambient_ld_library_path=None):
+    def __init__(self, seed=43, ld_library_path=None, mode="clean", ambient_ld_library_path=None, execution_commit=None, ancestry_mode="ancestor"):
         self.temp = os.path.realpath(tempfile.mkdtemp(prefix="m7gen"))
         self.run_root = os.path.join(self.temp, "runs")
         os.makedirs(self.run_root)
         self.seed = seed
         self.mode = mode
+        self.execution_commit = execution_commit
+        self.ancestry_mode = ancestry_mode
         self.ld_library_path = ld_library_path
         self.ambient = ambient_ld_library_path if ambient_ld_library_path is not None else ld_library_path
         self.pins = synthetic_pins()
@@ -249,9 +251,28 @@ class World(object):
             item["weight_sha256"] = hashes[common.WEIGHT_MEMBER]
             self.members[item["epoch"]] = hashes
         contract.validate_replicate_manifest(changed)
-        self.commit = changed["authorisation"]["executing_implementation_commit"]
+        self.training_commit = changed["authorisation"]["executing_implementation_commit"]
+        self.commit = self.training_commit
+        if self.execution_commit is None:
+            self.execution_commit = self.training_commit
         assert [r["epoch"] for r in changed["validation_ranking"]["ranked_candidates"]] == RANKING
         return changed
+
+    def rebind_training_commit(self, commit):
+        """Point the sealed replicate and its checkpoint names at another training commit."""
+        if not common.is_sha40(commit):
+            raise AssertionError(commit)
+        for item in self.manifest["checkpoints"]:
+            new_name = contract.checkpoint_child_name(self.seed, item["epoch"], commit)
+            os.rename(os.path.join(self.replicate_directory, item["directory_name"]), os.path.join(self.replicate_directory, new_name))
+            item["directory_name"] = new_name
+        self.manifest["authorisation"]["executing_implementation_commit"] = commit
+        contract.validate_replicate_manifest(self.manifest)
+        self.manifest_blob = common.canonical_json(self.manifest)
+        with open(os.path.join(self.replicate_directory, contract.SUCCESS_MANIFEST_NAME), "wb") as handle:
+            handle.write(self.manifest_blob)
+        self.training_commit = commit
+        self.commit = commit
 
     def entry(self, epoch, include_commit=True, ld_library_path="world"):
         ld_value = self.ld_library_path if ld_library_path == "world" else ld_library_path
@@ -263,18 +284,19 @@ class World(object):
             "activation_status": "active_unconsumed",
             "authorisation_id": name,
             "authorisation_timestamp": "2026-10-07T20:00:00+11:00",
-            "authorization_parent_commit": self.commit,
+            "authorization_parent_commit": self.execution_commit,
             "candidate_epoch": epoch,
             "candidate_seed": self.seed,
             "candidate_update": epoch * 21,
-            "checkpoint_directory": os.path.join(self.replicate_directory, contract.checkpoint_child_name(self.seed, epoch, self.commit)),
+            "checkpoint_directory": os.path.join(self.replicate_directory, contract.checkpoint_child_name(self.seed, epoch, self.training_commit)),
             "checkpoint_member_sha256": dict(self.members[epoch]),
-            "checkpoint_relative_name": contract.checkpoint_child_name(self.seed, epoch, self.commit),
+            "checkpoint_relative_name": contract.checkpoint_child_name(self.seed, epoch, self.training_commit),
+            "checkpoint_training_implementation_commit": self.training_commit,
             "checkpoint_weight_sha256": self.members[epoch][common.WEIGHT_MEMBER],
             "consumed": False,
             "cuda_visible_devices": "1",
             "evidence_directory": output,
-            "executing_implementation_commit": self.commit,
+            "executing_implementation_commit": self.execution_commit,
             "expected_schedule_sha256": self.pins["schedule"]["schedule"]["sha256"],
             "gpu_uuid": GPU_UUID,
             "implementation_config_sha256": sha(self.raw_config),
@@ -363,15 +385,25 @@ class World(object):
             if args == ["rev-parse", "HEAD"]:
                 return HEAD + "\n"
             if args == ["rev-parse", "HEAD^@"]:
-                return self.commit + "\n"
+                return self.execution_commit + "\n"
             if args[:1] == ["status"]:
                 return ""
             if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
                 return "main\n"
             if args == ["rev-parse", "origin/main"]:
-                return self.commit + "\n"
+                return self.execution_commit + "\n"
             if args[:2] == ["diff", "--name-only"] and args[3:] == ["HEAD"]:
                 return guardrails.CONFIG_RELATIVE + "\n"
+            if args[:2] == ["merge-base", "--is-ancestor"] and len(args) == 4:
+                training, execution = args[2], args[3]
+                accepted = (
+                    self.ancestry_mode == "ancestor"
+                    and training == self.training_commit
+                    and execution == self.execution_commit
+                )
+                if accepted:
+                    return ""
+                raise M7Error("git_status_unreadable", "a git command failed")
         elif repo == common.RNAGENESIS_ROOT:
             if args == ["rev-parse", "HEAD"]:
                 return common.RNAGENESIS_COMMIT + "\n"
@@ -1231,6 +1263,91 @@ class LdLibraryPathCandidateTests(WorldCase):
                 guardrails.validate_candidate_manifest(changed)
 
 
+# ------------------------------------------------------------------ checkpoint training provenance
+
+
+SEED43_TRAINING_COMMIT = "c150894b9982d7afebfb2b3390b0797a4da146b5"
+GUARDRAIL_EXECUTION_COMMIT = "d" * 40
+
+
+class CheckpointTrainingProvenanceTests(WorldCase):
+    def test_an_earlier_sealed_training_commit_need_not_equal_the_guardrail_execution_commit(self):
+        world = self.make(execution_commit=GUARDRAIL_EXECUTION_COMMIT)
+        world.rebind_training_commit(SEED43_TRAINING_COMMIT)
+        manifest = world.launch(5)
+        authorisation = manifest["authorisation"]
+        self.assertEqual(authorisation["authorization_parent_commit"], GUARDRAIL_EXECUTION_COMMIT)
+        self.assertEqual(authorisation["executing_implementation_commit"], GUARDRAIL_EXECUTION_COMMIT)
+        self.assertEqual(authorisation["checkpoint_training_implementation_commit"], SEED43_TRAINING_COMMIT)
+        self.assertNotEqual(SEED43_TRAINING_COMMIT, GUARDRAIL_EXECUTION_COMMIT)
+        self.assertNotEqual(authorisation["authorization_commit"], GUARDRAIL_EXECUTION_COMMIT)
+        self.assertEqual(manifest["checkpoint"]["directory_name"], contract.checkpoint_child_name(43, 5, SEED43_TRAINING_COMMIT))
+        self.assertEqual(manifest["checkpoint"]["members_sha256"], world.members[5])
+        self.assertEqual(manifest["candidate"]["update"], 105)
+        self.assertIs(manifest["checkpoint"]["tree_unchanged_across_generation"], True)
+
+    def test_substituted_missing_and_inconsistent_training_provenance_is_refused(self):
+        world = self.make(execution_commit=GUARDRAIL_EXECUTION_COMMIT)
+        world.rebind_training_commit(SEED43_TRAINING_COMMIT)
+        substituted = world.entry(5)
+        other = "e" * 40
+        substituted["checkpoint_training_implementation_commit"] = other
+        substituted["checkpoint_relative_name"] = contract.checkpoint_child_name(43, 5, other)
+        substituted["checkpoint_directory"] = os.path.join(world.replicate_directory, substituted["checkpoint_relative_name"])
+        with self.assertRaises(M7Error) as caught:
+            guardrails.verify_replicate_binding(substituted, world.deps(), world.run_root)
+        self.assertEqual(caught.exception.code, "provenance_mismatch")
+        missing = world.entry(5, include_commit=False)
+        del missing["checkpoint_training_implementation_commit"]
+        with self.assertRaises(M7Error) as caught:
+            guardrails.assert_active_entry(missing, world.run_root)
+        self.assertEqual(caught.exception.code, "authorisation_shape_invalid")
+        malformed = world.entry(5, include_commit=False)
+        malformed["checkpoint_training_implementation_commit"] = "not-a-commit"
+        with self.assertRaises(M7Error) as caught:
+            guardrails.assert_active_entry(malformed, world.run_root)
+        self.assertEqual(caught.exception.code, "provenance_mismatch")
+
+    def test_altered_checkpoint_member_metadata_and_architecture_are_refused(self):
+        world = self.make(execution_commit=GUARDRAIL_EXECUTION_COMMIT)
+        world.rebind_training_commit(SEED43_TRAINING_COMMIT)
+        changed = copy.deepcopy(world.manifest)
+        epoch_proof = next(item for item in changed["checkpoints"] if item["epoch"] == 5)
+        epoch_proof["saved_hashes"]["model_index.json"] = "ab" * 32
+        blob = common.canonical_json(changed)
+        path = os.path.join(world.replicate_directory, contract.SUCCESS_MANIFEST_NAME)
+        with open(path, "wb") as handle:
+            handle.write(blob)
+        entry = world.entry(5)
+        entry["replicate_manifest_sha256"] = sha(blob)
+        entry["replicate_manifest_bytes"] = len(blob)
+        with self.assertRaises(M7Error) as caught:
+            guardrails.verify_replicate_binding(entry, world.deps(), world.run_root)
+        self.assertEqual(caught.exception.code, "identity_mismatch")
+        changed = copy.deepcopy(world.manifest)
+        epoch_proof = next(item for item in changed["checkpoints"] if item["epoch"] == 5)
+        epoch_proof["configuration"]["configuration_compatible"] = False
+        blob = common.canonical_json(changed)
+        with open(path, "wb") as handle:
+            handle.write(blob)
+        entry = world.entry(5)
+        entry["replicate_manifest_sha256"] = sha(blob)
+        entry["replicate_manifest_bytes"] = len(blob)
+        with self.assertRaises(M7Error) as caught:
+            guardrails.verify_replicate_binding(entry, world.deps(), world.run_root)
+        self.assertIn(caught.exception.code, ("checkpoint_save_reload_incompatibility", "authorisation_evidence_mismatch", "incomplete_evidence_or_manifest"))
+
+    def test_a_later_or_unrelated_checkpoint_commit_is_refused_before_consumption(self):
+        for mode in ("later", "unrelated", "missing"):
+            world = self.make(execution_commit=GUARDRAIL_EXECUTION_COMMIT, ancestry_mode=mode)
+            world.rebind_training_commit(SEED43_TRAINING_COMMIT)
+            with self.assertRaises(M7Error, msg=mode) as caught:
+                world.launch(5)
+            self.assertEqual(caught.exception.code, "provenance_mismatch")
+            self.assertFalse(os.path.exists(world.output(5)))
+            self.assertEqual(world.calls, [])
+
+
 # ------------------------------------------------------------------ production wiring and the inactive gate
 
 
@@ -1307,7 +1424,27 @@ class ProductionWiringTests(WorldCase):
                 return guardrails.CONFIG_RELATIVE + "\nscripts/modelling/m7_common.py\n"
             return original_git(repo, args)
 
-        for git in (dirty, other_parent, drifted_rnagenesis, extra_file):
+        def side_branch(repo, args):
+            if repo == common.MRES_ROOT and args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+                return "m7-seed43-rank1-guardrail\n"
+            return original_git(repo, args)
+
+        def incompatible_origin(repo, args):
+            if repo == common.MRES_ROOT and args == ["rev-parse", "origin/main"]:
+                return "f" * 40 + "\n"
+            return original_git(repo, args)
+
+        def two_parents(repo, args):
+            if repo == common.MRES_ROOT and args == ["rev-parse", "HEAD^@"]:
+                return world.execution_commit + "\n" + ("c" * 40) + "\n"
+            return original_git(repo, args)
+
+        def head_is_parent(repo, args):
+            if repo == common.MRES_ROOT and args == ["rev-parse", "HEAD"]:
+                return world.execution_commit + "\n"
+            return original_git(repo, args)
+
+        for git in (dirty, other_parent, drifted_rnagenesis, extra_file, side_branch, incompatible_origin, two_parents, head_is_parent):
             with self.assertRaises(M7Error, msg=git.__name__):
                 world.launch(2, git=git)
             self.assertFalse(os.path.exists(world.output(2)))
@@ -1379,7 +1516,7 @@ class ProductionWiringTests(WorldCase):
         self.assertIn("execution_not_authorised", refused.stderr)
 
     def test_the_inactive_files_stay_inactive_and_unbound(self):
-        for name in ("D1_candidate_guardrails.yaml", "D1_final_replicates.yaml", "D1_final_selection.yaml"):
+        for name in ("D1_candidate_guardrails.yaml", "D1_final_selection.yaml"):
             with open(os.path.join(ROOT, "config/experiments", name), "rb") as handle:
                 text = handle.read().decode("utf-8")
             config = common.load_config_bytes(text.encode("utf-8"))
@@ -1389,8 +1526,17 @@ class ProductionWiringTests(WorldCase):
             for token in ("GPU-", "ld_library_path:", "output_directory:", "evidence_directory:", "authorization_commit:", "gpu_uuid:", "authorisation_timestamp:"):
                 self.assertNotIn(token, text, (name, token))
             self.assertIs(config.get("execution", {}).get("gpu_identity_bound", False), False, name)
+        with open(os.path.join(ROOT, "config/experiments/D1_final_replicates.yaml"), "rb") as handle:
+            live_replicate = common.load_config_bytes(handle.read())
+        self.assertEqual(live_replicate["document_status"], contract.ACTIVE_DOCUMENT_STATUS)
+        self.assertEqual(len(live_replicate["authorisation_entries"]), 1)
+        self.assertIn("seed44", live_replicate["authorisation_entries"][0]["authorisation_id"])
+        inactive_replicate = contract.load_config_bytes(support.helpers.inactive_replicate_bytes())
+        self.assertTrue(contract.assert_inactive_configuration(inactive_replicate))
+        self.assertEqual(inactive_replicate["authorisation_entries"], [])
         guardrails_config = inactive_config()[1]
         self.assertTrue(guardrails.assert_inactive_configuration(guardrails_config))
+        self.assertEqual(guardrails_config["authorisation_entries"], [])
         self.assertIs(guardrails_config["diagnostic_design"]["production_generation_callable_implemented_in_this_package"], True)
 
 

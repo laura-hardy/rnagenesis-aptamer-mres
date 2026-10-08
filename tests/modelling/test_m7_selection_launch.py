@@ -377,13 +377,19 @@ class InactiveGateTests(unittest.TestCase):
                 selection.assert_inactive_configuration(changed)
 
     def test_the_other_m7_configurations_and_the_m6_blobs_stay_inactive(self):
-        for name, module in (("D1_final_replicates.yaml", contract), ("D1_candidate_guardrails.yaml", guardrails)):
-            with open(os.path.join(ROOT, "config/experiments", name), "rb") as handle:
-                raw = handle.read()
-            config = common.load_config_bytes(raw)
-            self.assertTrue(module.assert_inactive_configuration(config), name)
-            self.assertEqual(config["authorisation_entries"], [], name)
-            self.assertIs(config["consumable_by_executable_workflow"], False, name)
+        replicate = contract.load_config_bytes(helpers.inactive_replicate_bytes())
+        self.assertTrue(contract.assert_inactive_configuration(replicate))
+        self.assertEqual(replicate["authorisation_entries"], [])
+        with open(os.path.join(ROOT, "config/experiments/D1_candidate_guardrails.yaml"), "rb") as handle:
+            raw = handle.read()
+        config = common.load_config_bytes(raw)
+        self.assertTrue(guardrails.assert_inactive_configuration(config))
+        self.assertEqual(config["authorisation_entries"], [])
+        self.assertIs(config["consumable_by_executable_workflow"], False)
+        with open(os.path.join(ROOT, "config/experiments/D1_final_replicates.yaml"), "rb") as handle:
+            live = common.load_config_bytes(handle.read())
+        self.assertEqual(live["document_status"], contract.ACTIVE_DOCUMENT_STATUS)
+        self.assertIn("seed44", live["authorisation_entries"][0]["authorisation_id"])
         self.assertEqual(helpers.git_blob_id(os.path.join(ROOT, "config/experiments/D1_diffusion_pilot.yaml")), helpers.M6_PILOT_YAML_BLOB)
         self.assertEqual(helpers.git_blob_id(os.path.join(ROOT, "config/experiments/D1_update21_diagnostic_generation.yaml")), helpers.M6_DIAGNOSTIC_YAML_BLOB)
 

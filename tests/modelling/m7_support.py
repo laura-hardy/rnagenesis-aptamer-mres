@@ -600,25 +600,35 @@ def ranking_hash(manifest):
     return selection._ranking_sha256(manifest["validation_ranking"])
 
 
-def guardrail_entry(manifest, epoch, position, preceding):
+def guardrail_entry(manifest, epoch, position, preceding, execution_commit=None):
+    """One candidate entry.
+
+    ``checkpoint_training_implementation_commit`` is the replicate's training
+    implementation. ``executing_implementation_commit`` is the guardrail
+    implementation. They are equal unless ``execution_commit`` names a later
+    guardrail implementation.
+    """
     seed = manifest["seed"]
+    training = manifest["authorisation"]["executing_implementation_commit"]
+    executing = training if execution_commit is None else execution_commit
     return {
         "authorisation_id": "m7_unit_seed%d_epoch%d_candidate" % (seed, epoch),
         "authorization_commit": manifest["authorisation"]["authorization_commit"],
-        "authorization_parent_commit": manifest["authorisation"]["authorization_parent_commit"],
+        "authorization_parent_commit": executing,
         "candidate_epoch": epoch,
         "candidate_seed": seed,
-        "executing_implementation_commit": manifest["authorisation"]["executing_implementation_commit"],
+        "checkpoint_training_implementation_commit": training,
+        "executing_implementation_commit": executing,
         "preceding_candidates": list(preceding),
         "ranking_position": position,
     }
 
 
-def guardrail_blob(manifest, replicate_blob, epoch, passed, position, preceding):
+def guardrail_blob(manifest, replicate_blob, epoch, passed, position, preceding, execution_commit=None):
     """Canonical bytes for one candidate-guardrail manifest bound to a replicate manifest."""
     checkpoint = next(item for item in manifest["checkpoints"] if item["epoch"] == epoch)
     values = next(row["aggregate_mse"] for row in manifest["validation_observations"] if row["epoch"] == epoch)
-    entry = guardrail_entry(manifest, epoch, position, preceding)
+    entry = guardrail_entry(manifest, epoch, position, preceding, execution_commit=execution_commit)
     weight = checkpoint["weight_sha256"]
     built = guardrails.build_candidate_manifest(
         entry,
