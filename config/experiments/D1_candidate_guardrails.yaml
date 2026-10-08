@@ -1,16 +1,17 @@
-# M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
-# Authoritative inactive M7 candidate-guardrail configuration.
-# This file must not be consumed by an executable workflow. It binds no GPU, no
-# output directory, no checkpoint path, no biological path and no authorisation.
-# Its entry point accepts --help, --schema and --authorisation-id <id> (refused while
-# this file is inactive). A later authorisation-only
-# commit may change only this file, adding one entry per candidate evaluated, in
-# the order of the sealed validation ranking. The production generation
-# callable is implemented; this inactive file binds no value for it to use,
-# including no LD_LIBRARY_PATH value.
+# M7_CANDIDATE_GUARDRAILS_AUTHORISED_FOR_SINGLE_USE_EXECUTION
+# Proposed single-use M7 candidate-guardrail authorisation.
+# Seed 43, validation-ranking position 1, epoch 5, update 105, GPU 1, attempt 1.
+# This file is a proposal. It has not been committed on the live repository,
+# and authorization_commit is deliberately absent.
+# authorization_parent_commit and executing_implementation_commit name the
+# guardrail implementation 44a8db783caa32d07b91cce130fab14b24f62fe3.
+# checkpoint_training_implementation_commit names the sealed training commit
+# c150894b9982d7afebfb2b3390b0797a4da146b5.
+# The commit that carries this file may change only this file.
+# The future authorisation commit hash is not stored in this file.
 
-document_status: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED
-consumable_by_executable_workflow: false
+document_status: M7_CANDIDATE_GUARDRAILS_AUTHORISED_FOR_SINGLE_USE_EXECUTION
+consumable_by_executable_workflow: true
 schema_version: m7-candidate-guardrail-config-1
 manifest_schema_version: m7-candidate-guardrail-manifest-1
 experiment_id: D1_candidate_guardrails
@@ -19,12 +20,76 @@ rnagenesis_branch: mres-d1-diffusion-finetune
 rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
 
 execution:
-  authorised: false
-  biological_paths_permitted: false
-  gpu_identity_bound: false
+  authorised: true
+  biological_paths_permitted: true
+  gpu_identity_bound: true
 
-# Inactive: no entry.
-authorisation_entries: []
+# Proposed single seed-43 rank-1 entry. Rank 1 binds no preceding failed candidate.
+authorisation_entries:
+- activation_status: 'active_unconsumed'
+  authorisation_id: 'm7_d1_candidate_guardrail_seed43_rank1_epoch5_44a8db783caa_gpu1_attempt1'
+  authorisation_timestamp: '2026-10-08T11:34:16+11:00'
+  authorization_parent_commit: '44a8db783caa32d07b91cce130fab14b24f62fe3'
+  candidate_epoch: 5
+  candidate_seed: 43
+  candidate_update: 105
+  checkpoint_directory: '/home/laura/rnagenesis-mres-runs/m7_d1_final_replicate_seed43_c150894b9982_gpu1_attempt2/D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-5__update-105__git-c150894b9982d7afebfb2b3390b0797a4da146b5'
+  checkpoint_member_sha256:
+    model_index.json: '05ac20f9fd3bd818ec88b37ff35e482ac80c5f5329666ecdfbe9227aa045b70e'
+    scheduler/scheduler_config.json: '6b470b030031daa7c812ef9a6dfe49f14fa695c17a939406f1c780bad6a91396'
+    unet/config.json: '42c864c81e35ef1a0c7964a3642492fba95c9e24a153407f9fd98855b20d9d70'
+    unet/diffusion_pytorch_model.safetensors: 'c0797888bde9033cc15b056c8c09e70b9f7fba0fb21b1f3840a4f1efb77031ab'
+  checkpoint_relative_name: 'D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-5__update-105__git-c150894b9982d7afebfb2b3390b0797a4da146b5'
+  checkpoint_training_implementation_commit: 'c150894b9982d7afebfb2b3390b0797a4da146b5'
+  checkpoint_weight_sha256: 'c0797888bde9033cc15b056c8c09e70b9f7fba0fb21b1f3840a4f1efb77031ab'
+  consumed: false
+  cuda_visible_devices: '1'
+  evidence_directory: '/home/laura/rnagenesis-mres-runs/m7_d1_candidate_guardrail_seed43_rank1_epoch5_44a8db783caa_gpu1_attempt1'
+  executing_implementation_commit: '44a8db783caa32d07b91cce130fab14b24f62fe3'
+  expected_schedule_sha256: '0f527d44ae1029c936391fe81709f991a21811c4349e49c5b6aafb414b1702f0'
+  gpu_uuid: 'GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f'
+  implementation_config_sha256: 'f7f701db51edb76adeb62adfadbc7f19b5c252968af2df2ec5146838333ff6ba'
+  implementation_file_hashes:
+    config/modelling/validation_metrics_v1.yaml: 'd30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb'
+    scripts/b1_development_pool_runner.py: '622684b254f911ca4d00db8af20d0d0c67eeebf46007e3fe84995e1e11db2341'
+    scripts/modelling/m4_diagnostic_metrics.py: 'eebb6c8faf0d909bd907cd1e1e09c75908676ffe3e4eb04842f09b943b9d9e56'
+    scripts/modelling/m5_smoke_contract.py: 'cbb9ff275149315c6a7cb227fafe5c2a0cd3d9b0a5375b296861945f0666ce3a'
+    scripts/modelling/m6_diagnostic_generation.py: '83f299bea7ec69406c898ad0e971bebf06056beb58649de0c25a5cc6d7195726'
+    scripts/modelling/m6_pilot_contract.py: '525b7ff424b7b934792bf3b092526d2f5f6a85cc6e789116615f4a2d1059a21f'
+    scripts/modelling/m7_candidate_guardrails.py: '5f72b77740795e85b642c3e1d28553d10a9b7c10d148c3510c22a749bb5533a2'
+    scripts/modelling/m7_common.py: '408b9b8fd8abb9e963ffc9723fc5e0c1fe24da0e9853767d2e43b43a3bbfe9c3'
+    scripts/modelling/m7_replicate_contract.py: 'dd251f665446d3c0c9c52e96f228a402eb7a65d050d93196896a31abb2d24c97'
+    tests/modelling/test_m7_candidate_guardrails.py: 'f7847ea8606aa42354d0e9d31ffb51ac6d15991299835fe214fc711426175f61'
+  interpreter:
+    path: '/home/laura/miniconda3/envs/rnagenesis-h200/bin/python'
+    resolved_path: '/home/laura/miniconda3/envs/rnagenesis-h200/bin/python3.8'
+    sha256: '058a393acc1b0ee5d0564a6dca1e36f6602b4686b369ad957eca2b359d145059'
+    size: 15035704
+  ld_library_path: null
+  logical_device: 'cuda:0'
+  output_directory: '/home/laura/rnagenesis-mres-runs/m7_d1_candidate_guardrail_seed43_rank1_epoch5_44a8db783caa_gpu1_attempt1'
+  pci_bus: '00000000:61:00.0'
+  permitted_roles:
+    - 'ACCEPTED_SCHEDULE'
+    - 'FROZEN_ENCDEC'
+    - 'SEED_EPOCH_CHECKPOINT'
+    - 'TRAIN_TEXT_DIAGNOSTIC_ONLY'
+  phase: 'M7_D1_candidate_guardrail'
+  physical_gpu_index: 1
+  preceding_candidates: []
+  ranking_position: 1
+  replicate_manifest_bytes: 287982
+  replicate_manifest_path: '/home/laura/rnagenesis-mres-runs/m7_d1_final_replicate_seed43_c150894b9982_gpu1_attempt2/m7_replicate_manifest.json'
+  replicate_manifest_sha256: 'f59bb4a236e3d1ac532dd83d524d8e7ceb51cbf2b9010741206169577d1acecc'
+  reuse_permitted: false
+  scope: 'single_use_m7_d1_candidate_guardrail_seed_43_epoch_5'
+  session:
+    consumption_event: 'bound_output_directory_creation'
+    pattern: 'm5_single_use_timestamp_and_scope'
+    resume_permitted: false
+    wall_clock_expiry: null
+  single_use: true
+  validation_ranking_sha256: '9c8b7f828ae8bd7a26d4cd221e8a8ca681225d0cd65e4c2fadd0d9976188f52b'
 
 authorisation_schema:
   entries_per_authorisation_only_commit: one_per_candidate_to_be_evaluated
