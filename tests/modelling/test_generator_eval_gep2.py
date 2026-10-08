@@ -291,8 +291,9 @@ class SpecContractTests(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)))
         self.assertEqual(spec["freeze_status"], "draft")
         self.assertFalse(spec["aggregate_generator_quality_score"])
-        self.assertEqual(spec["governing_plan"]["version"], "3.0")
-        self.assertEqual(spec["governing_plan"]["sha256"], "e6193d0d14245049c218b4da0ef8059fb63b2f31e4885b3457cd44e41b76c50c")
+        self.assertEqual(spec["governing_plan"]["version"], "3.1")
+        self.assertEqual(spec["governing_plan"]["revision_date"], "8 October 2026")
+        self.assertEqual(spec["governing_plan"]["sha256"], preflight._hash_revision_path(spec["governing_plan"]["path"]))
         analysis_path = os.path.join(ROOT, "scripts/modelling/generator_eval_analysis.py")
         with open(analysis_path, "rb") as handle:
             digest = hashlib.sha256(handle.read()).hexdigest()
@@ -484,8 +485,12 @@ class ClosenessTests(unittest.TestCase):
         # Length 8 labelled long must stay long. It is not inferred to be short.
         self.assertEqual(len(long_d1["sequence"]), 8)
         report = analysis.analyse(document)
-        short = report["conditions"]["D1"]["stratified"]["short"]
-        long = report["conditions"]["D1"]["stratified"]["long"]
+        seed_block = report["d1_by_training_seed"]["by_training_seed"][0]
+        short = seed_block["stratified"]["short"]
+        long = seed_block["stratified"]["long"]
+        pooled = report["conditions"]["D1"]["stratified"]
+        self.assertIsNone(pooled["long"]["pooled_gc_fraction"])
+        self.assertEqual(pooled["long"]["pooled_gc_aggregation_basis"], "unavailable pending a defined aggregation")
         self.assertEqual(short["generated_valid_row_denominator"], 1)
         self.assertEqual(long["generated_valid_row_denominator"], 1)
         self.assertEqual(short["reference_unique_core_denominator"], 1)
@@ -538,9 +543,19 @@ class SeedAndDirectionTests(unittest.TestCase):
             [b1, d1, b0_row("mix-b0"), b2_row("mix-b2")],
             ["UUUUUUUU"],
             [reference("ref-a", "AAAAAAAA"), reference("ref-c", "CCCCCCCC")],
+            d1_pooling_provenance={
+                "pooling_policy": "equal_training_seed_mixture",
+                "policy_verified": True,
+                "participating_training_seeds": [91001],
+            },
         )
         report = analysis.analyse(document)
         self.assertEqual(report["b1_d1_directional_consistency"]["label"], "mixed")
+        self.assertEqual(
+            report["b1_d1_directional_consistency"]["aggregation_basis"],
+            "equal-training-seed valid-conditional mixture",
+        )
+        self.assertFalse(report["b1_d1_directional_consistency"]["uses_unlabelled_concatenated_d1_fallback"])
         differences = report["b1_d1_directional_consistency"]["differences"]
         self.assertLess(differences["nearest_reference_normalized_edit_distance.median"]["d1_minus_b1"], 0)
         self.assertGreater(differences["nucleotide_total_variation_to_reference"]["d1_minus_b1"], 0)
@@ -708,9 +723,13 @@ class BlockScheduleAndPanelTests(unittest.TestCase):
         report = analysis.analyse(default_document(), fold=fold)
         self.assertTrue(calls)
         self.assertFalse(report["viennarna_called"])
-        self.assertEqual(report["conditions"]["D1"]["structure"]["mfe_per_nt.median"], -2.0)
-        self.assertEqual(report["conditions"]["D1"]["structure"]["paired_fraction.median"], 0.0)
-        self.assertFalse(report["conditions"]["D1"]["structure"]["new_mfe_formula_defined"])
+        pooled_structure = report["conditions"]["D1"]["structure"]
+        self.assertIsNone(pooled_structure["mfe_per_nt.median"])
+        self.assertEqual(pooled_structure["aggregation_basis"], "unavailable pending a defined aggregation")
+        seed_structure = report["d1_by_training_seed"]["by_training_seed"][0]["structure"]
+        self.assertEqual(seed_structure["mfe_per_nt.median"], -2.0)
+        self.assertEqual(seed_structure["paired_fraction.median"], 0.0)
+        self.assertFalse(seed_structure["new_mfe_formula_defined"])
 
     def test_empty_and_all_invalid_inputs_do_not_fabricate_values(self):
         empty = envelope([], ["UUUUUUUU"], [reference("ref-a", "ACGUACGU")])
@@ -752,7 +771,7 @@ class BlockScheduleAndPanelTests(unittest.TestCase):
         self.assertIn("only synthetic TRAIN/reference fixtures used", text)
         self.assertIn("no EVAL, REF or VALIDATION data loaded", text)
         self.assertIn("metric_count: 35", text)
-        self.assertIn("unresolved_item_count: 6", text)
+        self.assertIn("unresolved_item_count: 7", text)
         for sequence in sequences:
             self.assertNotIn(sequence, text)
         formula_hashes = {
@@ -776,7 +795,7 @@ class ReviewedCoverageTests(unittest.TestCase):
 
     def test_b0_and_b2_report_closeness_gc_and_denominators(self):
         report = analysis.analyse(default_document())
-        for condition in ("B0", "B1", "B2", "D1"):
+        for condition in ("B0", "B1", "B2"):
             block = report["conditions"][condition]
             self.assertEqual(block["successfully_parsed_outputs"], 1)
             self.assertEqual(block["raw_attempts"], 1)
@@ -793,6 +812,17 @@ class ReviewedCoverageTests(unittest.TestCase):
                 self.assertEqual(metric["generated_unique_valid_count"], 1)
                 self.assertEqual(metric["reference_unique_core_denominator"], 2)
                 self.assertEqual(metric["direction"], "lower")
+        d1 = report["conditions"]["D1"]
+        self.assertEqual(d1["raw_attempts"], 1)
+        self.assertEqual(d1["accounting"]["attempted"], 1)
+        self.assertIsNone(d1["pooled_gc_fraction"])
+        self.assertEqual(d1["pooled_gc_undefined_reason"], "pooling_policy_not_verified")
+        self.assertFalse(d1["uses_unlabelled_concatenated_d1_fallback"])
+        self.assertEqual(report["b1_d1_directional_consistency"]["label"], "not_applicable")
+        self.assertFalse(report["b1_d1_directional_consistency"]["uses_unlabelled_concatenated_d1_fallback"])
+        seed_block = report["d1_by_training_seed"]["by_training_seed"][0]
+        self.assertIsNotNone(seed_block["pooled_gc_fraction"])
+        self.assertEqual(seed_block["generated_valid_row_denominator"], 1)
         b0 = report["conditions"]["B0"]
         self.assertEqual(b0["exact_hit_applicability"], "not_applicable")
         self.assertIsNone(b0["exact_hit_rate"])
@@ -893,7 +923,10 @@ class ReviewedCoverageTests(unittest.TestCase):
             self.assertEqual(block["generated_valid_row_denominator"], 0)
             self.assertEqual(block["generated_unique_valid_count"], 0)
             self.assertIsNone(block["pooled_gc_fraction"])
-            self.assertEqual(block["pooled_gc_undefined_reason"], "no_canonical_bases")
+            if condition == "D1":
+                self.assertEqual(block["pooled_gc_undefined_reason"], "pooling_policy_not_verified")
+            else:
+                self.assertEqual(block["pooled_gc_undefined_reason"], "no_canonical_bases")
             self.assertNotEqual(block["pooled_gc_fraction"], 0)
             for key in self._closeness_keys():
                 metric = block["closeness"][key]

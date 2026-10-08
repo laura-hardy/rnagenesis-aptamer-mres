@@ -3,9 +3,9 @@
 | Plan detail | Value |
 |---|---|
 | Project | Towards prediction-guided generative design of RNA aptamers against carbapenemase targets |
-| Document version | 3.0 |
-| Revision date | 7 October 2026 |
-| Status | Execution plan reflecting the final scope agreed with the supervisor |
+| Document version | 3.1 |
+| Revision date | 8 October 2026 |
+| Status | Execution plan reflecting the final scope agreed with the supervisor. Version 3.1 incorporates the approved M8 generator-EVAL addendum. Production generation facts remain pending authoritative manifest verification. |
 | Evaluation budget | Approximately five working days once prerequisites are ready; protect subsequent thesis writing |
 | Execution model | Local frozen generator analysis; Laura runs AptaRank manually through its UI; version-controlled code prepares uploads and processes downloaded results |
 
@@ -118,14 +118,16 @@ If any required pool, generator analysis or UI interface is absent, move the eva
 
 Retain the implemented M4 design. D1 training seeds are independent model-training replicates when more than one exists. B1 Phase A seeds are paired protocol/length controls; B1 Phase B seed summaries are coupled to length and descriptive; B2 is a single-seed empirical null; B0 retains historical provenance. The limited B1/D1 comparison uses the implemented matched generation-chunk schedule where applicable. Generation chunks and candidate rows are not independent training replicates.
 
-Two D1 training seeds are preferred, not mandatory. Freeze the achieved count before result inspection. With one D1 training seed, state that uncertainty does not include training-run variability; with two, show the observed range and limited precision. The D1 generation budget is 30,000 raw attempts **in total** across retained checkpoints, not 30,000 per checkpoint. Report pool-size differences and use the frozen equal-size primary B1/B2/D1 generator analysis sample where required. Keep B0 external rather than pooling its different length regime.
+Two D1 training seeds are preferred, not mandatory. Freeze the achieved count before result inspection. With one D1 training seed, state that uncertainty does not include training-run variability; with two, show the observed range and limited precision. The figure of 30,000 D1 raw attempts is a planned total budget across retained checkpoints, not 30,000 per checkpoint and not a verified achieved production count. Actual D1 allocation and pooling are confirmed from the final manifests before M9A. If those manifests confirm equal production weighting of the fitted D1 models, valid-conditional D1 summaries use an equal mixture of the seed-specific valid-output distributions. Raw accounting and global multiplicity remain the actual observed counts. Generated rows within one training seed are nested Monte Carlo samples, not additional model replicates. Keep B0 external rather than pooling its different length regime into the B1–D1 comparison.
 
-### 4.2 M6 → M9A → M9B → M9C → M10
+### 4.2 M7 guardrails → immutable M8 → post-M8 accounting → M9A → M9B → M9C → explicit M10
+
+The generator sequence is M7 guardrails, then immutable M8 raw generation, then condition-blind post-M8 parsing and accounting, then M9A, M9B, M9C, and an explicit M10 EVAL unlock. M7 guardrail samples are excluded from production pools. M6 remains the scope and runtime lock below; it does not place guardrail samples into those pools.
 
 | Gate | Required record |
 |---|---|
 | M6 scope/runtime lock | Five agreed analyses; achieved seeds; four pool availability; generator metric specification; UI time/candidate limits; one/two illustrative target rule; NDM-1 target preparation and supervisor review route. Use an existing M6 record where valid; update the evaluation scope before EVAL access. |
-| M9A generator freeze | Checkpoint hashes, selected seeds, generation settings, cleaning, pools/manifests, frozen generator evaluation code. |
+| M9A generator freeze | Checkpoint hashes, selected seeds, generation settings, cleaning, pools/manifests, the condition-blind parser and any documented B0 adapter version, derived-ledger linkage, and frozen generator evaluation code. Actual D1 allocation and pooling are confirmed from final manifests at this gate. |
 | M9B AptaRank calibration | Tier 1 empirical calibration from corrected unique REF cores; brief Tier 2 score/control audit; effective deployment/preset. |
 | M9C end-to-end freeze | Analysis questions/metrics, exact-length control algorithm, Tier 2 target/mode/site rules, generated-condition samples and Tier 2 shortlist rule, runtime fallback, tie/failure handling, code/configuration hashes. |
 | M10 held-out assessment | Explicit EVAL unlock, one frozen analysis; no score-guided changes or second claim of fresh EVAL. |
@@ -134,9 +136,15 @@ The unlock record includes timestamps, operator/reviewer, corrected role hashes,
 
 ## 5. Four-condition generator-level EVAL
 
-After M9C and formal unlock, run the frozen generator evaluation on the B0/B1/B2/D1 pools against unique EVAL cores. B1 versus D1 remains the primary controlled comparison; B2 gives a non-neural context. **B0 is required in this plan** as a separate external/descriptive condition with its historical 37-nt output regime. Do not pool B0 into a matched-length B1/D1 causal estimate or imply that the historical B0 run supplies new independent training seeds. EVAL is held out from this project's development; the released B0 model's external training history may not guarantee independence from every EVAL publication, so report known overlap checks and unresolved provenance.
+After M9C and formal unlock, run the frozen generator evaluation on the B0/B1/B2/D1 pools against unique EVAL cores. B1 versus D1 remains the primary controlled comparison; B2 is the non-neural null. **B0 is required in this plan** as a separate external/descriptive condition with its historical 37-nt output regime. Do not pool B0 into a matched-length B1/D1 causal estimate or imply that the historical B0 run supplies new independent training seeds. EVAL is held out from this project's development; the released B0 model's external training history may not guarantee independence from every EVAL publication, so report known overlap checks and unresolved provenance.
 
-The generator analysis uses its frozen primary samples and full-pool accounting; the later AptaRank 200-per-condition sample is a separate derived input. Preserve condition/checkpoint, actual training seed, length-sampling seed, length-condition seed, generation chunk, cleaning/version and metric-specific denominators. Do not choose favourable seeds or generate replacement pools after seeing EVAL.
+Raw production artifacts are immutable. Do not filter, deduplicate, truncate, pad, top up, replace, or replenish them. Derived parsed and accounting tables are separate outputs, reproducibly linked to each source attempt. `record_id` is the canonical attempt identifier. Each derived row retains the source-artifact hash. Do not silently renumber attempts. A low valid or unique count stays visible.
+
+The primary generator-analysis grain is all valid parsed attempts, including repetitions. Exact duplicates and their multiplicities are outcomes. A unique-only generator analysis is a labelled sensitivity with its own denominator; it does not replace the primary result. An expensive metric may use only a prespecified multiplicity-preserving attempt-level subsample, frozen before EVAL, and must report that sampled denominator. This grain is separate from the AptaRank application, which continues to draw valid unique candidates under Section 9.
+
+Post-M8 parsing is condition-blind: the pipeline must not branch on condition in order to improve a condition's result. B0 may use a documented format adapter. After adaptation it enters the same biological validity parser as B1, B2, and D1. The adapter does not put B0 into the B1–D1 controlled comparison. Do not infer a biological requested length for B0 from nominal `max_seq_len` or from cleaned length when the source did not record one.
+
+The generator analysis uses full-pool attempt accounting. The later AptaRank 200-per-condition sample is a separate derived input. Preserve condition/checkpoint, actual training seed, length-sampling seed, length-condition seed, generation chunk, cleaning/version and metric-specific denominators. Do not choose favourable seeds or generate replacement pools after seeing EVAL.
 
 ### 5.1 Frozen metrics and outputs
 
@@ -144,14 +152,14 @@ The generator analysis uses its frozen primary samples and full-pool accounting;
 |---|---|
 | Output accounting | Attempted, parsed, valid A/C/G/U, unique valid, duplicates/invalid and metric-specific denominators for all four conditions |
 | TRAIN relationship | Exact TRAIN overlap and already implemented novelty/nearest-TRAIN diagnostics |
-| Sequence/structure distributions | Length, nucleotide/GC composition, frozen mono-/dinucleotide summaries where implemented, normalized MFE, paired fraction and other predeclared descriptors |
-| Diversity | Existing sequence/structure cluster, singleton, largest-cluster and effective-diversity summaries where implemented |
-| EVAL relationship | Each predeclared EVAL distance/closeness metric separately with its direction, length handling and uncertainty limit; one frozen representation metric only if already implemented and validated before unlock |
+| Sequence/structure distributions | Length, nucleotide/GC composition, frozen mono-/dinucleotide summaries where implemented, normalized MFE, paired fraction and other predeclared descriptors. Production ViennaRNA settings are not yet fully pinned; an explicit pin or a scope decision is required before M9C. |
+| Diversity | Exact-duplicate excess, multiplicity, and a sequence-free multiplicity histogram on valid attempts. Unique-only counts are a labelled sensitivity. Generated-sequence clustering, threshold sensitivities, and effective-cluster analyses are deferred to Section 14. |
+| EVAL relationship | Each predeclared EVAL distance/closeness metric separately with its direction, length handling and uncertainty limit. Representation-space analysis is deferred to Section 14 and is not a required generator output. |
 | Design-aware interpretation | D1 training-seed values/range; actual matched B1/D1 chunk results where applicable; B2's single-seed limitation; separate length-aware B0 panel |
 
-Before unlock, hash a generator_eval_metric_spec with one row per implemented metric: exact name, data/reference, denominator/filter, calculation, units/range, length/seed treatment, improvement direction or “not applicable”, role (closeness, guardrail or outcome), and code/configuration revision. Validity, TRAIN novelty and diversity are outcomes/guardrails, not extra votes for closeness. Do not form a single generator-quality score.
+Before unlock, hash a generator_eval_metric_spec with one row per implemented metric: exact name, data/reference, denominator/filter, calculation, units/range, length/seed treatment, improvement direction or “not applicable”, role (closeness, guardrail or outcome), and code/configuration revision. Validity, TRAIN novelty, and exact-duplicate multiplicity are outcomes/guardrails, not extra votes for closeness. Generated-sequence clustering is not a required diversity output. Do not form a single generator-quality score.
 
-Use only the frozen design-aware procedure. Condition on or stratify by length where needed. Do not turn 30,000 sequence rows, B1 length seeds, B2's single seed or generation chunks into independent training replicates. With few D1 seeds, prefer per-seed results and honest ranges over a precise model-to-model confidence claim. Report discordant metrics as mixed. These results assess generated-distribution movement toward held-out aptamer characteristics; they do not show binding, affinity, selectivity or NDM-1-specific generation.
+Use only the frozen design-aware procedure. Condition on or stratify by length where needed. Do not turn generated rows, B1 length seeds, B2's single seed, or generation chunks into independent training replicates. The planned 30,000-attempt D1 budget is not, by itself, a verified production count. With few D1 seeds, prefer per-seed results, the manifest-confirmed pooling rule, and honest ranges over a precise model-to-model confidence claim. An equal mixture of two fitted models is not a confidence interval and is not evidence from many training replicates. Report discordant metrics as mixed. These results assess generated-distribution movement toward held-out aptamer characteristics; they do not show binding, affinity, selectivity or NDM-1-specific generation.
 
 ## 6. REF-calibrated AptaRank Tier 1 EVAL
 
@@ -272,7 +280,7 @@ There is no favourable-score completion criterion. An unavailable target, uninte
 
 Before unblinding, the existing synthetic fixtures should cover opaque-ID joins after row shuffling, duplicates, invalid/missing rows, paired controls and clustered EVAL resampling, effect/AUROC directions, variable-K/tied Tier 2 ranking, single-target descriptive mode, score-blind four-condition sampling, B0 separation, D1 seed roles and a frozen top-L extraction. Review code/output using synthetic or non-sensitive fixtures; apply it locally to restricted sequences.
 
-Normalized tables retain every condition/pool/checkpoint identity, attempted/parsed/valid/unique denominator, seed role, EVAL or REF parent hash, run ID, target configuration, technical exclusion and score-basis branch. Validate schemas/ranges/unique keys, spot-check representative rows against Laura's UI artefacts, and regenerate final tables cleanly from immutable raw inputs. Every reported number maps to source hashes, the filter/statistic, code revision/environment and output hash.
+Normalized generator tables retain `record_id`, the source-artifact hash, every condition/pool/checkpoint identity, the attempted/parsed/valid/unique denominator, seed role, EVAL or REF parent hash, run ID, target configuration, technical exclusion and score-basis branch. Validate schemas/ranges/unique keys, spot-check representative rows against Laura's UI artefacts, and regenerate final tables cleanly from immutable raw inputs. Every reported number maps to source hashes, the filter/statistic, code revision/environment and output hash.
 
 Write five Results subsections matching Section 1's five required analyses. The NDM-1 subsection distinguishes the AptaRank review pool from the supervisor's final choices. The discussion covers few D1 seeds, asymmetric pools, B0 length differences, synthetic controls, incomplete target-family metadata, small structurally selected Tier 2 examples, bank/score limitations, modified chemistry not represented and absent wet-lab validation. Report low Tier 1 pass rates, weak target ranking and unselected NDM-1 candidates as found. No aggregate generator-quality score or new Tier 1/Tier 2 composite is introduced.
 
@@ -286,6 +294,8 @@ The following items are recorded for later work. None is required to finish the 
 - **Related carbapenemase stress test.** Score the same frozen NDM-1 candidates against independently justified KPC-2/OXA-48 structures if later feasible; mismatches are not experimental non-binders and this cannot prove selectivity.
 - **Expanded generated-condition analysis.** Larger Tier 1 samples, Tier 2 shortlists beyond the frozen top-L, full-pool Tier 2 scoring, extra training seeds, a harmonized B0 rerun and extensive seed/length/subgroup sensitivity.
 - **Formal corpus ablation and experimental follow-up.** The current curated corpus is already a methodological contribution; ablation, binding measurements and independent functional testing need separate time and evidence.
+- **Generated-sequence clustering.** Near-duplicate clustering of generated outputs, identity-threshold choice, threshold sensitivity, cluster-size summaries, Shannon diversity, and effective-cluster analyses belong to a later sequence-prioritisation pipeline. Do not import a corpus clustering threshold into generated outputs. Exact duplicate and multiplicity reporting remains in the core evaluation.
+- **Representation-space analysis.** A later study would need a frozen encoder and hashes, a justified query-token-to-sequence aggregation, normalization, a distance or kernel, a subsampling policy, and seed-aware reporting. Representation similarity does not establish binding, specificity, activity, or affinity.
 
 Do not use future-work results to relabel the one-time thesis EVAL as fresh or to retrofit this plan's score definitions.
 
@@ -293,4 +303,4 @@ Do not use future-work results to relabel the one-time thesis EVAL as fresh or t
 
 This revision starts from the user's locally edited v2.7 plan and preserves the corrected S7D counts/hashes, formal evidence definitions, M4 seed roles, B1/D1 primary comparison, Tier 1 methods, manual AptaRank UI and claim boundaries. The corrected corpus authority is corpus_report.md (closure state 25 September 2026) and rna_aptamer_corpus_curation_plan.md v1.6, with corrective closure commit 10aac629bb0ef0337107c3d628b23e1897962af9 and documentation handoff 05616cf82c3c7c1adbe87f631590f456c44c946a. The separate camera-ready workflow still governs its one-day publication analysis.
 
-This is an updated protocol. It does not assert that generation, calibration, UI runs, supervisor review or final EVAL have already been completed.
+This is an updated protocol. It does not assert that generation, calibration, UI runs, supervisor review or final EVAL have already been completed. Version 3.1 incorporates the approved 8 October 2026 M8 generator-EVAL addendum. It does not verify production manifests, checkpoint identities, seed labels, attempt counts, or artifact hashes, and it does not authorize M9A, M9C, or EVAL access.

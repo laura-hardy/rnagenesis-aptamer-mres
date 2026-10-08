@@ -19,7 +19,123 @@ import subprocess
 import sys
 
 PACKAGE_ID = "GEP-1"
-SCHEMA_VERSION = "generator-eval-preflight-gep1-r1"
+SCHEMA_VERSION = "generator-eval-preflight-gep1-r3"
+GOVERNING_PLAN_VERSION = "3.1"
+GOVERNING_PLAN_REVISION_DATE = "8 October 2026"
+SYNTHETIC_RAW_CONTRACT = "synthetic-m8-raw-attempt-bundle-v1"
+SYNTHETIC_PARSER_ADAPTER_VERSION = "synthetic-m8-parser-adapter-v2"
+SOURCE_MANIFEST_SCHEMA = "synthetic-m8-source-manifest-v2"
+DERIVED_PROVENANCE_SCHEMA = "synthetic-m8-derived-provenance-v1"
+REPLENISHMENT_PROHIBITED_STATEMENT = (
+    "Replenishment is prohibited. Invalid or duplicate attempts are not filtered, "
+    "deduplicated, truncated, padded, topped up, replaced, or replenished."
+)
+# Known before parsing. derived_ledger_sha256 is not an input.
+SOURCE_MANIFEST_REQUIRED = (
+    "source_artifact_id",
+    "source_artifact_sha256",
+    "source_byte_size",
+    "parser_adapter_version",
+    "replenishment_prohibited",
+)
+SOURCE_MANIFEST_OPTIONAL = (
+    "expected_attempt_count",
+    "expected_derived_ledger_sha256",
+)
+DERIVED_PROVENANCE_FIELDS = (
+    "source_artifact_id",
+    "source_artifact_sha256",
+    "parser_adapter_version",
+    "derived_row_count",
+    "derived_ledger_sha256",
+    "replenishment_prohibited",
+)
+PARSE_OUTCOME_VALID = "valid_canonical_sequence"
+PARSE_OUTCOME_EMPTY = "empty_output"
+PARSE_OUTCOME_UNPARSEABLE = "unparseable_output"
+PARSE_OUTCOME_NON_SEQUENCE = "non_sequence_output"
+PARSE_OUTCOME_NON_ACGU = "parsed_non_acgu"
+PARSE_OUTCOMES = (
+    PARSE_OUTCOME_VALID,
+    PARSE_OUTCOME_EMPTY,
+    PARSE_OUTCOME_UNPARSEABLE,
+    PARSE_OUTCOME_NON_SEQUENCE,
+    PARSE_OUTCOME_NON_ACGU,
+)
+FAILURE_REASONS = (
+    PARSE_OUTCOME_EMPTY,
+    PARSE_OUTCOME_UNPARSEABLE,
+    PARSE_OUTCOME_NON_SEQUENCE,
+    PARSE_OUTCOME_NON_ACGU,
+)
+SEQUENCE_NULL_PARSE_OUTCOMES = (
+    PARSE_OUTCOME_EMPTY,
+    PARSE_OUTCOME_UNPARSEABLE,
+    PARSE_OUTCOME_NON_SEQUENCE,
+)
+POOLING_POLICY_EQUAL = "equal_training_seed_mixture"
+POOLING_POLICY_UNVERIFIED = "unverified"
+D1_POOLING_KEYS = (
+    "pooling_policy",
+    "policy_verified",
+    "participating_training_seeds",
+)
+SYNTHETIC_B0_SOURCE_KEYS = (
+    "record_id",
+    "historical_text",
+    "historical_generation_seed",
+    "historical_batch_index",
+    "nominal_max_seq_len",
+    "checkpoint_id",
+)
+SYNTHETIC_B2_SOURCE_KEYS = (
+    "record_id",
+    "raw_text",
+    "empirical_null_seed",
+    "requested_length",
+)
+SYNTHETIC_B1_SOURCE_KEYS = (
+    "record_id",
+    "raw_text",
+    "checkpoint_id",
+    "checkpoint_sha256",
+    "generation_seed",
+    "length_sampling_seed",
+    "length_condition_seed",
+    "generation_chunk_id",
+    "requested_length",
+    "original_attempt_index",
+    "invocation_index",
+    "batch_position",
+    "requested_target_length",
+    "max_seq_len",
+    "invocation_seed",
+    "length_schedule_provenance",
+)
+SYNTHETIC_D1_SOURCE_KEYS = (
+    "record_id",
+    "raw_text",
+    "checkpoint_id",
+    "checkpoint_sha256",
+    "training_seed",
+    "generation_seed",
+    "length_sampling_seed",
+    "generation_chunk_id",
+    "requested_length",
+    "original_attempt_index",
+    "invocation_index",
+    "batch_position",
+    "requested_target_length",
+    "max_seq_len",
+    "invocation_seed",
+    "length_schedule_provenance",
+)
+SYNTHETIC_SOURCE_KEYS = {
+    "B0": SYNTHETIC_B0_SOURCE_KEYS,
+    "B1": SYNTHETIC_B1_SOURCE_KEYS,
+    "B2": SYNTHETIC_B2_SOURCE_KEYS,
+    "D1": SYNTHETIC_D1_SOURCE_KEYS,
+}
 DEFAULT_MODE = "synthetic_preflight"
 FROZEN_UNLOCKED_MODE = "frozen_unlocked"
 SYNTHETIC_ROLE = "SYNTHETIC"
@@ -216,7 +332,11 @@ FORBIDDEN_METRIC_ALIASES = (
 OPTIONAL_RECORD_FIELDS = (
     "s6_length_stratum",
     "s6_assignment_provenance",
+    "source_artifact_sha256",
+    "parse_outcome",
+    "failure_reason",
 )
+_MODULE_CACHE = {}
 RESOLVED_BLOCKING_IDS = (
     "parsed_outputs_predicate_versus_successful_parse",
     "alias_requested_length_exact_hit_rate",
@@ -256,6 +376,7 @@ BLOCKING_IDS = (
     "confidence_intervals_not_specified_in_gep1",
     "train_reference_not_loaded_in_gep1",
     "structure_metrics_not_executed_in_gep1",
+    "viennarna_production_settings_not_pinned",
     "production_matched_chunk_schedule_not_wired",
     "b2_generic_seed_field_disambiguated",
 )
@@ -323,10 +444,15 @@ def default_fixture_path():
 
 
 def _load_module(filename, name):
+    """Load a sibling module once per process. Shared validity must not reload M4."""
+    cached = _MODULE_CACHE.get(name)
+    if cached is not None:
+        return cached
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    _MODULE_CACHE[name] = module
     return module
 
 
@@ -434,8 +560,12 @@ def _validate_governing_plan(spec, problems):
     if not isinstance(plan, dict) or set(plan) != {"path", "sha256", "version", "revision_date"}:
         problems.append(_problem("revision_invalid", "the governing plan must record path, sha256, version, and revision date"))
         return
-    if plan.get("path") != GOVERNING_PLAN_RELATIVE or plan.get("version") != "3.0" or not _nonempty_text(plan.get("revision_date")):
-        problems.append(_problem("revision_invalid", "the governing plan is not v3.0"))
+    if (
+        plan.get("path") != GOVERNING_PLAN_RELATIVE
+        or plan.get("version") != GOVERNING_PLAN_VERSION
+        or plan.get("revision_date") != GOVERNING_PLAN_REVISION_DATE
+    ):
+        problems.append(_problem("revision_invalid", "the governing plan is not v3.1 dated 8 October 2026"))
         return
     _validate_path_sha256(
         {"path": plan["path"], "sha256": plan.get("sha256")},
@@ -588,6 +718,7 @@ def validate_metric_spec(spec, require_draft=True):
                 named = True
         if not named:
             problems.append(_problem("metric_silently_dropped", name + " is neither specified nor blocked"))
+    _validate_m8_contract_blocks(spec, problems)
     _raise_problems(problems)
     return spec
 
@@ -627,6 +758,46 @@ def _check_status_consistency(row, problems, record_id):
             problems.append(_problem("cleaning_status_inconsistent", record_id + " valid sequence is not marked cleaned"))
     elif cleaning != "rejected" or not _nonempty_text(row["cleaning_version"]):
         problems.append(_problem("cleaning_status_inconsistent", record_id + " invalid alphabet is not marked rejected"))
+
+
+def _check_parser_classification(row, problems, record_id):
+    """Fail closed when a recorded parser outcome disagrees with the row."""
+    has_outcome = "parse_outcome" in row
+    has_reason = "failure_reason" in row
+    if not has_outcome and not has_reason:
+        return
+    if not has_outcome or not has_reason:
+        problems.append(_problem("parser_outcome_inconsistent", record_id + " records only one of parse_outcome and failure_reason"))
+        return
+    outcome = row["parse_outcome"]
+    reason = row["failure_reason"]
+    if outcome not in PARSE_OUTCOMES:
+        problems.append(_problem("parser_outcome_invalid", record_id + " parse_outcome is outside the closed vocabulary"))
+        return
+    if reason is not None and reason not in FAILURE_REASONS:
+        problems.append(_problem("failure_reason_invalid", record_id + " failure_reason is outside the closed vocabulary"))
+        return
+    if outcome == PARSE_OUTCOME_VALID:
+        if reason is not None or not _row_is_valid(row):
+            problems.append(_problem("parser_outcome_inconsistent", record_id + " valid canonical outcome is internally inconsistent"))
+        return
+    if reason != outcome:
+        problems.append(_problem("parser_outcome_inconsistent", record_id + " failure_reason does not match parse_outcome"))
+        return
+    if outcome == PARSE_OUTCOME_NON_ACGU:
+        sequence = row["sequence"]
+        if (
+            row["parsed_status"] is not True
+            or row["alphabet_valid"] is not False
+            or not isinstance(sequence, str)
+            or sequence == ""
+            or CANONICAL_SEQUENCE.fullmatch(sequence) is not None
+        ):
+            problems.append(_problem("parser_outcome_inconsistent", record_id + " parsed non-ACGU outcome is internally inconsistent"))
+        return
+    if outcome in SEQUENCE_NULL_PARSE_OUTCOMES:
+        if row["sequence"] is not None or row["parsed_status"] is not False or row["observed_length"] is not None:
+            problems.append(_problem("parser_outcome_inconsistent", record_id + " null-sequence outcome retained a sequence"))
 
 
 def _check_positive_requested_length(row, problems, record_id):
@@ -783,16 +954,25 @@ def _one_record(record, index):
         problems.append(_problem("checkpoint_invalid", record_id + " checkpoint id is blank"))
     if not _optional_sha256(record["checkpoint_sha256"]):
         problems.append(_problem("checkpoint_invalid", record_id + " checkpoint hash is not null or sha256"))
+    if "source_artifact_sha256" in record and not _sha256_value(record["source_artifact_sha256"]):
+        problems.append(_problem("source_artifact_sha256_invalid", record_id + " source artifact hash is not sha256"))
     if condition is not None:
         probe = dict(record)
         probe["condition"] = condition
         _check_seed_roles(probe, problems, record_id)
     _check_status_consistency(record, problems, record_id)
+    _check_parser_classification(record, problems, record_id)
     if problems:
         return problems, None
     normalized = {key: record[key] for key in RECORD_KEYS}
     normalized["condition_label"] = record["condition"]
     normalized["condition"] = condition
+    if "source_artifact_sha256" in record:
+        normalized["source_artifact_sha256"] = record["source_artifact_sha256"]
+    if "parse_outcome" in record:
+        normalized["parse_outcome"] = record["parse_outcome"]
+    if "failure_reason" in record:
+        normalized["failure_reason"] = record["failure_reason"]
     return [], normalized
 
 
@@ -1172,12 +1352,29 @@ def evaluate_eval_gate(declared_role, mode=None, unlock_record=None, expected_bi
     _raise_problems(problems)
 
 
+def _failure_reason_counts(rows):
+    counts = {reason: 0 for reason in FAILURE_REASONS}
+    for row in rows:
+        reason = row.get("failure_reason")
+        if reason in counts:
+            counts[reason] += 1
+    return counts
+
+
+def _valid_canonical_sequence_count(rows):
+    return sum(
+        row.get("parse_outcome") == PARSE_OUTCOME_VALID and row.get("failure_reason") is None
+        for row in rows
+    )
+
+
 def _accounting(rows, condition=None):
     attempted = len(rows)
     parsed = sum(row["parsed_status"] is True for row in rows)
     valid_rows = [row for row in rows if _row_is_valid(row)]
+    valid_sequences = [row["sequence"] for row in valid_rows]
     valid = len(valid_rows)
-    unique = len({row["sequence"] for row in valid_rows})
+    unique = len(set(valid_sequences))
     result = {
         "attempted": attempted,
         "parsed_status_true": parsed,
@@ -1186,7 +1383,15 @@ def _accounting(rows, condition=None):
         "unique_valid": unique,
         "invalid": attempted - valid,
         "duplicates": valid - unique,
+        "duplicate_excess": valid - unique,
         "empty_or_unparseable": sum((not _row_is_valid(row)) and row["sequence"] is None for row in rows),
+        "largest_duplicate_multiplicity": _largest_multiplicity(valid_sequences),
+        "multiplicity_histogram": _multiplicity_histogram(valid_sequences),
+        "multiplicity_histogram_emits_sequence_strings": False,
+        "multiplicity_histogram_emits_sequence_to_count_mapping": False,
+        "failure_reason_counts": _failure_reason_counts(rows),
+        "valid_canonical_sequence_count": _valid_canonical_sequence_count(rows),
+        "failure_reason_counts_emit_sequence_strings": False,
     }
     if condition == "B0":
         result.update(
@@ -1490,6 +1695,9 @@ def render_preflight_text(report):
         "overall: attempted=%d parsed_status_true=%d valid_acgu=%d unique_valid=%d"
         % (overall["attempted"], overall["parsed_status_true"], overall["valid_acgu"], overall["unique_valid"])
     )
+    lines.append("failure_reason_counts: " + json.dumps(overall["failure_reason_counts"], sort_keys=True))
+    lines.append("valid_canonical_sequence_count: %d" % overall["valid_canonical_sequence_count"])
+    lines.append("failure_reason_counts_emit_sequence_strings: false")
     lines.append("d1_training_seeds: " + json.dumps(report["seed_structure"]["d1_training_seeds_present"]))
     lines.append("one_d1_training_seed_limitation: " + json.dumps(report["one_d1_training_seed_limitation"]))
     if report["one_d1_training_seed_limitation_statement"]:
@@ -1525,6 +1733,537 @@ def render_preflight_text(report):
         lines.append("  error: %s: %s" % (error["code"], error["detail"]))
     lines.append(report["no_eval_statement"])
     return "\n".join(lines) + "\n"
+
+
+def _validate_m8_contract_blocks(spec, problems):
+    identity = spec.get("attempt_identity")
+    if identity != {
+        "canonical_attempt_id": "record_id",
+        "derived_row_source_hash_field": "source_artifact_sha256",
+        "second_attempt_id_field": False,
+    }:
+        problems.append(_problem("attempt_identity_invalid", "record_id remains the only attempt identifier"))
+    provenance = spec.get("provenance_manifest_contract")
+    expected_provenance = {
+        "synthetic_only": True,
+        "production_m8_reader": False,
+        "source_manifest_schema": SOURCE_MANIFEST_SCHEMA,
+        "derived_provenance_schema": DERIVED_PROVENANCE_SCHEMA,
+        "source_manifest_inputs": {
+            "required": list(SOURCE_MANIFEST_REQUIRED),
+            "optional": list(SOURCE_MANIFEST_OPTIONAL),
+            "requires_derived_ledger_sha256_before_parse": False,
+        },
+        "derived_provenance_outputs": list(DERIVED_PROVENANCE_FIELDS),
+        "replenishment_prohibited_statement": REPLENISHMENT_PROHIBITED_STATEMENT,
+        "parser_adapter_version": SYNTHETIC_PARSER_ADAPTER_VERSION,
+    }
+    if provenance != expected_provenance:
+        problems.append(_problem("provenance_contract_invalid", "the synthetic provenance manifest contract drifted"))
+    parser_contract = spec.get("parser_outcome_contract")
+    if parser_contract != {
+        "parse_outcome_field": "parse_outcome",
+        "failure_reason_field": "failure_reason",
+        "parse_outcomes": list(PARSE_OUTCOMES),
+        "failure_reasons": list(FAILURE_REASONS),
+        "valid_failure_reason": None,
+        "sequence_null_outcomes": list(SEQUENCE_NULL_PARSE_OUTCOMES),
+        "sequence_retained_when_biologically_invalid": PARSE_OUTCOME_NON_ACGU,
+    }:
+        problems.append(_problem("parser_outcome_contract_invalid", "the parser outcome vocabulary drifted"))
+    histogram = spec.get("multiplicity_histogram")
+    if not isinstance(histogram, dict) or histogram.get("implementation_symbol") != "generator_eval_analysis.multiplicity_histogram":
+        problems.append(_problem("multiplicity_histogram_invalid", "the multiplicity histogram is not the analysis implementation"))
+    elif histogram.get("emits_sequence_strings") is not False or histogram.get("emits_sequence_to_count_mapping") is not False:
+        problems.append(_problem("multiplicity_histogram_invalid", "the multiplicity histogram must not emit sequences"))
+    elif histogram.get("unique_only_replaces_primary") is not False:
+        problems.append(_problem("multiplicity_histogram_invalid", "unique-only analysis must not replace the primary grain"))
+    elif not _analysis_implements(histogram.get("implementation_symbol")):
+        problems.append(_problem("implementation_missing", "multiplicity_histogram has no analysis implementation"))
+    pooling = spec.get("d1_valid_conditional_pooling")
+    if pooling != {
+        "mode": POOLING_POLICY_EQUAL,
+        "requires_verified_provenance": True,
+        "hard_coded_training_seed_labels": False,
+        "applied_to_raw_counts": False,
+        "applied_to_global_duplicate_accounting": False,
+        "is_confidence_interval": False,
+        "concatenated_rows_are_the_equal_mixture": False,
+        "pooled_directional_consistency_uses_concatenated_d1_fallback": False,
+        "weighted_quantile_rule": "inclusive_cumulative_weight_exact_v2",
+        "composition_mixture": "equal_seed_frequency_mixture_before_comparison",
+        "missing_seed_policy": "null_with_explicit_reason_do_not_drop_seed",
+    }:
+        problems.append(_problem("d1_pooling_contract_invalid", "D1 valid-conditional pooling is not the verified equal-seed mixture"))
+    analysis = _load_module("generator_eval_analysis.py", "gep1_analysis_for_d1_inventory")
+    if spec.get("d1_metric_aggregation") != list(analysis.D1_METRIC_AGGREGATION):
+        problems.append(_problem("d1_pooling_contract_invalid", "the D1 metric aggregation inventory drifted"))
+    adapter = spec.get("b0_format_adapter")
+    if adapter != {
+        "synthetic_contract_only": True,
+        "production_schema_encoded": False,
+        "requested_length": "unavailable",
+        "uses_shared_biological_validity": True,
+        "included_in_b1_d1_controlled_comparison": False,
+    }:
+        problems.append(_problem("b0_adapter_contract_invalid", "the B0 adapter contract drifted"))
+    viennarna = spec.get("viennarna_production_settings")
+    if viennarna != {
+        "pinned": False,
+        "blocking_item_id": "viennarna_production_settings_not_pinned",
+        "settings_invented": False,
+    }:
+        problems.append(_problem("viennarna_settings_invalid", "production ViennaRNA settings must stay unpinned"))
+
+
+def biological_validity(text):
+    """Shared nonempty canonical A/C/G/U check for B0, B1, B2, and D1."""
+    metrics = _load_module("m4_diagnostic_metrics.py", "gep1_m4_biological_validity")
+    return metrics.recomputed_validity(text)
+
+
+def _unparsed_biological_result(outcome):
+    return {
+        "sequence": None,
+        "parsed_status": False,
+        "alphabet_valid": False,
+        "cleaning_status": "not_applicable",
+        "cleaning_version": None,
+        "observed_length": None,
+        "biological_validity": False,
+        "parse_outcome": outcome,
+        "failure_reason": outcome,
+    }
+
+
+def assign_biological_parse(raw_text):
+    """Classify one source payload. Non-sequences stay in the attempt ledger.
+
+    A list, object, number, or boolean is an accounted non-sequence output.
+    It does not abort the rest of the bundle. Valid rows have a null failure
+    reason. A parsed non-ACGU string remains in the restricted ledger.
+    """
+    if raw_text is None:
+        return _unparsed_biological_result(PARSE_OUTCOME_UNPARSEABLE)
+    if raw_text == "":
+        return _unparsed_biological_result(PARSE_OUTCOME_EMPTY)
+    if type(raw_text) is not str:
+        return _unparsed_biological_result(PARSE_OUTCOME_NON_SEQUENCE)
+    valid = biological_validity(raw_text)
+    if valid:
+        return {
+            "sequence": raw_text,
+            "parsed_status": True,
+            "alphabet_valid": True,
+            "cleaning_status": "cleaned",
+            "cleaning_version": SYNTHETIC_PARSER_ADAPTER_VERSION,
+            "observed_length": len(raw_text),
+            "biological_validity": True,
+            "parse_outcome": PARSE_OUTCOME_VALID,
+            "failure_reason": None,
+        }
+    return {
+        "sequence": raw_text,
+        "parsed_status": True,
+        "alphabet_valid": False,
+        "cleaning_status": "rejected",
+        "cleaning_version": SYNTHETIC_PARSER_ADAPTER_VERSION,
+        "observed_length": len(raw_text),
+        "biological_validity": False,
+        "parse_outcome": PARSE_OUTCOME_NON_ACGU,
+        "failure_reason": PARSE_OUTCOME_NON_ACGU,
+    }
+
+
+def _write_parse(row, parsed):
+    row["sequence"] = parsed["sequence"]
+    row["parsed_status"] = parsed["parsed_status"]
+    row["alphabet_valid"] = parsed["alphabet_valid"]
+    row["cleaning_status"] = parsed["cleaning_status"]
+    row["cleaning_version"] = parsed["cleaning_version"]
+    row["observed_length"] = parsed["observed_length"]
+    row["parse_outcome"] = parsed["parse_outcome"]
+    row["failure_reason"] = parsed["failure_reason"]
+    return row
+
+
+def _multiplicity_histogram(sequences):
+    module = _load_module("generator_eval_analysis.py", "gep1_analysis_histogram")
+    return module.multiplicity_histogram(sequences)
+
+
+def _largest_multiplicity(sequences):
+    histogram = _multiplicity_histogram(sequences)
+    if not histogram:
+        return 0
+    return max(item["multiplicity"] for item in histogram)
+
+
+def _exact_keys(value, expected):
+    if not isinstance(value, dict):
+        return False
+    for key in expected:
+        if key not in value:
+            return False
+    for key in value:
+        if key not in expected:
+            return False
+    return True
+
+
+def _nonnegative_int(value):
+    return type(value) is int and value >= 0
+
+
+def validate_provenance_manifest(manifest):
+    """Check source-manifest types before any attempt set, sort, join, or count.
+
+    The first parse does not require a derived-ledger hash. An optional
+    expected_derived_ledger_sha256 is accepted only for a later replay.
+    This accepts only the synthetic manifest. It does not open a production file.
+    """
+    problems = []
+    if not isinstance(manifest, dict):
+        raise GeneratorEvalContractError("provenance_type_invalid", "the provenance manifest is not an object")
+    for key in SOURCE_MANIFEST_REQUIRED:
+        if key not in manifest:
+            problems.append(_problem("provenance_type_invalid", "the provenance manifest lacks " + key))
+    for key in manifest:
+        if key not in SOURCE_MANIFEST_REQUIRED and key not in SOURCE_MANIFEST_OPTIONAL:
+            problems.append(_problem("provenance_type_invalid", "the provenance manifest has unexpected field " + str(key)))
+    if problems:
+        _raise_problems(problems)
+    source_id = manifest["source_artifact_id"]
+    if type(source_id) is not str or source_id.strip() == "":
+        problems.append(_problem("provenance_type_invalid", "source_artifact_id is not text"))
+    elif _forbidden_filename(source_id):
+        problems.append(_problem("filename_guard", "the source artifact identifier is a held-out role file name"))
+    source_hash = manifest["source_artifact_sha256"]
+    if type(source_hash) is not str:
+        problems.append(_problem("provenance_type_invalid", "source_artifact_sha256 is not text"))
+    elif not _sha256_value(source_hash):
+        problems.append(_problem("provenance_sha256_invalid", "source_artifact_sha256 is not lowercase sha256"))
+    if not _nonnegative_int(manifest["source_byte_size"]):
+        problems.append(_problem("provenance_type_invalid", "source_byte_size is not a nonnegative integer"))
+    version = manifest["parser_adapter_version"]
+    if type(version) is not str or version.strip() == "":
+        problems.append(_problem("provenance_type_invalid", "parser_adapter_version is not text"))
+    elif version != SYNTHETIC_PARSER_ADAPTER_VERSION:
+        problems.append(_problem("parser_adapter_version_invalid", "the parser version is not the synthetic adapter"))
+    statement = manifest["replenishment_prohibited"]
+    if type(statement) is not str:
+        problems.append(_problem("provenance_type_invalid", "replenishment_prohibited is not the required statement"))
+    elif statement != REPLENISHMENT_PROHIBITED_STATEMENT:
+        problems.append(_problem("replenishment_statement_invalid", "replenishment is not explicitly prohibited"))
+    normalized = {
+        "source_artifact_id": source_id if type(source_id) is str else None,
+        "source_artifact_sha256": source_hash if type(source_hash) is str else None,
+        "source_byte_size": manifest["source_byte_size"],
+        "parser_adapter_version": version if type(version) is str else None,
+        "replenishment_prohibited": statement if type(statement) is str else None,
+    }
+    if "expected_attempt_count" in manifest:
+        expected = manifest["expected_attempt_count"]
+        if not _nonnegative_int(expected):
+            problems.append(_problem("provenance_type_invalid", "expected_attempt_count is not a nonnegative integer"))
+        else:
+            normalized["expected_attempt_count"] = expected
+    if "expected_derived_ledger_sha256" in manifest:
+        expected_hash = manifest["expected_derived_ledger_sha256"]
+        if type(expected_hash) is not str:
+            problems.append(_problem("provenance_type_invalid", "expected_derived_ledger_sha256 is not text"))
+        elif not _sha256_value(expected_hash):
+            problems.append(_problem("provenance_sha256_invalid", "expected_derived_ledger_sha256 is not lowercase sha256"))
+        else:
+            normalized["expected_derived_ledger_sha256"] = expected_hash
+    _raise_problems(problems)
+    return normalized
+
+
+def validate_d1_pooling_provenance(provenance):
+    """Type-check the pooling declaration before seed sets or weight arithmetic."""
+    if not isinstance(provenance, dict) or not _exact_keys(provenance, D1_POOLING_KEYS):
+        raise GeneratorEvalContractError("pooling_type_invalid", "D1 pooling provenance fields are not the synthetic contract")
+    policy = provenance["pooling_policy"]
+    verified = provenance["policy_verified"]
+    seeds = provenance["participating_training_seeds"]
+    if type(policy) is not str or policy not in (POOLING_POLICY_EQUAL, POOLING_POLICY_UNVERIFIED):
+        raise GeneratorEvalContractError("pooling_type_invalid", "pooling_policy is not text from the synthetic contract")
+    if type(verified) is not bool:
+        raise GeneratorEvalContractError("pooling_type_invalid", "policy_verified is not a boolean")
+    if type(seeds) is not list:
+        raise GeneratorEvalContractError("pooling_type_invalid", "participating_training_seeds is not a list")
+    for seed in seeds:
+        if not _nonnegative_int(seed):
+            raise GeneratorEvalContractError("pooling_type_invalid", "a participating training seed is not a nonnegative integer")
+    seen = []
+    seen_set = set()
+    for seed in seeds:
+        if seed in seen_set:
+            raise GeneratorEvalContractError("pooling_seed_duplicated", "a participating training seed is duplicated")
+        seen_set.add(seed)
+        seen.append(seed)
+    if verified is True and (policy != POOLING_POLICY_EQUAL or not seen):
+        raise GeneratorEvalContractError("pooling_policy_not_verified", "equal-seed pooling was marked verified without the mixture policy")
+    if policy == POOLING_POLICY_EQUAL and verified is not True:
+        return {
+            "pooling_policy": policy,
+            "policy_verified": False,
+            "participating_training_seeds": seen,
+            "status": "unavailable",
+            "unavailable_reason": "pooling_policy_not_verified",
+        }
+    if policy != POOLING_POLICY_EQUAL or verified is not True:
+        return {
+            "pooling_policy": policy,
+            "policy_verified": False,
+            "participating_training_seeds": seen,
+            "status": "unavailable",
+            "unavailable_reason": "pooling_policy_not_verified",
+        }
+    return {
+        "pooling_policy": policy,
+        "policy_verified": True,
+        "participating_training_seeds": seen,
+        "status": "verified",
+        "unavailable_reason": None,
+    }
+
+
+def _blank_canonical_row(record_id, condition):
+    row = {key: None for key in RECORD_KEYS}
+    row["record_id"] = record_id
+    row["condition"] = condition
+    row["data_role"] = SYNTHETIC_ROLE
+    row["length_regime"] = LENGTH_REGIMES[condition]
+    return row
+
+
+def adapt_synthetic_b0_source(source, source_artifact_sha256):
+    """Map one synthetic historical B0 source row onto the canonical attempt schema.
+
+    The source schema is a documented synthetic contract. It is not a production
+    B0 file format. Requested biological length stays unavailable.
+    """
+    if type(source_artifact_sha256) is not str or not _sha256_value(source_artifact_sha256):
+        raise GeneratorEvalContractError("provenance_sha256_invalid", "the B0 source artifact hash is not sha256")
+    if not isinstance(source, dict) or not _exact_keys(source, SYNTHETIC_B0_SOURCE_KEYS):
+        raise GeneratorEvalContractError("b0_source_invalid", "the synthetic B0 source fields are not the documented adapter contract")
+    record_id = source["record_id"]
+    if type(record_id) is not str or RECORD_ID_TEXT.fullmatch(record_id) is None:
+        raise GeneratorEvalContractError("record_id_invalid", "the B0 source attempt id is invalid")
+    if "attempt_id" in source:
+        raise GeneratorEvalContractError("synonymous_attempt_id_forbidden", "record_id is the only attempt identifier")
+    historical_text = source["historical_text"]
+    seed = source["historical_generation_seed"]
+    batch = source["historical_batch_index"]
+    nominal = source["nominal_max_seq_len"]
+    checkpoint_id = source["checkpoint_id"]
+    if not _nonnegative_int(seed) or not _nonnegative_int(batch):
+        raise GeneratorEvalContractError("attempt_type_invalid", "B0 historical seed provenance is not a nonnegative integer")
+    if type(nominal) is not int or nominal != B0_NOMINAL_MAX_SEQ_LEN:
+        raise GeneratorEvalContractError("b0_nominal_max_seq_len_invalid", "synthetic B0 nominal max_seq_len is not 37")
+    if type(checkpoint_id) is not str or checkpoint_id.strip() == "":
+        raise GeneratorEvalContractError("attempt_type_invalid", "synthetic B0 checkpoint id is not text")
+    parsed = assign_biological_parse(historical_text)
+    row = _blank_canonical_row(record_id, "B0")
+    row["checkpoint_id"] = checkpoint_id
+    row["historical_generation_seed"] = seed
+    row["historical_batch_index"] = batch
+    row["nominal_max_seq_len"] = nominal
+    row["requested_length"] = None
+    row["requested_target_length"] = None
+    _write_parse(row, parsed)
+    row["source_artifact_sha256"] = source_artifact_sha256
+    return row
+
+
+def _controlled_row(condition, source, source_artifact_sha256):
+    expected = SYNTHETIC_SOURCE_KEYS[condition]
+    if not isinstance(source, dict) or not _exact_keys(source, expected):
+        raise GeneratorEvalContractError("attempt_type_invalid", condition + " synthetic source fields are not the documented contract")
+    if "attempt_id" in source:
+        raise GeneratorEvalContractError("synonymous_attempt_id_forbidden", "record_id is the only attempt identifier")
+    record_id = source["record_id"]
+    if type(record_id) is not str or RECORD_ID_TEXT.fullmatch(record_id) is None:
+        raise GeneratorEvalContractError("record_id_invalid", condition + " source attempt id is invalid")
+    raw_text = source["raw_text"]
+    parsed = assign_biological_parse(raw_text)
+    row = _blank_canonical_row(record_id, condition)
+    for key in expected:
+        if key in ("record_id", "raw_text"):
+            continue
+        row[key] = source[key]
+    _write_parse(row, parsed)
+    row["source_artifact_sha256"] = source_artifact_sha256
+    if condition == "B1":
+        row["training_seed"] = None
+        row["empirical_null_seed"] = None
+    elif condition == "B2":
+        row["training_seed"] = None
+        row["generation_seed"] = None
+        row["length_sampling_seed"] = None
+        row["length_condition_seed"] = None
+    elif condition == "D1":
+        row["length_condition_seed"] = None
+        row["empirical_null_seed"] = None
+    return row
+
+
+def _typecheck_attempt_identities(attempts):
+    """Validate attempt-id text before any id set, sort, or join."""
+    identities = []
+    for index, attempt in enumerate(attempts):
+        if not isinstance(attempt, dict):
+            raise GeneratorEvalContractError("attempt_type_invalid", "attempt %d is not an object" % index)
+        if "attempt_id" in attempt:
+            raise GeneratorEvalContractError("synonymous_attempt_id_forbidden", "record_id is the only attempt identifier")
+        record_id = attempt.get("record_id")
+        if type(record_id) is not str or RECORD_ID_TEXT.fullmatch(record_id) is None:
+            raise GeneratorEvalContractError("record_id_invalid", "attempt %d has an invalid record id" % index)
+        identities.append(record_id)
+    return identities
+
+
+def assert_derived_attempt_identity(source_ids, derived_rows):
+    """Require exactly one derived row per source attempt. Do not renumber."""
+    if type(source_ids) is not list or type(derived_rows) is not list:
+        raise GeneratorEvalContractError("attempt_join_invalid", "attempt identity inputs are not lists")
+    for record_id in source_ids:
+        if type(record_id) is not str:
+            raise GeneratorEvalContractError("record_id_invalid", "a source attempt id is not text")
+    derived_ids = []
+    for row in derived_rows:
+        if not isinstance(row, dict) or type(row.get("record_id")) is not str:
+            raise GeneratorEvalContractError("attempt_join_invalid", "a derived row lacks record_id")
+        record_id = row["record_id"]
+        derived_ids.append(record_id)
+        if not _sha256_value(row.get("source_artifact_sha256")):
+            raise GeneratorEvalContractError("source_artifact_sha256_invalid", record_id + " lacks a source artifact hash")
+    derived_counts = {}
+    for record_id in derived_ids:
+        derived_counts[record_id] = derived_counts.get(record_id, 0) + 1
+    for record_id, count in derived_counts.items():
+        if count > 1:
+            raise GeneratorEvalContractError("attempt_id_duplicated", record_id + " is duplicated in the derived ledger")
+    source_set = set(source_ids)
+    derived_set = set(derived_ids)
+    for record_id in source_ids:
+        if record_id not in derived_set:
+            raise GeneratorEvalContractError("attempt_id_missing", record_id + " has no derived row")
+    for record_id in derived_ids:
+        if record_id not in source_set:
+            raise GeneratorEvalContractError("attempt_id_extra", record_id + " is not a source attempt")
+    if len(derived_rows) != len(source_ids):
+        raise GeneratorEvalContractError("attempt_count_mismatch", "derived rows do not match the source attempt count")
+    if derived_ids != source_ids:
+        raise GeneratorEvalContractError("attempt_id_reordered", "derived attempt ids were renumbered or reordered")
+    return True
+
+
+def derived_ledger_sha256(rows):
+    payload = json.dumps(rows, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _derive_attempts(document, source_artifact_sha256):
+    if not isinstance(document, dict):
+        raise GeneratorEvalContractError("attempt_type_invalid", "the synthetic raw document is not an object")
+    for key in ("contract", "condition", "attempts"):
+        if key not in document:
+            raise GeneratorEvalContractError("attempt_type_invalid", "the synthetic raw document lacks " + key)
+    for key in document:
+        if key not in ("contract", "condition", "attempts", "note"):
+            raise GeneratorEvalContractError("attempt_type_invalid", "the synthetic raw document has unexpected field " + str(key))
+    if document["contract"] != SYNTHETIC_RAW_CONTRACT:
+        raise GeneratorEvalContractError("synthetic_contract_invalid", "the raw bundle is not the synthetic M8 contract")
+    condition = document["condition"]
+    if condition not in SYNTHETIC_SOURCE_KEYS:
+        raise GeneratorEvalContractError("unknown_condition", "the synthetic raw condition is unknown")
+    attempts = document["attempts"]
+    if type(attempts) is not list:
+        raise GeneratorEvalContractError("attempt_type_invalid", "synthetic attempts are not a list")
+    source_ids = _typecheck_attempt_identities(attempts)
+    seen = set()
+    for record_id in source_ids:
+        if record_id in seen:
+            raise GeneratorEvalContractError("attempt_id_duplicated", record_id + " is duplicated in the source")
+        seen.add(record_id)
+    rows = []
+    for attempt in attempts:
+        if condition == "B0":
+            row = adapt_synthetic_b0_source(attempt, source_artifact_sha256)
+        else:
+            row = _controlled_row(condition, attempt, source_artifact_sha256)
+        rows.append(row)
+    if len(rows) != len(attempts):
+        raise GeneratorEvalContractError("replenishment_prohibited", "parsing changed the attempt count")
+    return source_ids, rows
+
+
+def parse_synthetic_raw_bundle(raw_bytes, manifest):
+    """Parse a synthetic raw bundle without mutating the supplied bytes.
+
+    There is no production M8 reader. Bytes that are not the synthetic contract
+    fail closed.
+    """
+    normalized = validate_provenance_manifest(manifest)
+    if type(raw_bytes) is not bytes:
+        raise GeneratorEvalContractError("raw_payload_type_invalid", "the raw payload must be bytes, not a path or a mutable buffer")
+    before = hashlib.sha256(raw_bytes).hexdigest()
+    size = len(raw_bytes)
+    if size != normalized["source_byte_size"]:
+        raise GeneratorEvalContractError("source_byte_size_mismatch", "source_byte_size does not match the raw payload")
+    if before != normalized["source_artifact_sha256"]:
+        raise GeneratorEvalContractError("source_artifact_sha256_mismatch", "source_artifact_sha256 does not match the raw payload")
+    document = json.loads(raw_bytes.decode("utf-8"))
+    after = hashlib.sha256(raw_bytes).hexdigest()
+    if before != after:
+        raise GeneratorEvalContractError("raw_payload_mutated", "parsing changed the raw payload bytes")
+    source_ids, derived = _derive_attempts(document, normalized["source_artifact_sha256"])
+    validated = validate_records(derived)
+    for row in validated:
+        if row.get("source_artifact_sha256") != normalized["source_artifact_sha256"]:
+            raise GeneratorEvalContractError("source_artifact_sha256_mismatch", row["record_id"] + " lost its source artifact hash")
+    assert_derived_attempt_identity(source_ids, validated)
+    digest = derived_ledger_sha256(validated)
+    if "expected_derived_ledger_sha256" in normalized and digest != normalized["expected_derived_ledger_sha256"]:
+        raise GeneratorEvalContractError(
+            "derived_ledger_sha256_mismatch",
+            "expected_derived_ledger_sha256 does not match the derived rows",
+        )
+    if "expected_attempt_count" in normalized and normalized["expected_attempt_count"] != len(source_ids):
+        raise GeneratorEvalContractError(
+            "expected_attempt_count_mismatch",
+            "the expected attempt count does not match the source and was not topped up",
+        )
+    if len(validated) != len(source_ids):
+        raise GeneratorEvalContractError("replenishment_prohibited", "parsing changed the attempt count")
+    return {
+        "synthetic_contract": SYNTHETIC_RAW_CONTRACT,
+        "production_file_reader": False,
+        "raw_bytes_sha256_before": before,
+        "raw_bytes_sha256_after": after,
+        "raw_bytes_unchanged": True,
+        "source_artifact_id": normalized["source_artifact_id"],
+        "source_artifact_sha256": normalized["source_artifact_sha256"],
+        "derived_rows": validated,
+        "derived_ledger_sha256": digest,
+        "attempt_count": len(validated),
+        "source_attempt_ids": source_ids,
+        "replenishment_applied": False,
+        "b0_included_in_b1_d1_controlled_comparison": False,
+        "biological_validity_function": "m4_diagnostic_metrics.recomputed_validity",
+        "provenance": {
+            "schema": DERIVED_PROVENANCE_SCHEMA,
+            "source_artifact_id": normalized["source_artifact_id"],
+            "source_artifact_sha256": normalized["source_artifact_sha256"],
+            "parser_adapter_version": normalized["parser_adapter_version"],
+            "derived_row_count": len(validated),
+            "derived_ledger_sha256": digest,
+            "replenishment_prohibited": normalized["replenishment_prohibited"],
+        },
+    }
 
 
 def parse_envelope(document):

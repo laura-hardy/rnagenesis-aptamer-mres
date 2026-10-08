@@ -1,13 +1,13 @@
 {
-  "schema_version": "generator-eval-metric-spec-gep2-draft-r1",
+  "schema_version": "generator-eval-metric-spec-gep2-draft-r4",
   "package_id": "GEP-2",
   "freeze_status": "draft",
   "aggregate_generator_quality_score": false,
   "governing_plan": {
     "path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
-    "sha256": "e6193d0d14245049c218b4da0ef8059fb63b2f31e4885b3457cd44e41b76c50c",
-    "version": "3.0",
-    "revision_date": "7 October 2026"
+    "sha256": "9e5c8d3c0d7903697a2be04d4c0bc9b09a4dc29b268ef3eaa8472a4d45069579",
+    "version": "3.1",
+    "revision_date": "8 October 2026"
   },
   "field_schema": [
     "metric_id",
@@ -402,7 +402,7 @@
       "data_source": "valid cleaned sequences",
       "reference_role": "none",
       "scientific_role": "outcome",
-      "calculation_summary": "Number of distinct valid cleaned sequences. This is an outcome count, not a closeness vote and not an aggregate generator-quality score. Clustering diversity remains deferred.",
+      "calculation_summary": "Number of distinct valid cleaned sequences. This is an outcome count, not a closeness vote and not an aggregate generator-quality score. Generated-sequence clustering is not a required output. Clustering diversity remains deferred.",
       "numerator": "distinct valid cleaned sequences",
       "denominator_and_filters": "Not a ratio. Invalid sequences are excluded. unique_fraction uses valid_outputs as its denominator.",
       "units": "count",
@@ -429,7 +429,7 @@
       "data_source": "valid cleaned sequences",
       "reference_role": "none",
       "scientific_role": "accounting",
-      "calculation_summary": "valid_outputs minus unique_valid_outputs. Each extra copy of a valid sequence contributes one.",
+      "calculation_summary": "valid_outputs minus unique_valid_outputs. Each extra copy of a valid sequence contributes one. duplicate_excess is this count. A sequence-free multiplicity histogram is reported beside it and does not emit sequence strings. Unique-only analysis is a labelled sensitivity and does not replace the primary valid-attempt count.",
       "numerator": "extra copies beyond the first occurrence of each valid sequence",
       "denominator_and_filters": "Not a ratio. Invalid sequences are excluded.",
       "units": "count",
@@ -775,7 +775,7 @@
       "data_source": "caller-supplied fold of each distinct valid sequence, repeated on valid rows",
       "reference_role": "none",
       "scientific_role": "descriptor",
-      "calculation_summary": "Quantiles of the fold-returned MFE float. The code stores float(mfe) and does not rescale it. More negative MFE is not inherently better. thresholds_defined is false. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined.",
+      "calculation_summary": "Quantiles of the fold-returned MFE float. The code stores float(mfe) and does not rescale it. More negative MFE is not inherently better. thresholds_defined is false. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production ViennaRNA settings are not yet fully pinned. This package does not invent temperature, dangle, salt, or other folding settings.",
       "numerator": "fold-returned MFE",
       "denominator_and_filters": "Not a ratio. Quantiles are over valid rows. Invalid rows are excluded. A structure length that differs from the sequence raises fold_invalid.",
       "units": "fold-returned MFE float (ViennaRNA convention is kcal/mol; this code does not convert the value)",
@@ -802,7 +802,7 @@
       "data_source": "caller-supplied fold of each distinct valid sequence, repeated on valid rows",
       "reference_role": "none",
       "scientific_role": "descriptor",
-      "calculation_summary": "Quantiles of float(mfe) divided by the sequence length. mfe_per_nt remains the generator metric. It is not the AptaRank normalized-MFE component. mfe_per_nucleotide is not a second metric. More negative MFE per nucleotide is not a selection score. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined.",
+      "calculation_summary": "Quantiles of float(mfe) divided by the sequence length. mfe_per_nt remains the generator metric. It is not the AptaRank normalized-MFE component. mfe_per_nucleotide is not a second metric. More negative MFE per nucleotide is not a selection score. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production ViennaRNA settings are not yet fully pinned. This package does not invent temperature, dangle, salt, or other folding settings.",
       "numerator": "fold-returned MFE",
       "denominator_and_filters": "Sequence length in nucleotides. Quantiles are over valid rows. Division by zero is not reached because valid sequences are nonempty.",
       "units": "fold-returned MFE float per nucleotide",
@@ -829,7 +829,7 @@
       "data_source": "dot-bracket string returned by the caller-supplied fold",
       "reference_role": "none",
       "scientific_role": "descriptor",
-      "calculation_summary": "Quantiles of (count of '(' plus count of ')') divided by the sequence length. Unpaired positions are not added to the numerator. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined.",
+      "calculation_summary": "Quantiles of (count of '(' plus count of ')') divided by the sequence length. Unpaired positions are not added to the numerator. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production ViennaRNA settings are not yet fully pinned. This package does not invent temperature, dangle, salt, or other folding settings.",
       "numerator": "paired parentheses in the fold structure",
       "denominator_and_filters": "Sequence length. The structure length must equal the sequence length. Quantiles are over valid rows.",
       "units": "fraction",
@@ -893,7 +893,7 @@
       "missing_failure_handling": "Empty or unparseable output counts as not successfully parsed. The count is not derived from the legacy M4 parsed predicate. A missing sequence is not imputed.",
       "code_revision": {
         "path": "scripts/modelling/generator_eval_analysis.py",
-        "sha256": "0c8ebe27273734bc30931932d84271639bdf8aefb4cf85417881084e74f126bb"
+        "sha256": "91b8db184e3999f664e81f6fea845a4fc278f207f8d96fd7f488cdc55de245d2"
       },
       "config_revision": {
         "path": "config/modelling/validation_metrics_v1.yaml",
@@ -920,7 +920,7 @@
       "missing_failure_handling": "No canonical bases yields null. Null is not replaced with zero. No GC acceptance window is applied.",
       "code_revision": {
         "path": "scripts/modelling/generator_eval_analysis.py",
-        "sha256": "0c8ebe27273734bc30931932d84271639bdf8aefb4cf85417881084e74f126bb"
+        "sha256": "91b8db184e3999f664e81f6fea845a4fc278f207f8d96fd7f488cdc55de245d2"
       },
       "config_revision": {
         "path": "config/modelling/validation_metrics_v1.yaml",
@@ -947,7 +947,7 @@
       "missing_failure_handling": "The caller rejects a malformed, noncanonical, duplicate, or empty synthetic reference before metric calculation. An empty generated population is a metric-level result: the value is null with an explicit undefined reason and is not replaced with zero. These metrics are synthetic-reference-only in this package. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. Runtime role EVAL is refused. The three metrics are never combined or weighted.",
       "code_revision": {
         "path": "scripts/modelling/generator_eval_analysis.py",
-        "sha256": "0c8ebe27273734bc30931932d84271639bdf8aefb4cf85417881084e74f126bb"
+        "sha256": "91b8db184e3999f664e81f6fea845a4fc278f207f8d96fd7f488cdc55de245d2"
       },
       "config_revision": {
         "path": "config/modelling/validation_metrics_v1.yaml",
@@ -974,7 +974,7 @@
       "missing_failure_handling": "The caller rejects a malformed, noncanonical, duplicate, or empty synthetic reference before metric calculation. An empty generated population is a metric-level result: the value is null with an explicit undefined reason and is not replaced with zero. These metrics are synthetic-reference-only in this package. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. Runtime role EVAL is refused. The three metrics are never combined or weighted.",
       "code_revision": {
         "path": "scripts/modelling/generator_eval_analysis.py",
-        "sha256": "0c8ebe27273734bc30931932d84271639bdf8aefb4cf85417881084e74f126bb"
+        "sha256": "91b8db184e3999f664e81f6fea845a4fc278f207f8d96fd7f488cdc55de245d2"
       },
       "config_revision": {
         "path": "config/modelling/validation_metrics_v1.yaml",
@@ -1001,7 +1001,7 @@
       "missing_failure_handling": "The caller rejects a malformed, noncanonical, duplicate, or empty synthetic reference before metric calculation. An empty generated population is a metric-level result: the value is null with an explicit undefined reason and is not replaced with zero. These metrics are synthetic-reference-only in this package. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. Runtime role EVAL is refused. The three metrics are never combined or weighted. A generated or reference population with no overlapping pairs, including when every sequence is shorter than 2, is null with an explicit undefined reason.",
       "code_revision": {
         "path": "scripts/modelling/generator_eval_analysis.py",
-        "sha256": "0c8ebe27273734bc30931932d84271639bdf8aefb4cf85417881084e74f126bb"
+        "sha256": "91b8db184e3999f664e81f6fea845a4fc278f207f8d96fd7f488cdc55de245d2"
       },
       "config_revision": {
         "path": "config/modelling/validation_metrics_v1.yaml",
@@ -1075,7 +1075,7 @@
         "shannon_diversity",
         "effective_cluster_count"
       ],
-      "statement": "Sequence clustering, structure clustering, singleton fraction, largest-cluster share, and effective diversity stay deferred. No threshold is invented. They are not closeness votes. largest_duplicate_share remains the exact-string guardrail."
+      "statement": "Generated-sequence clustering, structure clustering, singleton fraction, largest-cluster share, Shannon diversity, effective-cluster count, and threshold sensitivity stay deferred. They are not required generator output. No threshold, including a corpus 90% threshold, is imported. They are not closeness votes. largest_duplicate_share remains the exact-string guardrail."
     },
     {
       "id": "representation_metrics_deferred",
@@ -1085,7 +1085,7 @@
         "frozen_representation_or_embedding_metrics",
         "representation_aggregation_rules"
       ],
-      "statement": "A representation metric stays deferred. No representation model is added during evaluation."
+      "statement": "Representation-space analysis stays deferred. No representation model, encoder, distance, or kernel is added during this evaluation."
     },
     {
       "id": "eval_closeness_not_implemented",
@@ -1141,6 +1141,17 @@
       "statement": "ViennaRNA is not called. Structure metrics run only when a deterministic synthetic fold is injected. No new MFE formula is defined, and mfe_per_nt is not the AptaRank normalized-MFE component."
     },
     {
+      "id": "viennarna_production_settings_not_pinned",
+      "status": "unresolved",
+      "related_names": [
+        "mfe",
+        "mfe_per_nt",
+        "paired_fraction",
+        "viennarna_settings"
+      ],
+      "statement": "Production ViennaRNA settings are not yet fully pinned. This is a blocking pre-M9C item and requires an explicit pin or a scope decision. This package does not invent temperature, dangle, salt, or other folding settings. Structure metrics remain synthetic-injection-only."
+    },
+    {
       "id": "production_matched_chunk_schedule_not_wired",
       "status": "unresolved",
       "related_names": [
@@ -1163,6 +1174,98 @@
       "statement": "The synthetic boundary mapper stores one integer producer field seed as empirical_null_seed, rejects a remaining generic seed, and does not create training_seed. Exactly one B2 seed is required. This package does not assume that a production run used seed 42."
     }
   ],
+  "attempt_identity": {
+    "canonical_attempt_id": "record_id",
+    "derived_row_source_hash_field": "source_artifact_sha256",
+    "second_attempt_id_field": false
+  },
+  "provenance_manifest_contract": {
+    "synthetic_only": true,
+    "production_m8_reader": false,
+    "source_manifest_schema": "synthetic-m8-source-manifest-v2",
+    "derived_provenance_schema": "synthetic-m8-derived-provenance-v1",
+    "source_manifest_inputs": {
+      "required": [
+        "source_artifact_id",
+        "source_artifact_sha256",
+        "source_byte_size",
+        "parser_adapter_version",
+        "replenishment_prohibited"
+      ],
+      "optional": [
+        "expected_attempt_count",
+        "expected_derived_ledger_sha256"
+      ],
+      "requires_derived_ledger_sha256_before_parse": false
+    },
+    "derived_provenance_outputs": [
+      "source_artifact_id",
+      "source_artifact_sha256",
+      "parser_adapter_version",
+      "derived_row_count",
+      "derived_ledger_sha256",
+      "replenishment_prohibited"
+    ],
+    "replenishment_prohibited_statement": "Replenishment is prohibited. Invalid or duplicate attempts are not filtered, deduplicated, truncated, padded, topped up, replaced, or replenished.",
+    "parser_adapter_version": "synthetic-m8-parser-adapter-v2"
+  },
+  "parser_outcome_contract": {
+    "parse_outcome_field": "parse_outcome",
+    "failure_reason_field": "failure_reason",
+    "parse_outcomes": [
+      "valid_canonical_sequence",
+      "empty_output",
+      "unparseable_output",
+      "non_sequence_output",
+      "parsed_non_acgu"
+    ],
+    "failure_reasons": [
+      "empty_output",
+      "unparseable_output",
+      "non_sequence_output",
+      "parsed_non_acgu"
+    ],
+    "valid_failure_reason": null,
+    "sequence_null_outcomes": [
+      "empty_output",
+      "unparseable_output",
+      "non_sequence_output"
+    ],
+    "sequence_retained_when_biologically_invalid": "parsed_non_acgu"
+  },
+  "multiplicity_histogram": {
+    "implementation_symbol": "generator_eval_analysis.multiplicity_histogram",
+    "key": "observed multiplicity",
+    "value": "number of distinct valid sequences having that multiplicity",
+    "emits_sequence_strings": false,
+    "emits_sequence_to_count_mapping": false,
+    "unique_only_replaces_primary": false
+  },
+  "d1_valid_conditional_pooling": {
+    "mode": "equal_training_seed_mixture",
+    "requires_verified_provenance": true,
+    "hard_coded_training_seed_labels": false,
+    "applied_to_raw_counts": false,
+    "applied_to_global_duplicate_accounting": false,
+    "is_confidence_interval": false,
+    "concatenated_rows_are_the_equal_mixture": false,
+    "pooled_directional_consistency_uses_concatenated_d1_fallback": false,
+    "weighted_quantile_rule": "inclusive_cumulative_weight_exact_v2",
+    "composition_mixture": "equal_seed_frequency_mixture_before_comparison",
+    "missing_seed_policy": "null_with_explicit_reason_do_not_drop_seed"
+  },
+  "b0_format_adapter": {
+    "synthetic_contract_only": true,
+    "production_schema_encoded": false,
+    "requested_length": "unavailable",
+    "uses_shared_biological_validity": true,
+    "included_in_b1_d1_controlled_comparison": false
+  },
+  "viennarna_production_settings": {
+    "pinned": false,
+    "blocking_item_id": "viennarna_production_settings_not_pinned",
+    "settings_invented": false
+  },
   "novelty_direction_statement": "Directions on nearest_train_normalized_edit_distance and maximum_edit_similarity_to_train describe novelty only and are not extra votes for overall generator quality.",
   "revision_schema": {
     "code_revision": [
@@ -1179,5 +1282,163 @@
       "version",
       "revision_date"
     ]
-  }
+  },
+  "d1_metric_aggregation": [
+    {
+      "metric_id": "raw_attempts",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "parsed_outputs",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "successfully_parsed_outputs",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "valid_outputs",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "invalid_outputs",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "empty_or_unparseable_outputs",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "exact_length_hits",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "exact_hit_rate",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "per_requested_length_exact_hit_rate",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "valid_nonempty_acgu_fraction",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "empty_or_unparseable_fraction",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "failure_reason_counts",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "actual_attempt_level_validity_rate",
+      "aggregation_basis": "actual attempt accounting"
+    },
+    {
+      "metric_id": "unique_valid_outputs",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome"
+    },
+    {
+      "metric_id": "duplicates",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome"
+    },
+    {
+      "metric_id": "duplicate_excess",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome"
+    },
+    {
+      "metric_id": "largest_duplicate_multiplicity",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome"
+    },
+    {
+      "metric_id": "largest_duplicate_share",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome"
+    },
+    {
+      "metric_id": "multiplicity_histogram",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome"
+    },
+    {
+      "metric_id": "unique_fraction",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome"
+    },
+    {
+      "metric_id": "pooled_gc_fraction",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture"
+    },
+    {
+      "metric_id": "nucleotide_total_variation_to_reference",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture"
+    },
+    {
+      "metric_id": "dinucleotide_total_variation_to_reference",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture"
+    },
+    {
+      "metric_id": "nearest_reference_normalized_edit_distance",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture"
+    },
+    {
+      "metric_id": "equal_seed_mean_validity_rate",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture"
+    },
+    {
+      "metric_id": "nucleotide_total_variation_to_train",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture"
+    },
+    {
+      "metric_id": "dinucleotide_total_variation_to_train",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture"
+    },
+    {
+      "metric_id": "b1_d1_directional_consistency",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture"
+    },
+    {
+      "metric_id": "mfe",
+      "aggregation_basis": "unavailable pending a defined aggregation"
+    },
+    {
+      "metric_id": "mfe_per_nt",
+      "aggregation_basis": "unavailable pending a defined aggregation"
+    },
+    {
+      "metric_id": "paired_fraction",
+      "aggregation_basis": "unavailable pending a defined aggregation"
+    },
+    {
+      "metric_id": "exact_train_match_rate",
+      "aggregation_basis": "unavailable pending a defined aggregation"
+    },
+    {
+      "metric_id": "exact_hit_rate_valid_outputs_diagnostic",
+      "aggregation_basis": "unavailable pending a defined aggregation"
+    },
+    {
+      "metric_id": "nearest_train_normalized_edit_distance",
+      "aggregation_basis": "unavailable pending a defined aggregation"
+    },
+    {
+      "metric_id": "maximum_edit_similarity_to_train",
+      "aggregation_basis": "unavailable pending a defined aggregation"
+    },
+    {
+      "metric_id": "full_length_stratified_results",
+      "aggregation_basis": "unavailable pending a defined aggregation"
+    },
+    {
+      "metric_id": "d1_by_training_seed",
+      "aggregation_basis": "per-seed only"
+    },
+    {
+      "metric_id": "matched_b1_d1_block_directional_consistency",
+      "aggregation_basis": "per-seed only"
+    },
+    {
+      "metric_id": "observed_range_across_training_seeds",
+      "aggregation_basis": "per-seed only"
+    }
+  ]
 }

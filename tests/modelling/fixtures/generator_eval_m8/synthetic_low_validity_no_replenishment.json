@@ -1,0 +1,37 @@
+{
+  "contract": "synthetic-m8-raw-attempt-bundle-v1",
+  "condition": "B2",
+  "note": "Synthetic low-validity bundle for the M8 reconciliation. Not a production generation file. Invalid and duplicate attempts stay in the attempt count.",
+  "attempts": [
+    {
+      "record_id": "low-empty",
+      "raw_text": "",
+      "empirical_null_seed": 3,
+      "requested_length": 4
+    },
+    {
+      "record_id": "low-unparseable",
+      "raw_text": null,
+      "empirical_null_seed": 3,
+      "requested_length": 4
+    },
+    {
+      "record_id": "low-non-acgu",
+      "raw_text": "ACGT",
+      "empirical_null_seed": 3,
+      "requested_length": 4
+    },
+    {
+      "record_id": "low-dup-1",
+      "raw_text": "ACGU",
+      "empirical_null_seed": 3,
+      "requested_length": 4
+    },
+    {
+      "record_id": "low-dup-2",
+      "raw_text": "ACGU",
+      "empirical_null_seed": 3,
+      "requested_length": 4
+    }
+  ]
+}

@@ -17,6 +17,7 @@ import json
 import os
 import re
 import sys
+from fractions import Fraction
 
 CANONICAL_SEQUENCE = re.compile(r"^[ACGU]+$")
 NUMERIC_SEED_FORMULA = re.compile(r"^([0-9]+) \+ invocation_index$")
@@ -31,6 +32,8 @@ SYNTHETIC_REFERENCE_ROLE = "synthetic_eval_stand_in"
 SYNTHETIC_TRAIN_ROLE = "synthetic_train_stand_in"
 FORBIDDEN_REFERENCE_ROLES = ("EVAL", "REF", "VALIDATION", "TRAIN")
 S6_LABELS = ("short", "long")
+# Planned total D1 raw-attempt budget across retained checkpoints.
+# It is not a verified achieved production count.
 FINAL_D1_ATTEMPT_BUDGET = 30000
 ONE_D1_SEED_STATEMENT = "Uncertainty excludes training-run variability."
 OBSERVED_RANGE_STATEMENT = (
@@ -95,6 +98,62 @@ OBSERVED_RANGE_KEYS = (
 FOLD_RANGE_KEYS = (
     "mfe_per_nt.median",
     "paired_fraction.median",
+)
+AGGREGATION_ACTUAL = "actual attempt accounting"
+AGGREGATION_GLOBAL_MULTIPLICITY = "global condition-level duplicate/multiplicity outcome"
+AGGREGATION_EQUAL_SEED = "equal-training-seed valid-conditional mixture"
+AGGREGATION_PER_SEED = "per-seed only"
+AGGREGATION_UNAVAILABLE = "unavailable pending a defined aggregation"
+WEIGHTED_QUANTILE_RULE = "inclusive_cumulative_weight_exact_v2"
+ANALYSIS_SCHEMA_VERSION = "generator-eval-analysis-gep2-r5"
+EXACT_QUANTILE_PROBABILITIES = (
+    ("p25", Fraction(1, 4)),
+    ("median", Fraction(1, 2)),
+    ("p75", Fraction(3, 4)),
+)
+COMPOSITION_MIXTURE_RULE = "equal_seed_frequency_mixture_before_comparison"
+POOLING_UNDEFINED_SEED = "undefined_valid_conditional_metric_for_at_least_one_training_seed"
+UNIMPLEMENTED_EQUAL_MIXTURE_REASON = "unavailable_pending_defined_equal_seed_aggregation"
+D1_METRIC_AGGREGATION = (
+    {"metric_id": "raw_attempts", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "parsed_outputs", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "successfully_parsed_outputs", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "valid_outputs", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "invalid_outputs", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "empty_or_unparseable_outputs", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "exact_length_hits", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "exact_hit_rate", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "per_requested_length_exact_hit_rate", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "valid_nonempty_acgu_fraction", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "empty_or_unparseable_fraction", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "failure_reason_counts", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "actual_attempt_level_validity_rate", "aggregation_basis": AGGREGATION_ACTUAL},
+    {"metric_id": "unique_valid_outputs", "aggregation_basis": AGGREGATION_GLOBAL_MULTIPLICITY},
+    {"metric_id": "duplicates", "aggregation_basis": AGGREGATION_GLOBAL_MULTIPLICITY},
+    {"metric_id": "duplicate_excess", "aggregation_basis": AGGREGATION_GLOBAL_MULTIPLICITY},
+    {"metric_id": "largest_duplicate_multiplicity", "aggregation_basis": AGGREGATION_GLOBAL_MULTIPLICITY},
+    {"metric_id": "largest_duplicate_share", "aggregation_basis": AGGREGATION_GLOBAL_MULTIPLICITY},
+    {"metric_id": "multiplicity_histogram", "aggregation_basis": AGGREGATION_GLOBAL_MULTIPLICITY},
+    {"metric_id": "unique_fraction", "aggregation_basis": AGGREGATION_GLOBAL_MULTIPLICITY},
+    {"metric_id": "pooled_gc_fraction", "aggregation_basis": AGGREGATION_EQUAL_SEED},
+    {"metric_id": "nucleotide_total_variation_to_reference", "aggregation_basis": AGGREGATION_EQUAL_SEED},
+    {"metric_id": "dinucleotide_total_variation_to_reference", "aggregation_basis": AGGREGATION_EQUAL_SEED},
+    {"metric_id": "nearest_reference_normalized_edit_distance", "aggregation_basis": AGGREGATION_EQUAL_SEED},
+    {"metric_id": "equal_seed_mean_validity_rate", "aggregation_basis": AGGREGATION_EQUAL_SEED},
+    {"metric_id": "nucleotide_total_variation_to_train", "aggregation_basis": AGGREGATION_EQUAL_SEED},
+    {"metric_id": "dinucleotide_total_variation_to_train", "aggregation_basis": AGGREGATION_EQUAL_SEED},
+    {"metric_id": "b1_d1_directional_consistency", "aggregation_basis": AGGREGATION_EQUAL_SEED},
+    {"metric_id": "mfe", "aggregation_basis": AGGREGATION_UNAVAILABLE},
+    {"metric_id": "mfe_per_nt", "aggregation_basis": AGGREGATION_UNAVAILABLE},
+    {"metric_id": "paired_fraction", "aggregation_basis": AGGREGATION_UNAVAILABLE},
+    {"metric_id": "exact_train_match_rate", "aggregation_basis": AGGREGATION_UNAVAILABLE},
+    {"metric_id": "exact_hit_rate_valid_outputs_diagnostic", "aggregation_basis": AGGREGATION_UNAVAILABLE},
+    {"metric_id": "nearest_train_normalized_edit_distance", "aggregation_basis": AGGREGATION_UNAVAILABLE},
+    {"metric_id": "maximum_edit_similarity_to_train", "aggregation_basis": AGGREGATION_UNAVAILABLE},
+    {"metric_id": "full_length_stratified_results", "aggregation_basis": AGGREGATION_UNAVAILABLE},
+    {"metric_id": "d1_by_training_seed", "aggregation_basis": AGGREGATION_PER_SEED},
+    {"metric_id": "matched_b1_d1_block_directional_consistency", "aggregation_basis": AGGREGATION_PER_SEED},
+    {"metric_id": "observed_range_across_training_seeds", "aggregation_basis": AGGREGATION_PER_SEED},
 )
 NOT_TRAINING_REPLICATE_UNITS = (
     "record_id",
@@ -190,6 +249,67 @@ def pooled_gc_fraction(sequences):
     if total == 0:
         return None
     return (counts["G"] + counts["C"]) / total
+
+
+def multiplicity_histogram(sequences):
+    """Sequence-free counts of distinct valid sequences by observed multiplicity.
+
+    The returned rows contain multiplicity and a distinct-sequence count only.
+    """
+    if not isinstance(sequences, list):
+        raise AnalysisContractError("multiplicity_histogram_invalid", "multiplicity input must be a list")
+    counts = {}
+    for sequence in sequences:
+        if not isinstance(sequence, str) or sequence == "":
+            raise AnalysisContractError("multiplicity_histogram_invalid", "multiplicity input is not a nonempty string")
+        counts[sequence] = counts.get(sequence, 0) + 1
+    bins = {}
+    for multiplicity in counts.values():
+        bins[multiplicity] = bins.get(multiplicity, 0) + 1
+    return [
+        {"multiplicity": multiplicity, "distinct_valid_sequences": bins[multiplicity]}
+        for multiplicity in sorted(bins)
+    ]
+
+
+def unique_only_sensitivity(sequences):
+    """Label a distinct-sequence summary without changing the primary attempt grain."""
+    if not isinstance(sequences, list):
+        raise AnalysisContractError("sensitivity_invalid", "the sensitivity input must be a list")
+    primary = list(sequences)
+    seen = []
+    for sequence in primary:
+        if sequence not in seen:
+            seen.append(sequence)
+    return {
+        "label": "unique_only_sensitivity",
+        "replaces_primary_result": False,
+        "primary_valid_attempt_count": len(primary),
+        "unique_valid_count": len(seen),
+        "denominator": "distinct_valid_sequences",
+    }
+
+
+def _failure_reason_counts(rows):
+    preflight = _preflight()
+    counts = {reason: 0 for reason in preflight.FAILURE_REASONS}
+    for row in rows:
+        reason = row.get("failure_reason") if isinstance(row, dict) else None
+        if reason in counts:
+            counts[reason] += 1
+    return counts
+
+
+def _annotate_multiplicity(accounting, sequences):
+    accounting["duplicate_excess"] = accounting["duplicates"]
+    accounting["multiplicity_histogram"] = multiplicity_histogram(sequences)
+    accounting["multiplicity_histogram_emits_sequence_strings"] = False
+    accounting["multiplicity_histogram_emits_sequence_to_count_mapping"] = False
+    accounting["primary_grain"] = "all_valid_parsed_attempts_including_repetitions"
+    accounting["raw_attempts_aggregation_basis"] = "actual_observed_attempt_counts"
+    accounting["duplicate_excess_aggregation_basis"] = "actual_observed_valid_attempts"
+    accounting["multiplicity_histogram_aggregation_basis"] = "actual_observed_valid_attempts"
+    return accounting
 
 
 def _undefined_metric(reason, **denominators):
@@ -542,6 +662,7 @@ def map_schedule_provenance(producer):
         "producer_max_seq_len_formula": max_formula,
         "production_budget_satisfied": False,
         "final_d1_attempt_budget": FINAL_D1_ATTEMPT_BUDGET,
+        "final_d1_attempt_budget_is_verified_production_count": False,
         "final_d1_attempt_budget_is_total_across_retained_seeds": True,
         "d1_training_seeds_each_receive_full_budget": False,
         "diagnostic_attempt_count_is_final_d1_budget": False,
@@ -727,6 +848,7 @@ def bind_schedule_to_ledgers(mapped, rows):
         "final_d1_attempt_budget_is_total_across_retained_seeds": True,
         "d1_training_seeds_each_receive_full_budget": False,
         "production_budget_satisfied": False,
+        "final_d1_attempt_budget_is_verified_production_count": False,
     }
 
 
@@ -871,6 +993,9 @@ def prepare_analysis_inputs(document):
     if not isinstance(document, dict):
         raise AnalysisContractError("analysis_input_invalid", "the analysis input must be an object")
     _reject_path_inputs(document)
+    pooling = None
+    if "d1_pooling_provenance" in document:
+        pooling = _preflight().validate_d1_pooling_provenance(document["d1_pooling_provenance"])
     if document.get("fixture_role") != "SYNTHETIC":
         raise AnalysisContractError("data_role_refused", "the analysis fixture role is not synthetic")
     sequences, reference_labels = _reference_entries(document)
@@ -916,6 +1041,7 @@ def prepare_analysis_inputs(document):
         "schedule": schedule,
         "b2_mapping": b2_mapping,
         "fold_supplied": False,
+        "d1_pooling_provenance": pooling,
     }
 
 
@@ -1420,11 +1546,14 @@ def schedule_independent_output_accounting(rows, train_cores):
     counts = _evaluation_row_counts(rows, train_cores)
     values, decisions = _descriptive_guardrail_report(counts)
     parsed = successfully_parsed_outputs(rows)
+    accounting = _annotate_multiplicity(_output_accounting_block(counts, parsed), _valid_sequences(rows))
+    accounting["failure_reason_counts"] = _failure_reason_counts(rows)
+    accounting["failure_reason_counts_emit_sequence_strings"] = False
     return {
         **{key: counts[key] for key in OUTPUT_ACCOUNTING_FIELDS},
         "successfully_parsed_outputs": parsed,
         "exact_train_matches": counts["exact_train_matches"],
-        "output_accounting": _output_accounting_block(counts, parsed),
+        "output_accounting": accounting,
         "guardrail_values": values,
         "guardrail_decisions": decisions,
         "checkpoint_eligible": None,
@@ -1545,6 +1674,9 @@ def _population_metrics(rows, reference, train_cores, fold, project_m4=True, m4_
         m6_reason = m4_reason
         raw_attempts = output_accounting["raw_attempts"]
         raw_source = "evaluation_ledger_rows"
+    _annotate_multiplicity(output_accounting, generated)
+    output_accounting["failure_reason_counts"] = _failure_reason_counts(rows)
+    output_accounting["failure_reason_counts_emit_sequence_strings"] = False
     per_length = projected.pop("per_requested_length_exact_hit_rate", _not_applicable_metric(exact_hit_reason or m4_reason))
     projected.pop("m6_report_only_diagnostics_applicability", None)
     projected.pop("m6_report_only_diagnostics_status_reason", None)
@@ -1729,6 +1861,591 @@ def _observed_range(seed_blocks, fold_supplied):
             continue
         observed[key] = {"minimum": min(values), "maximum": max(values), "undefined_reason": None}
     return observed
+
+
+def _blank_distance_metric(reason, denominators=None):
+    payload = {
+        "generated_valid_row_denominator": 0,
+        "generated_unique_valid_count": 0,
+        "reference_unique_core_denominator": 0,
+    }
+    if denominators:
+        payload.update(denominators)
+    return _undefined_metric(reason, **payload)
+
+
+def _closeness_record(nearest, nucleotide, dinucleotide, basis):
+    headlines = {
+        "nearest_reference_normalized_edit_distance.median": nearest.get("median"),
+        "nucleotide_total_variation_to_reference": nucleotide.get("value"),
+        "dinucleotide_total_variation_to_reference": dinucleotide.get("value"),
+    }
+    return {
+        "nearest_reference_normalized_edit_distance": nearest,
+        "nucleotide_total_variation_to_reference": nucleotide,
+        "dinucleotide_total_variation_to_reference": dinucleotide,
+        "headlines": headlines,
+        "combined": False,
+        "aggregation_basis": basis,
+        "uses_unlabelled_concatenated_d1_fallback": False,
+    }
+
+
+def _unavailable_closeness(reason, denominators=None):
+    metric = _blank_distance_metric(reason, denominators)
+    return _closeness_record(dict(metric), dict(metric), dict(metric), AGGREGATION_UNAVAILABLE)
+
+
+def _unavailable_train_nested(reason):
+    return {
+        "nucleotide_total_variation_to_train": None,
+        "dinucleotide_total_variation_to_train": None,
+        "undefined_reason": reason,
+        "aggregation_basis": AGGREGATION_UNAVAILABLE,
+        "role": "nested_descriptive_output",
+        "is_a_closeness_metric": False,
+        "is_a_quality_vote": False,
+        "separate_metric_id": False,
+        "uses_unlabelled_concatenated_d1_fallback": False,
+    }
+
+
+def _json_rational(value):
+    """JSON object for an exact rational. Fraction itself is not serialized."""
+    if not isinstance(value, Fraction):
+        raise AnalysisContractError("weighted_quantile_invalid", "an exact weight is not a rational")
+    return {"numerator": value.numerator, "denominator": value.denominator}
+
+
+def _exact_observation_weight(participating_seed_count, valid_rows):
+    """1 / (participating seeds × valid rows for that seed)."""
+    if type(participating_seed_count) is not int or participating_seed_count < 1:
+        raise AnalysisContractError("weighted_quantile_invalid", "participating seed count is not a positive integer")
+    if type(valid_rows) is not int or valid_rows < 1:
+        raise AnalysisContractError("weighted_quantile_invalid", "valid row count is not a positive integer")
+    return Fraction(1, participating_seed_count * valid_rows)
+
+
+def _exact_positive_weight(weight):
+    if isinstance(weight, bool) or isinstance(weight, float) or not isinstance(weight, (int, Fraction)):
+        raise AnalysisContractError("weighted_quantile_invalid", "a quantile weight must be an exact positive rational")
+    rational = Fraction(weight)
+    if rational <= 0:
+        raise AnalysisContractError("weighted_quantile_invalid", "a quantile weight is not a positive rational")
+    return rational
+
+
+def _exact_metric_value(value):
+    if isinstance(value, bool) or isinstance(value, Fraction) or not isinstance(value, (int, float)):
+        raise AnalysisContractError("weighted_quantile_invalid", "a quantile value is not a finite number")
+    if isinstance(value, float) and (value != value or value in (float("inf"), float("-inf"))):
+        raise AnalysisContractError("weighted_quantile_invalid", "a quantile value is not finite")
+    return Fraction(value)
+
+
+def weighted_empirical_quantiles(observations):
+    """Exact inclusive cumulative-weight quantiles.
+
+    Each observation is (value, weight, attempt_id). Values sort ascending, and
+    equal values break ties by attempt id. Weights are exact rationals, each
+    constructed as 1 / (participating seeds × valid rows for that seed). p25,
+    median, and p75 use probabilities 1/4, 1/2, and 3/4. The selected value is
+    the first observation whose exact cumulative weight is greater than or
+    equal to that probability. There is no floating-point tolerance and no
+    float-boundary fallback. The weighted mean is exact internally and is
+    converted to a JSON float only when reported.
+    """
+    if not observations:
+        return None
+    ordered = sorted(observations, key=lambda item: (item[0], item[2]))
+    weights = []
+    total = Fraction(0)
+    for _value, weight, _attempt_id in ordered:
+        rational = _exact_positive_weight(weight)
+        weights.append(rational)
+        total += rational
+    probabilities = {name: probability for name, probability in EXACT_QUANTILE_PROBABILITIES}
+
+    def at_probability(probability):
+        running = Fraction(0)
+        for (value, _weight, _attempt_id), rational in zip(ordered, weights):
+            running += rational
+            if running >= probability:
+                return value
+        raise AnalysisContractError(
+            "weighted_quantile_invalid",
+            "exact cumulative weight never reaches the probability",
+        )
+
+    weighted_sum = Fraction(0)
+    for (value, _weight, _attempt_id), rational in zip(ordered, weights):
+        weighted_sum += _exact_metric_value(value) * rational
+    exact_mean = weighted_sum / total
+    selected = {name: at_probability(probability) for name, probability in EXACT_QUANTILE_PROBABILITIES}
+    return {
+        "count": len(ordered),
+        "total_weight": float(total),
+        "total_weight_exact": _json_rational(total),
+        "minimum": ordered[0][0],
+        "p25": selected["p25"],
+        "median": selected["median"],
+        "p75": selected["p75"],
+        "maximum": ordered[-1][0],
+        "mean": float(exact_mean),
+        "mean_exact": _json_rational(exact_mean),
+        "quantile_rule": WEIGHTED_QUANTILE_RULE,
+        "probabilities_exact": {name: _json_rational(probability) for name, probability in probabilities.items()},
+        "weight_arithmetic": "exact_rational",
+        "float_boundary_fallback": False,
+    }
+
+
+def _equal_seed_fraction_mixture(fraction_maps):
+    if not fraction_maps or any(item is None for item in fraction_maps):
+        return None
+    mixed = {}
+    count = len(fraction_maps)
+    for key in fraction_maps[0]:
+        values = []
+        for item in fraction_maps:
+            value = item.get(key)
+            if value is None:
+                return None
+            values.append(value)
+        mixed[key] = sum(values) / count
+    return mixed
+
+
+def _per_seed_accounting(per_seed_rows, seed, weight, participating_seed_count=None):
+    selected = per_seed_rows[seed]
+    valid = len(_valid_sequences(selected))
+    raw = len(selected)
+    weight_exact = None
+    collective_weight_exact = None
+    reported_weight = weight
+    if weight is not None:
+        if not isinstance(weight, Fraction):
+            raise AnalysisContractError("weighted_quantile_invalid", "a seed weight must be an exact positive rational")
+        if type(participating_seed_count) is not int or participating_seed_count < 1:
+            raise AnalysisContractError("weighted_quantile_invalid", "exact seed weight lacks a participating seed count")
+        if weight != Fraction(1, participating_seed_count):
+            raise AnalysisContractError("weighted_quantile_invalid", "a seed weight is not 1/participating_seed_count")
+        reported_weight = float(weight)
+        weight_exact = _json_rational(weight)
+        if valid == 0:
+            collective_weight_exact = {"numerator": 0, "denominator": 1}
+        else:
+            collective_weight_exact = _json_rational(_exact_observation_weight(participating_seed_count, valid) * valid)
+    return {
+        "training_seed": seed,
+        "raw_attempts": raw,
+        "valid_outputs": valid,
+        "validity_rate": None if raw == 0 else valid / raw,
+        "weight": reported_weight,
+        "weight_exact": weight_exact,
+        "collective_weight_exact": collective_weight_exact,
+        "aggregation_basis": AGGREGATION_PER_SEED,
+        "raw_attempts_aggregation_basis": AGGREGATION_ACTUAL,
+    }
+
+
+def _observed_per_seed(per_seed_rows, observed):
+    return [_per_seed_accounting(per_seed_rows, seed, None) for seed in observed]
+
+
+def _unavailable_equal_mixture(reason):
+    return {
+        "pooled_gc_fraction": None,
+        "pooled_gc_undefined_reason": reason,
+        "pooled_gc_aggregation_basis": AGGREGATION_UNAVAILABLE,
+        "nucleotide_fractions": None,
+        "dinucleotide_fractions": None,
+        "closeness": _unavailable_closeness(reason),
+        "train_nested": _unavailable_train_nested(reason),
+        "aggregation_basis": AGGREGATION_UNAVAILABLE,
+        "undefined_reason": reason,
+        "quantile_rule": WEIGHTED_QUANTILE_RULE,
+        "composition_rule": COMPOSITION_MIXTURE_RULE,
+        "uses_unlabelled_concatenated_d1_fallback": False,
+    }
+
+
+def _compute_equal_mixture(per_seed_rows, supplied, reference_sequences, train_cores):
+    """Equal-seed valid-conditional mixture. A seed with no valid rows is not dropped."""
+    seed_count = len(supplied)
+    seed_weight = Fraction(1, seed_count)
+    metrics = _m6()
+    preflight = _preflight()
+    seed_nucleotide = []
+    seed_dinucleotide = []
+    observations = []
+    missing_valid = False
+    for seed in supplied:
+        selected = [row for row in per_seed_rows[seed] if preflight._row_is_valid(row)]
+        if not selected:
+            missing_valid = True
+            seed_nucleotide.append(None)
+            seed_dinucleotide.append(None)
+            continue
+        sequences = [row["sequence"] for row in selected]
+        composition = metrics.composition(sequences)
+        seed_nucleotide.append(composition["nucleotide_fractions"])
+        dinucleotide = composition["dinucleotide_fractions"]
+        if any(value is None for value in dinucleotide.values()):
+            seed_dinucleotide.append(None)
+        else:
+            seed_dinucleotide.append(dinucleotide)
+        row_weight = _exact_observation_weight(seed_count, len(selected))
+        for row in selected:
+            observations.append((row["sequence"], row_weight, row["record_id"]))
+    reason = POOLING_UNDEFINED_SEED if missing_valid else None
+    mixed_nucleotide = None if reason else _equal_seed_fraction_mixture(seed_nucleotide)
+    mixed_dinucleotide = None if reason else _equal_seed_fraction_mixture(seed_dinucleotide)
+    gc = None
+    gc_reason = reason
+    if mixed_nucleotide is not None:
+        gc = mixed_nucleotide["G"] + mixed_nucleotide["C"]
+        gc_reason = None
+    cores, core_reason = (None, "reference_not_supplied")
+    if reference_sequences is not None and reason is None:
+        cores, core_reason = _reference_cores(reference_sequences)
+    denominators = {
+        "generated_valid_row_denominator": len(observations),
+        "generated_unique_valid_count": len({item[0] for item in observations}),
+        "reference_unique_core_denominator": 0 if cores is None else len(cores),
+    }
+    distance_reason = reason or core_reason
+    if distance_reason or mixed_nucleotide is None:
+        nearest = _blank_distance_metric(distance_reason or POOLING_UNDEFINED_SEED, denominators)
+        nucleotide_metric = _blank_distance_metric(distance_reason or POOLING_UNDEFINED_SEED, denominators)
+    else:
+        reference_composition = metrics.composition(cores)
+        distances = [
+            (metrics.nearest_train(sequence, cores), row_weight, record_id)
+            for sequence, row_weight, record_id in observations
+        ]
+        quantiles = weighted_empirical_quantiles(distances)
+        nearest = {
+            "value": quantiles["median"],
+            "median": quantiles["median"],
+            "quantiles": quantiles,
+            "undefined_reason": None,
+            "direction": "lower",
+            "aggregation_basis": AGGREGATION_EQUAL_SEED,
+            "quantile_rule": WEIGHTED_QUANTILE_RULE,
+            **denominators,
+        }
+        nucleotide_value = metrics.total_variation(mixed_nucleotide, reference_composition["nucleotide_fractions"])
+        nucleotide_metric = {
+            "value": nucleotide_value,
+            "median": None,
+            "quantiles": None,
+            "undefined_reason": None if nucleotide_value is not None else "no_canonical_bases",
+            "direction": "lower",
+            "aggregation_basis": AGGREGATION_EQUAL_SEED,
+            "composition_rule": COMPOSITION_MIXTURE_RULE,
+            **denominators,
+        }
+    if distance_reason or mixed_dinucleotide is None:
+        dinucleotide_reason = distance_reason or POOLING_UNDEFINED_SEED
+        dinucleotide_metric = _blank_distance_metric(dinucleotide_reason, denominators)
+    else:
+        reference_composition = metrics.composition(cores)
+        dinucleotide_value = metrics.total_variation(mixed_dinucleotide, reference_composition["dinucleotide_fractions"])
+        dinucleotide_metric = {
+            "value": dinucleotide_value,
+            "median": None,
+            "quantiles": None,
+            "undefined_reason": None if dinucleotide_value is not None else "no_overlapping_dinucleotides",
+            "direction": "lower",
+            "aggregation_basis": AGGREGATION_EQUAL_SEED,
+            "composition_rule": COMPOSITION_MIXTURE_RULE,
+            **denominators,
+        }
+    train_nested = _unavailable_train_nested(reason or "train_reference_not_supplied")
+    if reason is None and mixed_nucleotide is not None and isinstance(train_cores, (list, tuple)) and train_cores:
+        train_composition = metrics.composition(list(train_cores))
+        dinucleotide_train = None
+        train_reason = POOLING_UNDEFINED_SEED
+        if mixed_dinucleotide is not None:
+            dinucleotide_train = metrics.total_variation(mixed_dinucleotide, train_composition["dinucleotide_fractions"])
+            train_reason = None if dinucleotide_train is not None else "no_overlapping_dinucleotides"
+        train_nested = {
+            "nucleotide_total_variation_to_train": metrics.total_variation(
+                mixed_nucleotide, train_composition["nucleotide_fractions"]
+            ),
+            "dinucleotide_total_variation_to_train": dinucleotide_train,
+            "undefined_reason": train_reason,
+            "aggregation_basis": AGGREGATION_EQUAL_SEED if train_reason is None else AGGREGATION_UNAVAILABLE,
+            "composition_rule": COMPOSITION_MIXTURE_RULE,
+            "role": "nested_descriptive_output",
+            "is_a_closeness_metric": False,
+            "is_a_quality_vote": False,
+            "separate_metric_id": False,
+            "uses_unlabelled_concatenated_d1_fallback": False,
+        }
+    undefined = [
+        item["undefined_reason"]
+        for item in (nearest, nucleotide_metric, dinucleotide_metric)
+        if item.get("undefined_reason") is not None
+    ]
+    return {
+        "pooled_gc_fraction": gc,
+        "pooled_gc_undefined_reason": gc_reason,
+        "pooled_gc_aggregation_basis": AGGREGATION_EQUAL_SEED if gc_reason is None else AGGREGATION_UNAVAILABLE,
+        "nucleotide_fractions": mixed_nucleotide,
+        "dinucleotide_fractions": mixed_dinucleotide,
+        "closeness": _closeness_record(nearest, nucleotide_metric, dinucleotide_metric, AGGREGATION_EQUAL_SEED if not undefined else AGGREGATION_UNAVAILABLE),
+        "train_nested": train_nested,
+        "aggregation_basis": AGGREGATION_EQUAL_SEED,
+        "undefined_reason": undefined[0] if undefined else None,
+        "seed_count": seed_count,
+        "weight_per_seed": float(seed_weight),
+        "weight_per_seed_exact": _json_rational(seed_weight),
+        "quantile_rule": WEIGHTED_QUANTILE_RULE,
+        "composition_rule": COMPOSITION_MIXTURE_RULE,
+        "uses_unlabelled_concatenated_d1_fallback": False,
+    }
+
+
+def valid_conditional_equal_seed_mixture(rows, validated_pooling, reference_sequences=None, train_cores=None):
+    """Equal mixture of seed-specific valid-output distributions.
+
+    Raw counts and global duplicate accounting stay on the observed attempts.
+    Composition metrics mix seed-specific frequency distributions with equal
+    seed weight. Nearest-reference distances use inclusive_cumulative_weight_exact_v2.
+    A participating seed with no valid rows makes that conditional metric null.
+    Concatenated valid rows are labelled and are not the pooled headline.
+    """
+    if not isinstance(rows, list):
+        raise AnalysisContractError("records_invalid", "D1 rows must be a list")
+    if validated_pooling is None:
+        validated_pooling = {
+            "pooling_policy": None,
+            "policy_verified": False,
+            "participating_training_seeds": [],
+            "status": "unavailable",
+            "unavailable_reason": "pooling_policy_not_verified",
+        }
+    observed = []
+    per_seed_rows = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise AnalysisContractError("records_invalid", "a D1 row is not an object")
+        seed = row.get("training_seed")
+        if type(seed) is not int:
+            raise AnalysisContractError("d1_training_seed_provenance_missing", "a D1 row lacks a training seed")
+        if seed not in per_seed_rows:
+            observed.append(seed)
+            per_seed_rows[seed] = []
+        per_seed_rows[seed].append(row)
+    all_valid = _valid_sequences(rows)
+    concatenated_gc = pooled_gc_fraction(all_valid) if all_valid else None
+    global_unique = len(set(all_valid))
+    base = {
+        "pooling_policy": validated_pooling.get("pooling_policy"),
+        "policy_verified": validated_pooling.get("policy_verified") is True,
+        "participating_training_seed_count": len(validated_pooling.get("participating_training_seeds") or []),
+        "participating_training_seeds": list(validated_pooling.get("participating_training_seeds") or []),
+        "observed_training_seeds": observed,
+        "raw_attempts": len(rows),
+        "raw_attempts_aggregation_basis": AGGREGATION_ACTUAL,
+        "actual_attempt_level_validity_rate": None if not rows else len(all_valid) / len(rows),
+        "actual_attempt_level_validity_aggregation_basis": AGGREGATION_ACTUAL,
+        "global_valid_outputs": len(all_valid),
+        "global_unique_valid_outputs": global_unique,
+        "global_duplicate_excess": len(all_valid) - global_unique,
+        "global_multiplicity_histogram": multiplicity_histogram(all_valid),
+        "global_duplicate_accounting_aggregation_basis": AGGREGATION_GLOBAL_MULTIPLICITY,
+        "equal_seed_weighting_applied_to_raw_counts": False,
+        "equal_seed_weighting_applied_to_global_duplicates": False,
+        "metric_aggregation": [dict(item) for item in D1_METRIC_AGGREGATION],
+        "concatenated_valid_conditional": {
+            "pooled_gc_fraction": concatenated_gc,
+            "aggregation_basis": "concatenation_of_supplied_valid_attempts",
+            "not_an_equal_seed_mixture": True,
+            "used_as_pooled_headline": False,
+            "used_as_directional_consistency": False,
+        },
+        "is_confidence_interval": False,
+        "is_evidence_from_many_training_replicates": False,
+        "generated_rows_are_nested_monte_carlo_samples": True,
+        "generated_rows_are_model_replicates": False,
+        "training_replicate_unit": "training_seed",
+    }
+    observed_per_seed = _observed_per_seed(per_seed_rows, observed)
+    if validated_pooling.get("status") != "verified":
+        reason = validated_pooling.get("unavailable_reason") or "pooling_policy_not_verified"
+        base.update(
+            {
+                "status": "unavailable",
+                "unavailable_reason": reason,
+                "weights": None,
+                "per_seed": observed_per_seed,
+                "equal_seed_mean_validity_rate": None,
+                "equal_seed_mean_validity_aggregation_basis": AGGREGATION_UNAVAILABLE,
+                "equal_mixture": _unavailable_equal_mixture(reason),
+            }
+        )
+        return base
+    supplied = list(validated_pooling["participating_training_seeds"])
+    if len(supplied) != len(observed) or any(seed not in observed for seed in supplied) or any(seed not in supplied for seed in observed):
+        base.update(
+            {
+                "status": "unavailable",
+                "unavailable_reason": "participating_seed_set_mismatch",
+                "weights": None,
+                "per_seed": observed_per_seed,
+                "equal_seed_mean_validity_rate": None,
+                "equal_seed_mean_validity_aggregation_basis": AGGREGATION_UNAVAILABLE,
+                "equal_mixture": _unavailable_equal_mixture("participating_seed_set_mismatch"),
+            }
+        )
+        return base
+    seed_count = len(supplied)
+    seed_weight = Fraction(1, seed_count)
+    per_seed = [
+        _per_seed_accounting(
+            per_seed_rows,
+            seed,
+            seed_weight,
+            participating_seed_count=seed_count,
+        )
+        for seed in supplied
+    ]
+    rates = [item["validity_rate"] for item in per_seed]
+    equal_mean = None if any(rate is None for rate in rates) else sum(rates) / len(rates)
+    mixture = _compute_equal_mixture(per_seed_rows, supplied, reference_sequences, train_cores)
+    base.update(
+        {
+            "status": "computed",
+            "unavailable_reason": None,
+            "weights": [float(seed_weight) for _seed in supplied],
+            "weights_exact": [_json_rational(seed_weight) for _seed in supplied],
+            "per_seed": per_seed,
+            "equal_seed_mean_validity_rate": equal_mean,
+            "equal_seed_mean_validity_aggregation_basis": AGGREGATION_EQUAL_SEED,
+            "equal_mixture": mixture,
+        }
+    )
+    return base
+
+
+def _mark_unimplemented_pooled_d1_metrics(block):
+    """Pooled D1 metrics without an equal-mixture rule stay null. Per-seed results remain."""
+    reason = UNIMPLEMENTED_EQUAL_MIXTURE_REASON
+    structure = block.get("structure")
+    if isinstance(structure, dict):
+        structure["mfe"] = None
+        structure["mfe_per_nt"] = None
+        structure["paired_fraction"] = None
+        structure["mfe_per_nt.median"] = None
+        structure["paired_fraction.median"] = None
+        structure["undefined_reason"] = reason
+        structure["aggregation_basis"] = AGGREGATION_UNAVAILABLE
+        structure["uses_unlabelled_concatenated_valid_rows"] = False
+        structure["per_seed_results_remain_reportable"] = True
+    older_m6 = block.get("older_m6_metrics")
+    if isinstance(older_m6, dict):
+        for key in (
+            "nearest_train_normalized_edit_distance",
+            "maximum_edit_similarity_to_train",
+            "mfe",
+            "mfe_per_nt",
+            "paired_fraction",
+        ):
+            if key in older_m6:
+                older_m6[key] = _not_applicable_metric(reason)
+                older_m6[key]["aggregation_basis"] = AGGREGATION_UNAVAILABLE
+    older_m4 = block.get("older_m4_metrics")
+    if isinstance(older_m4, dict) and "exact_hit_rate_valid_outputs_diagnostic" in older_m4:
+        older_m4["exact_hit_rate_valid_outputs_diagnostic"] = _not_applicable_metric(reason)
+        older_m4["exact_hit_rate_valid_outputs_diagnostic"]["aggregation_basis"] = AGGREGATION_UNAVAILABLE
+    values = block.get("guardrail_values")
+    if isinstance(values, dict) and "exact_train_match_rate" in values:
+        values["exact_train_match_rate_observed_not_equal_mixture"] = values["exact_train_match_rate"]
+        values["exact_train_match_rate"] = None
+    for decision in block.get("guardrail_decisions") or []:
+        if decision.get("id") == "exact_train_match_rate":
+            decision["observed_value_not_an_equal_seed_mixture"] = decision.get("value")
+            decision["value"] = None
+            decision["passed"] = None
+            decision["undefined_reason"] = reason
+            decision["aggregation_basis"] = AGGREGATION_UNAVAILABLE
+        elif decision.get("id") in ("valid_nonempty_acgu_fraction", "empty_or_unparseable_fraction"):
+            decision["aggregation_basis"] = AGGREGATION_ACTUAL
+        elif decision.get("id") in ("unique_fraction", "largest_duplicate_share"):
+            decision["aggregation_basis"] = AGGREGATION_GLOBAL_MULTIPLICITY
+    if "exact_train_match_rate" in (block.get("guardrail_failures") or []):
+        block["guardrail_failures"] = [item for item in block["guardrail_failures"] if item != "exact_train_match_rate"]
+    stratified = block.get("stratified")
+    if isinstance(stratified, dict):
+        for stratum in stratified.values():
+            if not isinstance(stratum, dict):
+                continue
+            stratum["pooled_gc_fraction"] = None
+            stratum["pooled_gc_undefined_reason"] = reason
+            stratum["pooled_gc_aggregation_basis"] = AGGREGATION_UNAVAILABLE
+            closeness = stratum.get("closeness")
+            if not isinstance(closeness, dict):
+                continue
+            for key in (
+                "nearest_reference_normalized_edit_distance",
+                "nucleotide_total_variation_to_reference",
+                "dinucleotide_total_variation_to_reference",
+            ):
+                metric = closeness.get(key)
+                if isinstance(metric, dict):
+                    metric["value"] = None
+                    metric["median"] = None
+                    metric["undefined_reason"] = reason
+                    metric["aggregation_basis"] = AGGREGATION_UNAVAILABLE
+            for key in list(closeness.get("headlines") or {}):
+                closeness["headlines"][key] = None
+            closeness["aggregation_basis"] = AGGREGATION_UNAVAILABLE
+            closeness["uses_unlabelled_concatenated_d1_fallback"] = False
+
+
+def _apply_pooled_d1_result(block, pooling):
+    mixture = pooling["equal_mixture"]
+    block["pooled_gc_fraction"] = mixture["pooled_gc_fraction"]
+    block["pooled_gc_undefined_reason"] = mixture["pooled_gc_undefined_reason"]
+    block["pooled_gc_aggregation_basis"] = mixture["pooled_gc_aggregation_basis"]
+    block["closeness"] = mixture["closeness"]
+    block["train_nested_descriptive"] = mixture["train_nested"]
+    block["d1_metric_aggregation"] = pooling["metric_aggregation"]
+    block["actual_attempt_level_validity_rate"] = pooling["actual_attempt_level_validity_rate"]
+    block["actual_attempt_level_validity_aggregation_basis"] = AGGREGATION_ACTUAL
+    block["equal_seed_mean_validity_rate"] = pooling["equal_seed_mean_validity_rate"]
+    block["equal_seed_mean_validity_aggregation_basis"] = pooling["equal_seed_mean_validity_aggregation_basis"]
+    block["uses_unlabelled_concatenated_d1_fallback"] = False
+    _mark_unimplemented_pooled_d1_metrics(block)
+
+
+def _directional_from_pooling(b1_block, pooling):
+    b1_headlines = (b1_block.get("closeness") or {}).get("headlines") or {key: None for key in CLOSENESS_HEADLINE_KEYS}
+    mixture = pooling["equal_mixture"]
+    d1_headlines = mixture["closeness"]["headlines"]
+    if pooling["status"] != "computed":
+        consistency = directional_consistency(
+            {key: None for key in CLOSENESS_HEADLINE_KEYS},
+            {key: None for key in CLOSENESS_HEADLINE_KEYS},
+        )
+        consistency["unavailable_reason"] = pooling.get("unavailable_reason") or "pooling_policy_not_verified"
+        consistency["aggregation_basis"] = AGGREGATION_UNAVAILABLE
+        consistency["d1_headline_source"] = "unavailable"
+    else:
+        consistency = directional_consistency(b1_headlines, d1_headlines)
+        if any(d1_headlines.get(key) is None for key in CLOSENESS_HEADLINE_KEYS):
+            consistency["unavailable_reason"] = mixture.get("undefined_reason") or POOLING_UNDEFINED_SEED
+            consistency["aggregation_basis"] = AGGREGATION_UNAVAILABLE
+            consistency["d1_headline_source"] = "unavailable"
+        else:
+            consistency["unavailable_reason"] = None
+            consistency["aggregation_basis"] = AGGREGATION_EQUAL_SEED
+            consistency["d1_headline_source"] = "equal_training_seed_mixture"
+    consistency["uses_unlabelled_concatenated_d1_fallback"] = False
+    return consistency
 
 
 def _d1_seed_report(rows, prepared, fold):
@@ -1983,18 +2700,17 @@ def calculate_analysis(prepared, fold=None):
     for condition in ("B0", "B1", "B2", "D1"):
         selected = [row for row in rows if row["condition"] == condition]
         by_condition[condition] = _condition_block(condition, selected, prepared, fold)
-    b1_headlines = by_condition["B1"].get("closeness", {}).get("headlines")
-    d1_headlines = by_condition["D1"].get("closeness", {}).get("headlines")
-    if b1_headlines is None or d1_headlines is None:
-        consistency = directional_consistency(
-            {key: None for key in CLOSENESS_HEADLINE_KEYS},
-            {key: None for key in CLOSENESS_HEADLINE_KEYS},
-        )
-    else:
-        consistency = directional_consistency(b1_headlines, d1_headlines)
     d1_rows = [row for row in rows if row["condition"] == "D1"]
+    pooling_report = valid_conditional_equal_seed_mixture(
+        d1_rows,
+        prepared.get("d1_pooling_provenance"),
+        reference_sequences=prepared["reference_sequences"],
+        train_cores=prepared["train_cores"],
+    )
+    _apply_pooled_d1_result(by_condition["D1"], pooling_report)
+    consistency = _directional_from_pooling(by_condition["B1"], pooling_report)
     report = {
-        "schema_version": "generator-eval-analysis-gep2-r2",
+        "schema_version": ANALYSIS_SCHEMA_VERSION,
         "package_id": "GEP-2",
         "mode": "synthetic_analysis",
         "eval_access": "locked",
@@ -2017,6 +2733,7 @@ def calculate_analysis(prepared, fold=None):
         "b0_panel": _b0_panel([row for row in rows if row["condition"] == "B0"]),
         "b1_d1_directional_consistency": consistency,
         "d1_by_training_seed": _d1_seed_report(d1_rows, prepared, fold),
+        "d1_valid_conditional_pooling": pooling_report,
         "matched_b1_d1_blocks": _matched_blocks(rows, prepared),
         "schedule_provenance": prepared["schedule"],
         "b2_seed_mapping": None
@@ -2088,6 +2805,8 @@ def render_analysis_text(report):
         "viennarna_called: false",
         "production_pools_loaded: false",
         "directional_consistency: " + consistency["label"],
+        "directional_consistency_uses_unlabelled_concatenated_d1_fallback: false",
+        "d1_failure_reason_counts: " + json.dumps(report["conditions"]["D1"]["accounting"]["failure_reason_counts"], sort_keys=True),
         "d1_training_seed_count: %d" % seeds["d1_training_seed_count"],
         "one_d1_training_seed_limitation: " + json.dumps(seeds["one_d1_training_seed_limitation"]),
         "observed_range_is_a_confidence_interval: false",
