@@ -1,0 +1,14 @@
+{
+  "fixture_role": "synthetic_expected_cell_manifest",
+  "profile_id": "target_free_rigorous_style",
+  "expected_candidate_ids": [],
+  "expected_export_fields": [
+    "rank",
+    "candidate",
+    "aptamer-likeness",
+    "compatibility",
+    "shuffle",
+    "len",
+    "sequence"
+  ]
+}

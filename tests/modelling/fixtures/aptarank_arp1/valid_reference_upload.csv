@@ -1,0 +1,3 @@
+id,sequence,target_name,target_pdb_id,source_reference
+opaque-ref-01,CGCGCGCGCGCGCGCG,synthetic-target-label-alpha,synthetic-pdb-token-0000,synthetic-source-note-alpha
+opaque-ref-02,GGGGAAAACCCCUUUU,synthetic-target-label-beta,synthetic-pdb-token-0001,synthetic-source-note-beta

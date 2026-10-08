@@ -1,0 +1,3 @@
+rank,candidate,aptamer-likeness,compatibility,shuffle,len,sequence
+1,opaque-01,0.125,not evaluated,pass,15,AAAACCCCGGGGUUUU
+2,opaque-02,-3.5,not evaluated,fail,16,ACACACACACACACAC

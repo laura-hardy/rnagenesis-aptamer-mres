@@ -1,0 +1,431 @@
+{
+  "package_id": "ARP-1",
+  "schema_version": "aptarank-io-arp1-draft-r3",
+  "status": "draft",
+  "deployment_verified": false,
+  "scientific_result": false,
+  "combined_tier1_tier2_score": false,
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
+    "version": "3.0",
+    "revision_date": "7 October 2026",
+    "sha256": "e6193d0d14245049c218b4da0ef8059fb63b2f31e4885b3457cd44e41b76c50c"
+  },
+  "candidate_upload_column_order": [
+    "id",
+    "sequence"
+  ],
+  "reference_upload_column_order": [
+    "id",
+    "sequence",
+    "target_name",
+    "target_pdb_id",
+    "source_reference"
+  ],
+  "shortlist_export_column_order": [
+    "rank",
+    "candidate",
+    "aptamer-likeness",
+    "compatibility",
+    "shuffle",
+    "len",
+    "sequence"
+  ],
+  "column_types": {
+    "candidate_upload": {
+      "id": "nonempty_opaque_id",
+      "sequence": "uppercase_acgu"
+    },
+    "reference_upload": {
+      "id": "nonempty_opaque_id",
+      "sequence": "uppercase_acgu",
+      "target_name": "nonempty_uninterpreted_string",
+      "target_pdb_id": "nullable_uninterpreted_string",
+      "source_reference": "nonempty_uninterpreted_string"
+    },
+    "shortlist_export": {
+      "rank": "positive_integer",
+      "candidate": "nonempty_opaque_id",
+      "aptamer-likeness": "finite_decimal",
+      "compatibility": "profile_token",
+      "shuffle": "profile_token",
+      "len": "nonnegative_integer",
+      "sequence": "uppercase_acgu"
+    }
+  },
+  "rules": {
+    "opaque_id_preservation": "The upload id is copied unchanged into the export candidate column.",
+    "sequence_alphabet": "Sequences must be nonempty uppercase A, C, G and U. Lowercase bases, T, and other characters are rejected.",
+    "unique_ids": "Candidate upload ids are unique and nonempty. Reference upload ids are unique and nonempty.",
+    "nullable_target_pdb_id": "target_pdb_id may be blank when an unambiguous PDB is unavailable. A blank cell stays blank. ARP-1 does not replace it with a sentinel or an invented identifier. A nonempty value with leading or trailing whitespace is rejected. id stays nonempty and unique, sequence stays nonempty uppercase A/C/G/U, source_reference stays nonempty, and target_name stays nonempty in this corrected reference contract. Nullable PDB provenance preserves the full unique-core REF calibration set without inventing structural evidence.",
+    "id_set_reconciliation": "The expected candidate id set equals the candidate upload id set. Exported candidate ids plus explicit failure ids equal that set exactly.",
+    "sequence_round_trip": "The exported sequence is accepted only when it is character-for-character identical to the uploaded sequence for the same id.",
+    "exported_length": "The exported len integer equals the character length of the uploaded sequence and of the exported sequence.",
+    "join": "Rows are joined by candidate id. Row position is not a join key.",
+    "duplicates_missing_extra": "Duplicate, missing, and extra exported ids are rejected.",
+    "nonfinite_tier1": "A malformed or non-finite aptamer-likeness value is rejected. No score direction or threshold is applied.",
+    "shuffle_profile": "Shuffle tokens are accepted only for an explicitly selected synthetic run profile. No profile is inferred from the file.",
+    "target_free_compatibility": "Under the target-free profile the compatibility cell must be the observed literal only. That literal is not given a scientific meaning.",
+    "failure_accounting": "Every expected candidate is either one exported row or one explicit failure record with a nonempty reason. A missing export is not dropped and is not stored as zero.",
+    "sha256": "Every upload and every download is hashed with SHA-256 over its original bytes. The provenance record does not contain its own SHA-256. That digest is computed externally from the original provenance bytes and retained in the generated report SHA-256 block.",
+    "schema_change": "A header that differs in name, order, or membership fails closed. ARP-1 does not adapt the schema. A difference requires a reviewed specification revision.",
+    "utf8_bom": "One leading UTF-8 BOM is accepted. It is stripped only for decoding and logical header validation. The SHA-256 covers the original bytes. A BOM anywhere except the beginning of the byte stream is rejected. BOM handling is encoding normalization, not schema adaptation. Column name, order, and membership stay exact.",
+    "no_combined_score": "ARP-1 defines no combined Tier 1 and Tier 2 score.",
+    "no_binding_interpretation": "ARP-1 does not interpret binding, affinity, or selectivity."
+  },
+  "synthetic_run_profiles": {
+    "target_free_rigorous_style": {
+      "profile_id": "target_free_rigorous_style",
+      "target_entry": "not_entered_target_free",
+      "compatibility_allowed_tokens": [
+        "not evaluated"
+      ],
+      "shuffle_allowed_tokens": [
+        "pass",
+        "fail"
+      ],
+      "compatibility_meaning": "not_interpreted",
+      "shuffle_meaning": "unresolved",
+      "shuffle_threshold": null,
+      "preset_value": null,
+      "raw_tier2_score_expected": "unresolved"
+    }
+  },
+  "failure_accounting": {
+    "silent_drop_allowed": false,
+    "impute_missing_as_zero": false,
+    "reason_required": true,
+    "rule": "Every expected candidate is either one exported row or one explicit failure record with a nonempty reason. A missing export is not dropped and is not stored as zero."
+  },
+  "sha256_requirements": {
+    "algorithm": "SHA-256",
+    "hashed_byte_roles": [
+      "candidate_upload",
+      "reference_upload",
+      "shortlist_export",
+      "failure_accounting",
+      "expected_cell_manifest",
+      "provenance"
+    ],
+    "provenance_record_includes_own_sha256": false,
+    "hashing_boundary": "The provenance record does not contain its own SHA-256. That digest is computed externally from the original provenance bytes and retained in the generated report SHA-256 block.",
+    "rule": "Hash the exact original bytes of every upload and every download. Do not hash a rewritten copy in place of those bytes. The provenance record stores the five hashes of the other fixture byte streams and does not store its own SHA-256."
+  },
+  "required_ui_provenance_capture_fields": [
+    "run_id",
+    "operator",
+    "started_at",
+    "finished_at",
+    "deployment_version",
+    "deployment_schema_version",
+    "deployment_code_revision",
+    "preset_value",
+    "effective_settings",
+    "candidate_upload_sha256",
+    "reference_upload_sha256",
+    "shortlist_export_sha256",
+    "failure_accounting_sha256",
+    "expected_cell_manifest_sha256",
+    "raw_tier2_score_availability",
+    "raw_tier2_equation",
+    "raw_tier2_direction",
+    "raw_tier2_comparison_scope",
+    "control_bank_identifier",
+    "control_bank_hash",
+    "control_bank_provenance",
+    "canonical_target",
+    "structure_or_pdb",
+    "structure_sha256",
+    "chain_or_domain",
+    "binding_mode",
+    "site_or_pocket",
+    "numbering",
+    "preparation",
+    "runtime_seconds",
+    "runtime_status",
+    "expected_row_count",
+    "exported_row_count",
+    "failed_row_count",
+    "warnings",
+    "rerun_lineage",
+    "ui_capture_complete",
+    "deployment_verified"
+  ],
+  "provenance_record_schema": {
+    "fixture_role": "synthetic_run_provenance",
+    "fixture_selector_keys": [
+      "fixture_role",
+      "profile_id"
+    ],
+    "required_keys": [
+      "fixture_role",
+      "profile_id",
+      "run_id",
+      "operator",
+      "started_at",
+      "finished_at",
+      "deployment_version",
+      "deployment_schema_version",
+      "deployment_code_revision",
+      "preset_value",
+      "effective_settings",
+      "candidate_upload_sha256",
+      "reference_upload_sha256",
+      "shortlist_export_sha256",
+      "failure_accounting_sha256",
+      "expected_cell_manifest_sha256",
+      "raw_tier2_score_availability",
+      "raw_tier2_equation",
+      "raw_tier2_direction",
+      "raw_tier2_comparison_scope",
+      "control_bank_identifier",
+      "control_bank_hash",
+      "control_bank_provenance",
+      "canonical_target",
+      "structure_or_pdb",
+      "structure_sha256",
+      "chain_or_domain",
+      "binding_mode",
+      "site_or_pocket",
+      "numbering",
+      "preparation",
+      "runtime_seconds",
+      "runtime_status",
+      "expected_row_count",
+      "exported_row_count",
+      "failed_row_count",
+      "warnings",
+      "rerun_lineage",
+      "ui_capture_complete",
+      "deployment_verified"
+    ],
+    "null_fields": [
+      "deployment_version",
+      "deployment_schema_version",
+      "deployment_code_revision",
+      "preset_value",
+      "effective_settings",
+      "raw_tier2_equation",
+      "raw_tier2_direction",
+      "control_bank_identifier",
+      "control_bank_hash",
+      "control_bank_provenance",
+      "runtime_seconds"
+    ],
+    "unresolved_string_fields": [
+      "raw_tier2_score_availability",
+      "raw_tier2_comparison_scope"
+    ],
+    "false_fields": [
+      "ui_capture_complete",
+      "deployment_verified"
+    ],
+    "target_free_sentinel_fields": [
+      "canonical_target",
+      "structure_or_pdb",
+      "chain_or_domain",
+      "binding_mode",
+      "site_or_pocket",
+      "numbering",
+      "preparation"
+    ],
+    "target_free_sentinel": "not_entered_target_free",
+    "null_structure_hash_fields": [
+      "structure_sha256"
+    ],
+    "recorded_fixture_hash_fields": {
+      "candidate_upload_sha256": "candidate_upload",
+      "reference_upload_sha256": "reference_upload",
+      "shortlist_export_sha256": "shortlist_export",
+      "failure_accounting_sha256": "failure_accounting",
+      "expected_cell_manifest_sha256": "expected_cell_manifest"
+    },
+    "recorded_count_fields": [
+      "expected_row_count",
+      "exported_row_count",
+      "failed_row_count"
+    ],
+    "recorded_count_type": "Recorded counts are nonnegative JSON integers. Booleans and floats are excluded, including floats that are mathematically integral.",
+    "includes_own_sha256": false,
+    "hashing_boundary": "The provenance record does not contain its own SHA-256. That digest is computed externally from the original provenance bytes and retained in the generated report SHA-256 block.",
+    "runtime_status_value": "not_measured"
+  },
+  "raw_tier2_geometric_score": {
+    "observed_in_provisional_shortlist_export": false,
+    "availability": "unresolved",
+    "equation": null,
+    "direction": null,
+    "comparison_scope": "unresolved",
+    "absence_from_provisional_shortlist_is_not_definitional": true,
+    "note": "A provisional shortlist did not include a raw Tier 2 geometric score. That observation does not define the score as unavailable, and ARP-1 does not supply an equation, direction, or comparison scope."
+  },
+  "control_bank": {
+    "identifier": null,
+    "sha256": null,
+    "provenance": null,
+    "status": "unresolved"
+  },
+  "deployment_identity": {
+    "deployment_version": null,
+    "deployment_schema_version": null,
+    "deployment_code_revision": null,
+    "status": "unresolved",
+    "deployment_verified": false
+  },
+  "runtime_fields": [
+    "runtime_seconds",
+    "runtime_status"
+  ],
+  "row_accounting_fields": [
+    "candidate_upload_rows",
+    "reference_upload_rows",
+    "expected_candidates",
+    "exported_rows",
+    "failed_rows",
+    "duplicate_candidate_ids",
+    "duplicate_reference_ids",
+    "duplicate_exported_ids",
+    "missing_candidate_ids",
+    "extra_exported_ids",
+    "unaccounted_candidates",
+    "silent_drops",
+    "rows_imputed_as_zero"
+  ],
+  "target_configuration_fields": {
+    "fields": [
+      "canonical_target",
+      "structure_or_pdb",
+      "structure_sha256",
+      "chain_or_domain",
+      "binding_mode",
+      "site_or_pocket",
+      "numbering",
+      "preparation"
+    ],
+    "target_free_sentinel": "not_entered_target_free",
+    "note": "A target-free synthetic profile records the explicit sentinel on every textual target field. The structure hash is null because no structure file exists. ARP-1 does not invent a PDB identifier, a structure hash, or any other target configuration."
+  },
+  "unresolved_interface_questions": [
+    {
+      "id": "raw_tier2_score_availability",
+      "status": "unresolved",
+      "value": null,
+      "note": "Availability stays unresolved. Absence from one provisional shortlist does not define the deployment."
+    },
+    {
+      "id": "raw_tier2_equation",
+      "status": "unresolved",
+      "value": null,
+      "note": "ARP-1 does not supply an equation."
+    },
+    {
+      "id": "raw_tier2_direction",
+      "status": "unresolved",
+      "value": null,
+      "note": "ARP-1 does not supply a score direction."
+    },
+    {
+      "id": "raw_tier2_comparison_scope",
+      "status": "unresolved",
+      "value": null,
+      "note": "ARP-1 does not define a comparison scope."
+    },
+    {
+      "id": "control_bank_identifier",
+      "status": "unresolved",
+      "value": null,
+      "note": "No control-bank identifier is adopted."
+    },
+    {
+      "id": "control_bank_hash",
+      "status": "unresolved",
+      "value": null,
+      "note": "No control-bank hash is adopted."
+    },
+    {
+      "id": "control_bank_provenance",
+      "status": "unresolved",
+      "value": null,
+      "note": "No control-bank provenance is adopted."
+    },
+    {
+      "id": "deployment_version",
+      "status": "unresolved",
+      "value": null,
+      "note": "The live deployment version has not been recorded."
+    },
+    {
+      "id": "deployment_schema_version",
+      "status": "unresolved",
+      "value": null,
+      "note": "The live export schema version has not been recorded."
+    },
+    {
+      "id": "deployment_code_revision",
+      "status": "unresolved",
+      "value": null,
+      "note": "The live deployment code revision has not been recorded."
+    },
+    {
+      "id": "preset_value",
+      "status": "unresolved",
+      "value": null,
+      "note": "The governing plan requires the actual preset to be verified. ARP-1 does not adopt a preset value."
+    },
+    {
+      "id": "compatibility_token_meaning",
+      "status": "unresolved",
+      "value": null,
+      "note": "The target-free profile accepts an observed literal and does not define it."
+    },
+    {
+      "id": "shuffle_token_meaning",
+      "status": "unresolved",
+      "value": null,
+      "note": "pass and fail are observed literals. ARP-1 does not assign a threshold to them."
+    }
+  ],
+  "schema_change_policy": "A header that differs in name, order, or membership from this draft fails closed. ARP-1 does not rename, reorder, add, or drop columns to accept the file. A single leading UTF-8 BOM is encoding normalization, not schema adaptation: it is stripped only for decoding and logical header validation, and the SHA-256 covers the original bytes. A BOM anywhere else is rejected. A difference in column name, order, or membership requires a reviewed specification revision.",
+  "interpretation_boundary": {
+    "combined_tier1_tier2_score": false,
+    "binding_interpretation": false,
+    "affinity_interpretation": false,
+    "selectivity_interpretation": false,
+    "statement": "ARP-1 checks upload and export mechanics on synthetic fixtures only. It does not score binding, affinity, or selectivity, and it does not define a combined Tier 1 and Tier 2 score."
+  },
+  "provisional_interface_evidence": {
+    "authority": "reviewer-supplied observations",
+    "deployment_verified": false,
+    "candidate_upload_column_order": [
+      "id",
+      "sequence"
+    ],
+    "reference_upload_column_order": [
+      "id",
+      "sequence",
+      "target_name",
+      "target_pdb_id",
+      "source_reference"
+    ],
+    "shortlist_export_column_order": [
+      "rank",
+      "candidate",
+      "aptamer-likeness",
+      "compatibility",
+      "shuffle",
+      "len",
+      "sequence"
+    ],
+    "upload_ids_observed_in_column": "candidate",
+    "target_free_compatibility_literal": "not evaluated",
+    "shuffle_literals": [
+      "pass",
+      "fail"
+    ],
+    "settings_absent_from_csv_captured_from_ui": true,
+    "raw_tier2_geometric_score_observed_in_shortlist": false,
+    "raw_tier2_absence_is_not_definitional": true,
+    "validation_outcomes_reused": false,
+    "target_decisions_reused": false
+  }
+}

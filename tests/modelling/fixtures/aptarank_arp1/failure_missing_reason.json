@@ -1,0 +1,10 @@
+{
+  "fixture_role": "synthetic_failure_accounting",
+  "profile_id": "target_free_rigorous_style",
+  "failures": [
+    {
+      "candidate_id": "opaque-03",
+      "reason": ""
+    }
+  ]
+}
