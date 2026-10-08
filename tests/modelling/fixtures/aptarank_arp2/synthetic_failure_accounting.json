@@ -1,0 +1,10 @@
+{
+  "fixture_role": "synthetic_failure_accounting",
+  "profile_id": "target_free_rigorous_style",
+  "failures": [
+    {
+      "candidate_id": "SYN-CTRL-02",
+      "reason": "synthetic technical failure recorded explicitly so the row is not dropped and is not stored as zero"
+    }
+  ]
+}

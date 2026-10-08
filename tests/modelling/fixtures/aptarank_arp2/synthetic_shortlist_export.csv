@@ -1,0 +1,4 @@
+rank,candidate,aptamer-likeness,compatibility,shuffle,len,sequence
+3,SYN-CTRL-01,8.00,not evaluated,fail,16,ACGUACGUACGUACGU
+1,SYN-REAL-02,0,not evaluated,pass,16,GGGGUUUUAAAACCCC
+2,SYN-REAL-01,2.50,not evaluated,pass,16,AAAACCCCGGGGUUUU

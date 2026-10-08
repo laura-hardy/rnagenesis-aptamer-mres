@@ -1,0 +1,532 @@
+{
+  "package_id": "ARP-2B",
+  "schema_version": "aptarank-tier1-arp2b-draft-r2",
+  "status": "draft",
+  "deployment_verified": false,
+  "eval_access": "locked",
+  "scientific_result": false,
+  "full_tier1_statistical_analysis": false,
+  "aggregate_tier1_tier2_score": false,
+  "scorer_owner": "deployed AptaRank UI",
+  "provisional_camera_ready_formula_adopted": false,
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
+    "version": "3.0",
+    "sha256": "e6193d0d14245049c218b4da0ef8059fb63b2f31e4885b3457cd44e41b76c50c"
+  },
+  "arp2a_reconciliation": {
+    "path": "docs/aptarank_arp2a_tier1_reconciliation.md",
+    "sha256": "471bb5643650d3f23223ad6625afaeafe515e4beebc4814f262e263d9c18fab4",
+    "modified_by_arp2b": false
+  },
+  "analysis_module": {
+    "path": "scripts/modelling/aptarank_tier1_analysis.py",
+    "sha256": "ccc820bca63b9602c5df32e8ddfe117ce6ca61430c597cc6beb5f6db1c1fe99e"
+  },
+  "arp1_dependency": {
+    "module_path": "scripts/modelling/aptarank_io_preflight.py",
+    "module_sha256": "020ff616caade2983743eb941e7d4ce00d505f9bb349f10b428f98adb505263b",
+    "spec_path": "config/modelling/aptarank_io_spec.json",
+    "spec_sha256": "d32484b1dd0de0e344aa8cc5f5900fe1c184ab5261392f2dbfb941ba68d6d4a1",
+    "schema_version": "aptarank-io-arp1-draft-r3",
+    "modified_by_arp2b": false,
+    "role": "Mechanical upload, export, and failure validation is reused. ARP-1 is not modified. Both pinned hashes are enforced against the files."
+  },
+  "production_design_constants": {
+    "ref_calibration_cores": 113,
+    "eval_cores": 154,
+    "blinded_input_rows_before_technical_rejection": 308,
+    "eval_clusters_before_technical_rejection": 79,
+    "enforce_on_synthetic_fixtures": false,
+    "fixture_count_label": "synthetic",
+    "note": "These are production design constants. Synthetic fixture counts are labelled synthetic and are not checked against them."
+  },
+  "scoring_boundary": {
+    "scorer_owner": "deployed AptaRank UI",
+    "provisional_camera_ready_formula_adopted": false,
+    "local_recompute_normalized_mfe": false,
+    "local_recompute_ensemble_defect": false,
+    "local_recompute_positional_entropy": false,
+    "local_recompute_stem_fraction": false,
+    "local_recompute_gc_fraction": false,
+    "local_recompute_empirical_ref_calibration": false,
+    "local_recompute_composite_aptamer_likeness": false,
+    "local_recompute_dinucleotide_shuffles": false,
+    "local_recompute_shuffle_p_values": false
+  },
+  "interpretation_boundary": {
+    "binding_interpretation": false,
+    "affinity_interpretation": false,
+    "selectivity_interpretation": false,
+    "uniform_controls_are_synthetic_floor": true,
+    "aggregate_tier1_tier2_score": false,
+    "statement": "Uniform controls are a synthetic floor. This package does not interpret binding, affinity, or selectivity, and it defines no combined Tier 1 and Tier 2 score."
+  },
+  "private_key_contract": {
+    "fields": [
+      "candidate_id",
+      "class_label",
+      "pair_id",
+      "parent_core_id",
+      "cluster_id",
+      "length"
+    ],
+    "class_labels": [
+      "real",
+      "uniform_control"
+    ],
+    "join_uses_row_position": false,
+    "identifier_form": "nonempty opaque id with no whitespace, the ARP-1 acceptor",
+    "length_type": "positive JSON integer; booleans and floats are rejected",
+    "pair_rule": "Each pair has exactly two candidates, one real and one uniform_control, sharing pair_id, parent_core_id, cluster_id, and length. Each parent_core_id belongs to one pair_id. Distinct parent cores may share a cluster.",
+    "type_gate": "Identifier and length types are validated before set, sort, or candidate-id lookup."
+  },
+  "reconciliation_contract": {
+    "join_key": "candidate_id",
+    "join_uses_row_position": false,
+    "missing_results_are_zero": false,
+    "paired_difference_direction": "real_minus_control",
+    "reuses_arp1_mechanical_validation": true,
+    "disposition_rule": "Every expected candidate has exactly one validated exported score row or one explicit technical failure with a nonempty reason.",
+    "zero_score_rule": "A successful exported numeric score of 0 is a real numeric value.",
+    "token_rule": "Finite aptamer-likeness tokens are preserved. A nonempty group mean is the exact rational sum of those tokens divided by the count. An empty group stays undefined with denominator zero."
+  },
+  "report_contract": {
+    "aggregate_report_contains_sequences": false,
+    "candidate_level_biological_table": false,
+    "synthetic_diagnostics_may_name_fixture_ids": true,
+    "undefined_representation": "An empty group is null, denominator zero, undefined true, and an undefined reason. A defined rational mean is not labelled undefined.",
+    "exact_mean_representation": "exact_numerator and exact_denominator are the reduced integer fraction of the mean. Original score tokens are preserved. value is a terminating decimal string when the expansion terminates. A repeating mean may include decimal_approximation labelled with precision and rounding.",
+    "duplicate_sequence_scope": "Identical canonical A/C/G/U sequences under more than one candidate id are rejected inside the supplied candidate upload only. This does not compare an external known-core inventory and does not close U23.",
+    "reviewed_specification": "The public analysis path loads the on-disk specification and checks every pinned dependency. Caller-supplied specification objects and bytes are refused.",
+    "paired_effect_reported": "eligible count, real-minus-control direction, and blocked functional status"
+  },
+  "implemented": [
+    "Validate a synthetic private key before set, sort, or id lookup.",
+    "Reuse ARP-1 parsing and mechanical validation for uploads, export rows, and explicit failures.",
+    "Join validated export rows and explicit failures to the private key by opaque candidate id.",
+    "Account for every expected candidate exactly once.",
+    "Construct real and uniform_control pairs without using row position.",
+    "Distinguish group-level evaluable rows from complete pairs.",
+    "Preserve technical failures as missing technical outcomes and never as numeric zero.",
+    "Retain a successful exported score of zero as a numeric value.",
+    "Preserve finite aptamer-likeness tokens and represent each nonempty group arithmetic mean as an exact rational.",
+    "Require one parent_core_id for each pair_id.",
+    "Reject a repeated canonical sequence inside the supplied candidate upload without closing U23.",
+    "Report the pre-rejection cluster count from the private key.",
+    "Record the real-minus-control direction and the eligible paired-difference count.",
+    "Leave unresolved statistical and UI-dependent results blocked.",
+    "Record production design constants without enforcing them on synthetic fixtures."
+  ],
+  "blocked_outputs": [
+    {
+      "output": "median_and_iqr",
+      "blocking_ids": [
+        "U30"
+      ],
+      "reason": "Median and IQR stay blocked until the quantile convention in U30 is prespecified."
+    },
+    {
+      "output": "aggregate_paired_effect_functional_and_ci",
+      "blocking_ids": [
+        "U31"
+      ],
+      "reason": "The real-minus-control direction is fixed. The aggregate paired-effect functional and its confidence interval stay blocked by U31."
+    },
+    {
+      "output": "auroc",
+      "blocking_ids": [
+        "U29",
+        "U32"
+      ],
+      "reason": "AUROC stays blocked. Live score direction is U29 and tie handling is U32."
+    },
+    {
+      "output": "shuffle_pass_rates_or_interpretation",
+      "blocking_ids": [
+        "U19",
+        "U21",
+        "U33"
+      ],
+      "reason": "Shuffle tokens stay uninterpreted. Pass rates and shuffle interpretation stay blocked by U19, U21, and U33."
+    },
+    {
+      "output": "secondary_paired_test",
+      "blocking_ids": [
+        "U34"
+      ],
+      "reason": "The secondary paired test stays blocked by U34. No test is selected or computed."
+    },
+    {
+      "output": "bootstrap_intervals",
+      "blocking_ids": [
+        "U35",
+        "U36",
+        "U37",
+        "U38"
+      ],
+      "reason": "Bootstrap intervals stay blocked by U35, U36, U37, and U38. No resample is drawn."
+    },
+    {
+      "output": "component_table_without_verified_deployment",
+      "blocking_ids": [
+        "U1",
+        "U2",
+        "U3",
+        "U4",
+        "U5",
+        "U6",
+        "U7",
+        "U8",
+        "U9",
+        "U10",
+        "U11"
+      ],
+      "reason": "No component table is supplied by a verified deployment. Local component recomputation stays blocked."
+    },
+    {
+      "output": "local_scorer_recomputation",
+      "blocking_ids": [
+        "U1",
+        "U2",
+        "U3",
+        "U4",
+        "U5",
+        "U6",
+        "U7",
+        "U8",
+        "U9",
+        "U10",
+        "U11",
+        "U12",
+        "U13",
+        "U14",
+        "U15",
+        "U16",
+        "U17",
+        "U18",
+        "U19",
+        "U20",
+        "U21"
+      ],
+      "reason": "The deployed AptaRank UI is the scorer. Local recomputation of scorer internals stays blocked by U1 through U21."
+    },
+    {
+      "output": "uniform_control_generation",
+      "blocking_ids": [
+        "U22",
+        "U23",
+        "U24"
+      ],
+      "reason": "Uniform-control generation stays blocked by U22, U23, and U24."
+    },
+    {
+      "output": "opaque_production_ids",
+      "blocking_ids": [
+        "U25",
+        "U26"
+      ],
+      "reason": "Opaque production-id creation stays blocked by U25 and U26."
+    },
+    {
+      "output": "full_ranking_schema",
+      "blocking_ids": [
+        "U27",
+        "U28",
+        "U29"
+      ],
+      "reason": "A full-ranking schema stays blocked by U27, U28, and U29. ARP-1 is unchanged."
+    }
+  ],
+  "unresolved_ids": [
+    "U1",
+    "U2",
+    "U3",
+    "U4",
+    "U5",
+    "U6",
+    "U7",
+    "U8",
+    "U9",
+    "U10",
+    "U11",
+    "U12",
+    "U13",
+    "U14",
+    "U15",
+    "U16",
+    "U17",
+    "U18",
+    "U19",
+    "U20",
+    "U21",
+    "U22",
+    "U23",
+    "U24",
+    "U25",
+    "U26",
+    "U27",
+    "U28",
+    "U29",
+    "U30",
+    "U31",
+    "U32",
+    "U33",
+    "U34",
+    "U35",
+    "U36",
+    "U37",
+    "U38"
+  ],
+  "unresolved_register": [
+    {
+      "id": "U1",
+      "status": "unresolved",
+      "value": null,
+      "note": "The calibration grain, pooled across 113 REF cores or split by frozen length regime, is not chosen."
+    },
+    {
+      "id": "U2",
+      "status": "unresolved",
+      "value": null,
+      "note": "The empirical CDF formula and mid-rank tie rule remain provisional and are not adopted."
+    },
+    {
+      "id": "U3",
+      "status": "unresolved",
+      "value": null,
+      "note": "Lower-favoured direction is fixed. The transform into the CDF argument is not."
+    },
+    {
+      "id": "U4",
+      "status": "unresolved",
+      "value": null,
+      "note": "Stem fraction is centred on the REF median. The centrality algebra is not written."
+    },
+    {
+      "id": "U5",
+      "status": "unresolved",
+      "value": null,
+      "note": "The GC centrality reference point is not restated by the plan."
+    },
+    {
+      "id": "U6",
+      "status": "unresolved",
+      "value": null,
+      "note": "Treatment of values outside the REF sample is not adopted."
+    },
+    {
+      "id": "U7",
+      "status": "unresolved",
+      "value": null,
+      "note": "Numeric weights and the weighted-mean denominator are not adopted."
+    },
+    {
+      "id": "U8",
+      "status": "unresolved",
+      "value": null,
+      "note": "Missing-component policy inside the composite is not implemented."
+    },
+    {
+      "id": "U9",
+      "status": "unresolved",
+      "value": null,
+      "note": "Exported score range, direction, and rounding remain unverified."
+    },
+    {
+      "id": "U10",
+      "status": "unresolved",
+      "value": null,
+      "note": "Whether positional entropy is a mean is not fixed by the plan."
+    },
+    {
+      "id": "U11",
+      "status": "unresolved",
+      "value": null,
+      "note": "Component equations and folding settings are absent."
+    },
+    {
+      "id": "U12",
+      "status": "unresolved",
+      "value": null,
+      "note": "The structural components inside the shuffle subscore are not adopted."
+    },
+    {
+      "id": "U13",
+      "status": "unresolved",
+      "value": null,
+      "note": "The structural-subscore equation is absent."
+    },
+    {
+      "id": "U14",
+      "status": "unresolved",
+      "value": null,
+      "note": "The effective preset, including structure and shuffle counts, is unverified."
+    },
+    {
+      "id": "U15",
+      "status": "unresolved",
+      "value": null,
+      "note": "The shuffle seed and stream are not recorded."
+    },
+    {
+      "id": "U16",
+      "status": "unresolved",
+      "value": null,
+      "note": "The dinucleotide-preserving algorithm is named and not specified."
+    },
+    {
+      "id": "U17",
+      "status": "unresolved",
+      "value": null,
+      "note": "Shuffle comparison direction and inclusive counting are not adopted."
+    },
+    {
+      "id": "U18",
+      "status": "unresolved",
+      "value": null,
+      "note": "The plus-one p-value correction is not adopted."
+    },
+    {
+      "id": "U19",
+      "status": "unresolved",
+      "value": null,
+      "note": "Export pass is not bound to the p <= 0.05 rule."
+    },
+    {
+      "id": "U20",
+      "status": "unresolved",
+      "value": null,
+      "note": "Failed shuffles inside the UI are separate from an export technical failure and are unresolved."
+    },
+    {
+      "id": "U21",
+      "status": "unresolved",
+      "value": null,
+      "note": "Whether the export carries p-values, labels, or both is unverified."
+    },
+    {
+      "id": "U22",
+      "status": "unresolved",
+      "value": null,
+      "note": "The uniform-control generator and nucleotide index order are not chosen."
+    },
+    {
+      "id": "U23",
+      "status": "unresolved",
+      "value": null,
+      "note": "Known-core role membership and the digest function are not specified."
+    },
+    {
+      "id": "U24",
+      "status": "unresolved",
+      "value": null,
+      "note": "The resampling successor rule and attempt cap are not chosen."
+    },
+    {
+      "id": "U25",
+      "status": "unresolved",
+      "value": null,
+      "note": "The opaque candidate-id format is not frozen."
+    },
+    {
+      "id": "U26",
+      "status": "unresolved",
+      "value": null,
+      "note": "The opaque-id randomization seed and algorithm are not frozen."
+    },
+    {
+      "id": "U27",
+      "status": "unresolved",
+      "value": null,
+      "note": "No full-ranking export schema is tracked. ARP-1 is unchanged."
+    },
+    {
+      "id": "U28",
+      "status": "unresolved",
+      "value": null,
+      "note": "Consecutive ranks, rank ties, and monotonic score order are not checked as a ranking rule."
+    },
+    {
+      "id": "U29",
+      "status": "unresolved",
+      "value": null,
+      "note": "The live favourable direction of aptamer-likeness is unverified."
+    },
+    {
+      "id": "U30",
+      "status": "unresolved",
+      "value": null,
+      "note": "The median and IQR quantile convention is not selected."
+    },
+    {
+      "id": "U31",
+      "status": "unresolved",
+      "value": null,
+      "note": "The paired functional that receives the confidence interval is not selected."
+    },
+    {
+      "id": "U32",
+      "status": "unresolved",
+      "value": null,
+      "note": "AUROC tie handling is not specified."
+    },
+    {
+      "id": "U33",
+      "status": "unresolved",
+      "value": null,
+      "note": "The shuffle-rate denominator and paired pass difference are not specified."
+    },
+    {
+      "id": "U34",
+      "status": "unresolved",
+      "value": null,
+      "note": "The secondary paired test is not selected."
+    },
+    {
+      "id": "U35",
+      "status": "unresolved",
+      "value": null,
+      "note": "Bootstrap replacement, multiplicity, and core-versus-cluster weighting are not specified."
+    },
+    {
+      "id": "U36",
+      "status": "unresolved",
+      "value": null,
+      "note": "The percentile-interval endpoint convention is not selected."
+    },
+    {
+      "id": "U37",
+      "status": "unresolved",
+      "value": null,
+      "note": "The policy for undefined bootstrap replicates is not selected. Imputation as zero is forbidden."
+    },
+    {
+      "id": "U38",
+      "status": "unresolved",
+      "value": null,
+      "note": "Minimum evaluable counts for a defined result are not selected."
+    }
+  ],
+  "rules": {
+    "opaque_id": "Private-key identifiers are nonempty strings in the ARP-1 opaque-id form. Invalid identifier types fail before set, sort, or lookup.",
+    "length_type": "Length is a positive JSON integer. Booleans and floats are rejected, including integral floats.",
+    "unique_candidate_ids": "Candidate ids are unique in the private key and in the export.",
+    "pair_cardinality": "Each pair contains exactly two expected candidates, and every candidate belongs to one pair.",
+    "pair_class_composition": "Each pair contains exactly one real candidate and one uniform_control candidate.",
+    "pair_field_agreement": "Both members of a pair share pair_id, parent_core_id, cluster_id, and length. One parent_core_id maps to one pair_id.",
+    "join_by_candidate_id": "Export rows and failure records are joined to the private key by candidate id. Row position is not a join key.",
+    "exactly_one_disposition": "An id in both the export and the failure record, in neither, duplicated, missing, or unexpected fails closed.",
+    "zero_score_is_numeric": "A successful exported score of 0 remains evaluable and is not treated as missing.",
+    "technical_failure_not_zero": "A technical failure is a missing technical outcome with a nonempty reason. It is not stored as numeric zero.",
+    "no_row_position": "Permuting export rows does not change the accounting report.",
+    "production_counts_not_enforced_on_synthetic": "The constants 113, 154, 308, and 79 are recorded and are not enforced on synthetic fixtures.",
+    "no_local_rescoring": "Local code does not recompute normalized MFE, ensemble defect, positional entropy, stem fraction, GC fraction, empirical REF calibration, the composite, dinucleotide shuffles, or shuffle p-values.",
+    "no_aggregate_tier_score": "ARP-2B defines no combined Tier 1 and Tier 2 score.",
+    "no_binding_interpretation": "ARP-2B does not interpret binding, affinity, or selectivity.",
+    "one_parent_core_per_pair": "After identifier type validation, each parent_core_id belongs to exactly one pair_id. The two members of a pair share that parent core. Distinct parent cores may share a cluster. One parent core under two pair ids fails closed as duplicate_parent_core_across_pairs.",
+    "duplicate_candidate_sequence": "After ARP-1 parses and alphabet-validates the candidate upload, an identical canonical A/C/G/U sequence under more than one candidate id fails closed as duplicate_candidate_sequence. The check covers real/real, control/control, and real/control duplicates inside the supplied upload only. It does not compare an external known-core inventory and does not close U23.",
+    "exact_arithmetic_mean": "Every nonempty collection of finite exported scores has a defined exact rational mean. exact_numerator and exact_denominator are required. A terminating decimal may also be supplied. A repeating decimal approximation must be labelled with precision and rounding. An empty collection stays undefined with denominator zero. The sum does not use the default Decimal context.",
+    "reviewed_specification": "The public analysis path always loads the on-disk reviewed specification and enforces the governing-plan hash, the ARP-2A hash, the ARP-2B module hash, and the ARP-1 module and specification hashes. Caller-supplied specification objects and bytes cannot bypass that loader."
+  }
+}

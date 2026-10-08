@@ -1,0 +1,38 @@
+{
+  "fixture_role": "synthetic_private_key",
+  "count_label": "synthetic",
+  "candidates": [
+    {
+      "candidate_id": "SYN-REAL-01",
+      "class_label": "real",
+      "pair_id": "SYN-PAIR-01",
+      "parent_core_id": "SYN-PARENT-01",
+      "cluster_id": "SYN-CLUSTER-01",
+      "length": 16
+    },
+    {
+      "candidate_id": "SYN-CTRL-01",
+      "class_label": "uniform_control",
+      "pair_id": "SYN-PAIR-01",
+      "parent_core_id": "SYN-PARENT-01",
+      "cluster_id": "SYN-CLUSTER-01",
+      "length": 16
+    },
+    {
+      "candidate_id": "SYN-REAL-02",
+      "class_label": "real",
+      "pair_id": "SYN-PAIR-02",
+      "parent_core_id": "SYN-PARENT-02",
+      "cluster_id": "SYN-CLUSTER-02",
+      "length": 16
+    },
+    {
+      "candidate_id": "SYN-CTRL-02",
+      "class_label": "uniform_control",
+      "pair_id": "SYN-PAIR-02",
+      "parent_core_id": "SYN-PARENT-02",
+      "cluster_id": "SYN-CLUSTER-02",
+      "length": 16
+    }
+  ]
+}
