@@ -1,10 +1,13 @@
-# Unapplied M8 generation authorisation proposal for b1_block_b.
+# Unapplied M8 generation authorisation proposal for d1_seed43_block_a.
 # This file is not in the live checkout. It is not committed, pushed,
-# consumed, or launched. Assembly stays unauthorised. D1 generation stays
-# unauthorised. One generation entry is active and unconsumed.
+# consumed, or launched. Assembly stays unauthorised. B1 generation and
+# D1 seed-44 generation stay unauthorised. One generation entry is active
+# and unconsumed.
 # LD_LIBRARY_PATH is bound null. A later launch must bind
 # CUDA_VISIBLE_DEVICES=1 and CUDA_DEVICE_ORDER=PCI_BUS_ID.
 # An M7 configuration, schema, or authorisation id is not M8 authority.
+# B1 block B is in progress. Do not apply this proposal until that arm
+# completes and passes final verification.
 arms:
 - b1_block_a
 - b1_block_b
@@ -14,14 +17,14 @@ assembly_authorisation_entries: []
 assembly_manifest_schema_version: m8-assembly-manifest-1
 authorisation_entries:
 - activation_status: active_unconsumed
-  active_configuration_sha256: a4a111d0b64a566f4a7defcb665877677552aa134352249a5c631d3ae3e71080
-  arm: b1_block_b
-  asset_kind: b1
-  authorisation_id: m8_b1_block_b_ac371ba_gpu1_attempt1
-  authorization_parent_commit: c08be8839d9681d4f68b9242abcf9a7ff40c4d24
-  condition_id: B1_generic_released_rnagenesis
+  active_configuration_sha256: 36fdec928bf6a5b5199e3c41144e536653f84b4cdf4037ed3aa1af6e340705eb
+  arm: d1_seed43_block_a
+  asset_kind: d1
+  authorisation_id: m8_d1_seed43_block_a_ac371ba_gpu1_attempt1
+  authorization_parent_commit: f13e0849e19632181315bf5585ae585e16bbb127
+  condition_id: D1_mres_curated_aptamer_diffusion_adapted
   consumed: false
-  d1_training_seed: null
+  d1_training_seed: 43
   executing_implementation_commit: ac371ba274cbce21484ced78985f21902244e6cd
   gpu_uuid: GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f
   implementation_file_hashes:
@@ -41,14 +44,14 @@ authorisation_entries:
   logical_device: cuda:0
   minimum_free_filesystem_bytes: 10737418240
   minimum_free_gpu_memory_bytes: 103079215104
-  output_directory: /home/laura/rnagenesis-mres-runs/m8_b1_block_b_ac371ba_gpu1_attempt1
+  output_directory: /home/laura/rnagenesis-mres-runs/m8_d1_seed43_block_a_ac371ba_gpu1_attempt1
   pci_bus: 00000000:61:00.0
   physical_gpu: 1
   reuse_permitted: false
-  run_id: m8_b1_block_b_ac371ba_gpu1_attempt1
+  run_id: m8_d1_seed43_block_a_ac371ba_gpu1_attempt1
   run_root: /home/laura/rnagenesis-mres-runs
   single_use: true
-  technical_block: B
+  technical_block: A
 checkpoints:
   b1_generic:
     diffusion_relative: configs/rnagenesis/diffusion
