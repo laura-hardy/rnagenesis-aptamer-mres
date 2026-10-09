@@ -66,6 +66,7 @@ def generation_entry(arm, directory, run_root):
         "consumed": False,
         "d1_training_seed": spec["d1_training_seed"],
         "executing_implementation_commit": "b" * 40,
+        "gpu_sharing_policy": generation.GPU_SHARING_EXCLUSIVE,
         "gpu_uuid": "GPU-test",
         "implementation_file_hashes": implementation_file_hashes(),
         "interpreter_path": generation.PINNED_PYTHON,

@@ -1,11 +1,10 @@
-# M8 single-use generation authorisation for d1_seed44_block_b.
-# Assembly stays unauthorised. B1 generation stays unauthorised.
-# D1 seed-43 generation stays unauthorised. Exactly one generation
-# entry is active and unconsumed. Reuse is not permitted.
-# LD_LIBRARY_PATH is bound null. A launch must bind
-# CUDA_VISIBLE_DEVICES=1 and CUDA_DEVICE_ORDER=PCI_BUS_ID, and
-# LD_LIBRARY_PATH must be absent.
-# An M7 configuration, schema, or authorisation id is not M8 authority.
+# M8 shared-GPU implementation support. Inactive and non-consumable.
+# No generation authorisation and no assembly authorisation are active.
+# The former GPU 1 seed-44 block-B authorisation is recorded below as
+# unconsumed, not launched, and superseded before dispatch. It is not
+# executable. No GPU 0 authorisation is present. A later authorisation
+# must be a separate reviewed commit. An M7 configuration, schema, or
+# authorisation id is not M8 authority.
 arms:
 - b1_block_a
 - b1_block_b
@@ -13,43 +12,7 @@ arms:
 - d1_seed44_block_b
 assembly_authorisation_entries: []
 assembly_manifest_schema_version: m8-assembly-manifest-1
-authorisation_entries:
-- activation_status: active_unconsumed
-  active_configuration_sha256: 0f25902c51ffd693459b7c142e31123413aef29e2e80c9854be0c407893c12dd
-  arm: d1_seed44_block_b
-  asset_kind: d1
-  authorisation_id: m8_d1_seed44_block_b_ac371ba_gpu1_attempt1
-  authorization_parent_commit: acc7e244926fcb9336d35d29d0d767cf1afc5743
-  condition_id: D1_mres_curated_aptamer_diffusion_adapted
-  consumed: false
-  d1_training_seed: 44
-  executing_implementation_commit: ac371ba274cbce21484ced78985f21902244e6cd
-  gpu_uuid: GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f
-  implementation_file_hashes:
-    scripts/modelling/m8_assemble.py: 75d10d36dc0d653b5e0a5eac9f965c8b19a93459ebf884a05a648c95dfa876bb
-    scripts/modelling/m8_generation.py: 1a40ecb1cd3721a7b936d41cfb5cfe565a0640ecae6439faee8283354601a93f
-    scripts/modelling/m8_schedule.py: c76a2f0b44c1e264a7a23be666490dcc9b84fd482bbd1a8d08f9c6960c3294d7
-  interpreter_path: /home/laura/miniconda3/envs/rnagenesis-h200/bin/python
-  interpreter_resolved_path: /home/laura/miniconda3/envs/rnagenesis-h200/bin/python3.8
-  interpreter_sha256: 058a393acc1b0ee5d0564a6dca1e36f6602b4686b369ad957eca2b359d145059
-  ld_library_path: null
-  library_versions:
-    accelerate: 0.25.0
-    diffusers: 0.25.0
-    python: 3.8.13
-    torch: 2.1.2+cu121
-    transformers: 4.36.2
-  logical_device: cuda:0
-  minimum_free_filesystem_bytes: 10737418240
-  minimum_free_gpu_memory_bytes: 103079215104
-  output_directory: /home/laura/rnagenesis-mres-runs/m8_d1_seed44_block_b_ac371ba_gpu1_attempt1
-  pci_bus: 00000000:61:00.0
-  physical_gpu: 1
-  reuse_permitted: false
-  run_id: m8_d1_seed44_block_b_ac371ba_gpu1_attempt1
-  run_root: /home/laura/rnagenesis-mres-runs
-  single_use: true
-  technical_block: B
+authorisation_entries: []
 checkpoints:
   b1_generic:
     diffusion_relative: configs/rnagenesis/diffusion
@@ -76,12 +39,12 @@ checkpoints:
     weight_sha256: d0fcb5174230b8bbbc6bfe59eabda9b37687c03800012bc1a6981cc215469ed5
 closure:
   cleaner_invoked: false
-  execution_authorised: true
+  execution_authorised: false
   filtering_performed: false
   later_evaluation_required: true
-  m8_execution_authorised: true
+  m8_execution_authorised: false
   replacement_or_replenishment_performed: false
-consumable_by_executable_workflow: true
+consumable_by_executable_workflow: false
 deletion_implemented: false
 denied:
   evaluation_worktree: prohibited
@@ -97,15 +60,15 @@ denied:
   - ft_validation.csv
   - ref.csv
   - eval.csv
-document_status: M8_RAW_GENERATION_AUTHORISED_FOR_SINGLE_USE_EXECUTION
+document_status: M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED
 execution:
   assembly_authorised: false
-  authorised: true
+  authorised: false
   biological_paths_permitted: false
-  generation_authorised: true
-  gpu_identity_bound: true
+  generation_authorised: false
+  gpu_identity_bound: false
 experiment_id: M8_raw_generation
-manifest_schema_version: m8-arm-manifest-1
+manifest_schema_version: m8-arm-manifest-2
 pairing:
   b1_block_a: d1_seed43_block_a
   b1_block_b: d1_seed44_block_b
@@ -119,6 +82,28 @@ repository_identity:
   mres_commit: d0f9a397b536c64ca1b22662cc9ae36aea0101f6
   rnagenesis_branch: mres-d1-diffusion-finetune
   rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
+retired_unconsumed_authorisations:
+- activation_status: superseded_revoked_before_dispatch
+  authorisation_id: m8_d1_seed44_block_b_ac371ba_gpu1_attempt1
+  authorization_commit: e645925478e0110504f4dd8ce473a1a3be82d677
+  authorization_consumption_record_exists: false
+  authorization_parent_commit: acc7e244926fcb9336d35d29d0d767cf1afc5743
+  consumed: false
+  dispatch_occurred: false
+  executable: false
+  executing_implementation_commit: ac371ba274cbce21484ced78985f21902244e6cd
+  gpu_sharing_policy_at_refusal: exclusive
+  gpu_uuid: GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f
+  historical_commit_preserved: true
+  intended_output_directory: /home/laura/rnagenesis-mres-runs/m8_d1_seed44_block_b_ac371ba_gpu1_attempt1
+  launch_occurred: false
+  output_directory_created: false
+  pci_bus: 00000000:61:00.0
+  physical_gpu: 1
+  refusal_evidence_archive: /home/laura/m8-review-archives/m8_d1_seed44_block_b_launch_20261009T070756Z_569843
+  retirement_reason: exclusive_gpu_availability_gate_unsatisfied
+  sequence_generation_occurred: false
+  tmux_controller_started: false
 retention_minimum_date: '2026-11-01'
 retry_rule: new_id_authorisation_and_directory
 sampler:

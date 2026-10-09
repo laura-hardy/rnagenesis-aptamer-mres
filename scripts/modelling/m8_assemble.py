@@ -10,6 +10,16 @@ An authorised assembly accepts exactly two sealed arm manifests for one
 condition, re-checks every bound hash, and writes a canonical ledger sorted
 only by master attempt index. It does not parse, clean, filter, classify,
 deduplicate, or compute a metric.
+
+Historical ``m8-arm-manifest-1`` arms remain valid when they record exclusive
+use and zero compute processes. ``m8-arm-manifest-2`` arms must record the
+authorised sharing policy and the single pre-consumption compute-app
+observation. Assembly does not probe the GPU again. A positive pre-existing
+count is accepted only for ``shared_allowed`` when that evidence agrees and
+the recorded free-memory threshold passed. A selected-GPU row whose PID is
+empty, non-decimal, zero, negative, ``[N/A]``, or ``[Not Found]`` is refused
+by the shared evidence validator. An indeterminate row for another GPU is not
+counted. Pre-existing processes are not treated as generated-model processes.
 """
 
 from __future__ import annotations
@@ -252,11 +262,84 @@ def _validate_selected_set_chain(manifest, condition_id, block):
     return True
 
 
+def _arm_schema_version(manifest):
+    version = manifest.get("manifest_schema_version")
+    if version not in (generation.HISTORICAL_MANIFEST_SCHEMA_VERSION, generation.MANIFEST_SCHEMA_VERSION):
+        raise M8Error("assembly_invalid", "an arm manifest schema drifted", "assembly")
+    if manifest.get("schema_version") != version:
+        raise M8Error("assembly_invalid", "an arm manifest schema drifted", "assembly")
+    return version
+
+
+def _require_nonnegative_int(value, detail):
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise M8Error("assembly_invalid", detail, "assembly")
+    return value
+
+
+def _validate_arm_gpu(gpu, environment, schema_version):
+    """Accept historical exclusive evidence, or a complete sharing-policy record.
+
+    A historical manifest has no sharing-policy field. That absence is the
+    exclusive contract and requires a zero compute-process count. It is not
+    rewritten and it is not treated as shared use.
+    """
+    if not isinstance(gpu, dict) or gpu.get("logical_device") != generation.LOGICAL_DEVICE:
+        raise M8Error("assembly_invalid", "arm GPU provenance drifted", "assembly")
+    if schema_version == generation.HISTORICAL_MANIFEST_SCHEMA_VERSION:
+        if tuple(sorted(gpu)) != generation.HISTORICAL_GPU_KEYS:
+            raise M8Error("assembly_invalid", "arm GPU provenance drifted", "assembly")
+        if isinstance(gpu.get("compute_processes"), bool) or gpu.get("compute_processes") != 0:
+            raise M8Error("assembly_invalid", "an arm manifest records a compute process", "assembly")
+        memory_keys = ("memory_free_bytes", "memory_total_bytes", "minimum_free_memory_bytes")
+    elif schema_version == generation.MANIFEST_SCHEMA_VERSION:
+        if tuple(sorted(gpu)) != generation.ARM_GPU_KEYS:
+            raise M8Error("assembly_invalid", "arm GPU provenance drifted", "assembly")
+        policy = gpu.get("gpu_sharing_policy")
+        if policy not in generation.GPU_SHARING_POLICIES:
+            raise M8Error("assembly_invalid", "an arm GPU sharing policy is missing or unknown", "assembly")
+        count = gpu.get("preexisting_compute_process_count")
+        observed = gpu.get("preexisting_compute_applications_observed")
+        try:
+            generation.assert_compute_app_evidence(
+                gpu.get("compute_app_snapshot"),
+                gpu.get("compute_app_snapshot_sha256"),
+                gpu.get("uuid"),
+                count,
+                observed,
+            )
+        except M8Error as exc:
+            raise M8Error("assembly_invalid", exc.detail, "assembly")
+        if generation.TIMESTAMP_TEXT.fullmatch(str(gpu.get("observation_timestamp"))) is None:
+            raise M8Error("assembly_invalid", "an arm GPU observation timestamp is not exact", "assembly")
+        if policy == generation.GPU_SHARING_EXCLUSIVE and count != 0:
+            raise M8Error("assembly_invalid", "an exclusive arm records a pre-existing compute process", "assembly")
+        memory_keys = ("memory_free_bytes", "memory_total_bytes", "memory_used_bytes", "minimum_free_memory_bytes")
+    else:
+        raise M8Error("assembly_invalid", "an arm manifest schema drifted", "assembly")
+    if isinstance(gpu.get("physical_gpu"), bool) or not isinstance(gpu.get("physical_gpu"), int) or gpu.get("physical_gpu") < 0:
+        raise M8Error("assembly_invalid", "an arm GPU index is not a nonnegative integer", "assembly")
+    if not isinstance(gpu.get("uuid"), str) or gpu.get("uuid") == "" or len(gpu.get("uuid")) > 80:
+        raise M8Error("assembly_invalid", "an arm GPU identity is missing", "assembly")
+    if not isinstance(gpu.get("pci_bus"), str) or generation.PCI_BUS_TEXT.fullmatch(gpu.get("pci_bus")) is None:
+        raise M8Error("assembly_invalid", "an arm PCI identity is not exact", "assembly")
+    if str(environment.get("cuda_visible_devices")) != str(gpu.get("physical_gpu")):
+        raise M8Error("assembly_invalid", "an arm logical mapping does not match its GPU index", "assembly")
+    for key in memory_keys:
+        _require_nonnegative_int(gpu.get(key), "an arm GPU memory reading is not an integer byte count")
+    if gpu["minimum_free_memory_bytes"] < 1 or gpu["memory_free_bytes"] > gpu["memory_total_bytes"]:
+        raise M8Error("assembly_invalid", "an arm GPU memory relationship is impossible", "assembly")
+    if "memory_used_bytes" in gpu and gpu["memory_used_bytes"] > gpu["memory_total_bytes"]:
+        raise M8Error("assembly_invalid", "an arm GPU memory relationship is impossible", "assembly")
+    if gpu["memory_free_bytes"] < gpu["minimum_free_memory_bytes"]:
+        raise M8Error("assembly_invalid", "an arm GPU memory reading is below its threshold", "assembly")
+    return True
+
+
 def _check_arm(manifest, records, raw_by_relative, condition_id, block, built, arm_directory):
     if tuple(sorted(manifest)) != ARM_MANIFEST_KEYS:
         raise M8Error("assembly_invalid", "an arm manifest schema drifted", "assembly")
-    if manifest.get("manifest_schema_version") != generation.MANIFEST_SCHEMA_VERSION or manifest.get("schema_version") != generation.MANIFEST_SCHEMA_VERSION:
-        raise M8Error("assembly_invalid", "an arm manifest schema drifted", "assembly")
+    schema_version = _arm_schema_version(manifest)
     if manifest.get("completion_state") != "consumed_successfully":
         raise M8Error("assembly_invalid", "an arm manifest is not a successful seal", "assembly")
     if manifest.get("condition_id") != condition_id or manifest.get("block") != block:
@@ -323,36 +406,7 @@ def _check_arm(manifest, records, raw_by_relative, condition_id, block, built, a
         pass
     else:
         raise M8Error("assembly_invalid", "an arm library-path claim is contradictory", "assembly")
-    gpu = manifest.get("gpu")
-    gpu_keys = (
-        "compute_processes",
-        "logical_device",
-        "memory_free_bytes",
-        "memory_total_bytes",
-        "minimum_free_memory_bytes",
-        "pci_bus",
-        "physical_gpu",
-        "uuid",
-    )
-    if not isinstance(gpu, dict) or tuple(sorted(gpu)) != gpu_keys or gpu.get("logical_device") != generation.LOGICAL_DEVICE:
-        raise M8Error("assembly_invalid", "arm GPU provenance drifted", "assembly")
-    if isinstance(gpu.get("compute_processes"), bool) or gpu.get("compute_processes") != 0:
-        raise M8Error("assembly_invalid", "an arm manifest records a compute process", "assembly")
-    if isinstance(gpu.get("physical_gpu"), bool) or not isinstance(gpu.get("physical_gpu"), int) or gpu.get("physical_gpu") < 0:
-        raise M8Error("assembly_invalid", "an arm GPU index is not a nonnegative integer", "assembly")
-    if not isinstance(gpu.get("uuid"), str) or gpu.get("uuid") == "" or len(gpu.get("uuid")) > 80:
-        raise M8Error("assembly_invalid", "an arm GPU identity is missing", "assembly")
-    if not isinstance(gpu.get("pci_bus"), str) or generation.PCI_BUS_TEXT.fullmatch(gpu.get("pci_bus")) is None:
-        raise M8Error("assembly_invalid", "an arm PCI identity is not exact", "assembly")
-    if str(environment.get("cuda_visible_devices")) != str(gpu.get("physical_gpu")):
-        raise M8Error("assembly_invalid", "an arm logical mapping does not match its GPU index", "assembly")
-    for key in ("memory_free_bytes", "memory_total_bytes", "minimum_free_memory_bytes"):
-        if isinstance(gpu.get(key), bool) or not isinstance(gpu.get(key), int) or gpu.get(key) < 0:
-            raise M8Error("assembly_invalid", "an arm GPU memory reading is not an integer byte count", "assembly")
-    if gpu["minimum_free_memory_bytes"] < 1 or gpu["memory_free_bytes"] > gpu["memory_total_bytes"]:
-        raise M8Error("assembly_invalid", "an arm GPU memory relationship is impossible", "assembly")
-    if gpu["memory_free_bytes"] < gpu["minimum_free_memory_bytes"]:
-        raise M8Error("assembly_invalid", "an arm GPU memory reading is below its threshold", "assembly")
+    _validate_arm_gpu(manifest.get("gpu"), environment, schema_version)
     storage = manifest.get("storage")
     if not isinstance(storage, dict) or tuple(sorted(storage)) != ("filesystem_free_bytes", "minimum_free_bytes", "run_root"):
         raise M8Error("assembly_invalid", "arm storage provenance drifted", "assembly")

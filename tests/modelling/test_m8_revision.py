@@ -256,7 +256,10 @@ class ActiveDocumentTests(unittest.TestCase):
         self.assertEqual(manifest["environment"]["interpreter_sha256"], generation.PINNED_INTERPRETER_SHA256)
         self.assertEqual(manifest["environment"]["ld_library_path_sha256"], generation.sha256_bytes(LIBRARY_VALUE.encode("utf-8")))
         self.assertTrue(all(env.get("LD_LIBRARY_PATH") == LIBRARY_VALUE for env in deps.envs))
-        self.assertEqual(manifest["gpu"]["compute_processes"], 0)
+        self.assertEqual(manifest["gpu"]["gpu_sharing_policy"], generation.GPU_SHARING_EXCLUSIVE)
+        self.assertEqual(manifest["gpu"]["preexisting_compute_process_count"], 0)
+        self.assertFalse(manifest["gpu"]["preexisting_compute_applications_observed"])
+        self.assertEqual(manifest["manifest_schema_version"], generation.MANIFEST_SCHEMA_VERSION)
         self.assertGreaterEqual(manifest["storage"]["filesystem_free_bytes"], entry["minimum_free_filesystem_bytes"])
         self.assertFalse(manifest["asset_verification"]["members_copied"])
 
@@ -460,7 +463,7 @@ class RuntimeAndPreflightTests(unittest.TestCase):
     def test_gpu_and_storage_predicates_stop_before_consumption(self):
         entry = self._entry()
         probes = [
-            ("compute_processes", 1, "gpu_probe_invalid"),
+            ("preexisting_compute_process_count", 1, "gpu_probe_invalid"),
             ("uuid", "GPU-other", "gpu_probe_invalid"),
             ("pci_bus", "0000:11:22.0", "gpu_probe_invalid"),
             ("memory_free_bytes", 1, "gpu_probe_invalid"),

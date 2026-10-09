@@ -6,15 +6,29 @@ only print static text. ``--authorisation-id`` reads that configuration and
 refuses before any environment, Git, GPU, checkpoint, biological, run-root,
 or output inspection while the document is inactive.
 
-A future active entry describes exactly one of the four arms. This module
-does not call an M7 guardrail, a TRAIN-copy diagnostic, or the output cleaner.
-``generation.py`` is invoked and is not modified.
+A future active entry describes exactly one of the four arms and must name
+``gpu_sharing_policy`` as ``exclusive`` or ``shared_allowed``. Missing and
+unknown policies are rejected. Exclusive remains the only policy that the
+historical arm manifests satisfy, and only with zero pre-existing compute
+applications. A selected-GPU compute-app row counts only when its PID is a
+positive decimal integer. An empty, non-decimal, zero, negative, ``[N/A]``,
+or ``[Not Found]`` PID on that GPU is rejected. The production path queries
+GPU identity, processes, memory, and storage once during pre-consumption
+validation, before output creation and model generation, and does not repeat
+that probe after asset verification. The checked-in GPU 1 seed-44 block-B
+authorisation is a non-executable retirement record: unconsumed, not launched,
+and superseded before dispatch. This module does not call an M7 guardrail, a
+TRAIN-copy diagnostic, or the output cleaner. ``generation.py`` is invoked and
+is not modified. No probe path kills, signals, pauses, moves, or otherwise
+inspects or alters another process.
 """
 
 from __future__ import annotations
 
 import copy
+import csv
 import hashlib
+import io
 import json
 import os
 import re
@@ -44,8 +58,14 @@ DOCUMENT_STATUS = "M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED"
 ACTIVE_DOCUMENT_STATUS = "M8_RAW_GENERATION_AUTHORISED_FOR_SINGLE_USE_EXECUTION"
 ACTIVE_ASSEMBLY_STATUS = "M8_RAW_ASSEMBLY_AUTHORISED_FOR_SINGLE_USE_EXECUTION"
 SCHEMA_VERSION = "m8-raw-generation-config-1"
-MANIFEST_SCHEMA_VERSION = "m8-arm-manifest-1"
+HISTORICAL_MANIFEST_SCHEMA_VERSION = "m8-arm-manifest-1"
+MANIFEST_SCHEMA_VERSION = "m8-arm-manifest-2"
 ASSEMBLY_MANIFEST_SCHEMA_VERSION = "m8-assembly-manifest-1"
+GPU_SHARING_EXCLUSIVE = "exclusive"
+GPU_SHARING_SHARED_ALLOWED = "shared_allowed"
+GPU_SHARING_POLICIES = (GPU_SHARING_EXCLUSIVE, GPU_SHARING_SHARED_ALLOWED)
+COMPUTE_APP_COLUMNS = 4
+COMPUTE_APP_QUERY = "gpu_uuid,pid,process_name,used_gpu_memory"
 RECORD_SCHEMA_VERSION = "m8-raw-attempt-1"
 EXPERIMENT_ID = "M8_raw_generation"
 MRES_COMMIT = "d0f9a397b536c64ca1b22662cc9ae36aea0101f6"
@@ -151,6 +171,7 @@ ROOT_KEYS = (
     "record_schema",
     "repository_identity",
     "retention_minimum_date",
+    "retired_unconsumed_authorisations",
     "retry_rule",
     "sampler",
     "schedule_hashes",
@@ -351,6 +372,7 @@ ENTRY_KEYS = (
     "consumed",
     "d1_training_seed",
     "executing_implementation_commit",
+    "gpu_sharing_policy",
     "gpu_uuid",
     "implementation_file_hashes",
     "interpreter_path",
@@ -371,6 +393,74 @@ ENTRY_KEYS = (
     "technical_block",
 )
 INTERPRETER_BINDING_KEYS = ("path", "resolved_path", "sha256")
+GPU_PROBE_KEYS = (
+    "compute_app_snapshot",
+    "compute_app_snapshot_sha256",
+    "cuda_visible_devices",
+    "filesystem_free_bytes",
+    "logical_device",
+    "memory_free_bytes",
+    "memory_total_bytes",
+    "memory_used_bytes",
+    "observation_timestamp",
+    "pci_bus",
+    "physical_gpu",
+    "preexisting_compute_applications_observed",
+    "preexisting_compute_process_count",
+    "uuid",
+)
+HISTORICAL_GPU_KEYS = (
+    "compute_processes",
+    "logical_device",
+    "memory_free_bytes",
+    "memory_total_bytes",
+    "minimum_free_memory_bytes",
+    "pci_bus",
+    "physical_gpu",
+    "uuid",
+)
+ARM_GPU_KEYS = (
+    "compute_app_snapshot",
+    "compute_app_snapshot_sha256",
+    "gpu_sharing_policy",
+    "logical_device",
+    "memory_free_bytes",
+    "memory_total_bytes",
+    "memory_used_bytes",
+    "minimum_free_memory_bytes",
+    "observation_timestamp",
+    "pci_bus",
+    "physical_gpu",
+    "preexisting_compute_applications_observed",
+    "preexisting_compute_process_count",
+    "uuid",
+)
+# The checked-in retirement is not an authorisation entry and cannot be consumed.
+# It records the GPU 1 seed-44 block-B authorisation that the launch gate refused
+# before dispatch. The historical commit and the refusal archive stay in place.
+RETIRED_GPU1_SEED44_BLOCK_B = {
+    "activation_status": "superseded_revoked_before_dispatch",
+    "authorisation_id": "m8_d1_seed44_block_b_ac371ba_gpu1_attempt1",
+    "authorization_commit": "e645925478e0110504f4dd8ce473a1a3be82d677",
+    "authorization_consumption_record_exists": False,
+    "authorization_parent_commit": "acc7e244926fcb9336d35d29d0d767cf1afc5743",
+    "consumed": False,
+    "dispatch_occurred": False,
+    "executable": False,
+    "executing_implementation_commit": "ac371ba274cbce21484ced78985f21902244e6cd",
+    "gpu_sharing_policy_at_refusal": GPU_SHARING_EXCLUSIVE,
+    "gpu_uuid": "GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f",
+    "historical_commit_preserved": True,
+    "intended_output_directory": "/home/laura/rnagenesis-mres-runs/m8_d1_seed44_block_b_ac371ba_gpu1_attempt1",
+    "launch_occurred": False,
+    "output_directory_created": False,
+    "pci_bus": "00000000:61:00.0",
+    "physical_gpu": 1,
+    "refusal_evidence_archive": "/home/laura/m8-review-archives/m8_d1_seed44_block_b_launch_20261009T070756Z_569843",
+    "retirement_reason": "exclusive_gpu_availability_gate_unsatisfied",
+    "sequence_generation_occurred": False,
+    "tmux_controller_started": False,
+}
 PROVENANCE_KEYS = (
     "active_configuration_raw_sha256",
     "active_configuration_sha256",
@@ -503,15 +593,17 @@ def refuse_before_open(path, opener, bound_output=None, role="unspecified"):
     return opener(path)
 
 
-def _walk_keys(value):
+def _walk_keys(value, skipped=()):
     if isinstance(value, dict):
         for key, item in value.items():
             yield key
-            for nested in _walk_keys(item):
+            if key in skipped:
+                continue
+            for nested in _walk_keys(item, skipped):
                 yield nested
     elif isinstance(value, list):
         for item in value:
-            for nested in _walk_keys(item):
+            for nested in _walk_keys(item, skipped):
                 yield nested
 
 
@@ -610,6 +702,32 @@ def assert_shared_scientific_contract(document):
         raise M8Error("configuration_not_consumable", "closure claims filtering or a cleaner")
     if closure.get("replacement_or_replenishment_performed") is not False or closure.get("later_evaluation_required") is not True:
         raise M8Error("configuration_not_consumable", "closure accounting drifted")
+    assert_retirement_records(document)
+    return True
+
+
+def assert_retirement_records(document):
+    """The GPU 1 seed-44 block-B authorisation stays unconsumed and non-executable.
+
+    This record is not an authorisation entry. Launch never selects it.
+    """
+    records = document.get("retired_unconsumed_authorisations")
+    if records != [RETIRED_GPU1_SEED44_BLOCK_B]:
+        raise M8Error(
+            "configuration_not_consumable",
+            "the unconsumed GPU1 authorisation record is not the superseded retirement",
+        )
+    record = records[0]
+    if record["executable"] is not False or record["consumed"] is not False:
+        raise M8Error("configuration_not_consumable", "the retired GPU1 authorisation is marked executable or consumed")
+    if record["dispatch_occurred"] is not False or record["launch_occurred"] is not False:
+        raise M8Error("configuration_not_consumable", "the retired GPU1 authorisation is marked launched")
+    if record["sequence_generation_occurred"] is not False or record["output_directory_created"] is not False:
+        raise M8Error("configuration_not_consumable", "the retired GPU1 authorisation is marked as having run")
+    if record["activation_status"] != "superseded_revoked_before_dispatch":
+        raise M8Error("configuration_not_consumable", "the retired GPU1 authorisation is not superseded before dispatch")
+    if record["gpu_sharing_policy_at_refusal"] != GPU_SHARING_EXCLUSIVE:
+        raise M8Error("configuration_not_consumable", "the retired GPU1 authorisation was not an exclusive refusal")
     return True
 
 
@@ -625,7 +743,7 @@ def assert_inactive_configuration(document):
     closure = document.get("closure")
     if closure.get("execution_authorised") is not False or closure.get("m8_execution_authorised") is not False:
         raise M8Error("configuration_not_consumable", "closure does not keep execution unauthorised")
-    for key in _walk_keys(document):
+    for key in _walk_keys(document, ("retired_unconsumed_authorisations",)):
         if key in INACTIVE_FORBIDDEN_KEYS:
             raise M8Error("configuration_not_consumable", "inactive configuration carries a binding key")
     return True
@@ -813,7 +931,13 @@ def assert_child_interpreter(observed):
 
 
 def assert_generation_entry_schema(entry):
-    """Pure entry schema. This does not stat an output directory or open a repository."""
+    """Pure entry schema. This does not stat an output directory or open a repository.
+
+    ``gpu_sharing_policy`` is required. A missing key fails the exact field set
+    and does not become shared use. An unknown value is rejected. Only the
+    historical arm-manifest schema treats a missing policy as exclusive, and
+    only when its compute-process count is zero.
+    """
     if not isinstance(entry, dict) or tuple(sorted(entry)) != ENTRY_KEYS:
         raise M8Error("authorisation_field_missing", "the generation entry fields drifted")
     if entry["consumed"] is not False or entry["single_use"] is not True or entry["reuse_permitted"] is not False:
@@ -829,6 +953,8 @@ def assert_generation_entry_schema(entry):
         raise M8Error("authorisation_scope_invalid", "the entry seed or asset kind does not match the arm")
     if isinstance(entry["physical_gpu"], bool) or not isinstance(entry["physical_gpu"], int) or entry["physical_gpu"] < 0:
         raise M8Error("authorisation_scope_invalid", "the physical GPU index is invalid")
+    if entry.get("gpu_sharing_policy") not in GPU_SHARING_POLICIES:
+        raise M8Error("authorisation_scope_invalid", "the GPU sharing policy is missing or unknown")
     if entry["logical_device"] != LOGICAL_DEVICE:
         raise M8Error("authorisation_scope_invalid", "the logical device is not cuda:0")
     if not isinstance(entry["gpu_uuid"], str) or entry["gpu_uuid"] == "" or len(entry["gpu_uuid"]) > 80:
@@ -1519,20 +1645,117 @@ def assert_resolved_inside_directory(path, directory, deps):
     return resolved_path
 
 
+def parse_compute_app_snapshot(snapshot):
+    """Parse one ordinary nvidia-smi compute-app snapshot.
+
+    Rows are pre-existing compute applications. They are not generated-model
+    processes, and this parser does not signal or inspect them.
+    """
+    if not isinstance(snapshot, str) or "\x00" in snapshot:
+        raise M8Error("gpu_probe_invalid", "the compute-app snapshot is malformed", "gpu_probe")
+    if snapshot == "":
+        return []
+    if snapshot.strip() == "":
+        raise M8Error("gpu_probe_invalid", "the compute-app snapshot is malformed", "gpu_probe")
+    try:
+        parsed = list(csv.reader(io.StringIO(snapshot, newline="")))
+    except csv.Error:
+        raise M8Error("gpu_probe_invalid", "the compute-app snapshot is malformed", "gpu_probe")
+    rows = []
+    for row in parsed:
+        if not row or row == [""] or len(row) != COMPUTE_APP_COLUMNS:
+            raise M8Error("gpu_probe_invalid", "the compute-app snapshot is malformed", "gpu_probe")
+        cells = tuple(cell.strip() for cell in row)
+        if cells[0] == "":
+            raise M8Error("gpu_probe_invalid", "the compute-app snapshot is malformed", "gpu_probe")
+        rows.append(cells)
+    return rows
+
+
+# A counted PID is a decimal integer greater than zero, with no sign and no leading zero.
+POSITIVE_DECIMAL_PID = re.compile(r"[1-9][0-9]*")
+
+
+def selected_preexisting_compute_count(rows, uuid):
+    """Count selected-GPU rows whose PID is a positive decimal integer.
+
+    An empty, non-decimal, zero, negative, ``[N/A]``, or ``[Not Found]`` PID
+    on the selected GPU is malformed or indeterminate evidence and is rejected.
+    The same indeterminate PID on another GPU is not counted and does not
+    reject the selected GPU. This does not kill, signal, pause, move, or
+    inspect any process.
+    """
+    count = 0
+    for gpu_uuid, pid, _process_name, _used_memory in rows:
+        if gpu_uuid != uuid:
+            continue
+        if POSITIVE_DECIMAL_PID.fullmatch(pid) is None:
+            raise M8Error(
+                "gpu_probe_invalid",
+                "a selected-GPU compute-app row has a malformed or indeterminate PID",
+                "gpu_probe",
+            )
+        count += 1
+    return count
+
+
+def assert_compute_app_evidence(snapshot, digest, uuid, count, observed):
+    """The snapshot text, its SHA-256, the selected-GPU count, and the flag must agree.
+
+    Launch validation and assembly validation both use this function, so a
+    selected-GPU row with an indeterminate PID is refused in both places.
+    """
+    if not isinstance(digest, str) or SHA256_TEXT.fullmatch(digest) is None:
+        raise M8Error("gpu_probe_invalid", "the compute-app snapshot digest is missing", "gpu_probe")
+    if not isinstance(snapshot, str) or sha256_bytes(snapshot.encode("utf-8")) != digest:
+        raise M8Error("gpu_probe_invalid", "the compute-app snapshot digest does not match its text", "gpu_probe")
+    rows = parse_compute_app_snapshot(snapshot)
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        raise M8Error("gpu_probe_invalid", "the pre-existing compute-process count is not an integer", "gpu_probe")
+    if observed is not (count > 0):
+        raise M8Error("gpu_probe_invalid", "the pre-existing compute-application flag contradicts the count", "gpu_probe")
+    if selected_preexisting_compute_count(rows, uuid) != count:
+        raise M8Error("gpu_probe_invalid", "the compute-app snapshot does not match the selected GPU count", "gpu_probe")
+    return rows
+
+
+def zero_process_probe(entry, timestamp):
+    """A fresh zero-process observation. It is not a stored historical snapshot."""
+    snapshot = ""
+    return {
+        "compute_app_snapshot": snapshot,
+        "compute_app_snapshot_sha256": sha256_bytes(snapshot.encode("utf-8")),
+        "cuda_visible_devices": str(entry["physical_gpu"]),
+        "filesystem_free_bytes": entry["minimum_free_filesystem_bytes"],
+        "logical_device": LOGICAL_DEVICE,
+        "memory_free_bytes": entry["minimum_free_gpu_memory_bytes"],
+        "memory_total_bytes": entry["minimum_free_gpu_memory_bytes"],
+        "memory_used_bytes": 0,
+        "observation_timestamp": timestamp,
+        "pci_bus": entry["pci_bus"],
+        "physical_gpu": entry["physical_gpu"],
+        "preexisting_compute_applications_observed": False,
+        "preexisting_compute_process_count": 0,
+        "uuid": entry["gpu_uuid"],
+    }
+
+
 def assert_gpu_and_storage(entry, probe):
-    """Stop when identity or availability differs. This does not terminate or move any process."""
-    required = (
-        "compute_processes",
-        "cuda_visible_devices",
-        "filesystem_free_bytes",
-        "logical_device",
-        "memory_free_bytes",
-        "memory_total_bytes",
-        "pci_bus",
-        "physical_gpu",
-        "uuid",
-    )
-    if not isinstance(probe, dict) or tuple(sorted(probe)) != required:
+    """Stop when identity, sharing policy, memory, or storage differs.
+
+    Exclusive mode requires zero pre-existing compute applications on the
+    selected physical GPU. Shared mode permits a positive count only when the
+    entry itself says ``shared_allowed``. Either mode still requires the UUID,
+    PCI identity, physical index, free-memory threshold, and storage threshold.
+    This does not terminate, signal, pause, move, inspect, or alter any
+    process. The probe is the single pre-consumption observation. It is not
+    repeated after asset verification. A historical snapshot is not launch
+    authority.
+    """
+    policy = entry.get("gpu_sharing_policy")
+    if policy not in GPU_SHARING_POLICIES:
+        raise M8Error("authorisation_scope_invalid", "the GPU sharing policy is missing or unknown", "gpu_probe")
+    if not isinstance(probe, dict) or tuple(sorted(probe)) != GPU_PROBE_KEYS:
         raise M8Error("gpu_probe_invalid", "the GPU and storage probe is incomplete", "gpu_probe")
     if probe["logical_device"] != LOGICAL_DEVICE or probe["physical_gpu"] != entry["physical_gpu"]:
         raise M8Error("gpu_probe_invalid", "the GPU probe does not match the authorisation", "gpu_probe")
@@ -1542,19 +1765,51 @@ def assert_gpu_and_storage(entry, probe):
         raise M8Error("gpu_probe_invalid", "the PCI bus identity does not match the authorisation", "gpu_probe")
     if str(probe["cuda_visible_devices"]) != str(entry["physical_gpu"]):
         raise M8Error("gpu_probe_invalid", "the logical mapping is not cuda:0 on the selected GPU", "gpu_probe")
-    processes = probe["compute_processes"]
-    if isinstance(processes, bool) or not isinstance(processes, int) or processes != 0:
+    if TIMESTAMP_TEXT.fullmatch(str(probe.get("observation_timestamp"))) is None:
+        raise M8Error("gpu_probe_invalid", "the GPU observation timestamp is not exact", "gpu_probe")
+    count = probe["preexisting_compute_process_count"]
+    assert_compute_app_evidence(
+        probe["compute_app_snapshot"],
+        probe["compute_app_snapshot_sha256"],
+        probe["uuid"],
+        count,
+        probe["preexisting_compute_applications_observed"],
+    )
+    if policy == GPU_SHARING_EXCLUSIVE and count != 0:
         raise M8Error("gpu_probe_invalid", "the selected GPU has a compute process", "gpu_probe")
-    for key in ("memory_free_bytes", "memory_total_bytes", "filesystem_free_bytes"):
+    for key in ("memory_free_bytes", "memory_total_bytes", "memory_used_bytes", "filesystem_free_bytes"):
         if isinstance(probe[key], bool) or not isinstance(probe[key], int) or probe[key] < 0:
             raise M8Error("gpu_probe_invalid", "a capacity reading is not an integer byte count", "gpu_probe")
     if probe["memory_free_bytes"] > probe["memory_total_bytes"]:
         raise M8Error("gpu_probe_invalid", "free GPU memory exceeds the device total", "gpu_probe")
+    if probe["memory_used_bytes"] > probe["memory_total_bytes"]:
+        raise M8Error("gpu_probe_invalid", "used GPU memory exceeds the device total", "gpu_probe")
     if probe["memory_free_bytes"] < entry["minimum_free_gpu_memory_bytes"]:
         raise M8Error("gpu_probe_invalid", "free GPU memory is below the authorised threshold", "gpu_probe")
     if probe["filesystem_free_bytes"] < entry["minimum_free_filesystem_bytes"]:
         raise M8Error("insufficient_free_space", "free space at the run root is below the authorised threshold", "storage_probe")
     return dict(probe)
+
+
+def gpu_manifest_block(entry, probe):
+    """Manifest GPU evidence. Pre-existing processes are not model processes."""
+    checked = assert_gpu_and_storage(entry, probe)
+    return {
+        "compute_app_snapshot": checked["compute_app_snapshot"],
+        "compute_app_snapshot_sha256": checked["compute_app_snapshot_sha256"],
+        "gpu_sharing_policy": entry["gpu_sharing_policy"],
+        "logical_device": LOGICAL_DEVICE,
+        "memory_free_bytes": checked["memory_free_bytes"],
+        "memory_total_bytes": checked["memory_total_bytes"],
+        "memory_used_bytes": checked["memory_used_bytes"],
+        "minimum_free_memory_bytes": entry["minimum_free_gpu_memory_bytes"],
+        "observation_timestamp": checked["observation_timestamp"],
+        "pci_bus": checked["pci_bus"],
+        "physical_gpu": checked["physical_gpu"],
+        "preexisting_compute_applications_observed": checked["preexisting_compute_applications_observed"],
+        "preexisting_compute_process_count": checked["preexisting_compute_process_count"],
+        "uuid": checked["uuid"],
+    }
 
 
 def _selected_set_digest(rows):
@@ -1938,12 +2193,7 @@ def _manifest(
     if len(records) != schedule.BLOCK_ATTEMPT_TOTAL:
         raise M8Error("attempt_record_invalid", "an arm does not hold 15000 raw attempts", "manifest")
     if probe is None:
-        probe = {
-            "compute_processes": 0,
-            "filesystem_free_bytes": entry["minimum_free_filesystem_bytes"],
-            "memory_free_bytes": entry["minimum_free_gpu_memory_bytes"],
-            "memory_total_bytes": entry["minimum_free_gpu_memory_bytes"],
-        }
+        probe = zero_process_probe(entry, started)
     if provenance is None:
         raise M8Error("provenance_mismatch", "manifest provenance is missing", "manifest")
     if controller_interpreter is None or child_interpreter is None or selected_evidence is None:
@@ -2009,16 +2259,7 @@ def _manifest(
             "path": child_env.get("PATH"),
         },
         "filtering_performed": False,
-        "gpu": {
-            "compute_processes": probe["compute_processes"],
-            "logical_device": LOGICAL_DEVICE,
-            "memory_free_bytes": probe["memory_free_bytes"],
-            "memory_total_bytes": probe["memory_total_bytes"],
-            "minimum_free_memory_bytes": entry["minimum_free_gpu_memory_bytes"],
-            "pci_bus": entry["pci_bus"],
-            "physical_gpu": entry["physical_gpu"],
-            "uuid": entry["gpu_uuid"],
-        },
+        "gpu": gpu_manifest_block(entry, probe),
         "invocation_ledger": invocation_ledger,
         "later_evaluation_required": True,
         "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
@@ -2061,7 +2302,12 @@ def _manifest(
 
 
 def run_authorised_arm(entry, deps, raw_config_sha256=None):
-    """Run one future arm. Interpreter, repository, path, and GPU gates run before output consumption."""
+    """Run one future arm.
+
+    The GPU and storage probe runs once during pre-consumption validation,
+    before output creation and model generation. Checkpoint and asset
+    verification may follow that observation. The probe is not repeated.
+    """
     assert_generation_entry_schema(entry)
     assert_interpreter_binding(entry)
     if raw_config_sha256 is None:
@@ -2078,6 +2324,7 @@ def run_authorised_arm(entry, deps, raw_config_sha256=None):
         raise M8Error("runtime_identity", "library versions do not match the accepted runtime", "runtime_identity")
     library_record = resolve_ld_library_path(deps.environ, entry["ld_library_path"])
     assert_generation_filesystem_preflight(entry, deps)
+    # One observation. Checkpoint and asset checks below are not a second probe.
     probe = assert_gpu_and_storage(entry, deps.gpu_probe(deps.environ))
     if os.path.lexists(entry["output_directory"]):
         raise M8Error("output_directory_exists", "an active entry names an existing output directory", "output_directory")
@@ -2192,11 +2439,15 @@ def launch_authorised_generation(authorisation_id, config_bytes=None, deps=None)
 HELP_TEXT = """\
 M8 raw generation is ready for review and is not authorised.
 
-The checked-in configuration is inactive and non-consumable. This entry
-point accepts only --help, --schema and --authorisation-id <id>. The last
-reads only the M8 configuration and refuses with execution_not_authorised
-before the environment, Git, a GPU, a checkpoint, a biological path, the
-run root, or an output directory is inspected. It cannot execute.
+The checked-in configuration is inactive and non-consumable. It holds no
+generation authorisation and no assembly authorisation. The former GPU 1
+seed-44 block-B authorisation is recorded as unconsumed and superseded
+before dispatch, and it cannot be consumed. No GPU 0 authorisation is
+present. This entry point accepts only --help, --schema and
+--authorisation-id <id>. The last reads only the M8 configuration and
+refuses with execution_not_authorised before the environment, Git, a GPU,
+a checkpoint, a biological path, the run root, or an output directory is
+inspected. It cannot execute.
 """
 
 
@@ -2206,6 +2457,8 @@ def schema_document():
         "assembly_manifest_schema_version": ASSEMBLY_MANIFEST_SCHEMA_VERSION,
         "document_status": DOCUMENT_STATUS,
         "execution_authorised": False,
+        "gpu_sharing_policies": list(GPU_SHARING_POLICIES),
+        "historical_manifest_schema_version": HISTORICAL_MANIFEST_SCHEMA_VERSION,
         "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
         "raw_record_keys": list(RAW_RECORD_KEYS),
         "record_schema_version": RECORD_SCHEMA_VERSION,
@@ -2447,12 +2700,19 @@ class ProductionDeps(object):
         }
 
     def gpu_probe(self, environ):
+        """The single nvidia-smi observation for this launch.
+
+        It runs when pre-consumption validation asks for it. Callers do not
+        invoke it again after asset verification. This does not signal, pause,
+        move, or inspect another process. A previously saved CSV is not read
+        and is not launch authority.
+        """
         import subprocess
 
         query = subprocess.run(
             [
                 "/usr/bin/nvidia-smi",
-                "--query-gpu=index,uuid,pci.bus_id,memory.total,memory.free",
+                "--query-gpu=index,uuid,pci.bus_id,memory.total,memory.used,memory.free",
                 "--format=csv,noheader,nounits",
             ],
             check=False,
@@ -2461,7 +2721,11 @@ class ProductionDeps(object):
             env={"PATH": FIXED_CHILD_PATH, "LC_ALL": "C"},
         )
         apps = subprocess.run(
-            ["/usr/bin/nvidia-smi", "--query-compute-apps=gpu_uuid,pid", "--format=csv,noheader"],
+            [
+                "/usr/bin/nvidia-smi",
+                "--query-compute-apps=" + COMPUTE_APP_QUERY,
+                "--format=csv,noheader",
+            ],
             check=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -2469,33 +2733,48 @@ class ProductionDeps(object):
         )
         if query.returncode != 0 or apps.returncode != 0:
             raise M8Error("gpu_probe_invalid", "the GPU probe failed", "gpu_probe")
+        try:
+            query_text = query.stdout.decode("utf-8")
+            snapshot = apps.stdout.decode("utf-8")
+        except UnicodeDecodeError:
+            raise M8Error("gpu_probe_invalid", "the GPU probe was not UTF-8", "gpu_probe")
         visible = environ.get("CUDA_VISIBLE_DEVICES")
         selected = None
-        for line in query.stdout.decode("utf-8").splitlines():
-            parts = [part.strip() for part in line.split(",")]
-            if len(parts) != 5:
+        for line in query_text.splitlines():
+            if line.strip() == "":
                 continue
+            parts = [part.strip() for part in line.split(",")]
+            if len(parts) != 6 or not parts[0].isdigit():
+                raise M8Error("gpu_probe_invalid", "a GPU query row is malformed", "gpu_probe")
             if parts[0] == visible:
                 selected = parts
                 break
         if selected is None:
             raise M8Error("gpu_probe_invalid", "the authorised GPU was not probed", "gpu_probe")
         uuid = selected[1]
-        processes = 0
-        for line in apps.stdout.decode("utf-8").splitlines():
-            app_parts = [part.strip() for part in line.split(",")]
-            if len(app_parts) >= 2 and app_parts[0] == uuid and app_parts[1] not in ("", "[N/A]"):
-                processes += 1
+        rows = parse_compute_app_snapshot(snapshot)
+        count = selected_preexisting_compute_count(rows, uuid)
         filesystem = os.statvfs(RUN_ROOT)
+
+        def mib_to_bytes(text):
+            if not isinstance(text, str) or text.isdigit() is False:
+                raise M8Error("gpu_probe_invalid", "a GPU memory reading is not an integer", "gpu_probe")
+            return int(text) * 1024 * 1024
+
         return {
-            "compute_processes": processes,
+            "compute_app_snapshot": snapshot,
+            "compute_app_snapshot_sha256": sha256_bytes(snapshot.encode("utf-8")),
             "cuda_visible_devices": visible,
             "filesystem_free_bytes": int(filesystem.f_bavail) * int(filesystem.f_frsize),
             "logical_device": LOGICAL_DEVICE,
-            "memory_free_bytes": int(selected[4]) * 1024 * 1024,
-            "memory_total_bytes": int(selected[3]) * 1024 * 1024,
+            "memory_free_bytes": mib_to_bytes(selected[5]),
+            "memory_total_bytes": mib_to_bytes(selected[3]),
+            "memory_used_bytes": mib_to_bytes(selected[4]),
+            "observation_timestamp": self.now(),
             "pci_bus": selected[2],
             "physical_gpu": int(selected[0]),
+            "preexisting_compute_applications_observed": count > 0,
+            "preexisting_compute_process_count": count,
             "uuid": uuid,
         }
 

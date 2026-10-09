@@ -11721,3 +11721,29 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 **Boundary:** This revision was prepared in an isolated tree. It was not staged, committed, pushed, or copied onto either live checkout.
 
+## 2026-10-09 — M8 shared-GPU implementation and GPU1 revocation proposal (inactive; not applied)
+
+**Stage:** Aim 2 / modelling / M8 raw B1 and D1 generation
+
+**Status:** `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This proposal is inactive. It does not authorise generation, assembly, physical GPU 0, or a run directory. It was prepared in an isolated clone and was not committed, pushed, launched, or copied onto either live checkout.
+
+**Retired authorisation.** `m8_d1_seed44_block_b_ac371ba_gpu1_attempt1`, commit `e645925478e0110504f4dd8ce473a1a3be82d677`, is recorded as unconsumed, not launched, and superseded before dispatch. The exclusive-GPU availability gate refused it because physical GPU 1 had other compute processes. Dispatch did not occur, no controller started, no output directory was created, no consumption record exists, and no sequence was generated. That was a resource-gate refusal, not a model or scientific failure. The historical commit and the refusal archive are preserved. The authorisation is not executable. No GPU 0 authorisation entry is present.
+
+**Sharing policy.** An active generation entry must name `gpu_sharing_policy` as `exclusive` or `shared_allowed`. Absence is rejected for a new entry and does not enable sharing. `exclusive` still requires zero pre-existing compute applications on the selected GPU. `shared_allowed` permits a positive count only when that entry says so. GPU identity, processes, memory, and storage are observed once during pre-consumption validation, before output creation and model generation, and that observation is not repeated after asset verification. The launch does not terminate or signal another process. Historical `m8-arm-manifest-1` B1 and seed-43 manifests remain valid without rewriting. New manifests use `m8-arm-manifest-2` and record that single observation: the policy, the pre-existing count, the compute-app snapshot and its SHA-256, the observation time, and the selected GPU memory readings. Pre-existing processes are not generated-model processes.
+
+**Method.** Shared execution is an operational and resource-management deviation. It does not change the D1 seed-44 checkpoint, epoch 5, update 105, weight SHA-256 `d0fcb5174230b8bbbc6bfe59eabda9b37687c03800012bc1a6981cc215469ed5`, the 15,000 raw attempts, the block-B schedule, the 164 invocations, or generation seeds 900000–900163. It may change wall-clock runtime and it raises interruption and resource-contention risk. It does not by itself justify a biological or model-quality conclusion. The recommended later GPU 0 free-memory threshold is 30 GiB, exactly 32212254720 bytes, stored on that future authorisation rather than hard-coded. It is a point-in-time safety gate on the single pre-consumption observation, not a reservation or a guarantee against later growth.
+
+**Boundary:** No CUDA initialisation, no `nvidia-smi` launch probe, no output directory, and no generation were performed for this proposal.
+
+## 2026-10-09 — M8 shared-GPU selected-GPU PID correction (inactive; not applied)
+
+**Stage:** Aim 2 / modelling / M8 raw B1 and D1 generation
+
+**Status:** `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This revision stays inactive. It does not authorise generation, assembly, physical GPU 0, or a run directory. It was prepared in an isolated clone and was not committed, pushed, launched, or copied onto either live checkout. The previous proposal archive remains immutable.
+
+**Process rows.** `selected_preexisting_compute_count` counts every selected-GPU compute-app row whose PID is a positive decimal integer. A selected-GPU row whose PID is empty, non-decimal, zero, negative, `[N/A]`, or `[Not Found]` is rejected as malformed or indeterminate evidence. An indeterminate row for another GPU does not increment the selected-GPU count and does not by itself prevent use of the selected GPU. Production launch validation and assembly validation apply that rule through `assert_compute_app_evidence`. No path kills, signals, pauses, moves, or otherwise inspects or alters another process.
+
+**Single probe.** The GPU and storage probe still occurs once during pre-consumption validation, before output creation and model generation. It is not repeated after asset verification. Checkpoint and asset verification may occur between that observation and output-directory consumption. Concurrent workloads may grow after the observation. The 30 GiB figure remains an authorisation-level recommendation and a point-in-time safety gate. The manifest records that single observation. This revision does not add a second probe.
+
+**Boundary:** No CUDA initialisation, no `nvidia-smi`, no output directory, no authorisation consumption, and no generation were performed for this revision.
+

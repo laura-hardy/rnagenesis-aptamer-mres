@@ -126,16 +126,22 @@ class FakeDeps(object):
         return FakeCompleted(0)
 
     def gpu_probe(self, environ):
+        snapshot = ""
         return {
-            "compute_processes": 0,
-            "cuda_visible_devices": "1",
+            "compute_app_snapshot": snapshot,
+            "compute_app_snapshot_sha256": generation.sha256_bytes(snapshot.encode("utf-8")),
+            "cuda_visible_devices": str(self.entry["physical_gpu"]),
             "filesystem_free_bytes": 10 ** 12,
             "logical_device": "cuda:0",
             "memory_free_bytes": 10 ** 12,
             "memory_total_bytes": 2 * 10 ** 12,
-            "pci_bus": "0000:00:00.0",
-            "physical_gpu": 1,
-            "uuid": "GPU-test",
+            "memory_used_bytes": 10 ** 12,
+            "observation_timestamp": "2026-10-08T00:00:01+00:00",
+            "pci_bus": self.entry["pci_bus"],
+            "physical_gpu": self.entry["physical_gpu"],
+            "preexisting_compute_applications_observed": False,
+            "preexisting_compute_process_count": 0,
+            "uuid": self.entry["gpu_uuid"],
         }
 
     def library_versions(self):
@@ -242,11 +248,22 @@ class InactiveAndArgvTests(unittest.TestCase):
     def test_checked_in_configuration_is_inactive(self):
         document = generation.parse_config(generation.read_m8_config_bytes())
         generation.assert_inactive_configuration(document)
+        self.assertEqual(document["authorisation_entries"], [])
+        self.assertEqual(document["assembly_authorisation_entries"], [])
+        self.assertEqual(document["retired_unconsumed_authorisations"], [generation.RETIRED_GPU1_SEED44_BLOCK_B])
+        retired = document["retired_unconsumed_authorisations"][0]
+        self.assertFalse(retired["executable"])
+        self.assertFalse(retired["consumed"])
+        self.assertFalse(retired["dispatch_occurred"])
+        self.assertFalse(retired["launch_occurred"])
+        self.assertEqual(retired["activation_status"], "superseded_revoked_before_dispatch")
         text = generation.read_m8_config_bytes().decode("utf-8")
         self.assertNotIn("ld_library_path:", text.lower())
         self.assertNotIn(generation.PINNED_PYTHON, text)
-        self.assertNotIn("output_directory:", text)
-        self.assertNotIn("cuda:", text.lower())
+        self.assertNotIn("shared_allowed", text)
+        self.assertNotIn("GPU-b3c42ea9-ec47-c854-e469-cd78e443c76b", text)
+        self.assertNotIn("activation_status: active_unconsumed", text)
+        self.assertFalse(os.path.lexists(retired["intended_output_directory"]))
 
     def test_active_entry_cannot_name_an_existing_directory(self):
         with tempfile.TemporaryDirectory() as root:

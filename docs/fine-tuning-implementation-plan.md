@@ -1779,7 +1779,7 @@ Review seed consistency and freeze D1 training.
 
 ### M8 — Raw B1 and D1 generation
 
-**Status: M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED.** The inactive proposal is [M8 raw generation](fine_tuning/m8_raw_generation.md). No M8 execution is authorised. The checked-in configuration binds no GPU, interpreter, library path, timestamp, or output directory.
+**Status: M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED.** The inactive proposal is [M8 raw generation](fine_tuning/m8_raw_generation.md). No M8 execution is authorised. The checked-in configuration has no active generation entry and no active assembly entry. The unused GPU 1 seed-44 block-B authorisation is recorded as unconsumed and superseded before dispatch. It is not executable. Shared GPU execution is implemented only as a future per-authorisation policy, `exclusive` or `shared_allowed`. Exclusive remains the default. This revision does not authorise physical GPU 0. Shared execution would be an operational deviation: it can change wall-clock runtime and contention risk, and it does not change sampling, checkpoint selection, or evaluation criteria.
 
 **Objective**  
 Produce and seal raw B1 and D1 pools only. Parsing, filtering, clustering, representation analysis, and the four-condition comparison occur later under a common frozen evaluation protocol. They are not part of M8.
