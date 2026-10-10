@@ -1,4 +1,4 @@
-# M8 CPU-only D1 assembly authorisation proposal.
+# M8 CPU-only B1 assembly authorisation proposal.
 # This file is a proposal. It has not been applied, committed, consumed, or launched.
 # Generation stays unauthorised. Assembly is the single authorised use.
 # gpu_identity_bound is false. No GPU, CUDA device, or interpreter is bound.
@@ -16,30 +16,30 @@ arms:
 - d1_seed44_block_b
 assembly_authorisation_entries:
 - activation_status: active_unconsumed
-  active_configuration_sha256: 0a2fdff722eaad87b0a91066fb6702edd5c213f4f15930ad10155a3013a6cbaf
-  authorisation_id: m8_d1_combined_1069b63_cpu_attempt1
-  authorization_parent_commit: 02b273955a5db4b5439c4fc12038aac911371e9c
-  condition_id: D1_mres_curated_aptamer_diffusion_adapted
+  active_configuration_sha256: 233233c5c67551bbedeb68943bb755c6de1ff8fe7ffa51788309bab7a2a78521
+  authorisation_id: m8_b1_combined_1069b63_cpu_attempt1
+  authorization_parent_commit: c9a8cfc8cb2d720fdab8743bed088e8f900c3198
+  condition_id: B1_generic_released_rnagenesis
   consumed: false
-  executing_implementation_commit: 02b273955a5db4b5439c4fc12038aac911371e9c
+  executing_implementation_commit: c9a8cfc8cb2d720fdab8743bed088e8f900c3198
   implementation_file_hashes:
     scripts/modelling/m8_assemble.py: 686a1605dfdcbbe868a190b473b312818a17c400c1c0f96744076bf5d9d331c9
     scripts/modelling/m8_generation.py: e9d4eacdba7b2de531d51a94e3a94d31c4445b7125ba3e652517606dc7eedbc2
     scripts/modelling/m8_schedule.py: c76a2f0b44c1e264a7a23be666490dcc9b84fd482bbd1a8d08f9c6960c3294d7
   ld_library_path: null
-  output_directory: /home/laura/rnagenesis-mres-runs/m8_d1_combined_1069b63_cpu_attempt1
+  output_directory: /home/laura/rnagenesis-mres-runs/m8_b1_combined_1069b63_cpu_attempt1
   reuse_permitted: false
   run_root: /home/laura/rnagenesis-mres-runs
   single_use: true
   sources:
   - block: A
-    byte_count: 66078
-    path: /home/laura/rnagenesis-mres-runs/m8_d1_seed43_block_a_ac371ba_gpu1_attempt1/m8_arm_manifest.json
-    sha256: a0fde7024662ee13837e6f99b163711263b60d55fa6c60b8012db53f93873e52
+    byte_count: 64993
+    path: /home/laura/rnagenesis-mres-runs/m8_b1_block_a_ac371ba_gpu1_attempt1/m8_arm_manifest.json
+    sha256: bb788e862d6a7c41e8b942d53e8121d2d19722574d4956b4c2c2644f392931b9
   - block: B
-    byte_count: 67055
-    path: /home/laura/rnagenesis-mres-runs/m8_d1_seed44_block_b_1069b63_gpu0_shared_attempt1/m8_arm_manifest.json
-    sha256: f38aebd53e08c9012af5c4faa8a51a07ca39538dd1ccfcd26d003719b6ea5ca3
+    byte_count: 65352
+    path: /home/laura/rnagenesis-mres-runs/m8_b1_block_b_ac371ba_gpu1_attempt1/m8_arm_manifest.json
+    sha256: d51be51bbf10a90ca7ff809403f38007167a7cdd72704473a0dd39a2bb8510e7
 assembly_manifest_schema_version: m8-assembly-manifest-1
 authorisation_entries: []
 checkpoints:
