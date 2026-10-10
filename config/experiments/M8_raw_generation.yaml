@@ -1,61 +1,47 @@
-# M8 authorisation proposal for d1_seed44_block_b on shared physical GPU 0.
+# M8 CPU-only D1 assembly authorisation proposal.
 # This file is a proposal. It has not been applied, committed, consumed, or launched.
-# Assembly stays unauthorised. Reuse and resume stay unauthorised.
-# LD_LIBRARY_PATH is null. A later separately authorised launch must bind
-# CUDA_VISIBLE_DEVICES=0 and CUDA_DEVICE_ORDER=PCI_BUS_ID, and
-# LD_LIBRARY_PATH must be absent.
-# gpu_sharing_policy is shared_allowed.
-# minimum_free_gpu_memory_bytes is 32212254720.
+# Generation stays unauthorised. Assembly is the single authorised use.
+# gpu_identity_bound is false. No GPU, CUDA device, or interpreter is bound.
+# LD_LIBRARY_PATH is null. CPU assembly does not bind a library path.
 # The future authorisation commit is omitted from this file.
 # Execution derives it from live HEAD and requires origin/main to equal HEAD.
 # The entry stores the semantic configuration identity.
 # The raw YAML SHA-256 is recorded beside this file, after serialization.
 # retired_unconsumed_authorisations retains the GPU1 record unchanged.
+# Biological paths stay prohibited. Filtering, replacement, and replenishment stay false.
 arms:
 - b1_block_a
 - b1_block_b
 - d1_seed43_block_a
 - d1_seed44_block_b
-assembly_authorisation_entries: []
-assembly_manifest_schema_version: m8-assembly-manifest-1
-authorisation_entries:
+assembly_authorisation_entries:
 - activation_status: active_unconsumed
-  active_configuration_sha256: 7f1c2a47f41f1733a0e6ef8c8d7f6026dbd9259edb55aaf026c77ab7cd8603bd
-  arm: d1_seed44_block_b
-  asset_kind: d1
-  authorisation_id: m8_d1_seed44_block_b_1069b63_gpu0_shared_attempt1
-  authorization_parent_commit: 1069b6311f327bee6f0831fae5b42b47181b450d
+  active_configuration_sha256: 0a2fdff722eaad87b0a91066fb6702edd5c213f4f15930ad10155a3013a6cbaf
+  authorisation_id: m8_d1_combined_1069b63_cpu_attempt1
+  authorization_parent_commit: 02b273955a5db4b5439c4fc12038aac911371e9c
   condition_id: D1_mres_curated_aptamer_diffusion_adapted
   consumed: false
-  d1_training_seed: 44
-  executing_implementation_commit: 1069b6311f327bee6f0831fae5b42b47181b450d
-  gpu_sharing_policy: shared_allowed
-  gpu_uuid: GPU-b3c42ea9-ec47-c854-e469-cd78e443c76b
+  executing_implementation_commit: 02b273955a5db4b5439c4fc12038aac911371e9c
   implementation_file_hashes:
     scripts/modelling/m8_assemble.py: 686a1605dfdcbbe868a190b473b312818a17c400c1c0f96744076bf5d9d331c9
     scripts/modelling/m8_generation.py: e9d4eacdba7b2de531d51a94e3a94d31c4445b7125ba3e652517606dc7eedbc2
     scripts/modelling/m8_schedule.py: c76a2f0b44c1e264a7a23be666490dcc9b84fd482bbd1a8d08f9c6960c3294d7
-  interpreter_path: /home/laura/miniconda3/envs/rnagenesis-h200/bin/python
-  interpreter_resolved_path: /home/laura/miniconda3/envs/rnagenesis-h200/bin/python3.8
-  interpreter_sha256: 058a393acc1b0ee5d0564a6dca1e36f6602b4686b369ad957eca2b359d145059
   ld_library_path: null
-  library_versions:
-    accelerate: 0.25.0
-    diffusers: 0.25.0
-    python: 3.8.13
-    torch: 2.1.2+cu121
-    transformers: 4.36.2
-  logical_device: cuda:0
-  minimum_free_filesystem_bytes: 10737418240
-  minimum_free_gpu_memory_bytes: 32212254720
-  output_directory: /home/laura/rnagenesis-mres-runs/m8_d1_seed44_block_b_1069b63_gpu0_shared_attempt1
-  pci_bus: '00000000:41:00.0'
-  physical_gpu: 0
+  output_directory: /home/laura/rnagenesis-mres-runs/m8_d1_combined_1069b63_cpu_attempt1
   reuse_permitted: false
-  run_id: m8_d1_seed44_block_b_1069b63_gpu0_shared_attempt1
   run_root: /home/laura/rnagenesis-mres-runs
   single_use: true
-  technical_block: B
+  sources:
+  - block: A
+    byte_count: 66078
+    path: /home/laura/rnagenesis-mres-runs/m8_d1_seed43_block_a_ac371ba_gpu1_attempt1/m8_arm_manifest.json
+    sha256: a0fde7024662ee13837e6f99b163711263b60d55fa6c60b8012db53f93873e52
+  - block: B
+    byte_count: 67055
+    path: /home/laura/rnagenesis-mres-runs/m8_d1_seed44_block_b_1069b63_gpu0_shared_attempt1/m8_arm_manifest.json
+    sha256: f38aebd53e08c9012af5c4faa8a51a07ca39538dd1ccfcd26d003719b6ea5ca3
+assembly_manifest_schema_version: m8-assembly-manifest-1
+authorisation_entries: []
 checkpoints:
   b1_generic:
     diffusion_relative: configs/rnagenesis/diffusion
@@ -103,13 +89,13 @@ denied:
   - ft_validation.csv
   - ref.csv
   - eval.csv
-document_status: M8_RAW_GENERATION_AUTHORISED_FOR_SINGLE_USE_EXECUTION
+document_status: M8_RAW_ASSEMBLY_AUTHORISED_FOR_SINGLE_USE_EXECUTION
 execution:
-  assembly_authorised: false
+  assembly_authorised: true
   authorised: true
   biological_paths_permitted: false
-  generation_authorised: true
-  gpu_identity_bound: true
+  generation_authorised: false
+  gpu_identity_bound: false
 experiment_id: M8_raw_generation
 manifest_schema_version: m8-arm-manifest-2
 pairing:
