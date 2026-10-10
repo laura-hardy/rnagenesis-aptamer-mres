@@ -60,3 +60,6 @@ results/phase4_1_unadapted_rnagenesis_30k/.DS_Store
 # OS and editor noise (Excel lock files, temp files)
 ~$*
 *.tmp
+
+#thesis writing doc
+target/THESIS_METHODS_DRAFT.tex

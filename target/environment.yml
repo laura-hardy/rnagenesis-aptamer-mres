@@ -1,0 +1,8 @@
+name: ndm1-target-preparation
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.10
+  - numpy=1.26.4
+  - fpocket=4.0.0

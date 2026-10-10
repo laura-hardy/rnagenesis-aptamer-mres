@@ -1,0 +1,57 @@
+{
+  "alpha_sphere_count_parsed": 42,
+  "characteristic_dimension_A": 9.211825897696977,
+  "core_overlap": [
+    122,
+    124,
+    189,
+    250
+  ],
+  "dimension_ratio": 1.1297144224098281,
+  "druggability_score": 0.818,
+  "equivalent_sphere_diameter_A": 10.406732573356637,
+  "extended_overlap": [
+    65,
+    67,
+    73,
+    93,
+    123,
+    211,
+    219,
+    220
+  ],
+  "fpocket_score": 0.42,
+  "lining_residues": [
+    65,
+    67,
+    73,
+    93,
+    122,
+    123,
+    124,
+    189,
+    211,
+    215,
+    217,
+    219,
+    220,
+    250,
+    251
+  ],
+  "odd_shape_warning": false,
+  "pocket_number": 1,
+  "principal_axis_extents_A": [
+    9.211825897696977,
+    2.7208531181471876,
+    0.8904319794661751
+  ],
+  "volume_A3": 590.122,
+  "zn1_overlap": [
+    122,
+    189
+  ],
+  "zn2_overlap": [
+    124,
+    250
+  ]
+}

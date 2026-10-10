@@ -1,0 +1,17 @@
+{
+  "characteristic_dimension_absolute_difference_A": 0.0,
+  "characteristic_dimension_tolerance_A": 1e-06,
+  "exact_field_matches": {
+    "alpha_sphere_count_parsed": true,
+    "core_overlap": true,
+    "extended_overlap": true,
+    "lining_residues": true,
+    "pocket_number": true,
+    "zn1_overlap": true,
+    "zn2_overlap": true
+  },
+  "fpocket_volume_relative_difference": 0.05026757179023997,
+  "fpocket_volume_relative_tolerance": 0.1,
+  "note": "fpocket Volume is stochastic and does not participate in pocket selection; the 10% bound is a QC check, not a scientific acceptance threshold",
+  "status": "pass"
+}

@@ -1,0 +1,38 @@
+HEADER
+HEADER This is a pdb format file writen by the programm fpocket.                 
+HEADER It represents the atoms contacted by the voronoi vertices of the pocket.  
+HEADER                                                                           
+HEADER Information about the pocket     9:
+HEADER 0  - Pocket Score                      : 0.0813
+HEADER 1  - Drug Score                        : 0.0010
+HEADER 2  - Number of alpha spheres           :    19
+HEADER 3  - Mean alpha-sphere radius          : 3.9082
+HEADER 4  - Mean alpha-sphere Solvent Acc.    : 0.7603
+HEADER 5  - Mean B-factor of pocket residues  : 0.3348
+HEADER 6  - Hydrophobicity Score              : -7.4000
+HEADER 7  - Polarity Score                    :     3
+HEADER 8  - Amino Acid based volume Score     : 3.0000
+HEADER 9  - Pocket volume (Monte Carlo)       : 211.6617
+HEADER 10  -Pocket volume (convex hull)       : 4.0644
+HEADER 11 - Charge Score                      :    -1
+HEADER 12 - Local hydrophobic density Score   : 5.0000
+HEADER 13 - Number of apolar alpha sphere     :     6
+HEADER 14 - Proportion of apolar alpha sphere : 0.3158
+ATOM   1617   CG MET A 245     -14.592 -16.241  -3.415  0.00  0.00           C 0
+ATOM   1619   CE MET A 245     -14.315 -16.828  -0.726  0.00  0.00           C 0
+ATOM   1609    O SER A 244     -19.224 -17.108  -4.881  0.36  6.43           O 0
+ATOM   1616   CB MET A 245     -15.476 -17.429  -3.772  0.00  0.00           C 0
+ATOM   1690    N SER A 255     -19.487 -12.601  -5.065  0.00  0.00           N 0
+ATOM   1691   CA SER A 255     -20.311 -13.672  -5.578  0.00  0.00           C 0
+ATOM   1694   CB SER A 255     -21.747 -13.495  -5.087  0.00  0.00           C 0
+ATOM   1613   CA MET A 245     -16.415 -17.092  -4.925  0.00  0.00           C 0
+ATOM   1685    O ASP A 254     -17.552 -13.688  -5.394  0.00  0.00           O 0
+ATOM   1677    C PRO A 253     -15.223 -11.081  -3.757  0.00  0.00           C 0
+ATOM   1682    N ASP A 254     -16.003 -11.622  -4.681  0.00  0.00           N 0
+ATOM   1678    O PRO A 253     -15.658 -10.413  -2.813  0.38  5.36           O 0
+ATOM   1684    C ASP A 254     -18.165 -12.662  -5.089  0.00  0.00           C 0
+ATOM   1679   CB PRO A 253     -13.253 -12.474  -3.005  0.00  0.00           C 0
+ATOM   1683   CA ASP A 254     -17.444 -11.380  -4.705  0.00  0.00           C 0
+ATOM   1688  OD1 ASP A 254     -19.829  -9.844  -4.548  0.46  7.50           O 0
+TER
+END

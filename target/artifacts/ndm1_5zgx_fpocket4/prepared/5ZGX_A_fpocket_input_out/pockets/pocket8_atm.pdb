@@ -1,0 +1,39 @@
+HEADER
+HEADER This is a pdb format file writen by the programm fpocket.                 
+HEADER It represents the atoms contacted by the voronoi vertices of the pocket.  
+HEADER                                                                           
+HEADER Information about the pocket     8:
+HEADER 0  - Pocket Score                      : 0.1174
+HEADER 1  - Drug Score                        : 0.0008
+HEADER 2  - Number of alpha spheres           :    18
+HEADER 3  - Mean alpha-sphere radius          : 3.9889
+HEADER 4  - Mean alpha-sphere Solvent Acc.    : 0.6019
+HEADER 5  - Mean B-factor of pocket residues  : 0.4964
+HEADER 6  - Hydrophobicity Score              : 30.4444
+HEADER 7  - Polarity Score                    :     3
+HEADER 8  - Amino Acid based volume Score     : 3.5556
+HEADER 9  - Pocket volume (Monte Carlo)       : 174.7975
+HEADER 10  -Pocket volume (convex hull)       : 7.0361
+HEADER 11 - Charge Score                      :     0
+HEADER 12 - Local hydrophobic density Score   : 3.0000
+HEADER 13 - Number of apolar alpha sphere     :     4
+HEADER 14 - Proportion of apolar alpha sphere : 0.2222
+ATOM   1280    O THR A 201     -14.126 -25.079  -5.644  0.30  8.57           O 0
+ATOM   1601    N ALA A 243     -18.460 -22.390  -9.172  0.63  2.19           N 0
+ATOM   1580  CD1 PHE A 240     -13.585 -22.967 -13.755  0.00  0.00           C 0
+ATOM   1596   CB LYS A 242     -19.532 -25.707  -9.152  0.00  0.00           C 0
+ATOM   1605   CB ALA A 243     -16.649 -20.749  -9.222  0.00  0.00           C 0
+ATOM   1602   CA ALA A 243     -17.705 -21.433  -8.375  0.00  0.00           C 0
+ATOM   1575   CA PHE A 240     -16.763 -22.657 -13.818  0.00  0.00           C 0
+ATOM   1592    N LYS A 242     -19.832 -23.999 -10.888  0.00  0.00           N 0
+ATOM   1576    C PHE A 240     -18.112 -22.484 -13.125  0.00  0.00           C 0
+ATOM   1244   CA GLY A 197     -10.477 -22.251 -11.564  0.00  0.00           C 0
+ATOM   1269  OD1 ASP A 199     -11.160 -27.987 -10.712  0.00  0.00           O 0
+ATOM   1247    N ILE A 198      -9.986 -23.160  -9.370  0.53  1.09           N 0
+ATOM   1578   CB PHE A 240     -15.697 -21.750 -13.186  0.00  0.00           C 0
+ATOM   1251    O ILE A 198     -10.942 -25.039  -7.162  0.00  0.00           O 0
+ATOM   1295    O ILE A 203     -12.219 -21.390  -8.227  0.66  3.21           O 0
+ATOM   1261   CA ASP A 199     -10.370 -27.522  -8.136  0.00  0.00           C 0
+ATOM   1273    N GLY A 200     -11.285 -28.359  -6.069  0.00  0.00           N 0
+TER
+END
