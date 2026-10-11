@@ -1,45 +1,16 @@
-# M8 CPU-only B1 assembly authorisation proposal.
-# This file is a proposal. It has not been applied, committed, consumed, or launched.
-# Generation stays unauthorised. Assembly is the single authorised use.
-# gpu_identity_bound is false. No GPU, CUDA device, or interpreter is bound.
-# LD_LIBRARY_PATH is null. CPU assembly does not bind a library path.
-# The future authorisation commit is omitted from this file.
-# Execution derives it from live HEAD and requires origin/main to equal HEAD.
-# The entry stores the semantic configuration identity.
-# The raw YAML SHA-256 is recorded beside this file, after serialization.
-# retired_unconsumed_authorisations retains the GPU1 record unchanged.
-# Biological paths stay prohibited. Filtering, replacement, and replenishment stay false.
+# M8 shared-GPU implementation support. Inactive and non-consumable.
+# No generation authorisation and no assembly authorisation are active.
+# The former GPU 1 seed-44 block-B authorisation is recorded below as
+# unconsumed, not launched, and superseded before dispatch. It is not
+# executable. No GPU 0 authorisation is present. A later authorisation
+# must be a separate reviewed commit. An M7 configuration, schema, or
+# authorisation id is not M8 authority.
 arms:
 - b1_block_a
 - b1_block_b
 - d1_seed43_block_a
 - d1_seed44_block_b
-assembly_authorisation_entries:
-- activation_status: active_unconsumed
-  active_configuration_sha256: 233233c5c67551bbedeb68943bb755c6de1ff8fe7ffa51788309bab7a2a78521
-  authorisation_id: m8_b1_combined_1069b63_cpu_attempt1
-  authorization_parent_commit: c9a8cfc8cb2d720fdab8743bed088e8f900c3198
-  condition_id: B1_generic_released_rnagenesis
-  consumed: false
-  executing_implementation_commit: c9a8cfc8cb2d720fdab8743bed088e8f900c3198
-  implementation_file_hashes:
-    scripts/modelling/m8_assemble.py: 686a1605dfdcbbe868a190b473b312818a17c400c1c0f96744076bf5d9d331c9
-    scripts/modelling/m8_generation.py: e9d4eacdba7b2de531d51a94e3a94d31c4445b7125ba3e652517606dc7eedbc2
-    scripts/modelling/m8_schedule.py: c76a2f0b44c1e264a7a23be666490dcc9b84fd482bbd1a8d08f9c6960c3294d7
-  ld_library_path: null
-  output_directory: /home/laura/rnagenesis-mres-runs/m8_b1_combined_1069b63_cpu_attempt1
-  reuse_permitted: false
-  run_root: /home/laura/rnagenesis-mres-runs
-  single_use: true
-  sources:
-  - block: A
-    byte_count: 64993
-    path: /home/laura/rnagenesis-mres-runs/m8_b1_block_a_ac371ba_gpu1_attempt1/m8_arm_manifest.json
-    sha256: bb788e862d6a7c41e8b942d53e8121d2d19722574d4956b4c2c2644f392931b9
-  - block: B
-    byte_count: 65352
-    path: /home/laura/rnagenesis-mres-runs/m8_b1_block_b_ac371ba_gpu1_attempt1/m8_arm_manifest.json
-    sha256: d51be51bbf10a90ca7ff809403f38007167a7cdd72704473a0dd39a2bb8510e7
+assembly_authorisation_entries: []
 assembly_manifest_schema_version: m8-assembly-manifest-1
 authorisation_entries: []
 checkpoints:
@@ -68,12 +39,12 @@ checkpoints:
     weight_sha256: d0fcb5174230b8bbbc6bfe59eabda9b37687c03800012bc1a6981cc215469ed5
 closure:
   cleaner_invoked: false
-  execution_authorised: true
+  execution_authorised: false
   filtering_performed: false
   later_evaluation_required: true
-  m8_execution_authorised: true
+  m8_execution_authorised: false
   replacement_or_replenishment_performed: false
-consumable_by_executable_workflow: true
+consumable_by_executable_workflow: false
 deletion_implemented: false
 denied:
   evaluation_worktree: prohibited
@@ -89,10 +60,10 @@ denied:
   - ft_validation.csv
   - ref.csv
   - eval.csv
-document_status: M8_RAW_ASSEMBLY_AUTHORISED_FOR_SINGLE_USE_EXECUTION
+document_status: M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED
 execution:
-  assembly_authorised: true
-  authorised: true
+  assembly_authorised: false
+  authorised: false
   biological_paths_permitted: false
   generation_authorised: false
   gpu_identity_bound: false
