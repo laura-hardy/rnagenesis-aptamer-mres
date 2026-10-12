@@ -22,7 +22,7 @@ from __future__ import annotations
 import re
 
 STATUS = "M9_PARSER_IMPLEMENTED_SYNTHETIC_ONLY_NOT_AUTHORISED_FOR_PRODUCTION"
-PARSER_CONTRACT_SCHEMA = "generator-eval-parser-contract-m9-r1"
+PARSER_CONTRACT_SCHEMA = "generator-eval-parser-contract-m9-r2"
 SOURCE_MANIFEST_SCHEMA = "generator-eval-source-manifest-m9-r1"
 PARSER_VERSION = "m9-biological-parser-v1"
 PRODUCTION_EXECUTION_AUTHORISED = False

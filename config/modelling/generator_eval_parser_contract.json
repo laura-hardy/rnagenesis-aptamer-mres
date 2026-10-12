@@ -1,5 +1,5 @@
 {
-  "schema_version": "generator-eval-parser-contract-m9-r1",
+  "schema_version": "generator-eval-parser-contract-m9-r2",
   "status": "M9_PARSER_IMPLEMENTED_SYNTHETIC_ONLY_NOT_AUTHORISED_FOR_PRODUCTION",
   "production_execution_authorised": false,
   "production_derived_ledger_creation_authorised": false,
@@ -7,7 +7,12 @@
   "scientific_results_computed": false,
   "synthetic_execution_is_production_validation": false,
   "parser_version": "m9-biological-parser-v1",
-  "adapter_version": "m9-source-adapter-v1",
+  "adapter_version": "m9-source-adapter-v2",
+  "revision": {
+    "supersedes": "generator-eval-parser-contract-m9-r1",
+    "previous_adapter_version": "m9-source-adapter-v1",
+    "statement": "r2 supersedes the pre-production r1 adapter because r1 incorrectly rejected the literal / separators in the required preserved M8 provenance field source_raw_file_relative_path. This changes provenance-field acceptance only. It does not change biological parsing, filtering, source identity, or the sealed inputs."
+  },
   "derived_ledger_schema": "generator-eval-derived-ledger-m9-r1",
   "pinned_parser_provenance": {
     "rnagenesis_repository_commit": "e3b855bbf4d1af376f43747643fa30afd662828c",
@@ -103,6 +108,17 @@
     ]
   },
   "source_adapters": {
+    "m8_source_raw_file_relative_path": {
+      "field": "source_raw_file_relative_path",
+      "applies_to": ["B1", "D1"],
+      "role": "preserved_m8_provenance",
+      "not_a_filesystem_argument": true,
+      "not_used_to_discover_inputs": true,
+      "dereferenced": false,
+      "lexical_form": "raw/invocation_{invocation_index:04d}/seqs_wo_guidance_top_p=0.95_2_{line_count}_m8_i{invocation_index:04d}_seed{generation_seed}_len{requested_biological_length}.txt",
+      "folder_and_filename_invocation_index_match": true,
+      "integer_formatting": "line_count, generation_seed, and requested_biological_length are canonical decimal; the invocation index is {:04d} in both components"
+    },
     "B0": {
       "input": "Newline-delimited raw bytes plus explicit synthetic chunk metadata. The source SHA-256 is computed from those bytes and compared with the expected hash before record decoding.",
       "record_splitting": "LF delimiter; CR removed only as part of CRLF; trailing newline does not create an extra record; internal empty records are preserved; empty file has zero records; a file containing only one newline has one empty record.",

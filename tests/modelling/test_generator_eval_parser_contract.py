@@ -115,7 +115,9 @@ def m8_record(condition, record_id, text, training_seed=None, master=0):
         "requested_biological_length": 20,
         "run_id": "synthetic-run",
         "schema_version": "m8-raw-attempt-1",
-        "source_raw_file_relative_path": "synthetic-raw-token",
+        "source_raw_file_relative_path": (
+            "raw/invocation_0000/seqs_wo_guidance_top_p=0.95_2_16_m8_i0000_seed800000_len20.txt"
+        ),
         "source_raw_file_sha256": "ab" * 32,
         "technical_block": "A" if condition == "B1" or training_seed == 43 else "B",
         "within_batch_position": 0,
@@ -709,10 +711,147 @@ class FirewallTests(unittest.TestCase):
                     self.fail(filename + " calls open")
 
 
+class M8RelativePathTests(unittest.TestCase):
+    REPRESENTATIVE = (
+        "raw/invocation_0007/seqs_wo_guidance_top_p=0.95_2_16_m8_i0007_seed800007_len20.txt"
+    )
+
+    def _reject(self, value):
+        with self.assertRaises(biological.ParserContractError) as error:
+            adapters.validate_m8_source_raw_relative_path(value)
+        self.assertEqual(error.exception.code, "m8_relative_path_invalid")
+
+    def test_representative_writer_form_is_preserved_exactly(self):
+        accepted = adapters.validate_m8_source_raw_relative_path(self.REPRESENTATIVE)
+        self.assertIs(accepted, self.REPRESENTATIVE)
+        wider = "raw/invocation_0163/seqs_wo_guidance_top_p=0.95_2_48_m8_i0163_seed800163_len123.txt"
+        self.assertIs(adapters.validate_m8_source_raw_relative_path(wider), wider)
+
+    def test_rejections_cover_the_required_lexical_faults(self):
+        self._reject("/" + self.REPRESENTATIVE)
+        self._reject("~/" + self.REPRESENTATIVE)
+        self._reject("C:" + self.REPRESENTATIVE)
+        self._reject(
+            "raw/invocation_0007/../seqs_wo_guidance_top_p=0.95_2_16_m8_i0007_seed800007_len20.txt"
+        )
+        self._reject(
+            "raw/./invocation_0007/seqs_wo_guidance_top_p=0.95_2_16_m8_i0007_seed800007_len20.txt"
+        )
+        self._reject("raw//invocation_0007/seqs_wo_guidance_top_p=0.95_2_16_m8_i0007_seed800007_len20.txt")
+        self._reject(self.REPRESENTATIVE.replace("/", "\\"))
+        self._reject(self.REPRESENTATIVE + "\n")
+        self._reject(self.REPRESENTATIVE[:4] + "\x00" + self.REPRESENTATIVE[4:])
+        self._reject("")
+        self._reject("data/invocation_0007/seqs_wo_guidance_top_p=0.95_2_16_m8_i0007_seed800007_len20.txt")
+        self._reject(
+            "raw/invocation_0007/seqs_wo_guidance_top_p=0.95_2_16_m8_i0008_seed800007_len20.txt"
+        )
+        self._reject(
+            "raw/invocation_163/seqs_wo_guidance_top_p=0.95_2_16_m8_i0163_seed800007_len20.txt"
+        )
+        self._reject(None)
+        self._reject(7)
+
+    def test_validation_performs_no_filesystem_access(self):
+        import builtins
+        import inspect
+        import os
+        import pathlib
+
+        source = inspect.getsource(adapters.validate_m8_source_raw_relative_path)
+        for token in ("open(", "os.stat", "os.lstat", "os.path", "pathlib", "listdir", "scandir"):
+            self.assertNotIn(token, source)
+        calls = []
+
+        def record(name):
+            def wrapped(*args, **kwargs):
+                calls.append(name)
+                raise AssertionError(name)
+            return wrapped
+
+        originals = {
+            "open": builtins.open,
+            "stat": os.stat,
+            "lstat": os.lstat,
+            "listdir": os.listdir,
+            "scandir": os.scandir,
+            "os_open": os.open,
+            "resolve": pathlib.Path.resolve,
+            "path_stat": pathlib.Path.stat,
+            "path_open": pathlib.Path.open,
+            "exists": pathlib.Path.exists,
+        }
+        builtins.open = record("open")
+        os.stat = record("stat")
+        os.lstat = record("lstat")
+        os.listdir = record("listdir")
+        os.scandir = record("scandir")
+        os.open = record("os.open")
+        pathlib.Path.resolve = record("resolve")
+        pathlib.Path.stat = record("path.stat")
+        pathlib.Path.open = record("path.open")
+        pathlib.Path.exists = record("exists")
+        try:
+            accepted = adapters.validate_m8_source_raw_relative_path(self.REPRESENTATIVE)
+        finally:
+            builtins.open = originals["open"]
+            os.stat = originals["stat"]
+            os.lstat = originals["lstat"]
+            os.listdir = originals["listdir"]
+            os.scandir = originals["scandir"]
+            os.open = originals["os_open"]
+            pathlib.Path.resolve = originals["resolve"]
+            pathlib.Path.stat = originals["path_stat"]
+            pathlib.Path.open = originals["path_open"]
+            pathlib.Path.exists = originals["exists"]
+        self.assertEqual(calls, [])
+        self.assertEqual(accepted, self.REPRESENTATIVE)
+
+    def test_b1_and_d1_keep_the_representative_path_and_other_tokens_stay_strict(self):
+        for condition, training_seed in (("B1", None), ("D1", 43)):
+            record = m8_record(
+                condition,
+                "synthetic-%s-path" % condition.lower(),
+                DISTINCTIVE_VALID,
+                training_seed=43 if condition == "D1" else None,
+                master=7,
+            )
+            record["source_raw_file_relative_path"] = self.REPRESENTATIVE
+            raw = jsonl([record])
+            adapt = adapters.adapt_b1 if condition == "B1" else adapters.adapt_d1
+            rows = adapt(raw, source_artifact_id="synthetic-%s-artifact" % condition.lower(), source_artifact_sha256=sha256(raw))
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["source_raw_file_relative_path"], self.REPRESENTATIVE)
+            self.assertEqual(rows[0]["outcome"], "valid_canonical_sequence")
+            self.assertEqual(rows[0]["adapter_version"], "m9-source-adapter-v2")
+            self.assertEqual(rows[0]["parser_version"], "m9-biological-parser-v1")
+            slashed = m8_record(condition, "synthetic-%s-slash" % condition.lower(), "ACGU", training_seed=training_seed, master=1)
+            slashed["authorization_id"] = "synthetic/auth"
+            bad = jsonl([slashed])
+            with self.assertRaises(biological.ParserContractError) as error:
+                adapt(bad, source_artifact_id="synthetic-%s-artifact" % condition.lower(), source_artifact_sha256=sha256(bad))
+            self.assertEqual(error.exception.code, "filesystem_path_refused")
+
+    def test_contract_document_states_the_r2_provenance_correction(self):
+        with open(CONTRACT_DOC, "r", encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn("m9-source-adapter-v2", text)
+        self.assertIn("generator-eval-parser-contract-m9-r2", text)
+        self.assertIn("m9-biological-parser-v1", text)
+        self.assertIn("provenance-field acceptance only", text)
+        self.assertIn("does not change biological parsing, filtering, source identity, or the sealed inputs", text)
+
+
 class ContractDocumentTests(unittest.TestCase):
     def test_parser_contract_status_and_pins(self):
         document = load_json(CONTRACT)
         self.assertEqual(document["schema_version"], biological.PARSER_CONTRACT_SCHEMA)
+        self.assertEqual(document["schema_version"], "generator-eval-parser-contract-m9-r2")
+        self.assertEqual(document["adapter_version"], adapters.ADAPTER_VERSION)
+        self.assertEqual(document["adapter_version"], "m9-source-adapter-v2")
+        self.assertEqual(document["parser_version"], "m9-biological-parser-v1")
+        self.assertIn("source_raw_file_relative_path", document["revision"]["statement"])
+        self.assertIn("provenance-field acceptance only", document["revision"]["statement"])
         self.assertEqual(document["status"], biological.STATUS)
         self.assertEqual(document["status"], "M9_PARSER_IMPLEMENTED_SYNTHETIC_ONLY_NOT_AUTHORISED_FOR_PRODUCTION")
         self.assertFalse(document["production_execution_authorised"])

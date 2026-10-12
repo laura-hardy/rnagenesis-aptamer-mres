@@ -27,6 +27,9 @@ accounted outcome for a null or otherwise uninterpretable payload only when
 its identity and required provenance remain valid.
 
 B0, B1, B2, and D1 share one biological parser after source adaptation.
+``source_raw_file_relative_path`` is preserved M8 provenance. Adapter v2
+checks it with the tracked writer form and does not treat its ``/``
+separators as a filesystem argument. Other token fields stay slash-free.
 Synthetic adaptation is not production validation. This branch has not run
 production parsing.
 """
@@ -35,6 +38,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 
 from generator_eval_derived_ledger import blank_derived_row, freeze_derived_row
 from generator_eval_parser import (
@@ -50,7 +54,16 @@ from generator_eval_parser import (
     split_raw_record_bytes,
 )
 
-ADAPTER_VERSION = "m9-source-adapter-v1"
+ADAPTER_VERSION = "m9-source-adapter-v2"
+# Writer form from scripts/modelling/m8_generation.py relative_raw_path:
+# raw/invocation_{index:04d}/seqs_wo_guidance_top_p=0.95_2_{line_count}_m8_i{index:04d}_seed{seed}_len{length}.txt
+_M8_RELATIVE_RAW_PATH = re.compile(
+    r"raw/invocation_(?P<folder>[0-9]+)/"
+    r"seqs_wo_guidance_top_p=0\.95_2_(?P<line_count>[0-9]+)"
+    r"_m8_i(?P<file>[0-9]+)"
+    r"_seed(?P<seed>[0-9]+)"
+    r"_len(?P<length>[0-9]+)\.txt"
+)
 M8_SCHEMA_VERSION = "m8-raw-attempt-1"
 B0_NOMINAL_MAX_SEQ_LEN = 37
 CONDITION_LABELS = {
@@ -110,6 +123,88 @@ def _token(value):
         return False
     reject_control_string(value)
     return True
+
+
+def _canonical_decimal(text):
+    """True when text is the default decimal formatting of a nonnegative integer."""
+    if text == "0":
+        return True
+    return text.isdigit() and text[0] != "0"
+
+
+def _canonical_invocation_index(text):
+    """True when text is ``{:04d}`` of a nonnegative invocation index."""
+    if not text.isdigit():
+        return False
+    return "%04d" % int(text) == text
+
+
+def validate_m8_source_raw_relative_path(value):
+    """Accept one preserved M8 ``source_raw_file_relative_path`` lexically.
+
+    The tracked writer emits
+    ``raw/invocation_{index:04d}/seqs_wo_guidance_top_p=0.95_2_{line_count}_m8_i{index:04d}_seed{seed}_len{length}.txt``.
+    The folder index and the filename index are the same value. This is
+    provenance data, not a filesystem argument. The accepted string is
+    returned unchanged. This function does not resolve, join, open, stat,
+    or otherwise dereference it, and it does not choose an input from it.
+    """
+    if type(value) is not str:
+        raise ParserContractError(
+            "m8_relative_path_invalid",
+            "source_raw_file_relative_path is not a string",
+        )
+    if value == "":
+        raise ParserContractError(
+            "m8_relative_path_invalid",
+            "source_raw_file_relative_path is empty",
+        )
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise ParserContractError(
+            "m8_relative_path_invalid",
+            "source_raw_file_relative_path contains a control character",
+        )
+    if "\\" in value or value.startswith("/") or value.startswith("~") or (len(value) >= 2 and value[1] == ":"):
+        raise ParserContractError(
+            "m8_relative_path_invalid",
+            "source_raw_file_relative_path is not a POSIX-relative M8 path",
+        )
+    parts = value.split("/")
+    if any(part == "" for part in parts):
+        raise ParserContractError(
+            "m8_relative_path_invalid",
+            "source_raw_file_relative_path has an empty component",
+        )
+    if any(part in (".", "..") for part in parts):
+        raise ParserContractError(
+            "m8_relative_path_invalid",
+            "source_raw_file_relative_path has a dot component",
+        )
+    if parts[0] != "raw":
+        raise ParserContractError(
+            "m8_relative_path_invalid",
+            "source_raw_file_relative_path does not begin with raw/",
+        )
+    match = _M8_RELATIVE_RAW_PATH.fullmatch(value)
+    if match is None:
+        raise ParserContractError(
+            "m8_relative_path_invalid",
+            "source_raw_file_relative_path does not match the M8 writer form",
+        )
+    folder_index = match.group("folder")
+    file_index = match.group("file")
+    if folder_index != file_index or not _canonical_invocation_index(folder_index):
+        raise ParserContractError(
+            "m8_relative_path_invalid",
+            "the M8 invocation index is not the writer form",
+        )
+    for group_name in ("line_count", "seed", "length"):
+        if not _canonical_decimal(match.group(group_name)):
+            raise ParserContractError(
+                "m8_relative_path_invalid",
+                "an M8 path integer is not canonical decimal",
+            )
+    return value
 
 
 def _base_row(condition, source_artifact_id, source_artifact_sha256):
@@ -323,7 +418,7 @@ def _m8_provenance_valid(record, condition):
         and record["requested_biological_length"] >= 1
         and _token(record["run_id"])
         and record["schema_version"] == M8_SCHEMA_VERSION
-        and _token(record["source_raw_file_relative_path"])
+        and validate_m8_source_raw_relative_path(record["source_raw_file_relative_path"]) == record["source_raw_file_relative_path"]
         and sha256_text(record["source_raw_file_sha256"])
         and record["technical_block"] in ("A", "B")
         and _nonnegative_int(record["within_batch_position"])

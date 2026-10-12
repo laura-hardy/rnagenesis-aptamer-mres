@@ -6,8 +6,20 @@ This stage freezes parsing and source identity for B0, B1, B2, and D1. It does n
 
 The contract files are:
 
-- `config/modelling/generator_eval_parser_contract.json`
+- `config/modelling/generator_eval_parser_contract.json` (`generator-eval-parser-contract-m9-r2`)
 - `config/modelling/generator_eval_source_manifest.json`
+
+The source adapter revision is `m9-source-adapter-v2`. The biological parser remains `m9-biological-parser-v1`.
+
+## Contract revision r2
+
+`generator-eval-parser-contract-m9-r2` supersedes the pre-production r1 adapter. r1 incorrectly rejected the literal `/` separators in the required preserved M8 provenance field `source_raw_file_relative_path`. This changes provenance-field acceptance only. It does not change biological parsing, filtering, source identity, or the sealed inputs.
+
+That field is preserved M8 provenance, not a filesystem argument. A dedicated lexical validator accepts the tracked writer form and returns the supplied string unchanged:
+
+`raw/invocation_{invocation_index:04d}/seqs_wo_guidance_top_p=0.95_2_{line_count}_m8_i{invocation_index:04d}_seed{generation_seed}_len{requested_biological_length}.txt`
+
+The invocation index in the folder and the filename is the same `{:04d}` value. `line_count`, `generation_seed`, and `requested_biological_length` are canonical decimal integers. The validator rejects an empty string, control characters, an absolute path, empty, `.`, and `..` components, backslashes, other platform path syntax, and a prefix other than `raw/`. It does not resolve, join, open, stat, or dereference the string, and it does not use the string to choose an input. Actual input access comes only from the frozen source manifest. Other token fields remain on the slash-free validator.
 
 The in-memory implementation is:
 
@@ -74,7 +86,7 @@ For schema-valid B1, D1, and B2 records, a null or otherwise uninterpretable pay
 
 B0 takes newline-delimited bytes plus synthetic chunk metadata. The stable id is `b0:seed:{seed}:line:{one_based_line_number}`. Seed, line number, chunk id, and the recomputed source-artifact SHA-256 are preserved. Biological requested length is unavailable. Nominal `max_seq_len=37` is stored as the nominal sampler setting and is not converted into a requested biological length. Production order is later seeds 4201–4210. This stage does not require those seeds. B0 remains an external comparator.
 
-B1 and D1 take in-memory JSONL bytes matching the M8 raw-attempt schema. `raw_decoded_text` is parsed with the common parser only after the source hash matches and the record identity and required provenance are valid. The existing `record_id` is preserved. It is not invented. Master attempt index, generation seed, invocation index, requested biological length, maximum sequence length, technical block, checkpoint identity, and source hashes are preserved. `d1_training_seed` is null for B1 and an integer for D1. Equal-seed weighting is not applied. D1 seed counts are observed source allocation only.
+B1 and D1 take in-memory JSONL bytes matching the M8 raw-attempt schema. `raw_decoded_text` is parsed with the common parser only after the source hash matches and the record identity and required provenance are valid. The existing `record_id` is preserved. It is not invented. Master attempt index, generation seed, invocation index, requested biological length, maximum sequence length, technical block, checkpoint identity, source hashes, and `source_raw_file_relative_path` are preserved. The relative path is accepted only in the tracked M8 writer form described above and is copied exactly. `d1_training_seed` is null for B1 and an integer for D1. Equal-seed weighting is not applied. D1 seed counts are observed source allocation only.
 
 B2 takes in-memory JSONL bytes matching the B2 field set. `sequence` is parsed with the common parser and validity is recomputed. `valid_acgu` is retained as a source claim and is not the validity authority. The stable id is `b2:attempt:{attempt_index_as_five_digits}`, formed only from a recovered attempt index. `attempt_index`, sampled length, sequence hash, and seed are preserved. The B2 `seed` is the empirical-null seed, not a training seed. Seed 42 is the verified production value in the source manifest. It is not a general parser rule.
 
