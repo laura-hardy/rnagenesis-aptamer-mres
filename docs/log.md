@@ -11920,3 +11920,55 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_candidate_preparation` passed 21 tests. The AptaRank evidence, I/O, and Tier 1 suites, the generator-eval synthetic suites, and `tests.modelling.test_modelling_contract` passed 241 tests.
 
 **Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, models, checkpoints, and `results/` were not opened. No production upload or AptaRank scoring run was performed. No production sample, blinding key, or private key was instantiated. No overlap, leakage, or nearest-TRAIN workflow was run.
+
+## 2026-10-12 — M9B-3 synthetic downloaded-export validation
+
+**Stage:** Aim 2 / modelling / M9B-3 synthetic-only AptaRank downloaded-export validation
+
+**Status:** `DEFINED_SYNTHETIC_ONLY_EXPORT_BEHAVIOR_UNRESOLVED`. This stage validates caller-supplied shortlist bytes and joins them to the upload by opaque candidate id. It does not verify the live deployment or choose how a future download treats omitted rows. No scientific result is claimed.
+
+**Plan:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` stays the active plan, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. It was not edited.
+
+**Contract:** `config/modelling/aptarank_export_validation_contract.json`, SHA-256 `91c318459789bb95eeca169cc398941b71b2f73856a416ea308142ebffd43a1f`.
+
+**Evidence contract:** `config/modelling/aptarank_evidence_contract.json`, SHA-256 `0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b`.
+
+**Preparation contract:** `config/modelling/aptarank_candidate_preparation_contract.json`, SHA-256 `3bcfbdf14cd7e777a0b2746f91d0335ba4876195f5012610157e5aa23e083096`.
+
+**Reused modules:** Evidence module `scripts/modelling/aptarank_evidence_contract.py`, SHA-256 `08e780e03108c0008174a4559840ce59a56d567b99376d3ad0272eb29a69bbcb`. Preparation module `scripts/modelling/aptarank_candidate_preparation.py`, SHA-256 `a4f5b047f2803e775d9521c226287487412495055446e192681957c3d42879ca`. ARP-1 module `scripts/modelling/aptarank_io_preflight.py`, SHA-256 `eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01`. Record splitter `scripts/modelling/generator_eval_parser.py`, SHA-256 `4a59ff8e557ee1948410c7f705a9c3772fe2570d4255b0d2185acee99137eaa2`.
+
+**Join:** Exported rows join to the upload and the private membership key on the opaque candidate id. Row position is not a key. The exported sequence must match the sequence stored for that id. Duplicate, unknown, malformed, and substituted ids or sequences fail closed. Rank, aptamer-likeness, compatibility, shuffle, and length are checked against the public M9B-1 shortlist fields. AptaRank scores are not recomputed. Every condition membership for a shared uploaded sequence stays on the joined row. Exported, missing, and caller-supplied rejected rows stay distinct. A missing row has null export fields and no invented rejection reason.
+
+**Missing rows:** The caller must pass `require_complete` or `allow_partial`. There is no default. `live_export_behavior` remains unresolved until M9C.
+
+**Outputs:** Restricted `joined_candidates.jsonl` bytes and a sequence-free `validation_manifest.json`. The manifest omits sequences, candidate ids, source ids, exported scores, and rejection text. It does not embed its own hash.
+
+**Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_export_validation` passed 12 tests. With the M9B-2 preparation suite, the AptaRank evidence, I/O, and Tier 1 suites, the generator-eval synthetic suites, and `tests.modelling.test_modelling_contract`, 274 tests passed.
+
+**Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, production uploads, real AptaRank downloads, the UI, the API, and `results/` were not opened. AptaRank was not modified or run. No overlap, leakage, nearest-TRAIN, biological summary, Tier 1, or Tier 2 score was calculated.
+
+## 2026-10-12 — M9B-3 synthetic downloaded-export validation
+
+**Stage:** Aim 2 / modelling / M9B-3 synthetic-only AptaRank downloaded-export validation
+
+**Status:** `DEFINED_SYNTHETIC_ONLY_EXPORT_BEHAVIOR_UNRESOLVED`. This stage validates caller-supplied shortlist bytes and joins them to the upload by opaque candidate id. It does not verify the live deployment or choose how a future download treats omitted rows. No scientific result is claimed.
+
+**Plan:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` stays the active plan, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. It was not edited.
+
+**Contract:** `config/modelling/aptarank_export_validation_contract.json`, SHA-256 `91c318459789bb95eeca169cc398941b71b2f73856a416ea308142ebffd43a1f`.
+
+**Evidence contract:** `config/modelling/aptarank_evidence_contract.json`, SHA-256 `0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b`.
+
+**Preparation contract:** `config/modelling/aptarank_candidate_preparation_contract.json`, SHA-256 `3bcfbdf14cd7e777a0b2746f91d0335ba4876195f5012610157e5aa23e083096`.
+
+**Reused modules:** Evidence module `scripts/modelling/aptarank_evidence_contract.py`, SHA-256 `08e780e03108c0008174a4559840ce59a56d567b99376d3ad0272eb29a69bbcb`. Preparation module `scripts/modelling/aptarank_candidate_preparation.py`, SHA-256 `a4f5b047f2803e775d9521c226287487412495055446e192681957c3d42879ca`. ARP-1 module `scripts/modelling/aptarank_io_preflight.py`, SHA-256 `eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01`. Record splitter `scripts/modelling/generator_eval_parser.py`, SHA-256 `4a59ff8e557ee1948410c7f705a9c3772fe2570d4255b0d2185acee99137eaa2`.
+
+**Join:** Exported rows join to the upload and the private membership key on the opaque candidate id. Row position is not a key. The exported sequence must match the sequence stored for that id. Duplicate, unknown, malformed, and substituted ids or sequences fail closed. Rank, aptamer-likeness, compatibility, shuffle, and length are checked against the public M9B-1 shortlist fields. AptaRank scores are not recomputed. Every condition membership for a shared uploaded sequence stays on the joined row. Exported, missing, and caller-supplied rejected rows stay distinct. A missing row has null export fields and no invented rejection reason.
+
+**Missing rows:** The caller must pass `require_complete` or `allow_partial`. There is no default. `live_export_behavior` remains unresolved until M9C.
+
+**Outputs:** Restricted `joined_candidates.jsonl` bytes and a sequence-free `validation_manifest.json`. The manifest omits sequences, candidate ids, source ids, exported scores, and rejection text. It does not embed its own hash.
+
+**Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_export_validation` passed 12 tests. With the M9B-2 preparation suite, the AptaRank evidence, I/O, and Tier 1 suites, the generator-eval synthetic suites, and `tests.modelling.test_modelling_contract`, 274 tests passed.
+
+**Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, production uploads, real AptaRank downloads, the UI, the API, and `results/` were not opened. AptaRank was not modified or run. No overlap, leakage, nearest-TRAIN, biological summary, Tier 1, or Tier 2 score was calculated.

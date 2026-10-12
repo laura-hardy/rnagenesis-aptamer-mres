@@ -1,0 +1,144 @@
+{
+  "package_id": "M9B-3",
+  "schema_version": "m9b-aptarank-export-validation-v1",
+  "status": "DEFINED_SYNTHETIC_ONLY_EXPORT_BEHAVIOR_UNRESOLVED",
+  "stage": "M9B-3",
+  "deployment_verified": false,
+  "scientific_result": false,
+  "production_inputs_opened": false,
+  "aptarank_execution": false,
+  "scores_recomputed": false,
+  "overlap_or_leakage_calculated": false,
+  "live_export_behavior": "unresolved",
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md",
+    "version": "3.3",
+    "revision_date": "12 October 2026",
+    "sha256": "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
+  },
+  "evidence_contract": {
+    "path": "config/modelling/aptarank_evidence_contract.json",
+    "package_id": "M9B-1",
+    "sha256": "0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b"
+  },
+  "candidate_preparation_contract": {
+    "path": "config/modelling/aptarank_candidate_preparation_contract.json",
+    "package_id": "M9B-2",
+    "schema_version": "m9b-aptarank-candidate-preparation-v1",
+    "sha256": "3bcfbdf14cd7e777a0b2746f91d0335ba4876195f5012610157e5aa23e083096"
+  },
+  "reused_modules": [
+    {
+      "role": "evidence_contract_module",
+      "path": "scripts/modelling/aptarank_evidence_contract.py",
+      "sha256": "08e780e03108c0008174a4559840ce59a56d567b99376d3ad0272eb29a69bbcb"
+    },
+    {
+      "role": "candidate_preparation_module",
+      "path": "scripts/modelling/aptarank_candidate_preparation.py",
+      "sha256": "a4f5b047f2803e775d9521c226287487412495055446e192681957c3d42879ca"
+    },
+    {
+      "role": "aptarank_io_module",
+      "path": "scripts/modelling/aptarank_io_preflight.py",
+      "sha256": "eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01"
+    },
+    {
+      "role": "record_parser_module",
+      "path": "scripts/modelling/generator_eval_parser.py",
+      "sha256": "4a59ff8e557ee1948410c7f705a9c3772fe2570d4255b0d2185acee99137eaa2"
+    }
+  ],
+  "export_schema": {
+    "source_fact_id": "shortlist_export_columns",
+    "columns": ["rank", "candidate", "aptamer-likeness", "compatibility", "shuffle", "len", "sequence"],
+    "header_adaptation": false,
+    "compatibility_source_fact_id": "export_tokens",
+    "compatibility_tokens": ["strong", "moderate", "weak", "not evaluated"],
+    "shuffle_source_fact_id": "export_tokens",
+    "shuffle_tokens": ["pass", "fail", "—"],
+    "shuffle_absent_boolean_spelling": "U+2014",
+    "rank_source_fact_id": "rank_direction",
+    "rank_definition": "consecutive_1_based_ordinal_of_exported_rows",
+    "rank_sort": ["descending_exported_aptamer_likeness", "ascending_candidate_id"],
+    "rank_is_statistical_minimum_rank": false,
+    "score_recomputed": false,
+    "token_profile_inferred_from_file": false,
+    "arp1_target_free_profile_is_the_public_token_set": false
+  },
+  "field_validation": {
+    "aptamer_likeness": "finite_decimal_token_preserved",
+    "compatibility": "exact_public_token",
+    "shuffle": "exact_public_token",
+    "length": "exported_len_equals_uploaded_and_exported_sequence_length",
+    "sequence": "character_for_character_match_for_the_same_opaque_id",
+    "silent_normalization": false,
+    "thresholds_applied": false,
+    "biological_summary_calculated": false
+  },
+  "join": {
+    "key": "opaque_candidate_id",
+    "export_column": "candidate",
+    "upload_column": "id",
+    "private_key_field": "candidate_id",
+    "row_position_is_join_key": false,
+    "sequence_is_join_key": false,
+    "shared_condition_memberships": "all_private_key_memberships_retained",
+    "dispositions": ["exported", "missing", "rejected"],
+    "invent_rejection_reasons": false
+  },
+  "missing_row_policy": {
+    "caller_supplied": true,
+    "default": null,
+    "accepted": ["require_complete", "allow_partial"],
+    "reason": "Deployed export behavior remains unresolved until M9C. A missing download row is not given a rejection reason.",
+    "evidence_item_id": "live_export_behavior",
+    "missing_disposition": "missing",
+    "missing_rejection_reason": null,
+    "impute_missing_as_zero": false,
+    "require_complete": "Every uploaded id is one exported row or one caller-supplied rejection. Any other absence fails closed.",
+    "allow_partial": "An uploaded id absent from the export and from the caller-supplied rejection ledger is recorded as missing."
+  },
+  "rejection_records": {
+    "required": false,
+    "form": "caller_supplied_utf8_jsonl_bytes_or_null",
+    "keys": ["candidate_id", "reason"],
+    "reason_invented_when_absent": false,
+    "blank_reason": "fail_closed"
+  },
+  "outputs": {
+    "joined_candidates": {
+      "filename": "joined_candidates.jsonl",
+      "restricted": true,
+      "contains_sequences": true,
+      "analysis_ready": true,
+      "grain": "one_row_per_uploaded_candidate",
+      "order": ["exported_by_rank", "missing_by_candidate_id", "rejected_by_candidate_id"]
+    },
+    "validation_manifest": {
+      "filename": "validation_manifest.json",
+      "sequence_free": true,
+      "contains_candidate_identifiers": false,
+      "contains_source_identifiers": false,
+      "contains_exported_scores": false,
+      "own_sha256_embedded": false,
+      "includes_overlap_metrics": false
+    }
+  },
+  "inputs": {
+    "accepted_forms": ["caller_supplied_bytes"],
+    "filesystem_paths": false,
+    "production_uploads": false,
+    "real_downloads": false
+  },
+  "prohibited": [
+    "Opening TRAIN, VALIDATION, REF, EVAL, or a production sequence ledger",
+    "Reading a production upload, a real AptaRank download, the UI, or the API",
+    "Reading or writing results/",
+    "Calculating overlap, leakage, nearest-TRAIN distance, or a biological summary",
+    "Recomputing Tier 1 or Tier 2 scores",
+    "Modifying or reproducing AptaRank",
+    "Inferring a missing-row policy from the file",
+    "Inventing a rejection reason for a row the caller did not reject"
+  ]
+}
