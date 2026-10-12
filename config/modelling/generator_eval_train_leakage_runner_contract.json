@@ -1,0 +1,163 @@
+{
+  "schema_version": "generator-eval-train-leakage-runner-m9a-r1",
+  "contract_id": "m9a-train-leakage-runner-v1",
+  "status": "RUNNER_DEFINED_SYNTHETIC_ONLY_SEALED_ENTRY_UNEXECUTED",
+  "synthetic_execution_is_production_validation": false,
+  "sealed_production_entry_remains_unexecuted": true,
+  "m9a_complete": false,
+  "m9b_complete": false,
+  "m9c_complete": false,
+  "formulas": {
+    "module": "scripts/modelling/generator_eval_overlap_leakage.py",
+    "m9a_contract_id": "m9a-overlap-leakage-definitions-v1",
+    "modified_by_this_runner": false,
+    "exact_match": "full_parsed_string_membership",
+    "partial_match": false,
+    "substring_match": false,
+    "historical_0_01_guardrail_used_as_decision_threshold": false,
+    "row_and_distinct_sequence_grain": true,
+    "invalid_attempts_excluded_from_valid_denominators": true,
+    "zero_denominator_rate": "null_unless_frozen_d1_seed_rule_requires_failure",
+    "b0_role": "external_comparator",
+    "b0_pooled_into_b1_b2_d1_aggregate": false,
+    "d1_unweighted_mean_of_seed_rates": true,
+    "d1_actual_attempt_pooled_separately_labelled": true,
+    "nearest_distance": "global_levenshtein_divided_by_longer_length",
+    "nearest_execution": "one_scalar_per_globally_distinct_generated_sequence_projected_to_rows_conditions_and_seeds",
+    "nearest_execution_replaces_frozen_implementation": false,
+    "row_quantile_convention": "int(round(p * (n - 1))) on values sorted ascending",
+    "pooled_equal_mixture_rule": "inclusive_cumulative_weight_exact_v2",
+    "edit_similarity_is_sequence_identity": false
+  },
+  "references": {
+    "m9a_overlap_leakage_contract": {
+      "contract_id": "m9a-overlap-leakage-definitions-v1",
+      "relative_path": "config/modelling/generator_eval_overlap_leakage_contract.json",
+      "sha256": "6aeaa2338776cbe7aceffef63ee4ca7dfd7ed3643aa7d1e400fd54a02d113535",
+      "modified_by_this_runner": false
+    },
+    "governing_plan": {
+      "relative_path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
+      "sha256": "fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51",
+      "modified_by_this_runner": false
+    },
+    "frozen_data_contract": {
+      "contract_id": "rnagenesis_corrected_669_core_m0",
+      "relative_path": "config/modelling/frozen_data_contract.json",
+      "sha256": "396c83c3dbf9afc656ad5c60ec05c94fce3c5a684990c3cc1cebfb2411ccd5ff",
+      "modified_by_this_runner": false
+    },
+    "parser_version": "m9-biological-parser-v1",
+    "adapter_version": "m9-source-adapter-v2",
+    "production_manifest": {
+      "filename": "m9_production_manifest.json",
+      "sha256": "9aa5f60f939a8b25d031967ed3466a26d9d8e2d0610c76ec0b5db4cb43c2cc80",
+      "opened_by_this_runner": false
+    },
+    "combined_ledger": {
+      "filename": "m9_all_conditions_derived_attempt_ledger.jsonl",
+      "relative_path": "results/fine_tuning/m9_generator_evaluation/m9_all_conditions_derived_attempt_ledger.jsonl",
+      "sha256": "d50c30e85b26e39e8a25ea2660f9a7fa07433417de757364eb36799ca8c6073e",
+      "row_counts": {
+        "B0": 30080,
+        "B1": 30000,
+        "B2": 30000,
+        "D1": 30000,
+        "combined": 120080
+      },
+      "opened_by_runner_definition": false
+    }
+  },
+  "train": {
+    "comparison_population": "corpus_final.txt lines, because that file is the authoritative fitting input",
+    "provenance_grain": "ft_train.csv identity rows",
+    "csv_rows_silently_deduplicated": false,
+    "cores_rewritten": false,
+    "silent_t_to_u": false,
+    "whitespace_or_case_normalisation": false,
+    "flanks_removed": false,
+    "text_equals_csv_first_occurrence_order": true,
+    "csv": {
+      "filename": "ft_train.csv",
+      "development_locator": "/home/laura/rnagenesis-mres-data/development/ft_train.csv",
+      "sha256": "84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0",
+      "documented_byte_count": 1201524,
+      "documented_column_count": 86,
+      "identity_rows": 726,
+      "distinct_sequence_cores": 669,
+      "clusters": 569,
+      "targets": 320,
+      "identity_set_hash": "be5d3c700534633fce62498ea0b5d69cf0bfab148ad6a07931bc3b875efc9d5d",
+      "cluster_set_hash": "07f6dac62f5a280b5f4204724d20a3a1448bc5be13c99d8b6eda63dfc491d02e",
+      "partition": "FT",
+      "ft_split": "TRAIN",
+      "opened_by_runner_definition": false
+    },
+    "text": {
+      "filename": "corpus_final.txt",
+      "development_locator": "/home/laura/rnagenesis-mres-data/development/corpus_final.txt",
+      "sha256": "d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d",
+      "documented_byte_count": 37700,
+      "lines": 669,
+      "unique_cores": 669,
+      "order": "first_occurrence_in_frozen_ft_train_csv",
+      "line_endings": "LF-only, trailing LF",
+      "opened_by_runner_definition": false
+    }
+  },
+  "d1_training_seeds": [43, 44],
+  "outputs": {
+    "directory_must_not_already_exist": true,
+    "future_output_relative_directory": "results/fine_tuning/m9_generator_evaluation/m9a_train_leakage",
+    "created_by_runner_definition": false,
+    "exact_train_leakage_summary": {
+      "filename": "m9_exact_train_leakage_summary.json",
+      "schema": "generator-eval-exact-train-leakage-summary-m9a-r1"
+    },
+    "nearest_train_distance_summary": {
+      "filename": "m9_nearest_train_distance_summary.json",
+      "schema": "generator-eval-nearest-train-distance-summary-m9a-r1"
+    },
+    "manifest": {
+      "filename": "m9_train_leakage_manifest.json",
+      "schema": "generator-eval-train-leakage-manifest-m9a-r1",
+      "sha256_embedded": false
+    },
+    "sequence_strings_emitted": false,
+    "sequence_hashes_emitted": false,
+    "attempt_identifiers_emitted": false,
+    "nearest_neighbour_identities_emitted": false,
+    "train_identity_ids_emitted": false,
+    "target_labels_emitted": false
+  },
+  "protected_data_boundary": {
+    "validation_opened": false,
+    "ref_opened": false,
+    "eval_opened": false,
+    "models_accessed": false,
+    "checkpoints_accessed": false,
+    "structure_tools_accessed": false,
+    "aptarank_accessed": false,
+    "representation_analysis_accessed": false,
+    "sealed_entry_opens_train_only": true,
+    "sealed_entry_opens_validation": false,
+    "synthetic_execution_is_production_validation": false,
+    "closed_roles": {
+      "VALIDATION": {
+        "filename": "ft_validation.csv",
+        "sha256": "cb347a739455924a7f4c55206bd2ac0131b7f36d79c8881e37e42728b600e0cd",
+        "opened_by_this_runner": false
+      },
+      "REF": {
+        "filename": "ref.csv",
+        "sha256": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
+        "opened_by_this_runner": false
+      },
+      "EVAL": {
+        "filename": "eval.csv",
+        "sha256": "ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015",
+        "opened_by_this_runner": false
+      }
+    }
+  }
+}
