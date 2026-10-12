@@ -67,7 +67,8 @@
     "arp1_target_free_profile_is_the_public_token_set": false
   },
   "field_validation": {
-    "aptamer_likeness": "finite_decimal_token_preserved",
+    "aptamer_likeness": "finite_decimal_closed_unit_interval_original_token_preserved",
+    "aptamer_likeness_interval": [0, 1],
     "compatibility": "exact_public_token",
     "shuffle": "exact_public_token",
     "length": "exported_len_equals_uploaded_and_exported_sequence_length",
@@ -75,6 +76,31 @@
     "silent_normalization": false,
     "thresholds_applied": false,
     "biological_summary_calculated": false
+  },
+  "private_membership_validation": {
+    "validator": "pinned_candidate_preparation_normalizer",
+    "record_reconstruction": "uploaded_sequence_with_private_membership_fields",
+    "scientific_rules_duplicated": false,
+    "noncanonical_form": "fail_closed",
+    "error_conversion": "candidate_preparation_error_to_export_validation_error",
+    "source_identity_syntax": true,
+    "per_condition_provenance": true,
+    "index_constraints": "nonnegative_or_positive_where_defined",
+    "sha256_fields": true,
+    "b1_training_seed": null,
+    "d1_seed_block": [
+      {
+        "training_seed": 43,
+        "technical_block": "A"
+      },
+      {
+        "training_seed": 44,
+        "technical_block": "B"
+      }
+    ],
+    "invalid_or_mixed_d1_seeds": "fail_closed",
+    "multiplicity": "must_equal_complete_source_occurrences",
+    "source_occurrence_order": "canonical_m9b2_order_required"
   },
   "join": {
     "key": "opaque_candidate_id",

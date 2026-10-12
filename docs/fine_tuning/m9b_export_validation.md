@@ -4,7 +4,7 @@
 |---|---|
 | Status | `DEFINED_SYNTHETIC_ONLY_EXPORT_BEHAVIOR_UNRESOLVED` |
 | Stage | M9B-3, caller-supplied bytes and synthetic fixtures only |
-| Contract | `config/modelling/aptarank_export_validation_contract.json`, SHA-256 `91c318459789bb95eeca169cc398941b71b2f73856a416ea308142ebffd43a1f` |
+| Contract | `config/modelling/aptarank_export_validation_contract.json`, SHA-256 `5c5831c0d9e7e86c8ad9c3de7c569ea2db347ddf9941e6e743491cddfd4a700d` |
 | Plan | `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md`, version 3.3, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe` |
 | Evidence contract | `config/modelling/aptarank_evidence_contract.json`, SHA-256 `0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b` |
 | Preparation contract | `config/modelling/aptarank_candidate_preparation_contract.json`, SHA-256 `3bcfbdf14cd7e777a0b2746f91d0335ba4876195f5012610157e5aa23e083096` |
@@ -14,7 +14,7 @@ M9B-3 checks a downloaded shortlist against the upload and the private membershi
 
 ## Reused pins
 
-The export contract fails closed unless these files match the recorded digests. CSV parsing, opaque-id shape, the finite-decimal check, and id-keyed sequence comparison are the existing ARP-1 helpers. Private-key fields and JSONL splitting are the corrected M9B-2 contract and the existing record splitter. Public column order and export tokens are the M9B-1 facts.
+The export contract fails closed unless these files match the recorded digests. CSV parsing, opaque-id shape, the finite-decimal check, and id-keyed sequence comparison are the existing ARP-1 helpers. Private-key fields and JSONL splitting are the corrected M9B-2 contract and the existing record splitter. Each private membership is validated by that pinned normalizer, not by a second copy of its scientific rules. Public column order and export tokens are the M9B-1 facts.
 
 | Role | Path | SHA-256 |
 |---|---|---|
@@ -31,12 +31,14 @@ Rows join on the opaque candidate id. The export column is `candidate`, the uplo
 
 The exported sequence must be character-for-character the sequence stored for that same id. A sequence that belongs to a different uploaded id is substitution. Any other difference is a mismatch. Case and T are not rewritten.
 
-Every private-key membership for that id is kept, including two conditions that selected one uploaded sequence. Memberships are emitted in condition order B0, B1, B2, D1. Source occurrences stay in the supplied order. The private key still does not carry a sequence. Declared multiplicity must equal the number of source occurrences. Comparison roles stay the recorded condition roles.
+Every private-key membership for that id is kept, including two conditions that selected one uploaded sequence. Memberships are emitted in condition order B0, B1, B2, D1. The private key still does not carry a sequence. The uploaded sequence is used only to rebuild the M9B-2 input record (`condition`, `sequence`, `length`, `multiplicity`, `source_occurrences`) and pass it to the pinned candidate-preparation normalizer. Preparation failures become M9B-3 validation errors. A private key that is not already in canonical M9B-2 form fails closed and is not repaired.
+
+That delegated check is the M9B-2 rule, including source-identity syntax, the provenance keys and value constraints for each condition, nonnegative or positive indices where those constraints are defined, SHA-256 fields, a null B1 training seed, D1 seed 43 with technical block A and seed 44 with technical block B, refusal of any other or mixed D1 seed, multiplicity equal to the complete occurrence list, and canonical source-occurrence order. Source occurrences that are already in that order are retained. A reversed occurrence list fails closed.
 
 ## Fields that are checked and not recomputed
 
-- Rank is a positive integer without a leading zero. Across the exported rows it is the consecutive 1-based ordinal of descending exported aptamer-likeness, with ties broken by ascending candidate id. It is not the statistical minimum rank used inside the empirical CDF. The number in the likeness cell is parsed only to order those rows. It is not a new Tier 1 score.
-- Aptamer-likeness must be a finite decimal token. The original token is copied into the joined row. Non-finite tokens are rejected. No threshold is applied.
+- Rank is a positive integer without a leading zero. Across the exported rows it is the consecutive 1-based ordinal of descending exported aptamer-likeness, with ties broken by ascending candidate id. It is not the statistical minimum rank used inside the empirical CDF. The number in the likeness cell is parsed only to apply the closed interval and to order those rows. It is not a new Tier 1 score.
+- Aptamer-likeness must be a finite decimal token in the closed interval [0, 1] after that parse. The original valid token is copied into the joined row and is not rewritten. Exact 0 and exact 1 are accepted. Negative values and values greater than 1 are rejected, as are non-finite tokens. No selection threshold is applied.
 - Compatibility and shuffle must be exact public tokens. They are not interpreted.
 - `len` must be a nonnegative integer and must equal the character length of the exported sequence. After the sequences match, that length is also the uploaded length and every private-key length for the id.
 

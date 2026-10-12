@@ -11972,3 +11972,23 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_export_validation` passed 12 tests. With the M9B-2 preparation suite, the AptaRank evidence, I/O, and Tier 1 suites, the generator-eval synthetic suites, and `tests.modelling.test_modelling_contract`, 274 tests passed.
 
 **Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, production uploads, real AptaRank downloads, the UI, the API, and `results/` were not opened. AptaRank was not modified or run. No overlap, leakage, nearest-TRAIN, biological summary, Tier 1, or Tier 2 score was calculated.
+
+## 2026-10-12 — M9B-3 likeness interval and private-key provenance
+
+**Stage:** Aim 2 / modelling / M9B-3 synthetic-only AptaRank downloaded-export validation
+
+**Status:** `DEFINED_SYNTHETIC_ONLY_EXPORT_BEHAVIOR_UNRESOLVED`. This correction checks exported aptamer-likeness on the closed interval [0, 1] and checks every private membership with the pinned M9B-2 normalizer. It does not resolve live export behavior. No scientific result is claimed.
+
+**Plan:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` stays the active plan, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. It was not edited.
+
+**Contract:** `config/modelling/aptarank_export_validation_contract.json`, SHA-256 `5c5831c0d9e7e86c8ad9c3de7c569ea2db347ddf9941e6e743491cddfd4a700d`. The previous M9B-3 digest was `91c318459789bb95eeca169cc398941b71b2f73856a416ea308142ebffd43a1f`.
+
+**Aptamer-likeness:** After the existing finite-decimal parse, the value must lie in the closed interval [0, 1]. Exact 0 and exact 1 are accepted. Negative values and values greater than 1 are rejected. The original valid token is copied into the joined row and is not rewritten. No selection threshold is applied, and the score is not recomputed.
+
+**Private membership:** Each private-key row is rebuilt as an M9B-2 input record by attaching the uploaded sequence. That record is passed to the pinned candidate-preparation normalizer. Its errors become M9B-3 validation errors. The M9B-3 module does not keep a second copy of the scientific rules. A private key that is not already in canonical M9B-2 form fails closed. The delegated checks cover source-identity syntax, per-condition provenance keys and value constraints, nonnegative or positive indices where defined, SHA-256 fields, a null B1 training seed, D1 seed 43 with block A and seed 44 with block B, refusal of invalid or mixed D1 seeds, multiplicity equal to the complete occurrence list, and canonical source-occurrence order.
+
+**Missing rows:** `live_export_behavior` remains unresolved until M9C. The caller must still pass `require_complete` or `allow_partial`.
+
+**Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_export_validation` passed 14 tests. With the M9B-2 preparation suite, the AptaRank evidence, I/O, and Tier 1 suites, the generator-eval synthetic suites, and `tests.modelling.test_modelling_contract`, 276 tests passed.
+
+**Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, production uploads, real AptaRank downloads, the UI, the API, and `results/` were not opened. AptaRank was not modified or run. No overlap, leakage, nearest-TRAIN, biological summary, Tier 1, or Tier 2 score was calculated.

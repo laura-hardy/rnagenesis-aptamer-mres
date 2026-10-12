@@ -4,10 +4,15 @@
 The validator accepts caller-supplied upload bytes, private-membership bytes,
 and shortlist bytes. It joins on the opaque candidate id, checks the public
 shortlist fields recorded in M9B-1, and returns restricted joined bytes plus a
-sequence-free manifest. It does not read a path, a production upload, a real
-download, or AptaRank. It does not recompute a score. Deployed omission of
-export rows stays unresolved until M9C, so the caller must name the missing-row
-policy. A missing row is not given a rejection reason.
+sequence-free manifest. Exported aptamer-likeness must be a finite decimal in
+the closed interval [0, 1]; the original token is kept. Each private membership
+is checked by reconstructing the M9B-2 input record from the uploaded sequence
+and delegating to the pinned candidate-preparation normalizer. A private key
+that is not already in canonical M9B-2 form fails closed. The validator does
+not read a path, a production upload, a real download, or AptaRank. It does not
+recompute a score. Deployed omission of export rows stays unresolved until
+M9C, so the caller must name the missing-row policy. A missing row is not
+given a rejection reason.
 """
 
 from __future__ import annotations
@@ -25,7 +30,7 @@ SCHEMA_VERSION = "m9b-aptarank-export-validation-v1"
 STATUS = "DEFINED_SYNTHETIC_ONLY_EXPORT_BEHAVIOR_UNRESOLVED"
 STAGE = "M9B-3"
 CONTRACT_RELATIVE = "config/modelling/aptarank_export_validation_contract.json"
-CONTRACT_SHA256 = "91c318459789bb95eeca169cc398941b71b2f73856a416ea308142ebffd43a1f"
+CONTRACT_SHA256 = "5c5831c0d9e7e86c8ad9c3de7c569ea2db347ddf9941e6e743491cddfd4a700d"
 PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
 PLAN_SHA256 = "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
 EVIDENCE_CONTRACT_RELATIVE = "config/modelling/aptarank_evidence_contract.json"
@@ -159,6 +164,7 @@ TOP_LEVEL_KEYS = (
     "reused_modules",
     "export_schema",
     "field_validation",
+    "private_membership_validation",
     "join",
     "missing_row_policy",
     "rejection_records",
@@ -185,6 +191,7 @@ EXPORT_SCHEMA_KEYS = (
 )
 FIELD_KEYS = (
     "aptamer_likeness",
+    "aptamer_likeness_interval",
     "compatibility",
     "shuffle",
     "length",
@@ -246,6 +253,41 @@ INPUT_KEYS = (
     "production_uploads",
     "real_downloads",
 )
+PRIVATE_MEMBERSHIP_KEYS = (
+    "validator",
+    "record_reconstruction",
+    "scientific_rules_duplicated",
+    "noncanonical_form",
+    "error_conversion",
+    "source_identity_syntax",
+    "per_condition_provenance",
+    "index_constraints",
+    "sha256_fields",
+    "b1_training_seed",
+    "d1_seed_block",
+    "invalid_or_mixed_d1_seeds",
+    "multiplicity",
+    "source_occurrence_order",
+)
+D1_SEED_BLOCK = (
+    {"training_seed": 43, "technical_block": "A"},
+    {"training_seed": 44, "technical_block": "B"},
+)
+PREPARATION_ERROR_CODES = {
+    "length_invalid": "length_mismatch",
+    "length_ineligible": "length_ineligible",
+    "multiplicity_mismatch": "multiplicity_mismatch",
+    "duplicate_source_identity": "duplicate_source_identity",
+    "source_identity_invalid": "source_identity_invalid",
+    "provenance_invalid": "provenance_invalid",
+    "d1_training_seed_invalid": "d1_training_seed_invalid",
+    "ambiguous_d1_provenance": "ambiguous_d1_provenance",
+    "source_occurrence_invalid": "private_key_invalid",
+    "condition_invalid": "private_key_invalid",
+    "input_invalid": "private_key_invalid",
+    "sequence_invalid": "sequence_alphabet",
+    "malformed_input": "malformed_private_key",
+}
 PLAN_KEYS = ("path", "version", "revision_date", "sha256")
 EVIDENCE_PIN_KEYS = ("path", "package_id", "sha256")
 PREPARATION_PIN_KEYS = ("path", "package_id", "schema_version", "sha256")
@@ -416,7 +458,12 @@ def validate_contract_document(document):
     )
     fields = document["field_validation"]
     _exact_keys(fields, FIELD_KEYS, "spec_invalid", "the field-validation record drifted")
-    _require(fields["aptamer_likeness"] == "finite_decimal_token_preserved", "spec_invalid", "the likeness rule drifted")
+    _require(
+        fields["aptamer_likeness"] == "finite_decimal_closed_unit_interval_original_token_preserved",
+        "spec_invalid",
+        "the likeness rule drifted",
+    )
+    _require(fields["aptamer_likeness_interval"] == [0, 1], "spec_invalid", "the likeness interval drifted")
     _require(fields["compatibility"] == "exact_public_token", "spec_invalid", "the compatibility rule drifted")
     _require(fields["shuffle"] == "exact_public_token", "spec_invalid", "the shuffle rule drifted")
     _require(
@@ -431,6 +478,54 @@ def validate_contract_document(document):
     )
     for key in ("silent_normalization", "thresholds_applied", "biological_summary_calculated"):
         _require(fields[key] is False, "spec_invalid", key + " must remain false")
+    private_membership = document["private_membership_validation"]
+    _exact_keys(private_membership, PRIVATE_MEMBERSHIP_KEYS, "spec_invalid", "the private-membership validation record drifted")
+    _require(
+        private_membership["validator"] == "pinned_candidate_preparation_normalizer",
+        "spec_invalid",
+        "private memberships must use the pinned preparation normalizer",
+    )
+    _require(
+        private_membership["record_reconstruction"] == "uploaded_sequence_with_private_membership_fields",
+        "spec_invalid",
+        "the private-membership reconstruction drifted",
+    )
+    _require(
+        private_membership["scientific_rules_duplicated"] is False,
+        "spec_invalid",
+        "M9B-2 scientific rules must not be duplicated",
+    )
+    _require(private_membership["noncanonical_form"] == "fail_closed", "spec_invalid", "a noncanonical private key must fail closed")
+    _require(
+        private_membership["error_conversion"] == "candidate_preparation_error_to_export_validation_error",
+        "spec_invalid",
+        "preparation errors must become export-validation errors",
+    )
+    _require(private_membership["source_identity_syntax"] is True, "spec_invalid", "source-identity syntax must be checked")
+    _require(private_membership["per_condition_provenance"] is True, "spec_invalid", "per-condition provenance must be checked")
+    _require(
+        private_membership["index_constraints"] == "nonnegative_or_positive_where_defined",
+        "spec_invalid",
+        "the index constraints drifted",
+    )
+    _require(private_membership["sha256_fields"] is True, "spec_invalid", "SHA-256 provenance fields must be checked")
+    _require(private_membership["b1_training_seed"] is None, "spec_invalid", "the B1 training seed must stay null")
+    _require(private_membership["d1_seed_block"] == [dict(item) for item in D1_SEED_BLOCK], "spec_invalid", "the D1 seed block allocation drifted")
+    _require(
+        private_membership["invalid_or_mixed_d1_seeds"] == "fail_closed",
+        "spec_invalid",
+        "invalid or mixed D1 seeds must fail closed",
+    )
+    _require(
+        private_membership["multiplicity"] == "must_equal_complete_source_occurrences",
+        "spec_invalid",
+        "the multiplicity rule drifted",
+    )
+    _require(
+        private_membership["source_occurrence_order"] == "canonical_m9b2_order_required",
+        "spec_invalid",
+        "canonical source-occurrence order must be required",
+    )
     join = document["join"]
     _exact_keys(join, JOIN_KEYS, "spec_invalid", "the join record drifted")
     _require(join["key"] == "opaque_candidate_id", "spec_invalid", "the join key drifted")
@@ -720,62 +815,53 @@ def _upload_table(payload):
     return rows, sequences
 
 
-def _provenance_keys(condition):
-    preparation = _preparation()
-    if condition == "B0":
-        return preparation.B0_PROVENANCE_KEYS
-    if condition == "B2":
-        return preparation.B2_PROVENANCE_KEYS
-    return preparation.M8_PROVENANCE_KEYS
+def _convert_preparation_error(exc):
+    """Turn one pinned M9B-2 failure into an M9B-3 validation error.
 
-
-def _copy_provenance(condition, provenance):
-    expected = _provenance_keys(condition)
-    if type(provenance) is not dict or set(provenance) != set(expected):
-        raise ExportValidationError("private_key_invalid", "private-key provenance fields are not the recorded set")
-    copied = {}
-    for key in expected:
-        value = provenance[key]
-        if value is not None and type(value) is not str and type(value) is not int:
-            raise ExportValidationError("private_key_invalid", "a private-key provenance value is not a recorded scalar")
-        copied[key] = value
-    return copied
+    An unmapped preparation code fails closed. The scientific detail is kept
+    and is not replaced with a repaired membership.
+    """
+    code = PREPARATION_ERROR_CODES.get(exc.code, "private_key_invalid")
+    raise ExportValidationError(code, exc.detail) from exc
 
 
 def _copy_membership(row, sequence):
+    """Validate one private membership through the pinned M9B-2 normalizer.
+
+    The uploaded sequence rebuilds the M9B-2 input record. The private key
+    itself still has no sequence. A membership that the normalizer would
+    rewrite into canonical form is refused.
+    """
     preparation = _preparation()
     _exact_keys(row, preparation.PRIVATE_KEY_KEYS, "private_key_invalid", "a private-key row is not the recorded object")
     candidate_id = row["candidate_id"]
     if not _check_identifier(candidate_id):
         raise ExportValidationError("malformed_candidate_id", "a private-key candidate id is malformed")
-    condition = row["condition"]
-    if condition not in preparation.CONDITIONS:
-        raise ExportValidationError("private_key_invalid", "a private-key condition is not a recorded condition")
-    if row["comparison_role"] != preparation.COMPARISON_ROLES[condition]:
-        raise ExportValidationError("private_key_invalid", "a private-key comparison role does not match its condition")
-    if type(row["length"]) is not int or row["length"] != len(sequence):
-        raise ExportValidationError("length_mismatch", "candidate " + candidate_id + " private membership length does not match the uploaded sequence")
-    occurrences = row["source_occurrences"]
-    if type(occurrences) is not list or type(row["multiplicity"]) is not int or row["multiplicity"] != len(occurrences) or row["multiplicity"] < 1:
-        raise ExportValidationError("multiplicity_mismatch", "candidate " + candidate_id + " multiplicity does not equal its source occurrences")
-    copied_occurrences = []
-    for occurrence in occurrences:
-        _exact_keys(occurrence, preparation.OCCURRENCE_KEYS, "private_key_invalid", "a source occurrence is not the recorded object")
-        identity = occurrence["source_identity"]
-        if type(identity) is not str or identity == "" or identity != identity.strip():
-            raise ExportValidationError("private_key_invalid", "a source identity is empty")
-        copied_occurrences.append(
-            {
-                "source_identity": identity,
-                "provenance": _copy_provenance(condition, occurrence["provenance"]),
-            }
-        )
-    return {
-        "condition": condition,
-        "comparison_role": row["comparison_role"],
+    record = {
+        "condition": row["condition"],
+        "sequence": sequence,
         "length": row["length"],
         "multiplicity": row["multiplicity"],
-        "source_occurrences": copied_occurrences,
+        "source_occurrences": row["source_occurrences"],
+    }
+    try:
+        normalized = preparation._normalize_one(record)
+    except preparation.CandidatePreparationError as exc:
+        _convert_preparation_error(exc)
+    if (
+        row["condition"] != normalized["condition"]
+        or row["comparison_role"] != normalized["comparison_role"]
+        or row["length"] != normalized["length"]
+        or row["multiplicity"] != normalized["multiplicity"]
+        or row["source_occurrences"] != normalized["source_occurrences"]
+    ):
+        raise ExportValidationError("private_key_invalid", "a private-key membership is not in canonical M9B-2 form")
+    return {
+        "condition": normalized["condition"],
+        "comparison_role": normalized["comparison_role"],
+        "length": normalized["length"],
+        "multiplicity": normalized["multiplicity"],
+        "source_occurrences": normalized["source_occurrences"],
     }
 
 
@@ -873,9 +959,15 @@ def _likeness(token, candidate_id):
     if kind == "nonfinite":
         raise ExportValidationError("nonfinite_aptamer_likeness", "candidate " + candidate_id + " aptamer-likeness is not finite")
     try:
-        return Decimal(token)
+        score = Decimal(token)
     except InvalidOperation as exc:
         raise ExportValidationError("malformed_aptamer_likeness", "candidate " + candidate_id + " aptamer-likeness is malformed") from exc
+    if not score.is_finite() or score < 0 or score > 1:
+        raise ExportValidationError(
+            "aptamer_likeness_out_of_range",
+            "candidate " + candidate_id + " aptamer-likeness is outside the closed interval [0, 1]",
+        )
+    return score
 
 
 def _check_export_row(row):

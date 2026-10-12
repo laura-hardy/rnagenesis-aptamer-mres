@@ -28,7 +28,7 @@ if MODELLING not in sys.path:
 
 import aptarank_export_validation as validation
 
-CONTRACT_SHA256 = "91c318459789bb95eeca169cc398941b71b2f73856a416ea308142ebffd43a1f"
+CONTRACT_SHA256 = "5c5831c0d9e7e86c8ad9c3de7c569ea2db347ddf9941e6e743491cddfd4a700d"
 PLAN_SHA256 = "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
 EVIDENCE_SHA256 = "0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b"
 PREPARATION_SHA256 = "3bcfbdf14cd7e777a0b2746f91d0335ba4876195f5012610157e5aa23e083096"
@@ -93,6 +93,15 @@ def provenance(condition, seed=None, sampled_length=20):
         "source_artifact_sha256": ARTIFACT_SHA,
         "d1_training_seed": None if condition == "B1" else seed,
     }
+
+
+def d1_occurrence(identity, invocation_index, seed=43, block=None):
+    if block is None:
+        block = "B" if seed == 44 else "A"
+    document = provenance("D1", seed=seed)
+    document["invocation_index"] = invocation_index
+    document["technical_block"] = block
+    return {"source_identity": identity, "provenance": document}
 
 
 def membership(candidate_id, condition, length, source_identity, seed=None, sampled_length=20):
@@ -209,6 +218,24 @@ class ExportValidationTests(unittest.TestCase):
         self.assertEqual(document["export_schema"]["columns"], list(validation.EXPORT_COLUMNS))
         self.assertIn("\u2014", document["export_schema"]["shuffle_tokens"])
         self.assertIn("weak", document["export_schema"]["compatibility_tokens"])
+        self.assertEqual(
+            document["field_validation"]["aptamer_likeness"],
+            "finite_decimal_closed_unit_interval_original_token_preserved",
+        )
+        self.assertEqual(document["field_validation"]["aptamer_likeness_interval"], [0, 1])
+        self.assertIs(document["field_validation"]["thresholds_applied"], False)
+        membership = document["private_membership_validation"]
+        self.assertEqual(membership["validator"], "pinned_candidate_preparation_normalizer")
+        self.assertIs(membership["scientific_rules_duplicated"], False)
+        self.assertEqual(membership["noncanonical_form"], "fail_closed")
+        self.assertIsNone(membership["b1_training_seed"])
+        self.assertEqual(
+            membership["d1_seed_block"],
+            [
+                {"training_seed": 43, "technical_block": "A"},
+                {"training_seed": 44, "technical_block": "B"},
+            ],
+        )
 
     def test_pin_drift_fails_closed(self):
         document = validation.load_pinned_contract()
@@ -331,18 +358,12 @@ class ExportValidationTests(unittest.TestCase):
         with self.assertRaises(validation.ExportValidationError) as caught:
             self.validate(export=export_bytes(gapped))
         self.assertEqual(caught.exception.code, "rank_order")
-        signed = copy.deepcopy(base_export_rows())
-        signed[0][0] = "3"
-        signed[0][2] = "-1"
-        signed[1][0] = "1"
-        signed[1][2] = "2.5"
-        signed[2][0] = "2"
-        signed[2][2] = "2.5"
-        signed_result = self.validate(export=export_bytes(signed))
-        self.assertEqual(
-            [(row["candidate_id"], row["rank"], row["aptamer-likeness"]) for row in joined_rows(signed_result)],
-            [("cand_alpha", 1, "2.5"), ("cand_bravo", 2, "2.5"), ("cand_charlie", 3, "-1")],
-        )
+        for token in ("-1", "2.5"):
+            signed = copy.deepcopy(base_export_rows())
+            signed[1][2] = token
+            with self.assertRaises(validation.ExportValidationError) as caught:
+                self.validate(export=export_bytes(signed))
+            self.assertEqual(caught.exception.code, "aptamer_likeness_out_of_range")
 
     def test_missing_extra_and_duplicate_ids(self):
         kept = [row for row in base_export_rows() if row[1] != "cand_bravo"]
@@ -445,6 +466,111 @@ class ExportValidationTests(unittest.TestCase):
         with self.assertRaises(validation.ExportValidationError) as caught:
             self.validate(private=private_bytes(mismatched))
         self.assertEqual(caught.exception.code, "multiplicity_mismatch")
+
+    def test_aptamer_likeness_closed_unit_interval(self):
+        rows = copy.deepcopy(base_export_rows())
+        rows[0][0] = "2"
+        rows[1][0] = "3"
+        rows[1][2] = "0"
+        rows[2][0] = "1"
+        rows[2][2] = "1"
+        result = self.validate(export=export_bytes(rows))
+        self.assertEqual(
+            [(row["candidate_id"], row["rank"], row["aptamer-likeness"]) for row in joined_rows(result)],
+            [("cand_bravo", 1, "1"), ("cand_charlie", 2, "0.900"), ("cand_alpha", 3, "0")],
+        )
+        self.assertIn(b'"aptamer-likeness":"0"', result["joined_candidates"])
+        self.assertIn(b'"aptamer-likeness":"1"', result["joined_candidates"])
+        spelled = copy.deepcopy(base_export_rows())
+        spelled[0][0] = "2"
+        spelled[1][0] = "3"
+        spelled[1][2] = "0.0"
+        spelled[2][0] = "1"
+        spelled[2][2] = "1.0"
+        spelled_result = self.validate(export=export_bytes(spelled))
+        spelled_rows = {row["candidate_id"]: row for row in joined_rows(spelled_result)}
+        self.assertEqual(spelled_rows["cand_alpha"]["aptamer-likeness"], "0.0")
+        self.assertEqual(spelled_rows["cand_bravo"]["aptamer-likeness"], "1.0")
+        self.assertEqual(spelled_rows["cand_alpha"]["rank"], 3)
+        self.assertEqual(spelled_rows["cand_bravo"]["rank"], 1)
+        for token in ("-1", "-0.1", "-1e-400", "1.1", "2", "1.0000000000000001"):
+            rejected = copy.deepcopy(base_export_rows())
+            rejected[1][2] = token
+            with self.assertRaises(validation.ExportValidationError) as caught:
+                self.validate(export=export_bytes(rejected))
+            self.assertEqual(caught.exception.code, "aptamer_likeness_out_of_range", msg=token)
+            self.assertNotIn(ALPHA, caught.exception.detail)
+            self.assertNotIn(token, caught.exception.detail)
+
+    def test_private_membership_uses_pinned_m9b2_semantics(self):
+        def refuse(rows, code):
+            with self.assertRaises(validation.ExportValidationError) as caught:
+                self.validate(private=private_bytes(rows))
+            self.assertEqual(caught.exception.code, code)
+            self.assertNotIn(ALPHA, caught.exception.detail)
+            return caught.exception
+
+        seed_42 = copy.deepcopy(base_memberships())
+        seed_42[1]["source_occurrences"][0]["provenance"]["d1_training_seed"] = 42
+        refuse(seed_42, "d1_training_seed_invalid")
+        mismatch = copy.deepcopy(base_memberships())
+        mismatch[1]["source_occurrences"][0]["provenance"]["technical_block"] = "B"
+        refuse(mismatch, "d1_training_seed_invalid")
+        b1_seed = copy.deepcopy(base_memberships())
+        b1_seed[0]["source_occurrences"][0]["provenance"]["d1_training_seed"] = 43
+        refuse(b1_seed, "d1_training_seed_invalid")
+        bad_hash = copy.deepcopy(base_memberships())
+        bad_hash[2]["source_occurrences"][0]["provenance"]["source_artifact_sha256"] = "not-a-sha256"
+        refuse(bad_hash, "provenance_invalid")
+        bad_index = copy.deepcopy(base_memberships())
+        bad_index[0]["source_occurrences"][0]["provenance"]["invocation_index"] = -1
+        refuse(bad_index, "provenance_invalid")
+        bad_identity = copy.deepcopy(base_memberships())
+        bad_identity[2]["source_occurrences"][0]["source_identity"] = "synthetic src"
+        refuse(bad_identity, "source_identity_invalid")
+        mixed = copy.deepcopy(base_memberships())
+        first = mixed[1]["source_occurrences"][0]
+        mixed[1]["source_occurrences"] = [
+            first,
+            d1_occurrence("synthetic-src-d1-alpha-other", 0, seed=44, block="B"),
+        ]
+        mixed[1]["multiplicity"] = 2
+        refuse(mixed, "ambiguous_d1_provenance")
+        reversed_rows = copy.deepcopy(base_memberships())
+        earlier = reversed_rows[1]["source_occurrences"][0]
+        later = d1_occurrence("synthetic-src-d1-alpha-later", 2, seed=43, block="A")
+        reversed_rows[1]["source_occurrences"] = [later, earlier]
+        reversed_rows[1]["multiplicity"] = 2
+        refuse(reversed_rows, "private_key_invalid")
+        ordered = copy.deepcopy(base_memberships())
+        ordered[1]["source_occurrences"] = [earlier, later]
+        ordered[1]["multiplicity"] = 2
+        result = self.validate(private=private_bytes(ordered))
+        alpha = next(row for row in joined_rows(result) if row["candidate_id"] == "cand_alpha")
+        d1 = next(item for item in alpha["memberships"] if item["condition"] == "D1")
+        self.assertEqual(d1["multiplicity"], 2)
+        self.assertEqual(len(d1["source_occurrences"]), 2)
+        self.assertEqual(
+            [item["source_identity"] for item in d1["source_occurrences"]],
+            ["synthetic-src-d1-alpha", "synthetic-src-d1-alpha-later"],
+        )
+        self.assertEqual(
+            [item["provenance"]["d1_training_seed"] for item in d1["source_occurrences"]],
+            [43, 43],
+        )
+        self.assertEqual(
+            [item["provenance"]["technical_block"] for item in d1["source_occurrences"]],
+            ["A", "A"],
+        )
+        self.assertNotIn("sequence", d1)
+        seed_44 = copy.deepcopy(base_memberships())
+        seed_44[1]["source_occurrences"][0]["provenance"]["d1_training_seed"] = 44
+        seed_44[1]["source_occurrences"][0]["provenance"]["technical_block"] = "B"
+        accepted = self.validate(private=private_bytes(seed_44))
+        accepted_alpha = next(row for row in joined_rows(accepted) if row["candidate_id"] == "cand_alpha")
+        accepted_d1 = next(item for item in accepted_alpha["memberships"] if item["condition"] == "D1")
+        self.assertEqual(accepted_d1["source_occurrences"][0]["provenance"]["d1_training_seed"], 44)
+        self.assertEqual(accepted_d1["source_occurrences"][0]["provenance"]["technical_block"], "B")
 
     def test_partial_export_and_explicit_rejections(self):
         kept = [row for row in base_export_rows() if row[1] != "cand_bravo"]
