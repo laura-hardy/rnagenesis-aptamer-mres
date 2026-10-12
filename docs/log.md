@@ -11765,3 +11765,28 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 **Boundary:** This review did not stage, commit, or push on the live checkout. It did not launch, consume, generate, assemble, filter, or evaluate. It did not modify the run root or the evaluation worktree.
 
+## 2026-10-12 — Stage 4 M9 production parsing evidence
+
+**Stage:** Aim 2 / modelling / M9 production derived ledgers
+
+**Status:** COMPLETE for the parser freeze, the production derived-ledger run, and closeout hardening. M9A exact cross-condition overlap and leakage preparation remains a separate gate and has not started.
+
+**Commits:**
+
+- `c8202f9dd33b7f8bbbad8967ac88e0e00c04737b` — Implement frozen synthetic-only M9 parser contract
+- `d40584d4a666dc2ca7a778a4b1ef1bbda449b484` — Correct M8 relative-path provenance validation
+- `378f574b1620a9ff999082262868bffbe647d063` — Implement M9 production derived-ledger runner
+- `f703a8c721384e821337eba9a59093918f8decfe` — Harden M9 production ledger closeout
+
+**Location:** `results/fine_tuning/m9_generator_evaluation/`. Parser `m9-biological-parser-v1`. Adapter `m9-source-adapter-v2`. Frozen parser-contract SHA-256 `a8cda86af2cd6aff52ed7929c1a8cdfe134394f9087c768a731e8597339fe872`. Frozen source-manifest SHA-256 `89be54f49b020027d58686ececfc1d743c16e58c0ed12d0b6bae269d36c4aa6c`. Production runner commit `378f574b1620a9ff999082262868bffbe647d063`.
+
+**Accounting:** 120,080 attempts: B0 30,080, B1 30,000, B2 30,000, D1 30,000. D1 is 15,000 from training seed 43 and 15,000 from training seed 44. Every attempt is `valid_canonical_sequence`. That result is syntactic validity only, not biological validity. Empty, unparseable, non-sequence, and parsed non-ACGU outcomes are zero.
+
+**Duplicates:** Exact duplicates were counted only within a condition. B1 has 29,983 distinct valid sequences, 29,969 singleton rows, 31 duplicate-member rows, 14 repeated groups, and maximum multiplicity 4. B0, B2, and D1 have no within-condition repeats. `overall.distinct_valid_sequences = 120063` is the sum of the per-condition distinct counts, not global distinctness. Cross-condition overlap was not computed.
+
+**Outputs:** Summary `m9_parsing_accounting_summary.json`, 4,014 bytes, SHA-256 `b06aaf5cf9d2938cf555c496990ba6d04ed4d385fc5c7a6d7071eb504df148d4`. Manifest `m9_production_manifest.json`, 7,876 bytes, SHA-256 `9aa5f60f939a8b25d031967ed3466a26d9d8e2d0610c76ec0b5db4cb43c2cc80`. The five JSONL ledgers remain ignored and are retained as regenerable server-side artifacts. Their recorded digests are in the manifest and in the directory README. The summary and manifest contain no sequence strings.
+
+**Boundary:** REF, EVAL, TRAIN, VALIDATION, models, checkpoints, and AptaRank were not accessed. No sealed source or JSONL ledger was rewritten. Biological evaluation was not performed.
+
+**Next gate:** M9A exact cross-condition overlap and leakage preparation remains separate. It must not access REF or EVAL.
+

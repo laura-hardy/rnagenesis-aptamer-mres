@@ -1,0 +1,128 @@
+{
+  "schema": "generator-eval-parsing-accounting-m9-r1",
+  "sequence_strings_emitted": false,
+  "cross_condition_overlap_computed": false,
+  "conditions": {
+    "B0": {
+      "total_attempts": 30080,
+      "parser_outcome_counts": {
+        "valid_canonical_sequence": 30080,
+        "empty_output": 0,
+        "unparseable_output": 0,
+        "non_sequence_output": 0,
+        "parsed_non_acgu": 0
+      },
+      "exclusion_reason_counts": {
+        "empty_output": 0,
+        "unparseable_output": 0,
+        "non_sequence_output": 0,
+        "parsed_non_acgu": 0
+      },
+      "valid_canonical_count": 30080,
+      "invalid_or_non_sequence_count": 0,
+      "valid_singleton_row_count": 30080,
+      "valid_duplicate_member_row_count": 0,
+      "distinct_valid_sequences": 30080,
+      "repeated_within_condition_sequence_groups": 0,
+      "maximum_within_condition_multiplicity": 1
+    },
+    "B1": {
+      "total_attempts": 30000,
+      "parser_outcome_counts": {
+        "valid_canonical_sequence": 30000,
+        "empty_output": 0,
+        "unparseable_output": 0,
+        "non_sequence_output": 0,
+        "parsed_non_acgu": 0
+      },
+      "exclusion_reason_counts": {
+        "empty_output": 0,
+        "unparseable_output": 0,
+        "non_sequence_output": 0,
+        "parsed_non_acgu": 0
+      },
+      "valid_canonical_count": 30000,
+      "invalid_or_non_sequence_count": 0,
+      "valid_singleton_row_count": 29969,
+      "valid_duplicate_member_row_count": 31,
+      "distinct_valid_sequences": 29983,
+      "repeated_within_condition_sequence_groups": 14,
+      "maximum_within_condition_multiplicity": 4
+    },
+    "B2": {
+      "total_attempts": 30000,
+      "parser_outcome_counts": {
+        "valid_canonical_sequence": 30000,
+        "empty_output": 0,
+        "unparseable_output": 0,
+        "non_sequence_output": 0,
+        "parsed_non_acgu": 0
+      },
+      "exclusion_reason_counts": {
+        "empty_output": 0,
+        "unparseable_output": 0,
+        "non_sequence_output": 0,
+        "parsed_non_acgu": 0
+      },
+      "valid_canonical_count": 30000,
+      "invalid_or_non_sequence_count": 0,
+      "valid_singleton_row_count": 30000,
+      "valid_duplicate_member_row_count": 0,
+      "distinct_valid_sequences": 30000,
+      "repeated_within_condition_sequence_groups": 0,
+      "maximum_within_condition_multiplicity": 1
+    },
+    "D1": {
+      "total_attempts": 30000,
+      "parser_outcome_counts": {
+        "valid_canonical_sequence": 30000,
+        "empty_output": 0,
+        "unparseable_output": 0,
+        "non_sequence_output": 0,
+        "parsed_non_acgu": 0
+      },
+      "exclusion_reason_counts": {
+        "empty_output": 0,
+        "unparseable_output": 0,
+        "non_sequence_output": 0,
+        "parsed_non_acgu": 0
+      },
+      "valid_canonical_count": 30000,
+      "invalid_or_non_sequence_count": 0,
+      "valid_singleton_row_count": 30000,
+      "valid_duplicate_member_row_count": 0,
+      "distinct_valid_sequences": 30000,
+      "repeated_within_condition_sequence_groups": 0,
+      "maximum_within_condition_multiplicity": 1,
+      "d1_training_seed_attempt_counts": {
+        "43": 15000,
+        "44": 15000
+      }
+    }
+  },
+  "overall": {
+    "total_attempts": 120080,
+    "parser_outcome_counts": {
+      "valid_canonical_sequence": 120080,
+      "empty_output": 0,
+      "unparseable_output": 0,
+      "non_sequence_output": 0,
+      "parsed_non_acgu": 0
+    },
+    "exclusion_reason_counts": {
+      "empty_output": 0,
+      "unparseable_output": 0,
+      "non_sequence_output": 0,
+      "parsed_non_acgu": 0
+    },
+    "valid_canonical_count": 120080,
+    "invalid_or_non_sequence_count": 0,
+    "valid_singleton_row_count": 120049,
+    "valid_duplicate_member_row_count": 31,
+    "distinct_valid_sequences": 120063,
+    "repeated_within_condition_sequence_groups": 14,
+    "maximum_within_condition_multiplicity": 4,
+    "distinct_valid_sequences_are_within_condition_sums": true,
+    "cross_condition_overlap_computed": false
+  }
+}

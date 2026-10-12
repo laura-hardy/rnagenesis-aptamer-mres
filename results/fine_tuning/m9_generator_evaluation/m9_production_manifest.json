@@ -1,0 +1,194 @@
+{
+  "schema": "generator-eval-production-manifest-m9-r1",
+  "runner_git_commit": "378f574b1620a9ff999082262868bffbe647d063",
+  "parser_contract": {
+    "schema": "generator-eval-parser-contract-m9-r2",
+    "relative_path": "config/modelling/generator_eval_parser_contract.json",
+    "sha256": "a8cda86af2cd6aff52ed7929c1a8cdfe134394f9087c768a731e8597339fe872",
+    "parser_version": "m9-biological-parser-v1",
+    "adapter_version": "m9-source-adapter-v2"
+  },
+  "parser_version": "m9-biological-parser-v1",
+  "adapter_version": "m9-source-adapter-v2",
+  "ledger_schema": "generator-eval-production-ledger-m9-r1",
+  "source_manifest": {
+    "schema": "generator-eval-source-manifest-m9-r1",
+    "path": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/config/modelling/generator_eval_source_manifest.json",
+    "sha256": "89be54f49b020027d58686ececfc1d743c16e58c0ed12d0b6bae269d36c4aa6c"
+  },
+  "inputs": [
+    {
+      "condition": "B0",
+      "logical_artifact_id": "b0:chunk:1:seed:4201",
+      "expected_sha256": "12df7c26eed40f68241455f43b20aed190de81c27d47f06d2117aaef0866f1f6",
+      "recomputed_sha256": "12df7c26eed40f68241455f43b20aed190de81c27d47f06d2117aaef0866f1f6",
+      "byte_count": 117312
+    },
+    {
+      "condition": "B0",
+      "logical_artifact_id": "b0:chunk:2:seed:4202",
+      "expected_sha256": "1f8b9b082dc4cf01570d5aedb9d2fd1a71fb746c6ee63cde4fbef9c10a943cd6",
+      "recomputed_sha256": "1f8b9b082dc4cf01570d5aedb9d2fd1a71fb746c6ee63cde4fbef9c10a943cd6",
+      "byte_count": 117312
+    },
+    {
+      "condition": "B0",
+      "logical_artifact_id": "b0:chunk:3:seed:4203",
+      "expected_sha256": "49c6ff2ce0979ef406e7c63aeabf0fc6226ca2f5498b7b08f6c2fbf2b31e1ff3",
+      "recomputed_sha256": "49c6ff2ce0979ef406e7c63aeabf0fc6226ca2f5498b7b08f6c2fbf2b31e1ff3",
+      "byte_count": 117312
+    },
+    {
+      "condition": "B0",
+      "logical_artifact_id": "b0:chunk:4:seed:4204",
+      "expected_sha256": "cdd853c1a7d5a27e4c5ee7c242a7f0808b212aa7464d3d3bb41c11b78742d236",
+      "recomputed_sha256": "cdd853c1a7d5a27e4c5ee7c242a7f0808b212aa7464d3d3bb41c11b78742d236",
+      "byte_count": 117312
+    },
+    {
+      "condition": "B0",
+      "logical_artifact_id": "b0:chunk:5:seed:4205",
+      "expected_sha256": "f1bd2686fa5fb494bf9a270424fbdfbeb6b158669da09b4fc86694d6c5bd40f8",
+      "recomputed_sha256": "f1bd2686fa5fb494bf9a270424fbdfbeb6b158669da09b4fc86694d6c5bd40f8",
+      "byte_count": 117312
+    },
+    {
+      "condition": "B0",
+      "logical_artifact_id": "b0:chunk:6:seed:4206",
+      "expected_sha256": "275b744eeb2dd1cdc7b6042de65b5ea08cd159c1e90896d53f6300b1331d3904",
+      "recomputed_sha256": "275b744eeb2dd1cdc7b6042de65b5ea08cd159c1e90896d53f6300b1331d3904",
+      "byte_count": 117312
+    },
+    {
+      "condition": "B0",
+      "logical_artifact_id": "b0:chunk:7:seed:4207",
+      "expected_sha256": "db64a6e3c52980cbd62590f6b190774b55f079dfb8b552b27b3043141e4771ca",
+      "recomputed_sha256": "db64a6e3c52980cbd62590f6b190774b55f079dfb8b552b27b3043141e4771ca",
+      "byte_count": 117312
+    },
+    {
+      "condition": "B0",
+      "logical_artifact_id": "b0:chunk:8:seed:4208",
+      "expected_sha256": "63c21618be699ad1323570bbf2041db31fac6aa2d2b8c03691da767dfdd36b27",
+      "recomputed_sha256": "63c21618be699ad1323570bbf2041db31fac6aa2d2b8c03691da767dfdd36b27",
+      "byte_count": 117312
+    },
+    {
+      "condition": "B0",
+      "logical_artifact_id": "b0:chunk:9:seed:4209",
+      "expected_sha256": "1ec36b36e11fc966a870327b3cc02653c037382ffd9ce44cea7952cce6e0be0f",
+      "recomputed_sha256": "1ec36b36e11fc966a870327b3cc02653c037382ffd9ce44cea7952cce6e0be0f",
+      "byte_count": 117312
+    },
+    {
+      "condition": "B0",
+      "logical_artifact_id": "b0:chunk:10:seed:4210",
+      "expected_sha256": "b4e5f2e8ae9187d711dc614fd523e89f83dbc84b792b28c8f951cf343a38f511",
+      "recomputed_sha256": "b4e5f2e8ae9187d711dc614fd523e89f83dbc84b792b28c8f951cf343a38f511",
+      "byte_count": 117312
+    },
+    {
+      "condition": "B1",
+      "logical_artifact_id": "b1:m8-combined-raw-attempt-ledger",
+      "expected_sha256": "37ba0e1b852a6b8492a816a4adc0c6bfee15a554ba28a8ba5dd91d9e32a255d9",
+      "recomputed_sha256": "37ba0e1b852a6b8492a816a4adc0c6bfee15a554ba28a8ba5dd91d9e32a255d9",
+      "byte_count": 26427607
+    },
+    {
+      "condition": "B2",
+      "logical_artifact_id": "b2:empirical-null-raw-jsonl",
+      "expected_sha256": "bbe35f448db0d7fc02ad0156865798382b0b41e9ad047b4e52eddf7cff740c83",
+      "recomputed_sha256": "bbe35f448db0d7fc02ad0156865798382b0b41e9ad047b4e52eddf7cff740c83",
+      "byte_count": 6787972
+    },
+    {
+      "condition": "D1",
+      "logical_artifact_id": "d1:m8-combined-raw-attempt-ledger",
+      "expected_sha256": "cedcc36133f5dfb3678e1560c6d6bab703136fe89e512e939b9f93a9a6361de9",
+      "recomputed_sha256": "cedcc36133f5dfb3678e1560c6d6bab703136fe89e512e939b9f93a9a6361de9",
+      "byte_count": 28971289
+    }
+  ],
+  "b0_numeric_raw_concatenation_sha256": {
+    "expected_sha256": "ed612277105c6b8747fc7365cc6b67fa8a94e8e5e8e64ee535ecadcb37ff4aaa",
+    "recomputed_sha256": "ed612277105c6b8747fc7365cc6b67fa8a94e8e5e8e64ee535ecadcb37ff4aaa"
+  },
+  "outputs": [
+    {
+      "filename": "m9_b0_derived_attempt_ledger.jsonl",
+      "row_count": 30080,
+      "byte_count": 41103236,
+      "sha256": "4d35ea9e4980fa42e4dbefa08f80f49df39ca7517784ea1851ea20c3742fe6ef"
+    },
+    {
+      "filename": "m9_b1_derived_attempt_ledger.jsonl",
+      "row_count": 30000,
+      "byte_count": 50998055,
+      "sha256": "18d76af08e931dc46d59cba5c303a1824fced966337bb5cef06abcbb6bbaf935"
+    },
+    {
+      "filename": "m9_b2_derived_attempt_ledger.jsonl",
+      "row_count": 30000,
+      "byte_count": 42878534,
+      "sha256": "49ae765eef2aacb7ecc16a922cc663465a91f0e26f1abe8aff01eed7c6d86c06"
+    },
+    {
+      "filename": "m9_d1_derived_attempt_ledger.jsonl",
+      "row_count": 30000,
+      "byte_count": 53541744,
+      "sha256": "58cc3acb0e22d497521480d949ccb55237212bd8aec617f939471951c02deecd"
+    },
+    {
+      "filename": "m9_all_conditions_derived_attempt_ledger.jsonl",
+      "row_count": 120080,
+      "byte_count": 188521569,
+      "sha256": "d50c30e85b26e39e8a25ea2660f9a7fa07433417de757364eb36799ca8c6073e"
+    },
+    {
+      "filename": "m9_parsing_accounting_summary.json",
+      "row_count": null,
+      "byte_count": 4014,
+      "sha256": "b06aaf5cf9d2938cf555c496990ba6d04ed4d385fc5c7a6d7071eb504df148d4"
+    }
+  ],
+  "ordering": {
+    "conditions": [
+      "B0",
+      "B1",
+      "B2",
+      "D1"
+    ],
+    "within_condition": "source order",
+    "b0_chunks": "manifest source_chunks order",
+    "combined_ledger": "byte concatenation of B0, B1, B2, then D1"
+  },
+  "duplicate_policy": {
+    "population": "valid canonical sequences within one condition",
+    "multiplicity": "count of valid rows with that exact sequence in the same condition",
+    "duplicate_flag": "true for every valid row whose multiplicity is greater than one",
+    "singletons_flagged": false,
+    "invalid_rows": "multiplicity and duplicate flag are null",
+    "rows_dropped": false,
+    "cross_condition_overlap_computed": false
+  },
+  "d1_training_seed_attempt_counts": {
+    "43": 15000,
+    "44": 15000
+  },
+  "invocation": {
+    "argv": [
+      "scripts/modelling/generator_eval_production_ledger.py",
+      "--source-manifest",
+      "config/modelling/generator_eval_source_manifest.json",
+      "--output-dir",
+      "results/fine_tuning/m9_generator_evaluation"
+    ],
+    "production_totals": true
+  },
+  "serialization": "UTF-8 JSONL, LF after every row, production field order, compact separators",
+  "manifest_file": {
+    "filename": "m9_production_manifest.json",
+    "sha256_embedded": false,
+    "statement": "The SHA-256 of this manifest is the digest of these exact file bytes. It is not embedded, because embedding it would change the digest."
+  }
+}
