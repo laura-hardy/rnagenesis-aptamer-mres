@@ -4,7 +4,7 @@
 |---|---|
 | Status | `POLICY_FROZEN_REF_UNOPENED` |
 | Stage | M9C-1. The rest of M9C is not complete. |
-| Contract | `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `21a46064edf346d2eba1f369f80290d7801818ee038442f1092e80219428a21b` |
+| Contract | `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `b0387bc6d7c8d5328ccdbea05ad263b203b3405f80d7f359a6440751eb4e1b0f` |
 | Plan | `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md`, version 3.3, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe` |
 | Reused validator | `scripts/modelling/aptarank_io_preflight.py`, SHA-256 `eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01` |
 
@@ -14,7 +14,7 @@ This note freezes how the corrected REF CSV becomes the AptaRank reference uploa
 
 The frozen source is the 131-identity REF CSV, SHA-256 `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`, at the repository-relative path `data/processed/ref.csv`. Its header is the 85-column S5E clustered-corpus schema. `ft_split` is not part of that header.
 
-Preparation walks that file in its existing order and keeps one row for each distinct `sequence_core`. The expected live result is 113 accepted rows and zero dropped rows. The 18 later identity rows are duplicate-core collapses. They are not biological exclusions and they are not quality exclusions. Any other live result stops M9C.
+Preparation walks that file in its existing order and keeps one row for each distinct `sequence_core`. The expected AptaRank UI result is 113 accepted rows and zero dropped rows. That figure is an expectation, not an observed UI count. `aptarank_ui_executed` stays false, and both observed UI counts stay null. The 18 later identity rows are duplicate-core collapses. They are not biological exclusions and they are not quality exclusions. Sealed preparation that does not match this REF identity stops M9C. Matching the REF digest verifies the production file. It does not record an AptaRank result.
 
 For each core, the upload copies the first identity row and does not replace those fields from a later row:
 

@@ -22,7 +22,7 @@ SCHEMA_VERSION = "m9c-reference-upload-v1"
 STATUS = "POLICY_FROZEN_REF_UNOPENED"
 STAGE = "M9C-1"
 CONTRACT_RELATIVE = "config/modelling/aptarank_reference_upload_contract.json"
-CONTRACT_SHA256 = "21a46064edf346d2eba1f369f80290d7801818ee038442f1092e80219428a21b"
+CONTRACT_SHA256 = "b0387bc6d7c8d5328ccdbea05ad263b203b3405f80d7f359a6440751eb4e1b0f"
 PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
 PLAN_SHA256 = "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
 IO_SPEC_RELATIVE = "config/modelling/aptarank_io_spec.json"
@@ -36,8 +36,8 @@ SOURCE_COLUMN_COUNT = 85
 SOURCE_IDENTITY_ROWS = 131
 DISTINCT_SEQUENCE_CORES = 113
 DUPLICATE_CORE_COLLAPSES = 18
-ACCEPTED_COUNT = 113
-DROPPED_COUNT = 0
+EXPECTED_UI_ACCEPTED_COUNT = 113
+EXPECTED_UI_DROPPED_COUNT = 0
 STRUCTURE_FILE_SHA256 = "2e185a205c9be0bf76484e8ffb96ae225880723ed68eaaf25dffbbccaf01ff51"
 SELECTION_RECORD_SHA256 = "08f0c96af349ce4909d40c3004804317661777f72828cd807823341e0e4f0d04"
 TARGET_UPLOAD_SHA256 = "46471bb0643125ce86300ec050d6f0d3a09faa1d06dc325141c67cd1acdd5922"
@@ -57,12 +57,14 @@ MANIFEST_KEYS = (
     "source_row_count",
     "distinct_sequence_cores",
     "duplicate_core_collapses",
-    "accepted_count",
-    "dropped_count",
+    "prepared_upload_row_count",
     "reference_upload_sha256",
     "duplicate_provenance_sha256",
     "local_calibration",
-    "live_result",
+    "production_ref_identity_verified",
+    "aptarank_ui_executed",
+    "observed_ui_accepted_count",
+    "observed_ui_dropped_count",
 )
 TOP_LEVEL_KEYS = (
     "package_id",
@@ -84,7 +86,7 @@ TOP_LEVEL_KEYS = (
     "calibration",
     "source_schema",
     "retention",
-    "live_result",
+    "expected_live_ui_result",
     "external_ref",
     "frozen_target_mapping",
     "outputs",
@@ -277,28 +279,36 @@ def validate_contract_document(document, blobs):
     for source_name in FIELD_MAP.values():
         _require(source_name in columns, "schema_mismatch", "a retained source field is absent from the header")
     _require("partition" in columns and "sequence_core_sha256" in columns, "schema_mismatch", "the frozen REF header is incomplete")
-    live = document["live_result"]
+    expected = document["expected_live_ui_result"]
     _exact_keys(
-        live,
+        expected,
         (
+            "label",
             "source_sha256",
             "source_identity_rows",
             "distinct_sequence_cores",
             "duplicate_core_collapses",
-            "accepted",
-            "dropped",
+            "expected_ui_accepted_count",
+            "expected_ui_dropped_count",
             "other_result",
+            "aptarank_ui_executed",
+            "observed_ui_accepted_count",
+            "observed_ui_dropped_count",
         ),
         "spec_invalid",
-        "the live-result record changed",
+        "the expected UI result record changed",
     )
-    _require(live["source_sha256"] == REF_SHA256, "spec_invalid", "the frozen REF digest changed")
-    _require(live["source_identity_rows"] == SOURCE_IDENTITY_ROWS, "spec_invalid", "the frozen identity-row count changed")
-    _require(live["distinct_sequence_cores"] == DISTINCT_SEQUENCE_CORES, "spec_invalid", "the frozen core count changed")
-    _require(live["duplicate_core_collapses"] == DUPLICATE_CORE_COLLAPSES, "spec_invalid", "the frozen collapse count changed")
-    _require(live["accepted"] == ACCEPTED_COUNT, "spec_invalid", "the frozen accepted count changed")
-    _require(live["dropped"] == DROPPED_COUNT, "spec_invalid", "the frozen dropped count changed")
-    _require(live["other_result"] == "stop_m9c", "spec_invalid", "a nonmatching live result must stop M9C")
+    _require(expected["label"] == "expectation_not_observed_ui_result", "spec_invalid", "the UI counts are expectations")
+    _require(expected["source_sha256"] == REF_SHA256, "spec_invalid", "the frozen REF digest changed")
+    _require(expected["source_identity_rows"] == SOURCE_IDENTITY_ROWS, "spec_invalid", "the frozen identity-row count changed")
+    _require(expected["distinct_sequence_cores"] == DISTINCT_SEQUENCE_CORES, "spec_invalid", "the frozen core count changed")
+    _require(expected["duplicate_core_collapses"] == DUPLICATE_CORE_COLLAPSES, "spec_invalid", "the frozen collapse count changed")
+    _require(expected["expected_ui_accepted_count"] == EXPECTED_UI_ACCEPTED_COUNT, "spec_invalid", "the expected UI accepted count changed")
+    _require(expected["expected_ui_dropped_count"] == EXPECTED_UI_DROPPED_COUNT, "spec_invalid", "the expected UI dropped count changed")
+    _require(expected["other_result"] == "stop_m9c", "spec_invalid", "a nonmatching sealed preparation must stop M9C")
+    _require(expected["aptarank_ui_executed"] is False, "spec_invalid", "AptaRank UI execution stays unrecorded")
+    _require(expected["observed_ui_accepted_count"] is None, "spec_invalid", "an observed UI accepted count cannot be stored")
+    _require(expected["observed_ui_dropped_count"] is None, "spec_invalid", "an observed UI dropped count cannot be stored")
     _require(SOURCE_IDENTITY_ROWS - DISTINCT_SEQUENCE_CORES == DUPLICATE_CORE_COLLAPSES, "spec_invalid", "the collapse arithmetic changed")
     external = document["external_ref"]
     _exact_keys(
@@ -509,56 +519,62 @@ def _manifest_bytes(source_digest, source_rows, retained_count, collapses, uploa
         "source_row_count": source_rows,
         "distinct_sequence_cores": retained_count,
         "duplicate_core_collapses": collapses,
-        "accepted_count": retained_count,
-        "dropped_count": DROPPED_COUNT,
+        "prepared_upload_row_count": retained_count,
         "reference_upload_sha256": upload_hash,
         "duplicate_provenance_sha256": ledger_hash,
         "local_calibration": False,
-        "live_result": source_digest == REF_SHA256,
+        "production_ref_identity_verified": source_digest == REF_SHA256,
+        "aptarank_ui_executed": False,
+        "observed_ui_accepted_count": None,
+        "observed_ui_dropped_count": None,
     }
     _exact_keys(document, MANIFEST_KEYS, "manifest_invalid", "the preparation manifest schema drifted")
     return canonical_json_bytes(document) + b"\n"
 
 
-def _require_live_counts(source_rows, accepted, collapses):
+def _require_sealed_preparation_accounting(source_rows, prepared_rows, collapses):
     if (
         source_rows != SOURCE_IDENTITY_ROWS
-        or accepted != ACCEPTED_COUNT
+        or prepared_rows != DISTINCT_SEQUENCE_CORES
         or collapses != DUPLICATE_CORE_COLLAPSES
-        or DROPPED_COUNT != 0
     ):
         raise ReferenceUploadError(
             "conflicting_row_count",
-            "live REF accounting is %d identities, %d accepted, %d duplicate-core collapses, %d dropped; M9C stops"
-            % (source_rows, accepted, collapses, DROPPED_COUNT),
+            "sealed REF preparation accounting is %d identities, %d prepared upload rows, %d duplicate-core collapses; the expected UI result remains %d accepted and %d dropped; M9C stops"
+            % (source_rows, prepared_rows, collapses, EXPECTED_UI_ACCEPTED_COUNT, EXPECTED_UI_DROPPED_COUNT),
         )
 
 
-def prepare_reference_upload(payload, *, live=False):
+def prepare_reference_upload(payload, *, enforce_production_identity=False, **forbidden):
     """Collapse caller-supplied REF CSV bytes to one row per distinct core.
 
-    ``live=True`` requires the frozen REF digest. A digest that matches that
-    frozen value must produce 113 accepted rows and zero dropped rows.
-    Duplicate-core collapses are not drops. This function does not open a path.
+    ``enforce_production_identity=True`` requires the frozen REF digest. A
+    matching digest verifies production REF bytes. It is not an AptaRank UI
+    result. The expected UI result remains 113 accepted and zero dropped.
+    Duplicate-core collapses are not drops. This function does not open a path
+    and cannot record observed UI counts.
     """
-    if live is not True and live is not False:
-        raise ReferenceUploadError("input_type_invalid", "live must be a boolean")
+    if forbidden:
+        raise ReferenceUploadError("ui_observation_refused", "preparation cannot populate an observed AptaRank UI count")
+    if enforce_production_identity is not True and enforce_production_identity is not False:
+        raise ReferenceUploadError("input_type_invalid", "enforce_production_identity must be a boolean")
     _require_bytes(payload)
     document = load_pinned_contract()
     source_digest = sha256_bytes(payload)
-    if live is True and source_digest != REF_SHA256:
+    if enforce_production_identity is True and source_digest != REF_SHA256:
         raise ReferenceUploadError("digest_mismatch", "the REF bytes do not match the frozen digest")
     rows = _parse_source(payload, document)
     retained, collapses = _retain_rows(rows, document)
     upload = _upload_bytes(retained)
     _validate_upload(upload, retained)
     ledger = _ledger_bytes(retained)
-    accepted = len(retained)
-    if accepted != len(rows) - collapses or collapses < 0:
+    prepared_rows = len(retained)
+    if prepared_rows != len(rows) - collapses or collapses < 0:
         raise ReferenceUploadError("conflicting_row_count", "duplicate-core accounting does not match the source rows")
-    if source_digest == REF_SHA256 or live is True:
-        _require_live_counts(len(rows), accepted, collapses)
-    manifest = _manifest_bytes(source_digest, len(rows), accepted, collapses, sha256_bytes(upload), sha256_bytes(ledger))
+    identity_verified = source_digest == REF_SHA256
+    if identity_verified or enforce_production_identity is True:
+        _require_sealed_preparation_accounting(len(rows), prepared_rows, collapses)
+    manifest = _manifest_bytes(source_digest, len(rows), prepared_rows, collapses, sha256_bytes(upload), sha256_bytes(ledger))
     return {
         "reference_upload": upload,
         "duplicate_provenance": ledger,
@@ -568,9 +584,9 @@ def prepare_reference_upload(payload, *, live=False):
         "preparation_manifest_sha256": sha256_bytes(manifest),
         "source_sha256": source_digest,
         "source_row_count": len(rows),
-        "accepted_count": accepted,
-        "dropped_count": DROPPED_COUNT,
+        "prepared_upload_row_count": prepared_rows,
         "duplicate_core_collapses": collapses,
+        "production_ref_identity_verified": identity_verified,
     }
 
 
@@ -607,7 +623,7 @@ def prepare_sealed_reference():
     payload = _read_external_ref()
     if sha256_bytes(payload) != REF_SHA256:
         raise ReferenceUploadError("digest_mismatch", "the external REF bytes do not match the frozen digest")
-    return prepare_reference_upload(payload, live=True)
+    return prepare_reference_upload(payload, enforce_production_identity=True)
 
 
 def verify_frozen_target_mapping(structure_bytes, selection_bytes, target_upload_bytes):

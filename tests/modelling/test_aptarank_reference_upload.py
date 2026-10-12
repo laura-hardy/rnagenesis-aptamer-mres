@@ -26,7 +26,7 @@ if MODELLING not in sys.path:
 
 import aptarank_reference_upload as upload
 
-CONTRACT_SHA256 = "21a46064edf346d2eba1f369f80290d7801818ee038442f1092e80219428a21b"
+CONTRACT_SHA256 = "b0387bc6d7c8d5328ccdbea05ad263b203b3405f80d7f359a6440751eb4e1b0f"
 CORE_A = "ACGUACGUACGUACGUACGU"
 CORE_B = "GCAUGCAUGCAUGCAUGCAU"
 CORE_C = "ACGU"
@@ -110,11 +110,17 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertEqual(document["calibration"]["performer"], "aptarank")
         self.assertEqual(document["calibration"]["method"], "single_pooled_empirical_ref")
         self.assertFalse(document["calibration"]["project_implementation"])
-        self.assertEqual(document["live_result"]["accepted"], 113)
-        self.assertEqual(document["live_result"]["dropped"], 0)
-        self.assertEqual(document["live_result"]["source_identity_rows"], 131)
-        self.assertEqual(document["live_result"]["duplicate_core_collapses"], 18)
-        self.assertEqual(document["live_result"]["other_result"], "stop_m9c")
+        expected = document["expected_live_ui_result"]
+        self.assertEqual(expected["label"], "expectation_not_observed_ui_result")
+        self.assertEqual(expected["expected_ui_accepted_count"], 113)
+        self.assertEqual(expected["expected_ui_dropped_count"], 0)
+        self.assertEqual(expected["source_identity_rows"], 131)
+        self.assertEqual(expected["duplicate_core_collapses"], 18)
+        self.assertEqual(expected["other_result"], "stop_m9c")
+        self.assertFalse(expected["aptarank_ui_executed"])
+        self.assertIsNone(expected["observed_ui_accepted_count"])
+        self.assertIsNone(expected["observed_ui_dropped_count"])
+        self.assertNotIn("live_result", document)
         self.assertFalse(document["retention"]["later_rows_are_biological_or_quality_exclusions"])
         self.assertFalse(document["sealed_review_authorized"])
         self.assertFalse(upload.SEALED_REVIEW_AUTHORIZED)
@@ -150,9 +156,11 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertNotIn("Later beta", prepared["reference_upload"].decode("utf-8"))
         self.assertNotIn("9ZZZ", prepared["reference_upload"].decode("utf-8"))
         self.assertEqual(prepared["source_row_count"], 4)
-        self.assertEqual(prepared["accepted_count"], 3)
-        self.assertEqual(prepared["dropped_count"], 0)
+        self.assertEqual(prepared["prepared_upload_row_count"], 3)
+        self.assertNotIn("accepted_count", prepared)
+        self.assertNotIn("dropped_count", prepared)
         self.assertEqual(prepared["duplicate_core_collapses"], 1)
+        self.assertFalse(prepared["production_ref_identity_verified"])
         ledger = [json.loads(line) for line in prepared["duplicate_provenance"].decode("utf-8").splitlines()]
         self.assertEqual(ledger[0]["retained_id"], "S5I_synthetic_01")
         self.assertEqual(ledger[0]["source_identities"], ["S5I_synthetic_01", "S5I_synthetic_03"])
@@ -163,9 +171,15 @@ class ReferenceUploadTests(unittest.TestCase):
             self.assertNotIn(core, prepared["duplicate_provenance"].decode("utf-8"))
             self.assertNotIn(core, prepared["preparation_manifest"].decode("utf-8"))
         manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
-        self.assertEqual(manifest["dropped_count"], 0)
+        self.assertEqual(manifest["prepared_upload_row_count"], 3)
+        self.assertNotIn("accepted_count", manifest)
+        self.assertNotIn("dropped_count", manifest)
+        self.assertNotIn("live_result", manifest)
         self.assertFalse(manifest["local_calibration"])
-        self.assertFalse(manifest["live_result"])
+        self.assertFalse(manifest["production_ref_identity_verified"])
+        self.assertFalse(manifest["aptarank_ui_executed"])
+        self.assertIsNone(manifest["observed_ui_accepted_count"])
+        self.assertIsNone(manifest["observed_ui_dropped_count"])
         self.assertNotIn("sequence_core", manifest)
 
     def test_duplicate_identity_fails_closed(self):
@@ -230,10 +244,10 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "digest_mismatch")
         self.assertNotIn(CORE_A, caught.exception.detail)
 
-    def test_live_flag_rejects_a_different_digest(self):
+    def test_production_identity_flag_rejects_a_different_digest(self):
         payload = _source_bytes([_identity(1, CORE_A)])
         with self.assertRaises(upload.ReferenceUploadError) as caught:
-            upload.prepare_reference_upload(payload, live=True)
+            upload.prepare_reference_upload(payload, enforce_production_identity=True)
         self.assertEqual(caught.exception.code, "digest_mismatch")
 
     def test_frozen_digest_with_other_counts_stops_m9c(self):
@@ -249,9 +263,55 @@ class ReferenceUploadTests(unittest.TestCase):
             with self.assertRaises(upload.ReferenceUploadError) as caught:
                 upload.prepare_reference_upload(payload)
         self.assertEqual(caught.exception.code, "conflicting_row_count")
+        self.assertIn("sealed REF preparation accounting", caught.exception.detail)
+        self.assertNotIn("live REF accounting", caught.exception.detail)
         self.assertIn("M9C stops", caught.exception.detail)
-        self.assertIn("2 accepted", caught.exception.detail)
-        self.assertIn("0 dropped", caught.exception.detail)
+        self.assertIn("2 prepared upload rows", caught.exception.detail)
+        self.assertIn("113 accepted and 0 dropped", caught.exception.detail)
+
+    def test_simulated_production_preparation_cannot_populate_observed_ui_counts(self):
+        def core(index):
+            body = f"{index:08b}".replace("0", "A").replace("1", "C")
+            return "GUGU" + body + "GUGU"
+
+        rows = [_identity(index + 1, core(index)) for index in range(113)]
+        rows.extend(_identity(114 + index, core(index)) for index in range(18))
+        self.assertEqual(len(rows), 131)
+        payload = _source_bytes(rows)
+        real_hash = hashlib.sha256
+
+        def fake(blob):
+            if blob == payload:
+                return upload.REF_SHA256
+            return real_hash(blob).hexdigest()
+
+        with patch.object(upload, "sha256_bytes", side_effect=fake):
+            prepared = upload.prepare_reference_upload(payload, enforce_production_identity=True)
+            with self.assertRaises(upload.ReferenceUploadError) as caught:
+                upload.prepare_reference_upload(
+                    payload,
+                    enforce_production_identity=True,
+                    observed_ui_accepted_count=113,
+                    observed_ui_dropped_count=0,
+                )
+        self.assertEqual(caught.exception.code, "ui_observation_refused")
+        manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
+        self.assertTrue(prepared["production_ref_identity_verified"])
+        self.assertTrue(manifest["production_ref_identity_verified"])
+        self.assertEqual(manifest["prepared_upload_row_count"], 113)
+        self.assertEqual(manifest["source_row_count"], 131)
+        self.assertEqual(manifest["duplicate_core_collapses"], 18)
+        self.assertFalse(manifest["aptarank_ui_executed"])
+        self.assertIsNone(manifest["observed_ui_accepted_count"])
+        self.assertIsNone(manifest["observed_ui_dropped_count"])
+        text = prepared["preparation_manifest"].decode("utf-8")
+        self.assertIn('"aptarank_ui_executed":false', text)
+        self.assertIn('"observed_ui_accepted_count":null', text)
+        self.assertIn('"observed_ui_dropped_count":null', text)
+        self.assertNotIn('"observed_ui_accepted_count":113', text)
+        self.assertNotIn('"accepted_count"', text)
+        self.assertNotIn('"dropped_count"', text)
+        self.assertNotIn('"live_result"', text)
 
     def test_paths_and_sealed_locator_do_not_open_inputs(self):
         with patch("builtins.open", side_effect=AssertionError("opened")):

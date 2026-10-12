@@ -12042,3 +12042,13 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_reference_upload` passed 13 tests. No end-to-end rehearsal was added.
 
 **Boundary:** TRAIN, VALIDATION, REF, EVAL, production candidate sources, target-mapping files, and `results/` were not opened. AptaRank was not modified or run. No production upload or calibration artefact was written. Nothing was pushed.
+
+## 2026-10-13 — M9C-1 expected UI result correction
+
+**Stage:** Aim 2 / modelling / M9C-1 reference-upload policy correction
+
+**Status:** `POLICY_FROZEN_REF_UNOPENED`. The contract key `live_result` is now `expected_live_ui_result`. Expected UI counts remain 113 accepted and zero dropped, labelled as expectations. Preparation records `prepared_upload_row_count` and `production_ref_identity_verified`. It does not record `dropped_count`. `aptarank_ui_executed` stays false. `observed_ui_accepted_count` and `observed_ui_dropped_count` stay null. Matching the REF digest is production-file identity verification, not an AptaRank UI result.
+
+**Contract:** `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `b0387bc6d7c8d5328ccdbea05ad263b203b3405f80d7f359a6440751eb4e1b0f`. The previous M9C-1 digest was `21a46064edf346d2eba1f369f80290d7801818ee038442f1092e80219428a21b`.
+
+**Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_reference_upload` passed 14 tests, including a simulated production REF preparation that cannot populate observed UI counts. REF, EVAL, and production candidate sources were not opened.

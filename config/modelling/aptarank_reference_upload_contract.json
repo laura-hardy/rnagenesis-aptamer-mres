@@ -156,14 +156,18 @@
     "provenance_ledger": "all_source_identities_in_source_order",
     "provenance_includes_sequence": false
   },
-  "live_result": {
+  "expected_live_ui_result": {
+    "label": "expectation_not_observed_ui_result",
     "source_sha256": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
     "source_identity_rows": 131,
     "distinct_sequence_cores": 113,
     "duplicate_core_collapses": 18,
-    "accepted": 113,
-    "dropped": 0,
-    "other_result": "stop_m9c"
+    "expected_ui_accepted_count": 113,
+    "expected_ui_dropped_count": 0,
+    "other_result": "stop_m9c",
+    "aptarank_ui_executed": false,
+    "observed_ui_accepted_count": null,
+    "observed_ui_dropped_count": null
   },
   "external_ref": {
     "relative_path": "data/processed/ref.csv",
