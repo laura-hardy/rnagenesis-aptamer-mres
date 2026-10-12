@@ -11790,3 +11790,23 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 **Next gate:** M9A exact cross-condition overlap and leakage preparation remains separate. It must not access REF or EVAL.
 
+## 2026-10-12 — M9A exact cross-condition overlap evidence
+
+**Stage:** Aim 2 / modelling / M9A exact cross-condition overlap
+
+**Status:** COMPLETE for exact cross-condition overlap on the sealed combined derived ledger. M9A is not complete. TRAIN exact leakage and nearest-TRAIN-distance work remain outstanding.
+
+**Runner:** `a62f3afb53d67ac1619536c26e7848109b0a0ee8`. Contract `m9a-overlap-leakage-definitions-v1`, SHA-256 `6aeaa2338776cbe7aceffef63ee4ca7dfd7ed3643aa7d1e400fd54a02d113535`. Governing plan SHA-256 `fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51`.
+
+**Location:** `results/fine_tuning/m9_generator_evaluation/m9a_exact_cross_condition_overlap/`. Input combined ledger `m9_all_conditions_derived_attempt_ledger.jsonl`, 120,080 rows (B0 30,080; B1, B2, and D1 30,000 each), SHA-256 `d50c30e85b26e39e8a25ea2660f9a7fa07433417de757364eb36799ca8c6073e`. The ledger stays ignored. Summary SHA-256 `03e2b8f6d1dd21181c2d5521a552ec4aac6f78ad4fbd0dc5260ca105e849c32e`. Manifest SHA-256 `555159f1f0ca2cf2311ed4c797c2f22538e0a230e725f79eff90e8dcc94259c9`.
+
+**Result:** Only B1–D1 had nonzero exact overlap. B1→D1 row overlap is 1/30,000 and D1→B1 row overlap is 1/30,000. B1 distinct coverage is 1/29,983 and D1 distinct coverage is 1/30,000. The B1–D1 union is 59,982 and the Jaccard overlap is 1/59,982. The other five pairs are zero at both grains. Global distinct valid sequences are 120,062: 120,061 in exactly one condition and one in exactly two. B0 is an external comparator and is not pooled into the causal B1/B2/D1 comparison.
+
+**Review:** An independent local review verified the downloaded hashes and independently recomputed all overlap results without importing the production implementation.
+
+**Boundary:** TRAIN, VALIDATION, REF, EVAL, models, checkpoints, structure tools, and AptaRank were not accessed. The frozen contract and governing plan were not modified. No JSONL file is committed.
+
+**Limitation:** Exact cross-condition separation does not establish TRAIN novelty, structural novelty, biological quality, or superiority.
+
+**Next gate:** TRAIN exact leakage and nearest-TRAIN-distance remain outstanding.
+

@@ -1,0 +1,134 @@
+{
+  "schema": "generator-eval-cross-condition-overlap-manifest-m9a-r1",
+  "runner_git_commit": "a62f3afb53d67ac1619536c26e7848109b0a0ee8",
+  "contract": {
+    "contract_id": "m9a-overlap-leakage-definitions-v1",
+    "relative_path": "config/modelling/generator_eval_overlap_leakage_contract.json",
+    "expected_sha256": "6aeaa2338776cbe7aceffef63ee4ca7dfd7ed3643aa7d1e400fd54a02d113535",
+    "recomputed_sha256": "6aeaa2338776cbe7aceffef63ee4ca7dfd7ed3643aa7d1e400fd54a02d113535",
+    "byte_count": 7434
+  },
+  "governing_plan": {
+    "relative_path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
+    "expected_sha256": "fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51",
+    "recomputed_sha256": "fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51",
+    "byte_count": 52036
+  },
+  "combined_ledger": {
+    "filename": "m9_all_conditions_derived_attempt_ledger.jsonl",
+    "supplied_as": "sealed_locator",
+    "relative_path": "results/fine_tuning/m9_generator_evaluation/m9_all_conditions_derived_attempt_ledger.jsonl",
+    "expected_sha256": "d50c30e85b26e39e8a25ea2660f9a7fa07433417de757364eb36799ca8c6073e",
+    "recomputed_sha256": "d50c30e85b26e39e8a25ea2660f9a7fa07433417de757364eb36799ca8c6073e",
+    "byte_count": 188521569,
+    "row_count": 120080,
+    "row_counts": {
+      "B0": 30080,
+      "B1": 30000,
+      "B2": 30000,
+      "D1": 30000,
+      "combined": 120080
+    }
+  },
+  "outputs": [
+    {
+      "filename": "m9_cross_condition_overlap_summary.json",
+      "row_count": null,
+      "byte_count": 8185,
+      "sha256": "03e2b8f6d1dd21181c2d5521a552ec4aac6f78ad4fbd0dc5260ca105e849c32e"
+    }
+  ],
+  "metric_grain_and_denominator_rules": {
+    "row_grain": "valid_canonical_row",
+    "row_numerator": "For source condition A and target condition B, the number of valid canonical rows in A whose parsed sequence occurs at least once among valid canonical sequences in B.",
+    "row_denominator": "The number of valid canonical rows in A. Invalid attempts stay in attempt accounting and do not enter this denominator.",
+    "row_direction": "both_directions_for_each_unordered_pair",
+    "row_rate": "numerator divided by denominator; null when the denominator is zero, with numerator and denominator still reported",
+    "duplicate_policy": "A repeated sequence contributes once per source row. It contributes only membership when its condition is the target. Duplicate rows are not removed or downweighted.",
+    "input_population": "valid_canonical_parsed_rows_only",
+    "condition_pairs": [
+      [
+        "B0",
+        "B1"
+      ],
+      [
+        "B0",
+        "B2"
+      ],
+      [
+        "B0",
+        "D1"
+      ],
+      [
+        "B1",
+        "B2"
+      ],
+      [
+        "B1",
+        "D1"
+      ],
+      [
+        "B2",
+        "D1"
+      ]
+    ],
+    "zero_required_denominator_is_null": true,
+    "zero_required_denominator_becomes_zero": false,
+    "invalid_rows_enter_valid_denominators": false,
+    "distinct_grain": "distinct_valid_sequence",
+    "distinct_numerator": "The distinct shared-sequence count |S_A intersect S_B|.",
+    "distinct_denominator": "For directional distinct coverage, the source condition's distinct valid-sequence count. For Jaccard overlap, the distinct union count |S_A union S_B|.",
+    "distinct_direction": "a_distinct_coverage_by_b_and_b_distinct_coverage_by_a",
+    "shared_sequence_count": "|S_A intersect S_B|",
+    "union_count": "|S_A union S_B|",
+    "jaccard": "intersection divided by union; null when the union is zero",
+    "zero_denominator": "A zero required denominator yields a null rate. It does not become zero.",
+    "global_distinct_valid_sequence_count": "|S_B0 union S_B1 union S_B2 union S_D1|",
+    "exactly_n_conditions": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "membership_patterns": "one count for each observed nonempty condition-membership pattern",
+    "reconciliation": "membership-pattern counts sum to the global union size",
+    "sequence_strings_emitted": false,
+    "sequence_hashes_emitted": false
+  },
+  "serialization": "UTF-8 JSON, trailing LF, indent 2, ensure_ascii, constructed key order, allow_nan false",
+  "deterministic_serialization": true,
+  "access_boundary": {
+    "train_accessed": false,
+    "validation_accessed": false,
+    "ref_accessed": false,
+    "eval_accessed": false,
+    "models_accessed": false,
+    "checkpoints_accessed": false,
+    "structure_tools_accessed": false,
+    "aptarank_accessed": false,
+    "sealed_combined_ledger_opened": true,
+    "production_totals_enforced": true,
+    "rows_repaired": false,
+    "rows_reordered": false,
+    "rows_deduplicated": false,
+    "rows_replenished": false,
+    "rows_rewritten": false,
+    "b0_pooled_into_b1_b2_d1_aggregate": false,
+    "synthetic_execution_is_production_validation": false,
+    "protected_datasets_not_accessed_statement": "TRAIN, VALIDATION, REF, and EVAL were not accessed."
+  },
+  "invocation": {
+    "argv": [
+      "scripts/modelling/generator_eval_overlap_runner.py",
+      "--output-dir",
+      "results/fine_tuning/m9_generator_evaluation/m9a_exact_cross_condition_overlap"
+    ],
+    "production_totals": true
+  },
+  "future_output_relative_directory": "results/fine_tuning/m9_generator_evaluation/m9a_exact_cross_condition_overlap",
+  "manifest_file": {
+    "filename": "m9_cross_condition_overlap_manifest.json",
+    "sha256_embedded": false,
+    "statement": "The SHA-256 of this manifest is the digest of these exact file bytes. It is not embedded, because embedding it would change the digest."
+  }
+}
