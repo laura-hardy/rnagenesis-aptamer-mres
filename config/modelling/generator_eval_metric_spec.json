@@ -5,9 +5,9 @@
   "aggregate_generator_quality_score": false,
   "governing_plan": {
     "path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
-    "sha256": "9e5c8d3c0d7903697a2be04d4c0bc9b09a4dc29b268ef3eaa8472a4d45069579",
-    "version": "3.1",
-    "revision_date": "8 October 2026"
+    "sha256": "450240bb5b89e0c9b6c1e45fc6e4bbe57ed4475d3e7dfa313189d772a46d333c",
+    "version": "3.2",
+    "revision_date": "12 October 2026"
   },
   "field_schema": [
     "metric_id",

@@ -10,8 +10,9 @@ The module holds what the three M7 stages share: the error type, canonical
 JSON, bounded streaming digests, REF/EVAL and sibling-evidence denial before any
 filesystem open, symlink-safe ancestry, atomic writes with parent-directory
 ``fsync``, message-safe failure records, a strict allow-listed child
-environment with a fixed PATH, absolute validated ``git`` and ``nvidia-smi``
-executables, the free-space budget, and the strict checkpoint-tree observation.
+environment with a fixed PATH, a fixed ``CUDA_MODULE_LOADING=LAZY`` control,
+absolute validated ``git`` and ``nvidia-smi`` executables, the free-space
+budget, and the strict checkpoint-tree observation.
 The accepted M6 contract is loaded by its tracked path and reused. Nothing in
 M5 or M6 is changed.
 
@@ -804,7 +805,20 @@ def assert_free_space(path, checkpoint_count, weight_bytes=None, statvfs=None):
 # binds (see ``resolve_ld_library_path``); an ambient value is never inherited.
 # PATH is deliberately absent: the child PATH is the constant ``FIXED_CHILD_PATH``
 # and parent PATH text is never copied.
+# CUDA_MODULE_LOADING is deliberately absent. The child sets the fixed control
+# below itself; an ambient parent value is never copied and cannot replace it.
 ENVIRONMENT_ALLOW_LIST = ("LANG", "LC_ALL", "LC_CTYPE", "TZ")
+# Pinned PyTorch 2.1.2+cu121 assigns this exact value during CUDA lazy
+# initialisation when the variable is absent. The child sets it first, so that
+# assignment is not a stray name. The worker allow-list admits the name only
+# after ``assert_fixed_child_environment_controls`` has required this value.
+CUDA_MODULE_LOADING_NAME = "CUDA_MODULE_LOADING"
+CUDA_MODULE_LOADING_VALUE = "LAZY"
+FIXED_CHILD_ENVIRONMENT_CONTROLS = {
+    CUDA_MODULE_LOADING_NAME: CUDA_MODULE_LOADING_VALUE,
+}
+UNEXPECTED_ENVIRONMENT_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,64}$")
+UNEXPECTED_ENVIRONMENT_NAME_LIMIT = 8
 LD_LIBRARY_PATH_NAME = "LD_LIBRARY_PATH"
 LD_LIBRARY_PATH_MAXIMUM_LENGTH = 4096
 LD_LIBRARY_PATH_COMPONENT = re.compile(r"^/[A-Za-z0-9._+@=,%/\-]*$")
@@ -1223,6 +1237,9 @@ def build_child_environment(parent, physical_gpu, output_directory, ld_library_p
 
     ``ld_library_path`` is the authorisation-bound value, or ``None``. The live
     parent value must match it exactly before it is passed on.
+    ``CUDA_MODULE_LOADING`` is not read from the parent. The fixed control is
+    assigned here, after every other child assignment, so an ambient value
+    cannot replace it.
     """
     assert_parent_environment(parent, physical_gpu)
     resolve_ld_library_path(parent, ld_library_path)
@@ -1232,7 +1249,7 @@ def build_child_environment(parent, physical_gpu, output_directory, ld_library_p
             raise M7Error("environment_rejected", "output directory resolves inside a git repository")
     child = {}
     for name in ENVIRONMENT_ALLOW_LIST:
-        if name in parent:
+        if name in parent and name not in FIXED_CHILD_ENVIRONMENT_CONTROLS:
             child[name] = parent[name]
     child["PATH"] = FIXED_CHILD_PATH
     if ld_library_path is not None:
@@ -1248,7 +1265,59 @@ def build_child_environment(parent, physical_gpu, output_directory, ld_library_p
         if not _within(resolved, resolved_output):
             raise M7Error("environment_rejected", "an isolated path escaped the output directory")
         child[key] = value
+    for name, value in FIXED_CHILD_ENVIRONMENT_CONTROLS.items():
+        child[name] = value
     return child
+
+
+def assert_fixed_child_environment_controls(environ):
+    """Require each fixed control to be present with exactly its constant value.
+
+    A missing name, a non-text value, an empty value, a differently cased value
+    and any alternative value fail closed. The observed value is never repeated.
+    This is the only check that admits the control name to the worker allow-list.
+    """
+    if not isinstance(environ, collections.abc.Mapping):
+        raise M7Error("environment_rejected", "child environment is missing")
+    for name, expected in FIXED_CHILD_ENVIRONMENT_CONTROLS.items():
+        if name not in environ:
+            raise M7Error("environment_rejected", "fixed child control is missing: " + name)
+        value = environ[name]
+        if not isinstance(value, str):
+            raise M7Error("environment_rejected", "fixed child control is not text: " + name)
+        if value == "":
+            raise M7Error("environment_rejected", "fixed child control is empty: " + name)
+        if value != expected and value.casefold() == expected.casefold():
+            raise M7Error("environment_rejected", "fixed child control differs in case: " + name)
+        if value != expected:
+            raise M7Error("environment_rejected", "fixed child control is not the required value: " + name)
+    return True
+
+
+def unexpected_environment_detail(names):
+    """A rejection detail that names stray variables without their values.
+
+    Names are sorted. At most ``UNEXPECTED_ENVIRONMENT_NAME_LIMIT`` are listed.
+    A name that is not a short identifier, or that looks like sequence text, is
+    replaced by a placeholder. Further names are counted and not listed. The
+    accepted environment is unchanged: every name outside the allow-list still
+    fails.
+    """
+    ordered = sorted(names, key=lambda item: "" if item is None else str(item))
+    shown = []
+    for name in ordered[:UNEXPECTED_ENVIRONMENT_NAME_LIMIT]:
+        text = name if isinstance(name, str) else ""
+        if UNEXPECTED_ENVIRONMENT_NAME.fullmatch(text) is None or SEQUENCE_RUN_PATTERN.search(text) is not None:
+            shown.append("<omitted-name>")
+        else:
+            shown.append(text)
+    detail = "the worker environment holds " + str(len(ordered)) + " names outside the allow-list"
+    if shown:
+        detail += ": " + ",".join(shown)
+    hidden = len(ordered) - len(shown)
+    if hidden > 0:
+        detail += " +" + str(hidden)
+    return detail
 
 
 def assert_child_environment(environ, output_directory, ld_library_path=None, ld_library_path_pending=False):
@@ -1268,8 +1337,10 @@ def assert_child_environment(environ, output_directory, ld_library_path=None, ld
     for key, value in isolated_paths(output_directory).items():
         if environ.get(key) != value:
             raise M7Error("environment_rejected", "runtime location is not isolated: " + key)
+    assert_fixed_child_environment_controls(environ)
     allowed = set(ENVIRONMENT_ALLOW_LIST) | set(OFFLINE_CONTROLS) | set(isolated_paths(output_directory))
     allowed |= {"PATH", "PYTHONDONTWRITEBYTECODE", "PYTHONNOUSERSITE", "CUDA_VISIBLE_DEVICES", "CUDA_DEVICE_ORDER"}
+    allowed |= set(FIXED_CHILD_ENVIRONMENT_CONTROLS)
     assert_fixed_path(environ.get("PATH"))
     if ld_library_path is not None:
         observe_child_ld_library_path(environ, ld_library_path)
@@ -1279,7 +1350,7 @@ def assert_child_environment(environ, output_directory, ld_library_path=None, ld
         allowed.add(LD_LIBRARY_PATH_NAME)
     stray = sorted(name for name in environ if name not in allowed)
     if stray:
-        raise M7Error("environment_rejected", "the worker environment holds " + str(len(stray)) + " names outside the allow-list")
+        raise M7Error("environment_rejected", unexpected_environment_detail(stray))
     return True
 
 

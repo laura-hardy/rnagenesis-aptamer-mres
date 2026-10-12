@@ -1,0 +1,129 @@
+# M8 shared-GPU implementation support. Inactive and non-consumable.
+# No generation authorisation and no assembly authorisation are active.
+# The former GPU 1 seed-44 block-B authorisation is recorded below as
+# unconsumed, not launched, and superseded before dispatch. It is not
+# executable. No GPU 0 authorisation is present. A later authorisation
+# must be a separate reviewed commit. An M7 configuration, schema, or
+# authorisation id is not M8 authority.
+arms:
+- b1_block_a
+- b1_block_b
+- d1_seed43_block_a
+- d1_seed44_block_b
+assembly_authorisation_entries: []
+assembly_manifest_schema_version: m8-assembly-manifest-1
+authorisation_entries: []
+checkpoints:
+  b1_generic:
+    diffusion_relative: configs/rnagenesis/diffusion
+    encdec_config_sha256: ab309231b75405af3e2ef6fe49e4e74c1b96021ef2a4f61b46e5796b8799378a
+    encdec_weight_sha256: 3c4e34f7626c94416d504c16569b5f3f785fffe77889b9886344477b95e74c68
+    identity: b1_generic_released
+    unet_config_sha256: 3a9975ff165bbd5ca82923e6ed1c5ed7eb383a23f4f3f55db713c995031f8ee3
+    weight_sha256: c268021b6cab37423e3bffd495b139bb69698d8d11c7b96477fbfb239b0cff26
+  d1_seed_43:
+    checkpoint_name: D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-5__update-105__git-c150894b9982d7afebfb2b3390b0797a4da146b5
+    members_sha256:
+      model_index.json: 05ac20f9fd3bd818ec88b37ff35e482ac80c5f5329666ecdfbe9227aa045b70e
+      scheduler/scheduler_config.json: 6b470b030031daa7c812ef9a6dfe49f14fa695c17a939406f1c780bad6a91396
+      unet/config.json: 42c864c81e35ef1a0c7964a3642492fba95c9e24a153407f9fd98855b20d9d70
+      unet/diffusion_pytorch_model.safetensors: c0797888bde9033cc15b056c8c09e70b9f7fba0fb21b1f3840a4f1efb77031ab
+    weight_sha256: c0797888bde9033cc15b056c8c09e70b9f7fba0fb21b1f3840a4f1efb77031ab
+  d1_seed_44:
+    checkpoint_name: D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-44__epoch-5__update-105__git-2cb1b6a26391ed36754ec21685a4501d659d50ef
+    members_sha256:
+      model_index.json: 05ac20f9fd3bd818ec88b37ff35e482ac80c5f5329666ecdfbe9227aa045b70e
+      scheduler/scheduler_config.json: 6b470b030031daa7c812ef9a6dfe49f14fa695c17a939406f1c780bad6a91396
+      unet/config.json: 42c864c81e35ef1a0c7964a3642492fba95c9e24a153407f9fd98855b20d9d70
+      unet/diffusion_pytorch_model.safetensors: d0fcb5174230b8bbbc6bfe59eabda9b37687c03800012bc1a6981cc215469ed5
+    weight_sha256: d0fcb5174230b8bbbc6bfe59eabda9b37687c03800012bc1a6981cc215469ed5
+closure:
+  cleaner_invoked: false
+  execution_authorised: false
+  filtering_performed: false
+  later_evaluation_required: true
+  m8_execution_authorised: false
+  replacement_or_replenishment_performed: false
+consumable_by_executable_workflow: false
+deletion_implemented: false
+denied:
+  evaluation_worktree: prohibited
+  live_m7_seed44_authorisation_is_not_m8_authority: m7_d1_final_replicate_seed44_2cb1b6a26391_gpu1_attempt1
+  roles:
+  - REF
+  - EVAL
+  - VALIDATION
+  - TRAIN
+  sequence_basenames:
+  - corpus_final.txt
+  - ft_train.csv
+  - ft_validation.csv
+  - ref.csv
+  - eval.csv
+document_status: M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED
+execution:
+  assembly_authorised: false
+  authorised: false
+  biological_paths_permitted: false
+  generation_authorised: false
+  gpu_identity_bound: false
+experiment_id: M8_raw_generation
+manifest_schema_version: m8-arm-manifest-2
+pairing:
+  b1_block_a: d1_seed43_block_a
+  b1_block_b: d1_seed44_block_b
+record_schema:
+  classification_fields: none
+  raw_bytes_authoritative: true
+  raw_decoded_text_rule: deterministic_utf8_else_latin1
+  schema_version: m8-raw-attempt-1
+repository_identity:
+  mres_branch: main
+  mres_commit: d0f9a397b536c64ca1b22662cc9ae36aea0101f6
+  rnagenesis_branch: mres-d1-diffusion-finetune
+  rnagenesis_commit: e3b855bbf4d1af376f43747643fa30afd662828c
+retired_unconsumed_authorisations:
+- activation_status: superseded_revoked_before_dispatch
+  authorisation_id: m8_d1_seed44_block_b_ac371ba_gpu1_attempt1
+  authorization_commit: e645925478e0110504f4dd8ce473a1a3be82d677
+  authorization_consumption_record_exists: false
+  authorization_parent_commit: acc7e244926fcb9336d35d29d0d767cf1afc5743
+  consumed: false
+  dispatch_occurred: false
+  executable: false
+  executing_implementation_commit: ac371ba274cbce21484ced78985f21902244e6cd
+  gpu_sharing_policy_at_refusal: exclusive
+  gpu_uuid: GPU-ca3cb287-b8d7-b344-64e3-92193cc2ae5f
+  historical_commit_preserved: true
+  intended_output_directory: /home/laura/rnagenesis-mres-runs/m8_d1_seed44_block_b_ac371ba_gpu1_attempt1
+  launch_occurred: false
+  output_directory_created: false
+  pci_bus: 00000000:61:00.0
+  physical_gpu: 1
+  refusal_evidence_archive: /home/laura/m8-review-archives/m8_d1_seed44_block_b_launch_20261009T070756Z_569843
+  retirement_reason: exclusive_gpu_availability_gate_unsatisfied
+  sequence_generation_occurred: false
+  tmux_controller_started: false
+retention_minimum_date: '2026-11-01'
+retry_rule: new_id_authorisation_and_directory
+sampler:
+  ddim_steps: 50
+  do_sample: true
+  encdec: frozen
+  eta: '0'
+  guidance_enabled: false
+  max_seq_len_rule: requested_biological_length_plus_1
+  top_k: 0
+  top_p: '0.95'
+  weights: raw
+schedule_hashes:
+  block_a_invocation_schedule_sha256: 491c47d8df603e6b9277464611ba27da94dc15134b5e8b2290d91962c45cd13e
+  block_b_invocation_schedule_sha256: 7b66e5f79f5ce9bb44a896371715c707b7093883e40b8adf5963abf49e135b8f
+  empirical_histogram_sha256: dc599c637dafa455447551a78b0234c818262d82a86989cc863e09136abcaee3
+  master_attempt_map_sha256: a99ac979d430c2145f47f696822ec6cc06627142032aaf2f9c5766ffa1cdc14a
+  quota_allocation_sha256: d477d1ffc1d8f3df6f9124b0c613e3beb8891ffa8100b6a5744ac8f9d51aa721
+  source_length_vector_sha256: 7e6cb523a85116fc38788c336ef50c26e0eccc343712aaea89956a73c485bd3c
+schema_version: m8-raw-generation-config-1
+selected_set_identity:
+  final_selection_manifest_sha256: 49b218e3df74825e1931148e2f65b25aae057c822e2ab32d44c2960b1587c91c
+  selected_set_sha256: af0c0e555a8b878feadeb17fcbde18d8b780819a42d9e0cc547d2fc0c6895f8f

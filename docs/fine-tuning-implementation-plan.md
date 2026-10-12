@@ -1726,7 +1726,9 @@ TRAIN text was opened for exact-copy and nearest-TRAIN diagnostics only. VALIDAT
 
 ### M7 — Final D1 replicate training
 
-**M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED** (6 October 2026). The inactive package is described in [M7 final replicates implementation](fine_tuning/m7_final_replicates_implementation.md). No biological data or weights were accessed, no GPU was used, no run or evidence directory was created, no M7 authorisation exists, seeds 43 and 44 have not run, and **M7 is not complete**.
+**M7 COMPLETE / GO for M8 planning only — 8 October 2026.** The human gate accepts the two-seed selected set. Section 14 of [M7 final replicates implementation](fine_tuning/m7_final_replicates_implementation.md) is the account. M8 generation has not been performed and is not authorised.
+
+**Historical status, 6 October 2026: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED.** The inactive package is described in [M7 final replicates implementation](fine_tuning/m7_final_replicates_implementation.md). At that date no biological data or weights had been accessed for M7, no GPU had been used, no run or evidence directory had been created, no M7 authorisation existed, seeds 43 and 44 had not run, and M7 was not complete.
 
 **Objective**  
 Run the approved single MRes adaptation strategy reproducibly.
@@ -1747,7 +1749,7 @@ Run the approved single MRes adaptation strategy reproducibly.
 - candidate ranking by fixed-draw VALIDATION MSE ascending, then the earlier epoch on an exact tie; candidate diagnostics are lazy, evaluated in ranking order until the first passing checkpoint, each on the accepted 1,000-attempt M6 schedule with the approved cleaner and the five numerical guardrails (requested-length matching, early EOS and gross length behaviour stay report-only). If no candidate passes, the outcome is `no_eligible_checkpoint` and the learning rate, thresholds, architecture and seed are not changed automatically;
 - resume is unsupported. A technical retry uses the same seed and configuration, starts again from B1, uses a new immutable attempt directory and needs a new authorisation. All five checkpoints per executed seed are retained through at least 1 November 2026, and no deletion is implemented.
 
-**Frozen M8 boundary.** M8 will generate 30,000 raw D1 attempts in total: 30,000 for one seed, or 15,000 each for two seeds with a deterministic split balanced within requested-length strata. M8 generation is not implemented in the M7 package.
+**Frozen M8 boundary.** Both final seeds completed, so the approved M8 allocation is 15,000 raw attempts from the seed-43 checkpoint and 15,000 from the seed-44 checkpoint. The one-seed alternative is historical and is not executable. M8 generation is not implemented in the M7 package and is not authorised by this closure.
 
 **Operational cutoff (recorded, not automated).** Stretch target 18:00 AEDT, 7 October 2026; hard target 17:00 AEDT, 8 October 2026. Seed 44 proceeds only if `current time + 1.25 x measured seed-43 end-to-end execution time + 2 hours` is no later than the hard target. The decision is operational only and may not depend on seed-43 scientific results. If seed 44 is omitted, the deviation must be sealed before M8 generation.
 
@@ -1767,52 +1769,50 @@ Review seed consistency and freeze D1 training.
 - no post-hoc architecture changes;
 - no M7 execution, GPU use, biological access, or authorisation until a separate authorisation-only package is reviewed.
 
-**Current status: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED — 6 October 2026. M7 is not complete.**
+**Historical current-status line, 6 October 2026: M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED. M7 was not complete.**
+
+**Closure — 8 October 2026.** The human gate accepts the selected set from `/home/laura/rnagenesis-mres-runs/m7_d1_final_selection_b5de24327ed5_attempt1`. The manifest SHA-256 is `49b218e3df74825e1931148e2f65b25aae057c822e2ab32d44c2960b1587c91c`, `selection_outcome: selected_set_complete`, selected-set SHA-256 `af0c0e555a8b878feadeb17fcbde18d8b780819a42d9e0cc547d2fc0c6895f8f`. Seed 43 and seed 44 each contribute the epoch-5 update-105 checkpoint named in section 14 of the M7 implementation record. The M8 allocation is 15,000 raw attempts for each checkpoint, 30,000 in total. Seed 43 attempt 1 remains the consumed `runtime_identity` failure. Seed 43 attempt 2 and seed 44 attempt 1 are the accepted replicates. The result is limited to these two seeds: seed 42 stays excluded, no third seed was trained, and no one-seed deviation was used. All five epoch checkpoints of each executed seed are retained through at least 1 November 2026, and no deletion is implemented. The sealed manifests keep `m7_complete: false` and `m8_generation_performed: false`; those run-time flags are not rewritten. `D1_candidate_guardrails.yaml` and `D1_final_selection.yaml` are restored to their inactive documents. `D1_final_replicates.yaml` stays the seed-44 authorisation document because that is the state the tests require and because the validators accept no consumed document status. This closure is not a new executable authorisation and does not authorise M8 generation.
+
+**Current status: COMPLETE / GO — 8 October 2026, for M8 planning only.**
 
 ---
 
-### M8 — Final development generation and VALIDATION comparison
+### M8 — Raw B1 and D1 generation
+
+**Status: M8 raw generation and assembly are complete. The checked-in configuration is inactive, `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`, and non-consumable.** Later four-condition evaluation is required and is not authorised by this closure. The record is section 8 of [M8 raw generation](fine_tuning/m8_raw_generation.md). The checked-in configuration has no active generation entry and no active assembly entry. The unused GPU 1 seed-44 block-B authorisation remains recorded as unconsumed and superseded before dispatch. It is not executable. The consumed D1 seed-44 block-B arm used `shared_allowed` on physical GPU 0; that authorisation is not in the inactive configuration. Exclusive remains the default for a new entry that names it. Shared execution was an operational deviation for that one arm: it can change wall-clock runtime and contention risk, and it does not change sampling, checkpoint selection, or evaluation criteria.
 
 **Objective**  
-Generate the full B1 and D1 pools and complete development-time generator analysis.
+Produce and seal raw B1 and D1 pools only. Parsing, filtering, clustering, representation analysis, and the four-condition comparison occur later under a common frozen evaluation protocol. They are not part of M8.
 
-**Conditions**
+**Approved generation**
 
-- B1 generic released RNAGenesis;
-- B2 TRAIN-matched empirical RNA null;
-- D1 MRes curated-aptamer diffusion-adapted RNAGenesis;
-- B0 existing released aptamer-adapted RNAGenesis as external comparator.
+- B1: exactly 30,000 raw attempts from the generic released checkpoint.
+- D1: exactly 30,000 raw attempts, 15,000 from the selected training seed 43 and 15,000 from the selected training seed 44.
+- The M4 and M7 1,000-attempt pools are excluded.
+- Two D1 training seeds are the approved final set. The absent third seed is a resource and time limitation. The one-seed M8 alternative is historical and is not executable, because both final seeds completed.
+- Fixed raw-attempt accounting supersedes rejection and resampling language. There is no replenishment, replacement, rejection sampling, deduplication, truncation, padding, or dropping.
+- No cleaner-derived validity or acceptance classification is performed. Exact raw bytes remain authoritative in the retained, hashed raw invocation files. `raw_decoded_text` is the deterministic UTF-8-else-Latin-1 decoded representation stored in canonical JSON, and assembly verifies it against those raw bytes.
+- Generation seeds are unique within a block and are intentionally reused across the paired B1/D1 arm. Attempts are generated draws, not independent model-training replicates. D1 has two training replicates. The training seed is tied to the technical block, whose length allocations are 830,348 nt and 830,404 nt. Later evaluation must not treat 30,000 attempts as 30,000 independent model replicates.
+- The planning assumption was approximately 6.4–10.4 GPU-hours for all four arms, with a practical 12–16 hour reservation including verification and overhead. The measured sum of the four arm `elapsed_seconds` values is 33551.566182404757 seconds (9.3198794951124325 hours). The wall-clock span from the first arm start to the last arm finish is 84997 seconds. Checkpoint weights were not copied. Expected evidence storage was modest.
 
-**Primary generation target**
+**Later comparison, outside M8**
 
-```text
-30,000 raw attempts per new condition
-```
+The four conditions remain B1, B2, D1, and B0. B1 versus D1 is the primary controlled comparison. B2 is the non-neural null. B0 remains the external comparator and keeps its existing 30,080 attempts. TRAIN copying and novelty checks, VALIDATION distribution comparison, clustering, and representation analysis belong to that later protocol. REF and EVAL stay prohibited.
 
-B0 retains its existing 30,080 attempts.
+**Launch binding, still inactive.** A future authorization commit is live HEAD. `repository_identity.mres_commit` records that commit. `proposal_base_commit` keeps `d0f9a397b536c64ca1b22662cc9ae36aea0101f6` separately. Every commit after the executing implementation commit must be linear, must contain no merge, and may change only `config/experiments/M8_raw_generation.yaml`. The controller observation reads the running process, including `/proc/self/exe` where available. A child interpreter probe runs before consumption and does not import the model stack or query CUDA. Production path preflight refuses a symlinked run root, a symlinked checkpoint or source directory, and a raw file that does not resolve inside its arm. Assembly stores `active_configuration_raw_sha256` from the exact YAML bytes and validates the nested arm manifest, including D1 `selected_set_evidence`. After consumption and before the first generation subprocess, isolated `HOME`, `TMPDIR`, cache, and pycache directories are created inside the output. `TMPDIR` must exist. This paragraph describes validators that remain unauthorised.
 
-**Primary controlled comparison**
+**Closure — 10 October 2026.** The four generation arms and both CPU assemblies are complete. B1 and D1 each have 30,000 raw attempts, master indexes 0 through 29999 exactly once, and 30,000 unique record ids. B1 block A pairs with D1 training seed 43 and generation seeds 800000–800162. B1 block B pairs with D1 training seed 44 and generation seeds 900000–900163. Training seeds are 43 and 44 only. They are not generation seeds and they are not record ids. The B1 combined ledger is `/home/laura/rnagenesis-mres-runs/m8_b1_combined_1069b63_cpu_attempt1/m8_combined_raw_attempt_ledger.jsonl`, SHA-256 `37ba0e1b852a6b8492a816a4adc0c6bfee15a554ba28a8ba5dd91d9e32a255d9`, 26,427,607 bytes. The D1 combined ledger is `/home/laura/rnagenesis-mres-runs/m8_d1_combined_1069b63_cpu_attempt1/m8_combined_raw_attempt_ledger.jsonl`, SHA-256 `cedcc36133f5dfb3678e1560c6d6bab703136fe89e512e939b9f93a9a6361de9`, 28,971,289 bytes. Filtering, replacement, and replenishment stayed false. Parsing and deduplication stayed false on the assembly manifests. Sealed manifests were not rewritten. Evidence is retained through at least 1 November 2026.
 
-```text
-B1 vs D1
-```
+Only two fine-tuning seeds were used, because of time and GPU constraints. Evaluation completeness was prioritized over a third training replicate. The training seed is coupled to the D1 technical block and generation-seed range, so the pooled D1 condition supports condition-level evaluation and does not support clean replicate-level causal inference. Raw attempts are not yet established to be valid nucleotide sequences. No duplicate removal, exact training-set-match analysis, leakage analysis, biological-quality assessment, structure analysis, clustering, representation-space analysis, or functional evaluation was performed. M7 guardrail samples were not included. Seed 43 attempt 1 remains the consumed `runtime_identity` environment failure, not a model failure. Guardrails establish generation and runtime sanity only. Shared GPU use on the seed-44 block-B arm may affect runtime and resource contention; its generated bytes and provenance remain sealed.
 
-with B2 as the non-neural null.
+**Current status: COMPLETE for raw generation and assembly. Four-condition evaluation is required and is not authorised by this closure.**
 
-B0 is a separately interpreted external aptamer-adapted comparator because its existing pool uses the 37-nt released aptamer sampling regime.
+**Must not happen from this closure**
 
-**Reference use**
-
-- TRAIN: copying/novelty only;
-- VALIDATION: held-out development distribution comparison;
-- REF: prohibited;
-- EVAL: prohibited.
-
-**Human gate**  
-Freeze generator checkpoint(s), generation settings and generator-level analysis.
-
-**Must not happen yet**
-
+- no further M8 generation, assembly, GPU use, or run directory;
+- no parsing, cleaning, or filtering inside this closure;
+- no parameter tuning after inspecting REF or EVAL outcomes;
+- no entry into the evaluation worktree;
 - no AptaRank tuning from TRAIN;
 - no REF use for RNAGenesis decisions;
 - no EVAL.
@@ -1822,7 +1822,7 @@ Freeze generator checkpoint(s), generation settings and generator-level analysis
 ### M9A — RNAGenesis generator freeze
 
 **Objective**  
-Create an immutable generator decision record before AptaRank calibration.
+Create an immutable generator decision record before the M9B AptaRank implementation/interface review and REF workflow.
 
 **Freeze**
 
@@ -1836,24 +1836,64 @@ Create an immutable generator decision record before AptaRank calibration.
 
 ---
 
-### M9B — AptaRank REF calibration
+### M9B — AptaRank implementation/interface review, REF setup, and freeze
 
 **Objective**  
-Fit/calibrate the empirical AptaRank reference distributions independently of RNAGenesis development.
+Review the AptaRank paper, GitHub implementation, implementation notes, and actual user interface before freezing the manual evaluation workflow.
 
-**Input**
+Laura will operate AptaRank manually through its UI. The expected workflow is:
 
-```text
-REF only
-```
+1. upload the frozen reference file;
+2. upload the sequence file;
+3. separately select or upload the independently chosen target configuration when Tier 2 is used;
+4. run the frozen UI configuration;
+5. download the sequence file containing rankings and annotations.
 
-**Rule**
+AptaRank performs its own reference-distribution calibration from the uploaded REF data. The MRes pipeline does not locally fit, replace, or independently recreate that calibration as a prerequisite for using the tool.
 
-AptaRank calibration may not alter the frozen RNAGenesis generator.
+Local code may calculate REF component distributions descriptively for thesis reporting, interpretation, and audit. Those calculations must be labelled descriptive and must not be represented as calibration of AptaRank.
 
-No TRAIN-based AptaRank calibration is permitted.
+**Inputs and order**
 
-No EVAL is permitted.
+Before REF is opened:
+
+- review the paper, GitHub implementation, supplied implementation notes, and UI;
+- identify the actual deployment/version where possible;
+- verify upload schemas, target-configuration handling, effective settings, output columns, score directions, annotations, failure behaviour, and export behaviour using synthetic or non-protected inputs;
+- distinguish documented behaviour from assumptions or unavailable implementation details.
+
+After that interface review is frozen, M9B may use REF only for the manual AptaRank reference workflow. EVAL remains prohibited.
+
+**Freeze and record**
+
+Record, where the tool exposes or the implementation supports them:
+
+- AptaRank paper/source/release or deployment identity;
+- exact REF file identity and SHA-256;
+- reference-upload and sequence-upload schemas;
+- target configuration and its independent selection basis;
+- effective UI preset and settings;
+- ranking and annotation fields and their evidenced interpretation;
+- score direction where established;
+- row-preservation, missing-row, failed-row, duplicate, and sequence-conversion behaviour;
+- manual operator, timestamps, run identifiers, warnings, and rerun lineage;
+- hashes of every upload and immutable raw download;
+- local normalization/join/reporting code and configuration hashes;
+- descriptive REF-distribution outputs, separately labelled from tool calibration.
+
+**Rules**
+
+- Do not alter the frozen RNAGenesis generator.
+- Do not use TRAIN for AptaRank calibration.
+- Do not access EVAL.
+- Do not infer or reimplement undocumented scorer internals merely to fill a specification.
+- Record unavailable details as limitations.
+- Local code prepares uploads, validates downloads, joins provenance, accounts for failures, and produces prespecified summaries. The AptaRank UI remains the scorer.
+- No new combined Tier 1/Tier 2 score is introduced.
+
+**Completion**
+
+M9B is complete when the actual manual AptaRank workflow and its interpretation boundaries are frozen, the REF workflow has immutable provenance, and any descriptive REF distributions are reproducible and correctly labelled. M9B completion does not itself unlock EVAL.
 
 ---
 
@@ -1863,11 +1903,13 @@ Freeze:
 
 - RNAGenesis D1;
 - generation settings;
-- AptaRank calibration;
+- the M9B AptaRank implementation/interface and REF-workflow record;
 - ranking/filtering configuration;
 - final evaluation metrics;
 - all condition names;
 - statistical analysis plan.
+
+The frozen AptaRank record is the reviewed implementation, interface, and REF workflow. It is not a claim that local code calibrated AptaRank. AptaRank performs that calibration from the uploaded reference file. Descriptive local REF distributions stay labelled as descriptive.
 
 Write an explicit EVAL-unlock record.
 
@@ -2023,7 +2065,7 @@ This yields the final held-out estimate of the generator/ranking pipeline select
 | EVAL contamination | Blocker | role guards + physical absence | no EVAL transfer until M10 |
 | B0 mislabelled as unadapted | High | condition registry/review | fixed terminology in Section 4 |
 | B0 37-nt pool compared naively with length-matched conditions | High | metric review | treat B0 as external comparator; normalize/stratify length-sensitive metrics |
-| B1 length matching fails due early EOS | Medium | M4 length experiment | documented matching/resampling design before 30k generation |
+| B1 length matching fails due early EOS | Medium | M4 length experiment | historical M4 note; for M8 this is superseded by fixed raw-attempt accounting with no replenishment |
 | Existing B2 implementation differs from frozen protocol | Medium | code audit | correct/reuse before regeneration; record diff |
 | Modified chemistry overinterpreted | Medium | methods review | model base sequence only; preserve chemistry metadata; explicit wording |
 | AdaLayerNorm patch omitted after environment rebuild | High | startup verification | automated patch/hash check |
@@ -2103,13 +2145,13 @@ The MRes RNAGenesis modelling implementation is complete when:
 
 ## 22. Immediate next actions
 
-M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 2026. M2 is COMPLETE / GO — 28 September 2026. M3 is COMPLETE / GO — 29 September 2026, as recorded in [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c`. M4 is COMPLETE / GO — 2 October 2026, for M5 planning only. M5 is COMPLETE / GO — 3 October 2026, for M6 planning only. M6 is COMPLETE / GO — 6 October 2026, for M7 planning only: the attempt-6 training pilot and the update-21 diagnostic are accepted and the raw update-21 checkpoint is selected. M7 is not authorised. This does not authorise M7 execution, additional training or generation, biological TRAIN or VALIDATION access, GPU use, REF, EVAL, or a new run.
+M0 is COMPLETE / GO — 25 September 2026. M1 is COMPLETE / GO — 28 September 2026. M2 is COMPLETE / GO — 28 September 2026. M3 is COMPLETE / GO — 29 September 2026, as recorded in [M3 frozen corpus loader and modelling interface](fine_tuning/m3_frozen_corpus_loader_and_modelling_interface.md). The RNAGenesis implementation commit is `e3b855bbf4d1af376f43747643fa30afd662828c`. M4 is COMPLETE / GO — 2 October 2026, for M5 planning only. M5 is COMPLETE / GO — 3 October 2026, for M6 planning only. M6 is COMPLETE / GO — 6 October 2026, for M7 planning only: the attempt-6 training pilot and the update-21 diagnostic are accepted and the raw update-21 checkpoint is selected. M7 is COMPLETE / GO — 8 October 2026, for M8 planning only: the two-seed selected set is accepted, seed 43 at epoch 5 update 105 and seed 44 at epoch 5 update 105, with 15,000 raw D1 attempts allocated to each. That 8 October sentence did not itself authorise M8. M8 raw generation and assembly are COMPLETE as of 10 October 2026. The checked-in M8 configuration is inactive again. This closure does not authorise further training, biological TRAIN or VALIDATION access, GPU use, filtering, REF, EVAL, or the four-condition evaluation.
 
 Proceed in this order:
 
-1. Review the inactive M7 package (`M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED`, 6 October 2026). It does not authorise execution, biological access, GPU use, or a run directory, and seeds 43 and 44 have not run;
-2. a later, separate authorisation-only package binds one or two independently consumable entries (one per seed). It does not exist yet;
-3. M7 execution only after that separate authorisation. M7 is not complete.
+1. The M7 human gate is closed by the 8 October 2026 record. No further M7 execution is authorised. M7 completion is that human closure. Sealed M7 manifest bytes remain unchanged, including `m8_generation_performed: false`. The candidate-guardrail and final-selection documents are inactive. `D1_final_replicates.yaml` remains historical M7 state, including the live seed-44 authorisation, and is not M8 authority.
+2. M8 generation and assembly are complete. The inactive configuration has empty authorisation lists and every execution flag false. The B1 and D1 combined ledgers are the handoff inputs named in section 8 of [M8 raw generation](fine_tuning/m8_raw_generation.md). Sealed M8 manifests are not rewritten.
+3. The separate four-condition evaluation applies one declared parsing and filtering policy symmetrically across B0, B1, B2, and D1, and does not tune parameters after inspecting REF or EVAL outcomes. That evaluation is not authorised by this closure. The evaluation worktree stays out of scope.
 
 ---
 

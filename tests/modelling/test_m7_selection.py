@@ -225,7 +225,9 @@ class SelectionTests(unittest.TestCase):
         for mutate in (
             lambda m: m["b1_identity"].update(initial_state_aggregate_digest=support.digest("other-b1")),
             lambda m: m["b1_identity"].update(initial_state_parameter_names_sha256=support.digest("other-names")),
-            lambda m: m["configuration"].update(implementation_config_sha256=support.digest("other-config")),
+            lambda m: m["configuration"]["implementation_file_hashes"].__setitem__(
+                sorted(m["configuration"]["implementation_file_hashes"])[0], support.digest("other-implementation")
+            ),
         ):
             manifest = copy.deepcopy(json.loads(second[0].decode("utf-8")))
             mutate(manifest)
@@ -1027,6 +1029,481 @@ class ValidatorStrictnessTests(unittest.TestCase):
         self.refuse(lambda m: m["closure"].update(human_gate_required=False))
         self.refuse(lambda m: m.update(manifest_schema_version="m7-final-selection-manifest-1"))
         self.refuse(lambda m: m.update(schema_version="m7-final-selection-config-1"))
+
+
+# The sealed seed-43 training implementation, the sealed seed-44 training
+# implementation, the failed seed-43 attempt-1 implementation (another
+# replicate), and current main, which is later than the seed-43 training
+# commit. The last value stands for a later guardrail execution commit. This
+# fixture does not authorise it.
+SEED43_TRAINING_COMMIT = "c150894b9982d7afebfb2b3390b0797a4da146b5"
+SEED44_TRAINING_COMMIT = "2cb1b6a26391ed36754ec21685a4501d659d50ef"
+OTHER_REPLICATE_TRAINING_COMMIT = "e682cb6064a578868cc258e58465a0c036afe0d4"
+LATER_GUARDRAIL_EXECUTION_COMMIT = "00db7d9d5317e7b17f5d51adbbcd6c87bf9cce12"
+
+
+def retarget_training(manifest, commit):
+    """A replicate manifest whose training implementation is ``commit``.
+
+    A replicate manifest's ``executing_implementation_commit`` is that training
+    implementation. Checkpoint directory names are resealed to the same commit.
+    """
+    changed = copy.deepcopy(manifest)
+    changed["authorisation"]["authorization_parent_commit"] = commit
+    changed["authorisation"]["executing_implementation_commit"] = commit
+    for item in changed["checkpoints"]:
+        item["directory_name"] = contract.checkpoint_child_name(changed["seed"], item["epoch"], commit)
+    contract.validate_replicate_manifest(changed)
+    return changed
+
+
+def trained_manifest(seed, mse, commit):
+    base = support.variant(support.successful_run(seed)["manifest"], mse_by_epoch=mse, weight_salt="seed%d" % seed)
+    return retarget_training(base, commit)
+
+
+def prefix_guardrails(manifest, replicate_blob, outcomes, execution_commit=None):
+    order = [item["epoch"] for item in manifest["validation_ranking"]["ranked_candidates"]]
+    blobs = []
+    preceding = []
+    for position, passed in enumerate(outcomes, start=1):
+        epoch = order[position - 1]
+        blob_i = support.guardrail_blob(manifest, replicate_blob, epoch, passed, position, list(preceding), execution_commit=execution_commit)
+        blobs.append(blob_i)
+        if not passed:
+            preceding.append({"epoch": epoch, "manifest_sha256": common.sha256_bytes(blob_i), "outcome": "failed"})
+    return order, blobs
+
+
+def forward_seed43(outcomes=(False, True)):
+    """Seed 43 trained at c150894, with a later unequal guardrail execution commit."""
+    manifest = trained_manifest(43, MSE_A, SEED43_TRAINING_COMMIT)
+    blob = common.canonical_json(manifest)
+    order, guards = prefix_guardrails(manifest, blob, outcomes, LATER_GUARDRAIL_EXECUTION_COMMIT)
+    deviation = support.deviation_blob(blob, manifest)
+    return blob, guards, manifest, order, deviation
+
+
+def rewrite_checkpoint_training(guardrail, commit, rewrite_directory):
+    changed = copy.deepcopy(guardrail)
+    changed["authorisation"]["checkpoint_training_implementation_commit"] = commit
+    if rewrite_directory:
+        changed["checkpoint"]["directory_name"] = contract.checkpoint_child_name(changed["candidate"]["seed"], changed["candidate"]["epoch"], commit)
+    return changed
+
+
+class ForwardProvenanceSelectionTests(unittest.TestCase):
+    """Selection binds checkpoint provenance, not the guardrail execution commit."""
+
+    def test_a_forward_guardrail_manifest_selects_when_training_provenance_matches(self):
+        blob, guards, manifest, order, deviation = forward_seed43()
+        parsed_guard = json.loads(guards[0].decode("utf-8"))
+        authorisation = parsed_guard["authorisation"]
+        self.assertEqual(authorisation["checkpoint_training_implementation_commit"], SEED43_TRAINING_COMMIT)
+        self.assertEqual(authorisation["executing_implementation_commit"], LATER_GUARDRAIL_EXECUTION_COMMIT)
+        self.assertEqual(authorisation["authorization_parent_commit"], LATER_GUARDRAIL_EXECUTION_COMMIT)
+        self.assertNotEqual(authorisation["executing_implementation_commit"], authorisation["checkpoint_training_implementation_commit"])
+        self.assertEqual(manifest["authorisation"]["executing_implementation_commit"], SEED43_TRAINING_COMMIT)
+        self.assertTrue(parsed_guard["checkpoint"]["directory_name"].endswith(SEED43_TRAINING_COMMIT))
+        built = selection.build_final_selection([blob], guards, deviation)
+        self.assertEqual(built["selection_outcome"], selection.OUTCOME_COMPLETE)
+        self.assertEqual(built["completed_seeds"], [43])
+        self.assertEqual(built["m8_allocation"], {"43": 30000})
+        self.assertEqual(built["validation_rankings"][0]["ranked_epochs"], order)
+        self.assertEqual(built["validation_rankings"][0]["rule"], common.RANKING_RULE)
+        self.assertEqual(built["seed_records"][0]["selected_epoch"], order[1])
+        self.assertEqual(built["seed_records"][0]["status"], "selected")
+        self.assertEqual(built["seed_records"][0]["lazy_state"], "passed")
+        self.assertEqual(built["selected_set"][0]["epoch"], order[1])
+        self.assertTrue(built["selected_set"][0]["checkpoint_name"].endswith(SEED43_TRAINING_COMMIT))
+        self.assertFalse(built["selected_set"][0]["checkpoint_name"].endswith(LATER_GUARDRAIL_EXECUTION_COMMIT))
+        self.assertEqual(built["candidate_table"][order[0] - 1]["guardrail"]["passed"], False)
+        self.assertEqual(built["candidate_table"][order[1] - 1]["guardrail"]["passed"], True)
+        self.assertEqual(built["guardrail_manifests"], [
+            {"epoch": order[0], "seed": 43, "sha256": common.sha256_bytes(guards[0])},
+            {"epoch": order[1], "seed": 43, "sha256": common.sha256_bytes(guards[1])},
+        ])
+        self.assertIsNotNone(built["deviation"])
+        rendered = selection.final_selection_bytes(built).decode("utf-8")
+        self.assertIn(SEED43_TRAINING_COMMIT, rendered)
+        self.assertNotIn(LATER_GUARDRAIL_EXECUTION_COMMIT, rendered)
+        self.assertNotIn("executing_implementation_commit", built)
+        self.assertNotIn("checkpoint_training_implementation_commit", built)
+        self.assertTrue(selection.rebuild_matches(selection.final_selection_bytes(built), [blob], guards, deviation))
+        reversed_bytes = selection.final_selection_bytes(selection.build_final_selection([blob], list(reversed(guards)), deviation))
+        self.assertEqual(reversed_bytes, selection.final_selection_bytes(built))
+
+    def test_existing_equal_commit_ranking_fallback_two_seed_and_allocation_behavior_is_unchanged(self):
+        first, second = two_seed_scenario()
+        for guardrail_blob in list(first[1]) + list(second[1]):
+            authorisation = json.loads(guardrail_blob.decode("utf-8"))["authorisation"]
+            self.assertEqual(
+                authorisation["checkpoint_training_implementation_commit"],
+                authorisation["executing_implementation_commit"],
+            )
+        built = build(first, second)
+        self.assertEqual(built["selection_outcome"], selection.OUTCOME_COMPLETE)
+        self.assertEqual(built["completed_seeds"], [43, 44])
+        self.assertEqual(built["m8_allocation"], {"43": 15000, "44": 15000})
+        self.assertIsNone(built["deviation"])
+        self.assertEqual([row["seed"] for row in built["selected_set"]], [43, 44])
+        self.assertEqual(built["validation_rankings"][0]["rule"], common.RANKING_RULE)
+        one = support.scenario(43, MSE_A, [False, False, False, False, False])
+        deviation = support.deviation_blob(one[0], one[2])
+        none = build(one, None, deviation)
+        self.assertEqual(none["selection_outcome"], selection.OUTCOME_NONE)
+        self.assertIsNone(none["selected_set"])
+        self.assertEqual(none["m8_allocation"], {"43": 30000})
+
+    def test_missing_malformed_substituted_and_mismatched_checkpoint_training_commits_are_refused(self):
+        blob, guards, _manifest, _order, deviation = forward_seed43((True,))
+        original = json.loads(guards[0].decode("utf-8"))
+
+        missing = copy.deepcopy(original)
+        del missing["authorisation"]["checkpoint_training_implementation_commit"]
+        with self.assertRaises(M7Error) as caught:
+            selection.build_final_selection([blob], [common.canonical_json(missing)], deviation)
+        self.assertEqual(caught.exception.code, "guardrail_manifest_invalid")
+
+        for malformed in ("short", "B" * 40, "", None, "c150894b9982d7afebfb2b3390b0797a4da146b"):
+            changed = copy.deepcopy(original)
+            changed["authorisation"]["checkpoint_training_implementation_commit"] = malformed
+            with self.assertRaises(M7Error) as caught:
+                selection.build_final_selection([blob], [common.canonical_json(changed)], deviation)
+            self.assertEqual(caught.exception.code, "guardrail_manifest_invalid")
+
+        substituted = rewrite_checkpoint_training(original, "d" * 40, rewrite_directory=False)
+        with self.assertRaises(M7Error) as caught:
+            selection.build_final_selection([blob], [common.canonical_json(substituted)], deviation)
+        self.assertEqual(caught.exception.code, "guardrail_manifest_invalid")
+
+        mismatched = rewrite_checkpoint_training(original, LATER_GUARDRAIL_EXECUTION_COMMIT, rewrite_directory=True)
+        self.assertEqual(mismatched["authorisation"]["executing_implementation_commit"], LATER_GUARDRAIL_EXECUTION_COMMIT)
+        self.assertNotEqual(mismatched["authorisation"]["checkpoint_training_implementation_commit"], SEED43_TRAINING_COMMIT)
+        with self.assertRaises(M7Error) as caught:
+            selection.build_final_selection([blob], [common.canonical_json(mismatched)], deviation)
+        self.assertEqual(caught.exception.code, "selection_invalid")
+        self.assertIn("sealed training implementation", caught.exception.detail)
+
+    def test_a_checkpoint_training_commit_that_names_another_seed_or_replicate_is_refused(self):
+        blob, guards, _manifest, _order, deviation = forward_seed43((True,))
+        original = json.loads(guards[0].decode("utf-8"))
+        for foreign in (SEED44_TRAINING_COMMIT, OTHER_REPLICATE_TRAINING_COMMIT):
+            named = rewrite_checkpoint_training(original, foreign, rewrite_directory=True)
+            named["authorisation"]["executing_implementation_commit"] = SEED43_TRAINING_COMMIT
+            named["authorisation"]["authorization_parent_commit"] = SEED43_TRAINING_COMMIT
+            self.assertEqual(named["authorisation"]["executing_implementation_commit"], SEED43_TRAINING_COMMIT)
+            self.assertNotEqual(named["authorisation"]["checkpoint_training_implementation_commit"], SEED43_TRAINING_COMMIT)
+            with self.assertRaises(M7Error) as caught:
+                selection.build_final_selection([blob], [common.canonical_json(named)], deviation)
+            self.assertEqual(caught.exception.code, "selection_invalid")
+            self.assertIn("sealed training implementation", caught.exception.detail)
+
+    def test_selection_does_not_substitute_the_execution_commit_for_checkpoint_provenance(self):
+        blob, guards, _manifest, _order, deviation = forward_seed43((True,))
+        original = json.loads(guards[0].decode("utf-8"))
+        trapped = rewrite_checkpoint_training(original, SEED44_TRAINING_COMMIT, rewrite_directory=True)
+        trapped["authorisation"]["executing_implementation_commit"] = SEED43_TRAINING_COMMIT
+        trapped["authorisation"]["authorization_parent_commit"] = SEED43_TRAINING_COMMIT
+        self.assertEqual(trapped["authorisation"]["executing_implementation_commit"], SEED43_TRAINING_COMMIT)
+        with self.assertRaises(M7Error) as caught:
+            selection.build_final_selection([blob], [common.canonical_json(trapped)], deviation)
+        self.assertEqual(caught.exception.code, "selection_invalid")
+        self.assertIn("sealed training implementation", caught.exception.detail)
+        accepted = json.loads(guards[0].decode("utf-8"))
+        self.assertNotEqual(accepted["authorisation"]["executing_implementation_commit"], SEED43_TRAINING_COMMIT)
+        self.assertEqual(accepted["authorisation"]["checkpoint_training_implementation_commit"], SEED43_TRAINING_COMMIT)
+        built = selection.build_final_selection([blob], guards, deviation)
+        self.assertEqual(built["selection_outcome"], selection.OUTCOME_COMPLETE)
+        self.assertTrue(built["selected_set"][0]["checkpoint_name"].endswith(SEED43_TRAINING_COMMIT))
+
+
+# Real sealed training commits and the SHA-256 of each parent replicate YAML.
+# The configuration hashes differ because those YAML bytes carry different
+# single-use authorisation state. They are not a second training protocol.
+SEED43_CONFIG_SHA256 = "be4af21865f1561471ae5e63dd6231269adace8470f0fcd8bfede7847b89bdd6"
+SEED44_CONFIG_SHA256 = "d65b78ac72bd4dccd8d7dd52be5914d8227c34f0759315064f8d3fe3c649be35"
+SEED43_AUTHORIZATION_COMMIT = SEED44_TRAINING_COMMIT
+SEED44_AUTHORIZATION_COMMIT = "00db7d9d5317e7b17f5d51adbbcd6c87bf9cce12"
+# Synthetic stand-ins for later guardrail execution. They authorise nothing.
+GUARDRAIL_EXECUTION_SEED43 = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+GUARDRAIL_EXECUTION_SEED44 = "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+
+
+def revision_2_consistency_signature(view):
+    """Revision 2 required these fields, including the training commit, to be equal."""
+    parsed = view["parsed"]
+    identity = parsed["b1_identity"]
+    artifacts = parsed["validation_artifacts"]
+    return {
+        "b1_initial_state_aggregate_digest": identity["initial_state_aggregate_digest"],
+        "b1_initial_state_parameter_names_sha256": identity["initial_state_parameter_names_sha256"],
+        "b1_unet_config_sha256": identity["unet_config_sha256"],
+        "b1_weight_sha256": identity["weight_sha256"],
+        "checkpoint_training_implementation_commit": view["checkpoint_training_implementation_commit"],
+        "implementation_config_sha256": parsed["configuration"]["implementation_config_sha256"],
+        "schedule_trace_sha256": parsed["schedule"]["applied_learning_rate_trace_sha256"],
+        "validation_artifacts": {
+            key: artifacts[key]
+            for key in (
+                "draw_manifest_sha256",
+                "hash_report_sha256",
+                "noise_sha256",
+                "order_artifact_sha256",
+                "sequence_order_sha256",
+                "timestep_sha256",
+                "validation_csv_sha256",
+            )
+        },
+    }
+
+
+def revision_2_assert_cross_seed_consistency(views):
+    """The revision-2 rule. Equal training commits are impossible for the real pair."""
+    signatures = {seed: revision_2_consistency_signature(view) for seed, view in views.items()}
+    reference = next(iter(signatures.values()))
+    for seed, signature in signatures.items():
+        if signature["b1_initial_state_aggregate_digest"] != reference["b1_initial_state_aggregate_digest"] or (
+            signature["b1_initial_state_parameter_names_sha256"] != reference["b1_initial_state_parameter_names_sha256"]
+        ):
+            raise M7Error("selection_invalid", "the B1 initial-state digests differ between seeds")
+        if signature["validation_artifacts"] != reference["validation_artifacts"]:
+            raise M7Error("selection_invalid", "the validation artifact identities differ between seeds")
+        if signature != reference:
+            raise M7Error("selection_invalid", "the seeds were not trained under one identical implementation and B1")
+    return True
+
+
+def seal_sequential_replicate(seed, mse, training_commit, authorization_commit, config_sha256):
+    manifest = trained_manifest(seed, mse, training_commit)
+    if authorization_commit == training_commit:
+        raise AssertionError("an authorisation commit must not alias the training commit")
+    manifest["authorisation"]["authorization_commit"] = authorization_commit
+    manifest["configuration"]["implementation_config_sha256"] = config_sha256
+    manifest["repository"]["authorization_commit"] = authorization_commit
+    manifest["repository"]["executing_implementation_commit"] = training_commit
+    contract.validate_replicate_manifest(manifest)
+    return manifest
+
+
+def actual_training_topology():
+    """The real two-seed commit topology, as synthetic manifest bytes.
+
+    Seed 43 is sealed at c150894…. Seed 44 is sealed at 2cb1b6a…. Each
+    guardrail execution commit is later than, and distinct from, both training
+    commits. Rank-1 passes, so both seeds are selected.
+    """
+    left = seal_sequential_replicate(43, MSE_A, SEED43_TRAINING_COMMIT, SEED43_AUTHORIZATION_COMMIT, SEED43_CONFIG_SHA256)
+    right = seal_sequential_replicate(44, MSE_B, SEED44_TRAINING_COMMIT, SEED44_AUTHORIZATION_COMMIT, SEED44_CONFIG_SHA256)
+    left_blob = common.canonical_json(left)
+    right_blob = common.canonical_json(right)
+    _order43, guards43 = prefix_guardrails(left, left_blob, (True,), GUARDRAIL_EXECUTION_SEED43)
+    _order44, guards44 = prefix_guardrails(right, right_blob, (True,), GUARDRAIL_EXECUTION_SEED44)
+    return (left_blob, guards43, left), (right_blob, guards44, right)
+
+
+def topology_views(pair):
+    views = {}
+    for blob, _guards, _manifest in pair:
+        parsed, sha = selection._parse_canonical(blob, "a replicate manifest")
+        views[parsed["seed"]] = selection._replicate_view(parsed, sha)
+    return views
+
+
+class SequentialAuthorisationSelectionTests(unittest.TestCase):
+    """Two real training commits must select. Cross-seed substitution must not."""
+
+    def setUp(self):
+        self.pair = actual_training_topology()
+        self.views = topology_views(self.pair)
+
+    def test_actual_two_seed_training_commits_select_and_revision_2_equality_refuses(self):
+        left, right = self.pair
+        self.assertEqual(left[2]["authorisation"]["executing_implementation_commit"], SEED43_TRAINING_COMMIT)
+        self.assertEqual(right[2]["authorisation"]["executing_implementation_commit"], SEED44_TRAINING_COMMIT)
+        self.assertNotEqual(SEED43_TRAINING_COMMIT, SEED44_TRAINING_COMMIT)
+        self.assertEqual(left[2]["configuration"]["implementation_config_sha256"], SEED43_CONFIG_SHA256)
+        self.assertEqual(right[2]["configuration"]["implementation_config_sha256"], SEED44_CONFIG_SHA256)
+        self.assertNotEqual(SEED43_CONFIG_SHA256, SEED44_CONFIG_SHA256)
+        self.assertEqual(left[2]["configuration"]["implementation_file_hashes"], right[2]["configuration"]["implementation_file_hashes"])
+        for blob, guards, manifest in (left, right):
+            guard = json.loads(guards[0].decode("utf-8"))["authorisation"]
+            training = manifest["authorisation"]["executing_implementation_commit"]
+            self.assertEqual(guard["checkpoint_training_implementation_commit"], training)
+            self.assertNotIn(guard["executing_implementation_commit"], (SEED43_TRAINING_COMMIT, SEED44_TRAINING_COMMIT))
+            self.assertNotEqual(guard["executing_implementation_commit"], training)
+        signature = selection._consistency_signature(self.views[43])
+        self.assertNotIn("checkpoint_training_implementation_commit", signature)
+        self.assertNotIn("implementation_config_sha256", signature)
+        self.assertEqual(selection._consistency_signature(self.views[44]), signature)
+        with self.assertRaises(M7Error) as caught:
+            revision_2_assert_cross_seed_consistency(self.views)
+        self.assertEqual(caught.exception.code, "selection_invalid")
+        self.assertIn("identical implementation", caught.exception.detail)
+        built = build(left, right)
+        self.assertEqual(built["selection_outcome"], selection.OUTCOME_COMPLETE)
+        self.assertEqual(built["completed_seeds"], [43, 44])
+        self.assertIsNone(built["deviation"])
+        self.assertEqual(built["m8_allocation"], {"43": 15000, "44": 15000})
+        self.assertEqual(sum(built["m8_allocation"].values()), 30000)
+        selected = {item["seed"]: item for item in built["selected_set"]}
+        self.assertEqual(sorted(selected), [43, 44])
+        self.assertTrue(selected[43]["checkpoint_name"].endswith(SEED43_TRAINING_COMMIT))
+        self.assertTrue(selected[44]["checkpoint_name"].endswith(SEED44_TRAINING_COMMIT))
+        self.assertNotIn(GUARDRAIL_EXECUTION_SEED43, selection.final_selection_bytes(built).decode("utf-8"))
+        self.assertNotIn(GUARDRAIL_EXECUTION_SEED44, selection.final_selection_bytes(built).decode("utf-8"))
+        self.assertTrue(selection.rebuild_matches(selection.final_selection_bytes(built), [left[0], right[0]], list(left[1]) + list(right[1])))
+        reversed_bytes = selection.final_selection_bytes(selection.build_final_selection([right[0], left[0]], list(right[1]) + list(left[1])))
+        self.assertEqual(reversed_bytes, selection.final_selection_bytes(built))
+
+    def _refuse_substituted_guardrail(self, seed, foreign_commit):
+        left, right = self.pair
+        source = left if seed == 43 else right
+        original = json.loads(source[1][0].decode("utf-8"))
+        swapped = rewrite_checkpoint_training(original, foreign_commit, rewrite_directory=True)
+        self.assertEqual(swapped["authorisation"]["checkpoint_training_implementation_commit"], foreign_commit)
+        self.assertNotEqual(swapped["authorisation"]["checkpoint_training_implementation_commit"], source[2]["authorisation"]["executing_implementation_commit"])
+        guard43 = common.canonical_json(swapped) if seed == 43 else left[1][0]
+        guard44 = common.canonical_json(swapped) if seed == 44 else right[1][0]
+        with self.assertRaises(M7Error) as caught:
+            selection.build_final_selection([left[0], right[0]], [guard43, guard44])
+        self.assertEqual(caught.exception.code, "selection_invalid")
+        self.assertIn("sealed training implementation", caught.exception.detail)
+
+    def test_seed_43_guardrail_bound_to_seed_44_training_commit_is_refused(self):
+        self._refuse_substituted_guardrail(43, SEED44_TRAINING_COMMIT)
+
+    def test_seed_44_guardrail_bound_to_seed_43_training_commit_is_refused(self):
+        self._refuse_substituted_guardrail(44, SEED43_TRAINING_COMMIT)
+
+    def test_different_implementation_file_hashes_are_refused(self):
+        left, right = self.pair
+        changed = copy.deepcopy(right[2])
+        path = sorted(changed["configuration"]["implementation_file_hashes"])[0]
+        changed["configuration"]["implementation_file_hashes"][path] = support.digest("other-implementation-file")
+        contract.validate_replicate_manifest(changed)
+        with self.assertRaises(M7Error) as caught:
+            selection.build_final_selection([left[0], common.canonical_json(changed)], list(left[1]) + list(right[1]))
+        self.assertEqual(caught.exception.code, "selection_invalid")
+        self.assertIn("implementation file hashes", caught.exception.detail)
+
+    def test_different_b1_identity_is_refused(self):
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["b1_identity"]["initial_state_aggregate_digest"] = support.digest("other-b1-aggregate")
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("B1 initial-state digests", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["b1_identity"]["initial_state_parameter_names_sha256"] = support.digest("other-b1-names")
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("B1 initial-state digests", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["b1_identity"]["initial_state_entry_count"] = views[44]["parsed"]["b1_identity"]["initial_state_entry_count"] + 1
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("B1 initialisation identity", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["b1_identity"]["weight_sha256"] = support.digest("other-b1-weight")
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("B1 initialisation identity", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        asset = sorted(views[44]["parsed"]["b1_identity"]["observed_assets"])[0]
+        views[44]["parsed"]["b1_identity"]["observed_assets"][asset]["sha256"] = support.digest("other-b1-asset")
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("B1 initialisation identity", caught.exception.detail)
+
+    def test_different_model_architecture_identity_is_refused(self):
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["b1_identity"]["unet_config_sha256"] = support.digest("other-unet")
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("B1 initialisation identity", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        digest = support.digest("other-frozen-buffer")
+        for key in views[44]["parsed"]["frozen_state"]["persistent_buffer_digests_by_update"]:
+            views[44]["parsed"]["frozen_state"]["persistent_buffer_digests_by_update"][key] = digest
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("model architecture identity", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["frozen_state"]["encdec_requires_grad_false"] = False
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("model architecture identity", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["repository"]["rnagenesis_commit"] = "c" * 40
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("model architecture identity", caught.exception.detail)
+
+    def test_different_schedule_or_non_seed_protocol_is_refused(self):
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["schedule"]["applied_learning_rate_trace_sha256"] = support.digest("other-schedule")
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("learning-rate schedule", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["optimizer"]["learning_rate"] = "1e-4"
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("non-seed training protocol", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["accounting"]["physical_microbatch"] = 4
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("non-seed training protocol", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["post_schedule_position"]["multiplier"] = "1"
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("learning-rate schedule", caught.exception.detail)
+
+    def test_different_train_or_validation_identity_is_refused(self):
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["data_roles"]["train_text"]["observed_sha256"] = support.digest("other-train")
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("TRAIN identity", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["data_roles"]["validation_csv"]["observed_sha256"] = support.digest("other-validation")
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("VALIDATION identity", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["validation_artifacts"]["noise_sha256"] = support.digest("other-noise")
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("validation artifact identities", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["rng"]["validation_draw_seed"] = 2
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("validation draw seed", caught.exception.detail)
+
+    def test_other_sealed_scientific_fields_are_refused(self):
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["experiment_id"] = "D1_other"
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("sealed training implementation and protocol", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["deviations"] = list(views[44]["parsed"]["deviations"]) + [{"id": "unapproved"}]
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("non-seed training protocol", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["initialisation_isolation"]["m6_checkpoint_loaded"] = True
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("B1 initialisation identity", caught.exception.detail)
+        views = copy.deepcopy(self.views)
+        views[44]["parsed"]["schema_version"] = "m7-replicate-config-2"
+        with self.assertRaises(M7Error) as caught:
+            selection._assert_cross_seed_consistency(views)
+        self.assertIn("sealed training implementation and protocol", caught.exception.detail)
 
 
 def digest_of(text):

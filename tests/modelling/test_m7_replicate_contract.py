@@ -59,9 +59,23 @@ def file_hashes():
     return {path: digest(path) for path in contract.IMPLEMENTATION_FILE_PATHS}
 
 
+INACTIVE_REPLICATE_COMMIT = "c150894b9982d7afebfb2b3390b0797a4da146b5"
+
+
+def inactive_replicate_bytes():
+    """The inactive replicate document sealed at the CUDA-contract commit.
+
+    The live ``D1_final_replicates.yaml`` is the seed-44 authorisation. Inactivity
+    checks use this explicit fixture and do not treat that live file as inactive.
+    """
+    return subprocess.check_output(
+        ["git", "-C", ROOT, "show", INACTIVE_REPLICATE_COMMIT + ":config/experiments/D1_final_replicates.yaml"],
+        stderr=subprocess.DEVNULL,
+    )
+
+
 def load_inactive():
-    with open(CONFIG_PATH, "rb") as handle:
-        raw = handle.read()
+    raw = inactive_replicate_bytes()
     return raw, contract.load_config_bytes(raw)
 
 
@@ -191,6 +205,15 @@ class InactivePackageTests(unittest.TestCase):
         self.assertEqual(self.inactive["document_status"], "M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED")
         for token in ("GPU-", "authorisation_id: m7", "output_directory: /"):
             self.assertNotIn(token, text)
+
+    def test_the_live_replicate_file_is_the_seed44_authorisation(self):
+        with open(CONFIG_PATH, "rb") as handle:
+            live = contract.load_config_bytes(handle.read())
+        self.assertEqual(live["document_status"], contract.ACTIVE_DOCUMENT_STATUS)
+        self.assertIs(live["consumable_by_executable_workflow"], True)
+        self.assertEqual(len(live["authorisation_entries"]), 1)
+        self.assertIn("seed44", live["authorisation_entries"][0]["authorisation_id"])
+        self.assertNotEqual(live, self.inactive)
 
     def test_m6_configuration_blobs_are_unchanged_and_inactive(self):
         self.assertEqual(git_blob_id(os.path.join(ROOT, "config/experiments/D1_diffusion_pilot.yaml")), M6_PILOT_YAML_BLOB)
@@ -714,7 +737,6 @@ class EntryPointTests(unittest.TestCase):
         for arguments in (
             [],
             ["--seed", "43"],
-            ["--authorisation-id", "m7_unit_seed43_gpu1"],
             ["--authorisation-id", "bad"],
             ["--output-dir", "/x"],
             ["--help", "--schema"],
@@ -727,6 +749,13 @@ class EntryPointTests(unittest.TestCase):
                 completed.stderr.startswith("cli_argument_rejected") or completed.stderr.startswith("execution_not_authorised"),
                 completed.stderr,
             )
+        output = os.path.join(common.RUN_ROOT, "m7_unit_seed43_gpu1")
+        existed = os.path.lexists(output)
+        completed = self.run_cli("--authorisation-id", "m7_unit_seed43_gpu1")
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertEqual(completed.stdout, "")
+        self.assertFalse(completed.stderr.startswith("execution_not_authorised"))
+        self.assertEqual(os.path.lexists(output), existed)
 
     def test_help_and_schema_import_no_training_stack(self):
         code = (

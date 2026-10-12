@@ -8,6 +8,16 @@ weight, REF, EVAL or accepted run directory. It reads sealed manifests only.
 
 Pure part. ``build_final_selection`` takes already-read, canonical-JSON
 manifest bytes and returns one deterministic final-selection manifest.
+A guardrail manifest's ``executing_implementation_commit`` is the guardrail
+implementation that ran. Its ``checkpoint_training_implementation_commit`` is
+the implementation that trained and sealed the checkpoint, and that value is
+what selection compares with the replicate manifest's
+``executing_implementation_commit`` (a replicate manifest describes training,
+so that field remains its training implementation). The two guardrail commits
+may differ. Each seed keeps its own training commit: selection does not require
+the two replicates to share one commit id, and it does not invent a shared
+one. Checkpoint names keep each replicate's sealed training commit, and the
+guardrail execution commit stays on the hashed guardrail manifest.
 ``validate_final_selection_manifest`` re-derives every embedded selection claim
 from the embedded tables (see its docstring). The stage accepts either seeds 43
 and 44, or seed 43 alone together with a separately sealed operational
@@ -515,7 +525,10 @@ def _replicate_view(parsed, blob_sha):
     return {
         "blob_sha256": blob_sha,
         "checkpoints": checkpoints,
-        "implementation_commit": parsed["authorisation"]["executing_implementation_commit"],
+        # A replicate manifest describes training. Its executing commit is the
+        # implementation that trained and sealed the checkpoint, not a later
+        # guardrail execution commit.
+        "checkpoint_training_implementation_commit": parsed["authorisation"]["executing_implementation_commit"],
         "mse": mse,
         "parsed": parsed,
         "ranking": ranking,
@@ -524,45 +537,141 @@ def _replicate_view(parsed, blob_sha):
     }
 
 
+def _opened_corpus_identity(role):
+    """TRAIN or VALIDATION content identity. Paths are not part of the comparison."""
+    return {
+        "observed_byte_size": role["observed_byte_size"],
+        "observed_count": role["observed_count"],
+        "observed_sha256": role["observed_sha256"],
+        "role": role["role"],
+    }
+
+
 def _consistency_signature(view):
+    """Sealed scientific content shared by comparable replicates.
+
+    Sequential single-use authorisations leave each replicate with its own
+    training commit, authorisation id, authorisation commit and raw
+    configuration-file hash. Those values are provenance of that seed. They
+    are not compared here. ``_bind_guardrail_manifest`` still requires each
+    guardrail's ``checkpoint_training_implementation_commit`` to equal its
+    own replicate's training commit. Ancestry of one commit to the other is
+    not used: only the sealed content identities below are compared.
+    """
     parsed = view["parsed"]
     identity = parsed["b1_identity"]
     artifacts = parsed["validation_artifacts"]
+    frozen = parsed["frozen_state"]
+    roles = parsed["data_roles"]
+    repository = parsed["repository"]
+    isolation = parsed["initialisation_isolation"]
     return {
-        "b1_initial_state_aggregate_digest": identity["initial_state_aggregate_digest"],
-        "b1_initial_state_parameter_names_sha256": identity["initial_state_parameter_names_sha256"],
-        "b1_unet_config_sha256": identity["unet_config_sha256"],
-        "b1_weight_sha256": identity["weight_sha256"],
-        "implementation_commit": view["implementation_commit"],
-        "implementation_config_sha256": parsed["configuration"]["implementation_config_sha256"],
-        "schedule_trace_sha256": parsed["schedule"]["applied_learning_rate_trace_sha256"],
+        "accounting": dict(parsed["accounting"]),
+        "b1_identity": {
+            "initial_state_aggregate_digest": identity["initial_state_aggregate_digest"],
+            "initial_state_entry_count": identity["initial_state_entry_count"],
+            "initial_state_parameter_names_sha256": identity["initial_state_parameter_names_sha256"],
+            "observed_assets": {
+                name: {"byte_size": identity["observed_assets"][name]["byte_size"], "sha256": identity["observed_assets"][name]["sha256"]}
+                for name in sorted(identity["observed_assets"])
+            },
+            "unet_config_sha256": identity["unet_config_sha256"],
+            "weight_bytes": identity["weight_bytes"],
+            "weight_sha256": identity["weight_sha256"],
+        },
+        "deviations": list(parsed["deviations"]),
+        "experiment_id": parsed["experiment_id"],
+        # The per-update parameter digest proves, within one run, that the frozen
+        # encoder-decoder did not change. A CPU mock builds that module from the
+        # training seed, so those digests differ by seed even when the sealed
+        # asset hashes do not. Cross-seed architecture identity is the sealed
+        # asset hashes in ``b1_identity`` together with this protocol.
+        "frozen_encdec": {
+            "encdec_buffers_absent_from_optimizer": frozen["encdec_buffers_absent_from_optimizer"],
+            "encdec_eval_mode": frozen["encdec_eval_mode"],
+            "encdec_parameters_absent_from_optimizer": frozen["encdec_parameters_absent_from_optimizer"],
+            "encdec_requires_grad_false": frozen["encdec_requires_grad_false"],
+            "optimizer_contains_only_denoiser": frozen["optimizer_contains_only_denoiser"],
+            "optimizer_parameter_ids_equal_trainable_denoiser": frozen["optimizer_parameter_ids_equal_trainable_denoiser"],
+            "persistent_buffer_digests_by_update": dict(frozen["persistent_buffer_digests_by_update"]),
+            "rotary_cache_names": list(frozen["rotary_cache_names"]),
+        },
+        "implementation_file_hashes": dict(parsed["configuration"]["implementation_file_hashes"]),
+        "initialisation_isolation": {
+            "b1_loaded_fresh_for_this_seed": isolation["b1_loaded_fresh_for_this_seed"],
+            "cross_seed_state_reused": isolation["cross_seed_state_reused"],
+            "forbidden_weight_sha256": list(isolation["forbidden_weight_sha256"]),
+            "initialisation_relative_path": isolation["initialisation_relative_path"],
+            "m6_checkpoint_loaded": isolation["m6_checkpoint_loaded"],
+            "saved_weights_equal_a_forbidden_m6_hash": isolation["saved_weights_equal_a_forbidden_m6_hash"],
+        },
+        "optimizer": dict(parsed["optimizer"]),
+        "post_schedule_position": dict(parsed["post_schedule_position"]),
+        "rnagenesis": {"branch": repository["rnagenesis_branch"], "commit": repository["rnagenesis_commit"]},
+        "schedule": dict(parsed["schedule"]),
+        "schema_version": parsed["schema_version"],
+        "train_text": _opened_corpus_identity(roles["train_text"]),
         "validation_artifacts": {
             key: artifacts[key]
             for key in (
                 "draw_manifest_sha256",
+                "draws",
                 "hash_report_sha256",
                 "noise_sha256",
+                "noise_shape",
                 "order_artifact_sha256",
+                "sequence_count",
                 "sequence_order_sha256",
                 "timestep_sha256",
+                "timestep_shape",
                 "validation_csv_sha256",
             )
         },
+        "validation_csv": _opened_corpus_identity(roles["validation_csv"]),
+        "validation_draw_seed": parsed["rng"]["validation_draw_seed"],
     }
 
 
 def _assert_cross_seed_consistency(views):
+    """Refuse scientific drift. Do not refuse sequential authorisation provenance.
+
+    One completed seed has nothing to compare. Two seeds must share the sealed
+    implementation-file hashes, B1 identity, architecture, schedule, fixed
+    protocol, and TRAIN and VALIDATION identities. Checkpoint-training commit
+    ids and raw authorisation-bearing configuration hashes are allowed to differ.
+    """
+    if len(views) < 2:
+        return True
     signatures = {seed: _consistency_signature(view) for seed, view in views.items()}
-    reference = next(iter(signatures.values()))
-    for seed, signature in signatures.items():
-        if signature["b1_initial_state_aggregate_digest"] != reference["b1_initial_state_aggregate_digest"] or (
-            signature["b1_initial_state_parameter_names_sha256"] != reference["b1_initial_state_parameter_names_sha256"]
+    reference = signatures[min(signatures)]
+    for signature in signatures.values():
+        if signature == reference:
+            continue
+        b1 = signature["b1_identity"]
+        reference_b1 = reference["b1_identity"]
+        if b1["initial_state_aggregate_digest"] != reference_b1["initial_state_aggregate_digest"] or (
+            b1["initial_state_parameter_names_sha256"] != reference_b1["initial_state_parameter_names_sha256"]
         ):
             raise M7Error("selection_invalid", "the B1 initial-state digests differ between seeds")
         if signature["validation_artifacts"] != reference["validation_artifacts"]:
             raise M7Error("selection_invalid", "the validation artifact identities differ between seeds")
-        if signature != reference:
-            raise M7Error("selection_invalid", "the seeds were not trained under one identical implementation and B1")
+        if signature["validation_csv"] != reference["validation_csv"]:
+            raise M7Error("selection_invalid", "the VALIDATION identity differs between seeds")
+        if signature["implementation_file_hashes"] != reference["implementation_file_hashes"]:
+            raise M7Error("selection_invalid", "the sealed training implementation file hashes differ between seeds")
+        if b1 != reference_b1 or signature["initialisation_isolation"] != reference["initialisation_isolation"]:
+            raise M7Error("selection_invalid", "the B1 initialisation identity differs between seeds")
+        if signature["frozen_encdec"] != reference["frozen_encdec"] or signature["rnagenesis"] != reference["rnagenesis"]:
+            raise M7Error("selection_invalid", "the model architecture identity differs between seeds")
+        if signature["schedule"] != reference["schedule"] or signature["post_schedule_position"] != reference["post_schedule_position"]:
+            raise M7Error("selection_invalid", "the learning-rate schedule differs between seeds")
+        if signature["optimizer"] != reference["optimizer"] or signature["accounting"] != reference["accounting"] or signature["deviations"] != reference["deviations"]:
+            raise M7Error("selection_invalid", "the non-seed training protocol differs between seeds")
+        if signature["train_text"] != reference["train_text"]:
+            raise M7Error("selection_invalid", "the TRAIN identity differs between seeds")
+        if signature["validation_draw_seed"] != reference["validation_draw_seed"]:
+            raise M7Error("selection_invalid", "the validation draw seed differs between seeds")
+        raise M7Error("selection_invalid", "the seeds do not share one sealed training implementation and protocol")
     return True
 
 
@@ -599,8 +708,14 @@ def _bind_guardrail_manifest(parsed, sha, view):
         raise M7Error("selection_invalid", "a guardrail manifest carries a different validation value")
     if parsed["candidate"]["ranking_position"] != view["ranking"].index(epoch) + 1:
         raise M7Error("selection_invalid", "a guardrail manifest carries the wrong ranking position")
-    if parsed["authorisation"]["executing_implementation_commit"] != view["implementation_commit"]:
-        raise M7Error("selection_invalid", "a guardrail manifest ran under another implementation commit")
+    authorisation = parsed["authorisation"]
+    # Checkpoint provenance is the sealed training commit. The guardrail
+    # execution commit is a different identity and is not a fallback.
+    training = authorisation["checkpoint_training_implementation_commit"]
+    if training != view["checkpoint_training_implementation_commit"]:
+        raise M7Error("selection_invalid", "a guardrail manifest is not bound to this replicate's sealed training implementation")
+    if parsed["checkpoint"]["directory_name"] != checkpoint["directory_name"]:
+        raise M7Error("selection_invalid", "a guardrail manifest does not name this replicate's saved checkpoint")
     return seed, epoch
 
 
@@ -897,7 +1012,7 @@ def validate_final_selection_manifest(manifest):
     expected_rows = [(seed, epoch) for seed in seeds for epoch in common.CANDIDATE_EPOCHS]
     if [(row["seed"], row["epoch"]) for row in table] != expected_rows:
         raise M7Error("selection_invalid", "the candidate table has an extra, missing, duplicate or out-of-order epoch candidate")
-    commits = set()
+    commits_by_seed = {}
     for row in table:
         if _require_int(row["update"], "a candidate update") != replicate.epoch_update_range(row["epoch"])[1] or row["update"] == 0:
             raise M7Error("selection_invalid", "a candidate row is not an epoch boundary; update 0 is never a candidate")
@@ -909,7 +1024,9 @@ def validate_final_selection_manifest(manifest):
         commit = _commit_of_checkpoint_name(row["checkpoint_name"])
         if row["checkpoint_name"] != replicate.checkpoint_child_name(row["seed"], row["epoch"], commit):
             raise M7Error("selection_invalid", "a checkpoint name is not the name of its seed, epoch and update")
-        commits.add(commit)
+        previous = commits_by_seed.setdefault(row["seed"], commit)
+        if previous != commit:
+            raise M7Error("selection_invalid", "a seed's checkpoints do not share that seed's training implementation commit")
         guardrail = common.exact_keys(row["guardrail"], CANDIDATE_GUARDRAIL_KEYS, "selection_invalid")
         if guardrail["evaluated"] is True:
             _require_sha(guardrail["manifest_sha256"], "a candidate guardrail manifest digest")
@@ -920,8 +1037,6 @@ def validate_final_selection_manifest(manifest):
                 raise M7Error("selection_invalid", "an unevaluated candidate carries a guardrail record")
         else:
             raise M7Error("selection_invalid", "a candidate guardrail block has a non-boolean evaluated flag")
-    if len(commits) != 1:
-        raise M7Error("selection_invalid", "the candidate checkpoints do not share one implementation commit")
     for seed in seeds:
         seed_weights = [row["weight_sha256"] for row in table if row["seed"] == seed]
         if len(set(seed_weights)) != len(seed_weights):

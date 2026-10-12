@@ -343,7 +343,7 @@ def validate_spec_document(spec):
     plan = spec["governing_plan"]
     _require(isinstance(plan, dict), "spec_invalid", "the governing plan record is missing")
     _require(plan.get("path") == GOVERNING_PLAN_RELATIVE, "spec_invalid", "the governing plan path is not pinned")
-    _require(plan.get("version") == "3.0", "spec_invalid", "the governing plan version is not pinned")
+    _require(plan.get("version") == "3.2", "spec_invalid", "the governing plan version is not pinned")
     _require(isinstance(plan.get("sha256"), str) and len(plan["sha256"]) == 64, "spec_invalid", "the governing plan hash is missing")
     arp2a = spec["arp2a_reconciliation"]
     _require(isinstance(arp2a, dict), "spec_invalid", "the ARP-2A record is missing")

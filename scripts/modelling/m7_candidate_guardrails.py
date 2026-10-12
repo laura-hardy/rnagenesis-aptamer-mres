@@ -29,6 +29,10 @@ injected callable and no monkey-patching: ``launch_authorised_candidate`` wires
 the real defaults. The checked-in configuration is inactive, so the launcher
 and the entry point still refuse before any filesystem, TRAIN, checkpoint or
 GPU access beyond reading the tracked configuration file.
+``authorization_parent_commit`` and ``executing_implementation_commit`` name
+the guardrail implementation. ``checkpoint_training_implementation_commit``
+names the sealed training commit of the selected checkpoint and is checked
+separately.
 """
 
 from __future__ import annotations
@@ -319,6 +323,7 @@ ACTIVE_ENTRY_KEYS = (
     "checkpoint_directory",
     "checkpoint_member_sha256",
     "checkpoint_relative_name",
+    "checkpoint_training_implementation_commit",
     "checkpoint_weight_sha256",
     "consumed",
     "cuda_visible_devices",
@@ -363,6 +368,7 @@ def authorisation_schema():
             "seed_and_epoch",
             "ranking_position_and_failed_earlier_candidates",
             "checkpoint_directory_and_member_hashes",
+            "sealed_checkpoint_training_implementation_commit",
             "replicate_manifest_hash",
             "physical_and_logical_gpu_identity",
             "exact_output_directory",
@@ -448,8 +454,11 @@ def assert_active_entry(entry, run_root=None):
         raise M7Error("authorisation_field_missing", "authorisation id is not an m7 candidate id for this seed and epoch")
     parent = entry["authorization_parent_commit"]
     executing = entry["executing_implementation_commit"]
+    training = entry["checkpoint_training_implementation_commit"]
     if not common.is_sha40(parent) or parent != executing:
         raise M7Error("authorisation_commit_invalid", "parent commit and executing implementation commit differ")
+    if not common.is_sha40(training):
+        raise M7Error("provenance_mismatch", "checkpoint training implementation commit is malformed")
     if entry["phase"] != ACTIVE_PHASE or entry["scope"] != "single_use_m7_d1_candidate_guardrail_seed_%d_epoch_%d" % (seed, epoch):
         raise M7Error("authorisation_scope_invalid", "phase or scope is not this candidate")
     if list(entry["permitted_roles"]) != list(ACTIVE_ROLES):
@@ -472,7 +481,7 @@ def assert_active_entry(entry, run_root=None):
     name = common.assert_output_directory_shape(entry["output_directory"], run_root)
     if name != identifier or entry["evidence_directory"] != entry["output_directory"]:
         raise M7Error("authorisation_scope_invalid", "output directory is not the authorisation id")
-    expected_name = replicate.checkpoint_child_name(seed, epoch, executing)
+    expected_name = replicate.checkpoint_child_name(seed, epoch, training)
     directory = entry["checkpoint_directory"]
     if (
         not isinstance(directory, str)
@@ -645,6 +654,7 @@ def build_candidate_manifest(entry, replicate_binding, checkpoint, guardrails, r
             "authorization_parent_commit": entry["authorization_parent_commit"],
             "candidate_epoch": entry["candidate_epoch"],
             "candidate_seed": entry["candidate_seed"],
+            "checkpoint_training_implementation_commit": entry["checkpoint_training_implementation_commit"],
             "consumption_state": "consumed_successfully",
             "executing_implementation_commit": entry["executing_implementation_commit"],
             "reuse_permitted": False,
@@ -699,6 +709,7 @@ def validate_candidate_manifest(manifest):
             "authorization_parent_commit",
             "candidate_epoch",
             "candidate_seed",
+            "checkpoint_training_implementation_commit",
             "consumption_state",
             "executing_implementation_commit",
             "reuse_permitted",
@@ -736,8 +747,12 @@ def validate_candidate_manifest(manifest):
         or checkpoint["tree_unchanged_across_generation"] is not True
     ):
         raise M7Error("checkpoint_save_reload_incompatibility", "the checkpoint changed or does not match the bound weight")
-    if checkpoint["directory_name"] != replicate.checkpoint_child_name(seed, epoch, authorisation["executing_implementation_commit"]):
-        raise M7Error("guardrail_manifest_invalid", "checkpoint directory name drifted")
+    training = authorisation["checkpoint_training_implementation_commit"]
+    executing = authorisation["executing_implementation_commit"]
+    if not common.is_sha40(training) or not common.is_sha40(executing):
+        raise M7Error("guardrail_manifest_invalid", "a guardrail provenance commit is malformed")
+    if checkpoint["directory_name"] != replicate.checkpoint_child_name(seed, epoch, training):
+        raise M7Error("guardrail_manifest_invalid", "checkpoint directory name does not name the sealed training implementation commit")
     binding = common.exact_keys(
         manifest["replicate_binding"],
         ("replicate_manifest_sha256", "seed", "epoch", "validation_mse", "validation_ranking_sha256", "weight_sha256"),
@@ -1108,6 +1123,30 @@ def ranking_sha256(ranking):
     return common.sha256_bytes(common.canonical_json(ranking))
 
 
+def assert_checkpoint_training_ancestry(training_commit, execution_commit, git):
+    """The sealed training commit must be an ancestor of the guardrail execution commit.
+
+    Equality is an ancestor relationship. A later commit, an unrelated commit,
+    a missing object and a failed git command are refused. ``git`` is the
+    injected repository command; ``merge-base --is-ancestor`` exits 0 only
+    when the first commit is an ancestor of the second, including equality.
+    """
+    if not common.is_sha40(training_commit):
+        raise M7Error("provenance_mismatch", "checkpoint training implementation commit is malformed")
+    if not common.is_sha40(execution_commit):
+        raise M7Error("authorisation_commit_invalid", "the guardrail execution commit is malformed")
+    try:
+        git(MRES_ROOT, ["merge-base", "--is-ancestor", training_commit, execution_commit])
+    except M7Error as exc:
+        if exc.code != "git_status_unreadable":
+            raise
+        raise M7Error(
+            "provenance_mismatch",
+            "the sealed checkpoint implementation commit is not an ancestor of the guardrail execution commit",
+        ) from None
+    return True
+
+
 def _evidence_mismatch(operation):
     """Predecessor-evidence inspection failures are all evidence mismatches."""
     try:
@@ -1123,8 +1162,9 @@ def assert_predecessor_identity(parsed, entry):
 
     Nothing copied into the candidate entry is trusted unless it agrees with
     this manifest: the terminal state, seed, B1 initialisation, validation
-    artifacts, and the one checkpoint (epoch, update, name, member hashes and
-    weight hash) the entry names.
+    artifacts, the sealed training implementation commit, and the one checkpoint
+    (epoch, update, name, architecture proof, member hashes and weight hash)
+    the entry names. The training commit is not the guardrail execution commit.
     """
     m6 = common.m6_contract()
     if (
@@ -1217,8 +1257,10 @@ def verify_replicate_binding(entry, deps, run_root=None):
     replicate.validate_replicate_manifest(parsed)
     if parsed["run_id"] != parent_name:
         raise M7Error("sibling_evidence_access", "the sealed replicate manifest belongs to another directory")
-    if parsed["authorisation"]["executing_implementation_commit"] != entry["executing_implementation_commit"]:
-        raise M7Error("provenance_mismatch", "the replicate ran under another implementation commit")
+    sealed_training = parsed["authorisation"]["executing_implementation_commit"]
+    if sealed_training != entry["checkpoint_training_implementation_commit"]:
+        raise M7Error("provenance_mismatch", "the sealed training implementation commit does not match the checkpoint provenance")
+    assert_checkpoint_training_ancestry(sealed_training, entry["executing_implementation_commit"], deps.git)
     item = assert_predecessor_identity(parsed, entry)
     ranking = parsed["validation_ranking"]
     if ranking_sha256(ranking) != entry["validation_ranking_sha256"]:
@@ -1743,6 +1785,7 @@ def launch_authorised_candidate(authorisation_id, run_root=None, deps=None, conf
     if observation is None:
         observation = live_repository_observation(config, entry, deps)
     head = replicate.assert_repository_binding(config, entry, observation, PERMITTED_AUTHORIZATION_FILES)
+    assert_checkpoint_training_ancestry(entry["checkpoint_training_implementation_commit"], entry["executing_implementation_commit"], deps.git)
     common.resolve_ld_library_path(parent, entry["ld_library_path"])
     common.assert_interpreter_matches(deps.observe_interpreter(common.PINNED_PYTHON), entry["interpreter"])
     b1 = diagnostic().b1_runner()

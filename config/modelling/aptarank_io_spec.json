@@ -7,9 +7,9 @@
   "combined_tier1_tier2_score": false,
   "governing_plan": {
     "path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
-    "version": "3.0",
-    "revision_date": "7 October 2026",
-    "sha256": "e6193d0d14245049c218b4da0ef8059fb63b2f31e4885b3457cd44e41b76c50c"
+    "version": "3.2",
+    "revision_date": "12 October 2026",
+    "sha256": "450240bb5b89e0c9b6c1e45fc6e4bbe57ed4475d3e7dfa313189d772a46d333c"
   },
   "candidate_upload_column_order": [
     "id",

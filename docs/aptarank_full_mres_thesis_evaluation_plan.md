@@ -3,9 +3,9 @@
 | Plan detail | Value |
 |---|---|
 | Project | Towards prediction-guided generative design of RNA aptamers against carbapenemase targets |
-| Document version | 3.1 |
-| Revision date | 8 October 2026 |
-| Status | Execution plan reflecting the final scope agreed with the supervisor. Version 3.1 incorporates the approved M8 generator-EVAL addendum. Production generation facts remain pending authoritative manifest verification. |
+| Document version | 3.2 |
+| Revision date | 12 October 2026 |
+| Status | Execution plan reflecting the final scope agreed with the supervisor. Version 3.2 keeps that scope and the M8 addendum, and records the verified M8 B1/D1 raw-source identities, counts, allocation, and manifest status in section 4.3. Production parsing remains blocked. The current AptaRank preparation code is provisional. EVAL stays locked. |
 | Evaluation budget | Approximately five working days once prerequisites are ready; protect subsequent thesis writing |
 | Execution model | Local frozen generator analysis; Laura runs AptaRank manually through its UI; version-controlled code prepares uploads and processes downloaded results |
 
@@ -37,7 +37,7 @@ evaluation_references.csv
               or extra thesis experiment in this plan
 ~~~
 
-REF calibration is rebuilt from the corrected release. EVAL does not choose checkpoints, sampling, score equations/weights, target mode/site, control-bank rules, thresholds, metrics or shortlist sizes. Freeze the rules before M9C. After unlock, EVAL metadata may instantiate the prespecified small Tier 2 panel; EVAL scores may not choose it. Camera-ready VALIDATION results cannot tune this thesis evaluation.
+REF remains calibration-only data. AptaRank performs its own reference-distribution calibration from the uploaded corrected REF file. The MRes pipeline does not locally fit, replace, or independently recreate that calibration. Local REF-component distributions, if calculated, are descriptive thesis and audit outputs and are not calibration of AptaRank. EVAL does not choose checkpoints, sampling, score equations/weights, target mode/site, control-bank rules, thresholds, metrics or shortlist sizes. Freeze the rules before M9C. EVAL stays locked until the M9C record and the explicit M10 unlock. After unlock, EVAL metadata may instantiate the prespecified small Tier 2 panel; EVAL scores may not choose it. Camera-ready VALIDATION results cannot tune this thesis evaluation.
 
 The published NDM-1 reference panel remains a leakage/provenance resource. Its sequence-similarity comparison with generated candidates is deferred to Section 14 and is not part of the NDM-1 AptaRank shortlist.
 
@@ -110,7 +110,7 @@ The frozen primary corpus retains E2-E4. The formal E2 > E3 > E4 order is proven
 
 ## 4. Prerequisites, seed contract and evaluation unlock
 
-The five-day window is realistic only if corrected role files/hashes and the leakage audit are final; M9A has frozen D1 checkpoints and the selected training seeds; B0/B1/B2/D1 pools and provenance already exist; B1/D1 length allocation and cleaning are frozen; the generator evaluation code and metric specification work on synthetic fixtures; the AptaRank deployment, upload/export schema and runtime are known; and an NDM-1 structure/chain/mode/site can be specified with the supervisor from independent structural evidence. Prepare the illustrative Tier 2 target candidates and score-blind eligibility rule without using EVAL scores.
+The five-day window is realistic only if corrected role files/hashes and the leakage audit are final; M9A has frozen D1 checkpoints and the selected training seeds; the verified M8 B1/D1 raw pools and allocation exist and B0/B2 provenance is available under the same later protocol; the common parser contract is implemented and approved; the generator evaluation code and metric specification work on synthetic fixtures; the AptaRank paper, GitHub implementation, implementation notes, and UI have been reviewed and the manual workflow frozen; and an NDM-1 structure/chain/mode/site can be specified with the supervisor from independent structural evidence. The current AptaRank preparation code is provisional until that review. Prepare the illustrative Tier 2 target candidates and score-blind eligibility rule without using EVAL scores.
 
 If any required pool, generator analysis or UI interface is absent, move the evaluation schedule. Do not reclassify one of the five agreed analyses as optional merely to keep a five-day label. If NDM-1 has no defensible configuration, document that technical limitation and confer with the supervisor; do not invent a favourable site or claim the shortlist was completed.
 
@@ -118,7 +118,7 @@ If any required pool, generator analysis or UI interface is absent, move the eva
 
 Retain the implemented M4 design. D1 training seeds are independent model-training replicates when more than one exists. B1 Phase A seeds are paired protocol/length controls; B1 Phase B seed summaries are coupled to length and descriptive; B2 is a single-seed empirical null; B0 retains historical provenance. The limited B1/D1 comparison uses the implemented matched generation-chunk schedule where applicable. Generation chunks and candidate rows are not independent training replicates.
 
-Two D1 training seeds are preferred, not mandatory. Freeze the achieved count before result inspection. With one D1 training seed, state that uncertainty does not include training-run variability; with two, show the observed range and limited precision. The figure of 30,000 D1 raw attempts is a planned total budget across retained checkpoints, not 30,000 per checkpoint and not a verified achieved production count. Actual D1 allocation and pooling are confirmed from the final manifests before M9A. If those manifests confirm equal production weighting of the fitted D1 models, valid-conditional D1 summaries use an equal mixture of the seed-specific valid-output distributions. Raw accounting and global multiplicity remain the actual observed counts. Generated rows within one training seed are nested Monte Carlo samples, not additional model replicates. Keep B0 external rather than pooling its different length regime into the B1–D1 comparison.
+Two D1 training seeds were achieved. The one-seed M8 alternative is historical and is not the executed allocation. With these two seeds, show the observed range and limited precision; the absent third seed remains a resource and time limitation. The verified M8 D1 pool is exactly 30,000 raw attempts, 15,000 from training seed 43 and 15,000 from training seed 44, not 30,000 per checkpoint. Those manifests confirm equal raw production weighting of the two fitted models. Valid-conditional D1 summaries use an equal mixture of the seed-specific valid-output distributions only after the approved parser exists. Raw accounting and global multiplicity remain the actual observed counts. Parsed and valid counts are not an M9 result. Generated rows within one training seed are nested Monte Carlo samples, not additional model replicates. Keep B0 external rather than pooling its different length regime into the B1–D1 comparison.
 
 ### 4.2 M7 guardrails → immutable M8 → post-M8 accounting → M9A → M9B → M9C → explicit M10
 
@@ -127,12 +127,30 @@ The generator sequence is M7 guardrails, then immutable M8 raw generation, then 
 | Gate | Required record |
 |---|---|
 | M6 scope/runtime lock | Five agreed analyses; achieved seeds; four pool availability; generator metric specification; UI time/candidate limits; one/two illustrative target rule; NDM-1 target preparation and supervisor review route. Use an existing M6 record where valid; update the evaluation scope before EVAL access. |
-| M9A generator freeze | Checkpoint hashes, selected seeds, generation settings, cleaning, pools/manifests, the condition-blind parser and any documented B0 adapter version, derived-ledger linkage, and frozen generator evaluation code. Actual D1 allocation and pooling are confirmed from final manifests at this gate. |
-| M9B AptaRank calibration | Tier 1 empirical calibration from corrected unique REF cores; brief Tier 2 score/control audit; effective deployment/preset. |
-| M9C end-to-end freeze | Analysis questions/metrics, exact-length control algorithm, Tier 2 target/mode/site rules, generated-condition samples and Tier 2 shortlist rule, runtime fallback, tie/failure handling, code/configuration hashes. |
+| M9A generator freeze | Checkpoint hashes, selected seeds, generation settings, cleaning, pools/manifests, the condition-blind parser and any documented B0 adapter version, derived-ledger linkage, and frozen generator evaluation code. M8 B1/D1 raw allocation and equal D1 production weighting are already verified in section 4.3. M9A still requires the approved common parser. No production derived ledger exists yet. |
+| M9B AptaRank implementation/interface review, REF setup, and workflow freeze | Review the paper, GitHub implementation, implementation notes, and UI before REF is opened. Freeze the manual workflow: reference upload, sequence upload, separately selected target configuration when Tier 2 is used, frozen UI execution, and download of ranked and annotated sequences. AptaRank calibrates itself from the uploaded reference file. Local REF distributions are descriptive and are not tool calibration. Record deployment identity, schemas, settings, score direction, and failure behaviour only where the tool or implementation establishes them. M9B does not unlock EVAL. |
+| M9C end-to-end freeze | Analysis questions/metrics, exact-length control algorithm, Tier 2 target/mode/site rules, generated-condition samples and Tier 2 shortlist rule, runtime fallback, tie/failure handling, code/configuration hashes, and the frozen M9B AptaRank implementation/interface and REF-workflow record. M9C does not treat local code as having calibrated AptaRank. |
 | M10 held-out assessment | Explicit EVAL unlock, one frozen analysis; no score-guided changes or second claim of fresh EVAL. |
 
 The unlock record includes timestamps, operator/reviewer, corrected role hashes, M9A/M9B artefacts, AptaRank deployment, code/configuration versions and the frozen plan. Independently verifiable bugs before M9C may be fixed for reasons unrelated to better paper/EVAL performance; rebuild affected REF artefacts and repeat affected preflight. After EVAL unlock, retain technical rerun lineage and report any scientific-method deviation transparently.
+
+### 4.3 Verified M8 raw-source identities
+
+A read-only audit has verified the completed M8 raw generation and assembly record. These identities are the B1 and D1 raw sources for later evaluation. They are not parsed sequences, valid-output counts, or an M9 scientific result. B0 and B2 source artifacts are outside this M8 verification.
+
+| Item | Identity |
+| --- | --- |
+| B1 combined raw ledger | `/home/laura/rnagenesis-mres-runs/m8_b1_combined_1069b63_cpu_attempt1/m8_combined_raw_attempt_ledger.jsonl`; 30,000 records; 26,427,607 bytes; SHA-256 `37ba0e1b852a6b8492a816a4adc0c6bfee15a554ba28a8ba5dd91d9e32a255d9` |
+| B1 assembly manifest | `m8_assembly_manifest.json`; 2,886 bytes; SHA-256 `f217e2e8ce922eef42b5f761159c7d96b7938585b4840922321454076d95d458` |
+| D1 combined raw ledger | `/home/laura/rnagenesis-mres-runs/m8_d1_combined_1069b63_cpu_attempt1/m8_combined_raw_attempt_ledger.jsonl`; 30,000 records; 28,971,289 bytes; SHA-256 `cedcc36133f5dfb3678e1560c6d6bab703136fe89e512e939b9f93a9a6361de9` |
+| D1 assembly manifest | `m8_assembly_manifest.json`; 2,939 bytes; SHA-256 `5ec79e1485b201d801ca819d9d60a2ee4383abd9cccfbbb011c6e11a9a59bbcb` |
+| D1 selected set | SHA-256 `af0c0e555a8b878feadeb17fcbde18d8b780819a42d9e0cc547d2fc0c6895f8f`; final-selection manifest SHA-256 `49b218e3df74825e1931148e2f65b25aae057c822e2ab32d44c2960b1587c91c` |
+| D1 seed 43 checkpoint | `D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-5__update-105__git-c150894b9982d7afebfb2b3390b0797a4da146b5`; epoch 5; update 105; weight SHA-256 `c0797888bde9033cc15b056c8c09e70b9f7fba0fb21b1f3840a4f1efb77031ab` |
+| D1 seed 44 checkpoint | `D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-44__epoch-5__update-105__git-2cb1b6a26391ed36754ec21685a4501d659d50ef`; epoch 5; update 105; weight SHA-256 `d0fcb5174230b8bbbc6bfe59eabda9b37687c03800012bc1a6981cc215469ed5` |
+
+Allocation. B1 and D1 each contain master indexes 0 through 29999 exactly once and 30,000 unique record ids. B1 block A is paired with D1 training seed 43 and generation seeds 800000–800162: 15,000 attempts and 830,348 nt. B1 block B is paired with D1 training seed 44 and generation seeds 900000–900163: 15,000 attempts and 830,404 nt. B1 records a null training seed. Generation seeds are not training seeds and are not record ids. The two fitted D1 models have equal raw production weight. The training seed is tied to the technical block, so the pooled D1 condition supports condition-level evaluation and does not support clean replicate-level causal inference.
+
+Manifest status, 10 October 2026. Raw generation and CPU assembly are complete. Both assembly manifests record parsing, filtering, deduplication, metric computation, replacement, and replenishment as false, and `later_evaluation_required` as true. The checked-in M8 configuration is inactive. Raw attempts are not established to be valid nucleotide sequences. This verification does not authorise EVAL. Production parsing of these ledgers is blocked; section 15 records why.
 
 ## 5. Four-condition generator-level EVAL
 
@@ -159,13 +177,15 @@ The generator analysis uses full-pool attempt accounting. The later AptaRank 200
 
 Before unlock, hash a generator_eval_metric_spec with one row per implemented metric: exact name, data/reference, denominator/filter, calculation, units/range, length/seed treatment, improvement direction or “not applicable”, role (closeness, guardrail or outcome), and code/configuration revision. Validity, TRAIN novelty, and exact-duplicate multiplicity are outcomes/guardrails, not extra votes for closeness. Generated-sequence clustering is not a required diversity output. Do not form a single generator-quality score.
 
-Use only the frozen design-aware procedure. Condition on or stratify by length where needed. Do not turn generated rows, B1 length seeds, B2's single seed, or generation chunks into independent training replicates. The planned 30,000-attempt D1 budget is not, by itself, a verified production count. With few D1 seeds, prefer per-seed results, the manifest-confirmed pooling rule, and honest ranges over a precise model-to-model confidence claim. An equal mixture of two fitted models is not a confidence interval and is not evidence from many training replicates. Report discordant metrics as mixed. These results assess generated-distribution movement toward held-out aptamer characteristics; they do not show binding, affinity, selectivity or NDM-1-specific generation.
+Use only the frozen design-aware procedure. Condition on or stratify by length where needed. Do not turn generated rows, B1 length seeds, B2's single seed, or generation chunks into independent training replicates. The verified M8 raw counts are 30,000 B1 attempts and 30,000 D1 attempts. Parsed and valid counts remain unavailable until the approved parser runs, and the audit's observed acceptance counts are not an M9 scientific result. With two D1 seeds, prefer per-seed results, the verified equal-weight pooling rule, and honest ranges over a precise model-to-model confidence claim. An equal mixture of two fitted models is not a confidence interval and is not evidence from many training replicates. Report discordant metrics as mixed. These results assess generated-distribution movement toward held-out aptamer characteristics; they do not show binding, affinity, selectivity or NDM-1-specific generation.
 
 ## 6. REF-calibrated AptaRank Tier 1 EVAL
 
-### 6.1 REF calibration and blinded inputs
+### 6.1 Reference upload and blinded inputs
 
-Build Tier 1 empirical calibration from **113 corrected unique REF cores** (65 short, 48 long). Preserve the five established components: normalized MFE (lower favoured), ensemble defect (lower), positional entropy (lower), stem fraction (two-sided centrality around the REF median) and GC fraction (two-sided centrality). Keep the established weighted mean, frozen weights/directions, empirical CDF/tie handling, shuffle criterion, preset and seed. Calibration is not a REF performance evaluation.
+AptaRank performs its own reference-distribution calibration from the uploaded corrected REF file. The MRes pipeline does not locally fit, replace, or independently recreate that calibration as a prerequisite for using the tool. Local code may calculate REF component distributions for thesis reporting, interpretation, and audit. Those calculations must be labelled descriptive and must not be represented as calibration of AptaRank.
+
+The reference file uses **113 corrected unique REF cores** (65 short, 48 long). The established Tier 1 description remains the review checklist: normalized MFE (lower favoured), ensemble defect (lower), positional entropy (lower), stem fraction (two-sided centrality around the REF median) and GC fraction (two-sided centrality), together with the established weighted mean, frozen weights/directions, empirical CDF/tie handling, shuffle criterion, preset and seed. M9B checks that description against the paper, GitHub implementation, implementation notes, and UI. A detail those sources do not establish is a limitation. It is not filled by reimplementing the scorer. The current AptaRank preparation code is provisional until that review is frozen. AptaRank's calibration is not a REF performance evaluation.
 
 After unlock, take all **154 unique EVAL cores** and make one exact-length uniform A/C/G/U control per core using recorded master seed 42 and deterministic resampling for duplicate/known-core matches. Randomize opaque IDs into a **308-row blinded candidate upload before technical rejection**; keep real/control, pair, core, cluster and length in a private key. Laura uploads this with the frozen REF through the AptaRank UI, without a protein target. The analysis code consumes the downloaded results, never labels recovered by row position.
 
@@ -179,7 +199,7 @@ Resample EVAL sequence clusters with their paired controls for 95% CIs on paired
 
 ## 7. AptaRank manual execution and analysis-code boundary
 
-Laura operates the AptaRank UI and downloads every result. Local code prepares candidate/reference uploads, opaque-ID private keys, a target-configuration JSON/settings record, an expected-cell manifest, and a per-run checklist. It then imports Laura's CSV/artefact downloads, validates IDs/settings/row counts, joins the private keys, computes the prespecified summaries and exports review tables. No code stage assumes API access, starts UI jobs, or changes deployment settings.
+Laura operates AptaRank manually through its UI. The expected workflow is: upload the frozen reference file; upload the sequence file; separately select or upload the independently chosen target configuration when Tier 2 is used; run the frozen UI configuration; and download the sequence file containing rankings and annotations. Local code prepares uploads, opaque-ID private keys, a target-configuration record, an expected-cell manifest, and a per-run checklist. It then imports Laura's downloads, validates IDs/settings/row counts, joins the private keys, computes the prespecified summaries and exports review tables. That preparation code is provisional pending review of the paper, GitHub implementation, implementation notes, and interface. No code stage assumes API access, starts UI jobs, changes deployment settings, or replaces AptaRank as the scorer.
 
 The target JSON is a reproducible configuration record: canonical target, structure/PDB file and hash, chain/domain, binding mode, independent site/residue evidence or frozen pocket rule, numbering and preparation choices. Use it as an upload only if the deployed UI actually supports that format; otherwise Laura enters the frozen settings manually and captures the UI/run artefact. Select mode and site from literature/structural evidence with the supervisor, not from an attractive AptaRank score.
 
@@ -252,8 +272,8 @@ This timetable is conditional on the Section 4 prerequisites, measured UI runtim
 
 | Timing | Required work and output |
 |---|---|
-| Before Day 1 | Final corpus and M9A pools/manifests; tested generator code; UI schema/runtime; proposed illustrative target(s); literature-based NDM-1 configuration; supervisor review slot. |
-| Day 1 | Confirm metric and seed contract; REF Tier 1 calibration; brief Tier 2 scoring-basis audit; freeze sample/top-L/runtime rules, target-configuration rules, code and M9C unlock record. |
+| Before Day 1 | Final corpus and M9A pools/manifests, including the approved common parser; tested generator code; M9B review of the AptaRank paper, implementation, notes, and UI; proposed illustrative target(s); literature-based NDM-1 configuration; supervisor review slot. |
+| Day 1 | Confirm the metric and seed contract; finish the M9B implementation/interface review on synthetic or non-protected inputs; freeze the manual REF workflow, including AptaRank's own calibration from the uploaded reference file; label any local REF distributions as descriptive; briefly audit the Tier 2 scoring basis without inventing an unexposed score; freeze sample/top-L/runtime rules, target-configuration rules, code and the M9C unlock record. |
 | Day 2 | Open EVAL once; run four-condition generator EVAL locally; Laura runs blinded EVAL Tier 1 in AptaRank; normalize and account for downloaded rows. |
 | Day 3 | Finish generator/Tier 1 effects, uncertainty and thesis-ready text. Instantiate the one- or two-target illustrative EVAL Tier 2 panel from metadata and independent structures; Laura runs the bounded Tier 2 job(s); process the downloads. |
 | Day 4 | Prepare and run the blinded B0/B1/B2/D1 Tier 1 candidate file; normalize scores and compute four-condition results; freeze top-L membership and prepare the NDM-1 target batch. |
@@ -267,7 +287,7 @@ The thesis evaluation is complete when all of the following exist with exact den
 
 1. Corrected role/hash contract, M9A–M9C records and a clean one-time EVAL unlock.
 2. Four-condition B0/B1/B2/D1 generator EVAL, with B1–D1 primary, B2 contextual and B0 external/length-aware; frozen metrics, seed limitations and honest null/mixed results.
-3. REF-calibrated Tier 1 EVAL on unique EVAL cores and paired uniform controls, including distributions, effects/AUROC, shuffle passes and cluster-aware uncertainty.
+3. REF-calibrated Tier 1 EVAL on unique EVAL cores and paired uniform controls, including distributions, effects/AUROC, shuffle passes and cluster-aware uncertainty. The calibration is AptaRank's, from the uploaded REF file. Local REF distributions in the record are labelled descriptive.
 4. One- or two-target **illustrative** Tier 2 EVAL, labelled descriptive for one target and cognate-versus-mismatch only when two same-mode targets yield permissible comparisons.
 5. AptaRank Tier 1 outputs for generated sequences from **all four** conditions, with B0 separately interpreted.
 6. AptaRank Tier 2 outputs for the frozen top-L subset from **all four** conditions against a valid NDM-1 configuration, with explicit failed-row accounting.
@@ -303,4 +323,10 @@ Do not use future-work results to relabel the one-time thesis EVAL as fresh or t
 
 This revision starts from the user's locally edited v2.7 plan and preserves the corrected S7D counts/hashes, formal evidence definitions, M4 seed roles, B1/D1 primary comparison, Tier 1 methods, manual AptaRank UI and claim boundaries. The corrected corpus authority is corpus_report.md (closure state 25 September 2026) and rna_aptamer_corpus_curation_plan.md v1.6, with corrective closure commit 10aac629bb0ef0337107c3d628b23e1897962af9 and documentation handoff 05616cf82c3c7c1adbe87f631590f456c44c946a. The separate camera-ready workflow still governs its one-day publication analysis.
 
-This is an updated protocol. It does not assert that generation, calibration, UI runs, supervisor review or final EVAL have already been completed. Version 3.1 incorporates the approved 8 October 2026 M8 generator-EVAL addendum. It does not verify production manifests, checkpoint identities, seed labels, attempt counts, or artifact hashes, and it does not authorize M9A, M9C, or EVAL access.
+This is an updated protocol. It does not assert that parsing, AptaRank UI runs, supervisor review, or final EVAL have already been completed. Version 3.1, dated 8 October 2026, incorporated the approved M8 generator-EVAL addendum while production manifests were still unverified. Version 3.2 records the subsequent read-only verification of the M8 B1 and D1 raw sources in section 4.3. It does not authorize M9A completion, M9C, or EVAL access.
+
+### Current status — 12 October 2026
+
+Production parsing is blocked. The sealed B0, B1, and D1 neural output contains RNAGenesis boundary markers. The pinned cleaner is the approved M1 cleaner. Its rule removes leading and trailing runs of `1`/`2` and then requires a nonempty A/C/G/U sequence. The evaluation branch's synthetic parser does not do that: its M4 projection stores empty boundary-marker runs and does not strip those markers. Production parsing stays blocked until the common parser contract is implemented and approved. The read-only audit's observed acceptance counts are not an M9 scientific result. No production derived ledger currently exists.
+
+M9B has not been frozen. The AptaRank preparation code on this branch is provisional pending review of the paper, GitHub implementation, implementation notes, and interface. Undocumented scorer internals stay unresolved. `deployment_verified` remains false, and EVAL remains locked.

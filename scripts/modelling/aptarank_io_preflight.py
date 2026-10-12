@@ -405,7 +405,7 @@ def validate_spec_document(spec):
     plan = spec["governing_plan"]
     _require(isinstance(plan, dict), "spec_invalid", "the governing plan record is missing")
     _require(plan.get("path") == GOVERNING_PLAN_RELATIVE, "spec_invalid", "the governing plan path is not pinned")
-    _require(plan.get("version") == "3.0", "spec_invalid", "the governing plan version is not pinned")
+    _require(plan.get("version") == "3.2", "spec_invalid", "the governing plan version is not pinned")
     _require(isinstance(plan.get("sha256"), str) and len(plan["sha256"]) == 64, "spec_invalid", "the governing plan hash is missing")
     _require(spec["candidate_upload_column_order"] == list(CANDIDATE_COLUMNS), "spec_schema_drift", "candidate columns drifted")
     _require(spec["reference_upload_column_order"] == list(REFERENCE_COLUMNS), "spec_schema_drift", "reference columns drifted")

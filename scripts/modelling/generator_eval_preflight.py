@@ -20,8 +20,8 @@ import sys
 
 PACKAGE_ID = "GEP-1"
 SCHEMA_VERSION = "generator-eval-preflight-gep1-r3"
-GOVERNING_PLAN_VERSION = "3.1"
-GOVERNING_PLAN_REVISION_DATE = "8 October 2026"
+GOVERNING_PLAN_VERSION = "3.2"
+GOVERNING_PLAN_REVISION_DATE = "12 October 2026"
 SYNTHETIC_RAW_CONTRACT = "synthetic-m8-raw-attempt-bundle-v1"
 SYNTHETIC_PARSER_ADAPTER_VERSION = "synthetic-m8-parser-adapter-v2"
 SOURCE_MANIFEST_SCHEMA = "synthetic-m8-source-manifest-v2"
@@ -565,7 +565,7 @@ def _validate_governing_plan(spec, problems):
         or plan.get("version") != GOVERNING_PLAN_VERSION
         or plan.get("revision_date") != GOVERNING_PLAN_REVISION_DATE
     ):
-        problems.append(_problem("revision_invalid", "the governing plan is not v3.1 dated 8 October 2026"))
+        problems.append(_problem("revision_invalid", "the governing plan is not v3.2 dated 12 October 2026"))
         return
     _validate_path_sha256(
         {"path": plan["path"], "sha256": plan.get("sha256")},

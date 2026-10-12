@@ -11,8 +11,8 @@
   "provisional_camera_ready_formula_adopted": false,
   "governing_plan": {
     "path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
-    "version": "3.0",
-    "sha256": "e6193d0d14245049c218b4da0ef8059fb63b2f31e4885b3457cd44e41b76c50c"
+    "version": "3.2",
+    "sha256": "450240bb5b89e0c9b6c1e45fc6e4bbe57ed4475d3e7dfa313189d772a46d333c"
   },
   "arp2a_reconciliation": {
     "path": "docs/aptarank_arp2a_tier1_reconciliation.md",
@@ -21,13 +21,13 @@
   },
   "analysis_module": {
     "path": "scripts/modelling/aptarank_tier1_analysis.py",
-    "sha256": "ccc820bca63b9602c5df32e8ddfe117ce6ca61430c597cc6beb5f6db1c1fe99e"
+    "sha256": "5587819096585844c9359442399a3c415033156f9f42d7009b9509aabe890448"
   },
   "arp1_dependency": {
     "module_path": "scripts/modelling/aptarank_io_preflight.py",
-    "module_sha256": "020ff616caade2983743eb941e7d4ce00d505f9bb349f10b428f98adb505263b",
+    "module_sha256": "c219af6721e66148df31bdc72329a01ffb30425e3e9d136f5b80f26ecab5613d",
     "spec_path": "config/modelling/aptarank_io_spec.json",
-    "spec_sha256": "d32484b1dd0de0e344aa8cc5f5900fe1c184ab5261392f2dbfb941ba68d6d4a1",
+    "spec_sha256": "c1f4d5b0beb0c942f14d6fe55b2a9940e1f6c0f90bb473981eee7626a30a4b10",
     "schema_version": "aptarank-io-arp1-draft-r3",
     "modified_by_arp2b": false,
     "role": "Mechanical upload, export, and failure validation is reused. ARP-1 is not modified. Both pinned hashes are enforced against the files."

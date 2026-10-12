@@ -1,0 +1,189 @@
+{
+  "artifact_sha256_before_provenance": {
+    "aptarank_target_5zgx.txt": "46471bb0643125ce86300ec050d6f0d3a09faa1d06dc325141c67cd1acdd5922",
+    "logs/fpocket.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "logs/fpocket.stdout.txt": "20628cc571c36f7819097754697b6f1ad1ce748eb9339e7e096c93d88073ed50",
+    "prepared/5ZGX_A_biological_master.pdb": "c94100f5208e83edf940a69c9d68dc52d47db9864ed5a30a0f900f598027e541",
+    "prepared/5ZGX_A_fpocket_input.pdb": "8aa4c4efa09b8dec45551c7e44ad2dcc721e5a0d4b791c03d7963b2847b105cb",
+    "prepared/5ZGX_A_fpocket_input_out/5ZGX_A_fpocket_input.pml": "034c75e8f075dbcef4ae1e11758e657d31b76de63277229ef1cebc3bea274eef",
+    "prepared/5ZGX_A_fpocket_input_out/5ZGX_A_fpocket_input.tcl": "ff3b7feb59225cf0497e3b8d24a2d132441cb0bbaad360f5b8ece56e9e81f57b",
+    "prepared/5ZGX_A_fpocket_input_out/5ZGX_A_fpocket_input_PYMOL.sh": "d70d905faf474aa6c6a752277dd68e872741e445022e980080b9912029b6b7c6",
+    "prepared/5ZGX_A_fpocket_input_out/5ZGX_A_fpocket_input_VMD.sh": "e6c02b372306ff1419dfc253c1bc4a042dfc667d3b98c54925467b15ecc3c2c9",
+    "prepared/5ZGX_A_fpocket_input_out/5ZGX_A_fpocket_input_info.txt": "cc9c1731fad70b5e8559fedc810a76cf508b94722366b1a887fba996fe259448",
+    "prepared/5ZGX_A_fpocket_input_out/5ZGX_A_fpocket_input_out.pdb": "67a738611fb2d1f201d3b969b42796fed5d871ba8c3c3183ed6ff993299803b9",
+    "prepared/5ZGX_A_fpocket_input_out/5ZGX_A_fpocket_input_pockets.pqr": "442b77c2d1a4d62231ed8e40a4169c77d5013391cd75c29b1205e4aba949593f",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket10_atm.pdb": "fd0731f2456133212682723f09372fdf760f1f782a90aced09021a905af3e150",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket10_vert.pqr": "31807f6bf261c533e19d5e473c75cf99a300950985b049545db79d9167cd775c",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket1_atm.pdb": "1a3c42562d9f0c166fa1773d4926c59c0c9b80227e2bd6ccf7451e63644584d7",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket1_vert.pqr": "8edb957ca4a603b5aa4080d4823d9346b922eee097b3772f09e1e10e3a375ba1",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket2_atm.pdb": "2ffce36a45f4941abc8b90fcf2bb9ff80278518782ab27e16601de31bee13570",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket2_vert.pqr": "844f7ba224d6e28e7a02fa1ccfea8bcb1cba5e92fe3e5d0f362189c355a317da",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket3_atm.pdb": "b4b96c2c500a4a46d74d922359a6d38cfafc549e49b95e3cde85c30e8844bfa3",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket3_vert.pqr": "1e6ece27c82daab4ed4f2b26e6e746e96a5557796ef3696abc6af979482c3f96",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket4_atm.pdb": "bfa64417abebd8962d293e29aa2d0f9b8fdfddeeaa4ff5527d9a3dbb6f70c292",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket4_vert.pqr": "8f7a662375cd04777f9694cb9c7cb01e340d217d92e0a5916cc1026a8e5931ca",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket5_atm.pdb": "dd17cd28c9d89342518db66e8cf748f62e25c2c606808dda7e5aff82ba0d1fa4",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket5_vert.pqr": "7bdecfe29442cbf5324c62c2f9eb365dce547f5ed6f19873e52fb5ecd9110104",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket6_atm.pdb": "1674f2b7fb200769edd6ef297736c23cd5cb7be4cdba4cc79b471f38e2107154",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket6_vert.pqr": "967134b81b065a5a9cf6a44d08f24464493c64a21d52984a44b6713e7deacc5e",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket7_atm.pdb": "2b9cf76a6819b763c465290b440cd97ffb6850f5079e62845f72a6b527f6535f",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket7_vert.pqr": "effdf6a17e57c0791ded00df9ad0337c16dd8fdd9f9a360ab91362ab68d1a484",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket8_atm.pdb": "68ee120cf51caaebe9b9dea76ff8e4b38cef195fdc04b3a8d0320101d73587af",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket8_vert.pqr": "4701a1e41d01ef47ac354532d020db1a36baf2c6c879ea687502499b37c5fc78",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket9_atm.pdb": "f14a6a44b486765e39e4979189023545506da7bd20c5ee974073686a98980089",
+    "prepared/5ZGX_A_fpocket_input_out/pockets/pocket9_vert.pqr": "f1d7481de416a764382b5c9cb7728e7164884015409087427c5ac4ccc1b0f72f",
+    "results/pocket_inventory.csv": "9d22b9d6f9e3afe50440228d9de0b2f2539a69eb2dca5be4c656a2600709bac5",
+    "results/run_report.md": "d659c66c2913eb44f5a54d5a3e3f376f275e320f59e5781d55da8f3039450d09",
+    "results/selected_pocket.json": "d0b7b50ce92056335106418c2244dc3a98cbe9bb89438eb18bc7cf21dd05454c",
+    "source/5ZGX.pdb": "2e185a205c9be0bf76484e8ffb96ae225880723ed68eaaf25dffbbccaf01ff51"
+  },
+  "candidate_data_read": false,
+  "candidate_scores_used_for_selection": false,
+  "fpocket_summary": {
+    "pocket_count": 10,
+    "selected_pocket": {
+      "alpha_sphere_count_parsed": 42,
+      "characteristic_dimension_A": 9.211825897696977,
+      "core_overlap": [
+        122,
+        124,
+        189,
+        250
+      ],
+      "dimension_ratio": 1.1297144224098281,
+      "druggability_score": 0.818,
+      "equivalent_sphere_diameter_A": 10.406732573356637,
+      "extended_overlap": [
+        65,
+        67,
+        73,
+        93,
+        123,
+        211,
+        219,
+        220
+      ],
+      "fpocket_score": 0.42,
+      "lining_residues": [
+        65,
+        67,
+        73,
+        93,
+        122,
+        123,
+        124,
+        189,
+        211,
+        215,
+        217,
+        219,
+        220,
+        250,
+        251
+      ],
+      "odd_shape_warning": false,
+      "pocket_number": 1,
+      "principal_axis_extents_A": [
+        9.211825897696977,
+        2.7208531181471876,
+        0.8904319794661751
+      ],
+      "volume_A3": 590.122,
+      "zn1_overlap": [
+        122,
+        189
+      ],
+      "zn2_overlap": [
+        124,
+        250
+      ]
+    },
+    "selected_pocket_number": 1
+  },
+  "generated_utc": "2026-10-09T06:58:50.538655+00:00",
+  "preparation_policy": {
+    "alternate_locations": "highest occupancy; ties prefer blank then A",
+    "aptarank_strip_hetatm": true,
+    "biological_master": "protein plus ZN and OH; EDO and HOH removed",
+    "chain_selection": "chain A only",
+    "fpocket_input": "protein only; all HETATM removed"
+  },
+  "schema_version": "1.0.0",
+  "selection_rule": {
+    "automatic_highest_fpocket_score_fallback": false,
+    "primary": "maximum count overlap with core_selection_residues",
+    "tie_break": "maximum count overlap with tie_break_residues",
+    "unresolved_tie": "fail closed",
+    "uses_fpocket_score": false,
+    "uses_fpocket_volume": false,
+    "validity_requirement": "selected pocket overlaps at least one Zn1 and one Zn2 residue"
+  },
+  "software": {
+    "environment_file_sha256": "229c64e7fcb7c82eb15de7c5ad4d42ee2d74af5c612c9362f577aeef4e01b83c",
+    "fpocket": "4.0",
+    "fpocket_command": "fpocket -f prepared/5ZGX_A_fpocket_input.pdb -v 300",
+    "fpocket_volume_iterations": 300,
+    "fpocket_volume_note": "fpocket Volume is a stochastic Monte Carlo estimate; it is descriptive and used only for the equivalent-sphere cross-check, not pocket selection",
+    "numpy": "1.26.4",
+    "python": "3.10.18",
+    "workflow_source_sha256": "5c601c71838cbcca4cf97a7847a6e4eaa5a4d9991e41cd4a442c016dd699ead8"
+  },
+  "source": {
+    "download_url": "https://files.rcsb.org/download/5ZGX.pdb",
+    "expected_and_observed_sha256": "2e185a205c9be0bf76484e8ffb96ae225880723ed68eaaf25dffbbccaf01ff51",
+    "experimental_method": "X-RAY DIFFRACTION",
+    "resolution_A": 0.95
+  },
+  "structure_summary": {
+    "modeled_residue_count": 229,
+    "modeled_residue_max": 270,
+    "modeled_residue_min": 42,
+    "prepared_master_hetero_atoms": 3,
+    "prepared_protein_atoms": 1701,
+    "raw_chain_a_hetero_atom_counts": {
+      "EDO": 24,
+      "HOH": 301,
+      "OH": 1,
+      "ZN": 2
+    },
+    "raw_coordinate_records": 2155
+  },
+  "target": {
+    "binding_mode": "pocket",
+    "canonical_name": "New Delhi metallo-beta-lactamase-1 (NDM-1)",
+    "chain": "A",
+    "core_selection_residues": [
+      120,
+      122,
+      124,
+      189,
+      208,
+      250
+    ],
+    "operational_site_description": "shallow catalytic groove",
+    "pdb_id": "5ZGX",
+    "residue_numbering": "PDB author residue numbering",
+    "tie_break_residues": [
+      65,
+      67,
+      70,
+      73,
+      93,
+      123,
+      211,
+      219,
+      220
+    ],
+    "zn1_residues": [
+      120,
+      122,
+      189
+    ],
+    "zn2_residues": [
+      124,
+      208,
+      250
+    ]
+  },
+  "target_config_id": "NDM1_5ZGX_A_CATALYTIC_GROOVE_POCKET_V1"
+}

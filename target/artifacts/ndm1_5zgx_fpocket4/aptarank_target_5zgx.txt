@@ -1,0 +1,7 @@
+target_name: NDM-1
+source: pdb
+id: 5ZGX
+chain: A
+binding_mode: pocket
+strip_hetatm: true
+target_site_residues: [120, 122, 124, 189, 208, 250]

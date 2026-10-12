@@ -11618,3 +11618,150 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Residual limitations (accepted, not blockers):** the hash-to-open window; the generator, launchers and tool paths have never run for real; the selection binds the running interpreter by resolved path only; a self-consistent rewrite of a final manifest is detectable only by `rebuild_matches` against the sealed inputs; the fixed `PATH` and tool paths are specific to this host. Details are in section 10 of the implementation document.
 
 **Review-time wording corrections before staging.** Three clarifications were made while preparing the commit; they change no execution behavior, scientific decision or authorisation state. (1) The replicate-launcher section heading comment in `m7_replicate_runner.py` now reads "authorised launcher and entry point" instead of the stale "launcher (not wired to the entry point)". (2) The comment above `FIXED_CHILD_PATH` in `m7_common.py` and the matching sentence in the implementation document no longer say that every user-controlled directory is absent: the child `PATH` never inherits the parent `PATH` text, the deliberately pinned environment's `bin` directory (the only user-space component) comes first, `/usr/bin` and `/bin` follow, and `/usr/local/bin` and every ambient directory from the invoking shell are absent; the value is unchanged. (3) The implementation document no longer implies that the launcher calls `rebuild_matches`: `launch_authorised_selection` invokes the deterministic builder as a dry run before consumption and again after consumption, validates the result and writes it atomically, and `rebuild_matches` provides the corresponding byte-for-byte comparison for later audit. All historical entries are preserved.
+
+---
+
+## 2026-10-07 — M7 seed-43 attempt 1 failed at runtime identity; fixed `CUDA_MODULE_LOADING` control (configuration returned to inactive)
+
+**Stage:** Aim 2 / modelling / M7 final D1 replicate training
+
+**Status:** `M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This is an implementation-contract correction after a consumed failed attempt. It is not an authorisation for attempt 2. The checked-in replicate configuration is again inactive and non-consumable: `authorisation_entries: []`, every execution flag false, and no GPU, interpreter, output directory, timestamp or attempt-2 binding. Scientific hyperparameters, the seed policy, the M8 total of 30,000 raw D1 attempts, and retention through at least 1 November 2026 are unchanged. Nothing was staged, committed, pushed, or fetched. No attempt-2 authorisation, command, or run directory was created. **M7 is not complete.**
+
+**Attempt 1.** Authorisation `m7_d1_final_replicate_seed43_e682cb6064a5_gpu1_attempt1` was consumed and failed. The evidence directory `/home/laura/rnagenesis-mres-runs/m7_d1_final_replicate_seed43_e682cb6064a5_gpu1_attempt1` is retained and was not modified. `authorization_consumption.json` SHA-256 is `d99177aee5c719082bfcc79d1a9d3c1f639c63ea44b7470cf4d877b0b982eb15`. `authorization_failure.json` SHA-256 is `2612bcbcc8aa3f9273ad51ce00ad3d8524f16b08298d1e31637ce4c39f29c722`. The code is `environment_rejected`, the stage is `runtime_identity`, and the recorded detail is `the worker environment holds 1 names outside the allow-list`. The state is consumed, failed, and non-resumable. Epoch, update, microbatch and the partial checkpoint are null. There is no success manifest and no training update. The authorisation commit is `efa118dee886fa29e66626170dba9467b10e72c3`. Its parent and the executing implementation commit are `e682cb6064a578868cc258e58465a0c036afe0d4`. The post-failure observation supplied with the attempt is that GPU 1 remained at 15 MiB used and 0% utilization. This correction did not query the GPU.
+
+**Cause.** The import-only diagnostic passed. `run_authorised_replicate` then calls `clock.stamp()`, and `SynchronizedClock.stamp()` calls `torch.cuda.synchronize()`. Pinned PyTorch `2.1.2+cu121` assigns `CUDA_MODULE_LOADING=LAZY` during CUDA lazy initialisation when the variable is absent. The following worker environment check rejected that name. This happened before biological inputs, training updates, or checkpoints. The installed source was read only; CUDA was not initialised to reconfirm it.
+
+**Correction.** The child environment now sets `CUDA_MODULE_LOADING` itself to exactly `LAZY` through `FIXED_CHILD_ENVIRONMENT_CONTROLS`. An ambient parent value is not copied and cannot replace it. The worker requires that exact value. A missing, empty, differently cased, non-text, or other value fails closed. The name enters the worker allow-list only after that check. A genuinely stray name is still rejected. The unexpected-environment diagnostic reports a bounded, sorted list of names and never their values. The null `LD_LIBRARY_PATH` behaviour, fixed `PATH`, CUDA device mapping, offline controls, isolated cache paths, and the repository, GPU, interpreter, asset, data-access and single-use gates are unchanged.
+
+**Attempt 2.** It needs a new implementation commit, a new authorisation id, a new output directory, and a separate approval. This entry does not create them. Attempt 1 cannot be resumed.
+
+**Tests.** CPU and mock only, CUDA hidden, offline controls, bytecode disabled, caches outside both repositories. 432 focused M7 tests pass (64, 35, 47, 26, 49, 67, 50, 61, 33 by file). The 16 modelling test modules together pass with 700 tests. The B1 development-pool (30), generic (62), phase B (35) and null-model (54) suites passed, each in its own process. No real GPU test was run.
+
+---
+
+## 2026-10-07 — M7 candidate-guardrail provenance split (inactive; not an authorisation)
+
+**Stage:** Aim 2 / modelling / M7 candidate guardrails
+
+**Status:** `M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED` for `config/experiments/D1_candidate_guardrails.yaml`. This commit corrects the repository-binding contract. It does not authorise a candidate, bind a GPU, name an output directory, or launch generation. The live seed-44 replicate authorisation is unchanged. **M7 is not complete.**
+
+**Why the commits are distinct.** `c150894b9982d7afebfb2b3390b0797a4da146b5` is the sealed training implementation of the completed seed-43 replicate and of its checkpoint directory names. A later guardrail authorisation has to be a single child of the guardrail implementation it executes, on clean `main`, with `origin/main` equal to that parent or to the authorisation commit. After replicate authorisations advanced `main`, those two commits are no longer the same. Requiring them to be identical made forward-only execution impossible. A side branch, a second worktree, a rewritten history, a locally moved `origin/main`, a force-push, and an unpushed authorisation commit were rejected: the launcher refuses every one of them.
+
+**Correction.** `authorization_parent_commit` remains equal to `executing_implementation_commit`, and that commit is the guardrail implementation. The new entry field `checkpoint_training_implementation_commit` is the sealed training commit. It must match the completed replicate manifest, the checkpoint path, and the checkpoint member hashes, and `git merge-base --is-ancestor` must show it is an ancestor of the guardrail execution commit. A later, unrelated, missing, malformed, or substituted commit is refused. Checkpoint members, including the weight file, are still streamed before and after generation. Thresholds, schedule, ranking, learning rate, selection policy and the M8 allocation are unchanged. The revision-2 proposal that stored the training commit as `executing_implementation_commit` is superseded and must not be committed as written. Both completed replicate directories are unchanged. Final selection was updated in the same schema migration. It binds each guardrail to its replicate by `checkpoint_training_implementation_commit` and the replicate's training `executing_implementation_commit`. It does not treat the guardrail execution commit as checkpoint provenance. A later unequal execution commit is accepted when the training commit and the other evidence relationships match. The final-selection manifest stores neither commit in a new field: checkpoint names keep the sealed training commit, and the execution commit stays on the hashed guardrail manifest.
+
+## 2026-10-07 — M7 cross-seed comparability after sequential authorisations (inactive; not an authorisation)
+
+**Stage:** Aim 2 / modelling / M7 final selection
+
+**Status:** `M7_IMPLEMENTATION_READY_FOR_REVIEW_NOT_AUTHORISED` for both `config/experiments/D1_candidate_guardrails.yaml` and `config/experiments/D1_final_selection.yaml`. This note records a proposal-only correction. It does not authorise a candidate, bind a GPU, name an output directory, or launch generation. The live seed-44 replicate authorisation is unchanged. **M7 is not complete.**
+
+**Why the training commits differ.** Sequential single-use authorisations give the two replicates different training commit ids. Seed 43 is sealed to `c150894b9982d7afebfb2b3390b0797a4da146b5`. Seed 44 is sealed to `2cb1b6a26391ed36754ec21685a4501d659d50ef`, the authorisation commit of seed 43. The only Git change between those commits is the authorisation-bearing replicate YAML. The sealed training implementation-file hashes are identical. Each manifest's raw `implementation_config_sha256` differs because that hash covers the parent YAML, including its authorisation state.
+
+**Correction.** Checkpoint provenance is checked within each seed. A guardrail must carry that seed's own training commit. It must not carry the other seed's. Cross-seed selection does not require the training commit ids, the authorisation commits, or the raw authorisation-bearing configuration hashes to be equal. Comparability is the sealed implementation content and protocol: implementation-file hashes, B1 identity, architecture, the learning-rate schedule and fixed training protocol, TRAIN and VALIDATION identities, validation artifacts, and non-seed hyperparameters. An ancestor relationship is not used as a substitute for those content identities. An authorisation-only Git difference is not a scientific training difference. No shared training commit is synthesized. Checkpoint names keep each replicate's own training commit.
+
+---
+
+## 2026-10-08 — Accept the M7 selected set and close M7
+
+**Stage:** Aim 2 / modelling / M7 final D1 replicates
+
+**Status:** M7 is COMPLETE / GO for M8 planning only. On 8 October 2026 the human gate accepts the two-seed selected set. This record does not authorise M8 generation, further training, GPU use, biological-data access, VALIDATION, REF, or EVAL.
+
+**Preflight:** MRes branch `main`. HEAD and `origin/main` were `0761f866c97e8f9372b0f224fb413dcc0995c6e9`, the single-use final-selection authorisation, with the single parent `b5de24327ed5d3c601597d1f1c886e2c253916dd`. The index and worktree were clean. The closure review did not query a GPU, did not open a weight file or a biological dataset, and did not modify a run directory.
+
+**Evidence:** Final selection ran once under `m7_d1_final_selection_b5de24327ed5_attempt1`. The directory contains `authorization_consumption.json` (503 bytes, SHA-256 `29df8fdc56a0198b53b32ee6918b3f158a283c0f4d05a893ce70bd9ea2f00c5d`, `consumed_output_created`, `reuse_permitted: false`) and `m7_final_selection_manifest.json` (13,124 bytes, SHA-256 `49b218e3df74825e1931148e2f65b25aae057c822e2ab32d44c2960b1587c91c`). No failure record exists. The outcome is `selected_set_complete` for seeds 43 and 44. The selected-set SHA-256 is `af0c0e555a8b878feadeb17fcbde18d8b780819a42d9e0cc547d2fc0c6895f8f`. Rebuilding from the four sealed manifests reproduced the manifest bytes and the allocation of 15,000 sequences for each seed. The selected checkpoints are seed 43 epoch 5 update 105 `D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-5__update-105__git-c150894b9982d7afebfb2b3390b0797a4da146b5` and seed 44 epoch 5 update 105 `D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-44__epoch-5__update-105__git-2cb1b6a26391ed36754ec21685a4501d659d50ef`.
+
+**Attempts:** Seed 43 attempt 1 remains the consumed `runtime_identity` failure at `/home/laura/rnagenesis-mres-runs/m7_d1_final_replicate_seed43_e682cb6064a5_gpu1_attempt1` and is not accepted training evidence. Seed 43 attempt 2 is the accepted replicate, manifest SHA-256 `f59bb4a236e3d1ac532dd83d524d8e7ceb51cbf2b9010741206169577d1acecc`. Seed 44 attempt 1 is the accepted replicate, manifest SHA-256 `900182689f3e133d395b45dd58a987e91b767e005fc00e744e1eacedeffa3fa6`.
+
+**Limitation and retention:** The accepted set is seeds 43 and 44 only. Seed 42 stays excluded, no third seed was trained, and no one-seed deviation was used. All five epoch checkpoints of each executed seed are retained through at least 1 November 2026. Deletion is not implemented.
+
+**Configuration:** `D1_candidate_guardrails.yaml` is restored to inactive blob `e04fb083073f780959b24f335f81c61961607625`. `D1_final_selection.yaml` is restored to inactive blob `544b79bbf4e98f8770c8a788e3990473a1f010fa`. `D1_final_replicates.yaml` is unchanged at blob `3d8238da0158c9157fbbcb14645822a3cb6e340d`, the seed-44 authorisation. The validators have no consumed document status, and the tests require that live replicate file. The sealed manifests keep `m7_complete: false`. They are not the milestone-status authority. This closure is not a new executable authorisation.
+
+**Boundary:** Nothing in this review was staged, committed, or pushed. No M8 authorisation or output directory was created, no sequence was generated, and no scientific workflow was launched.
+
+---
+
+## 2026-10-08 — M8 raw-generation proposal ready for review (inactive; not applied)
+
+**Stage:** Aim 2 / modelling / M8 raw B1 and D1 generation
+
+**Status:** `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This log text belongs to the inactive proposal. It is not an authorisation, and this task does not apply it as a live commit. The checked-in configuration `config/experiments/M8_raw_generation.yaml` is non-consumable, every execution flag is false, and both authorisation lists are empty. No GPU, interpreter, `LD_LIBRARY_PATH`, timestamp, or output directory is bound.
+
+**What M8 seals.** Raw pools only. B1 is 30,000 raw attempts. D1 is 30,000 raw attempts, 15,000 from training seed 43 and 15,000 from training seed 44. The M4 and M7 1,000-attempt pools are excluded. Parsing, filtering, clustering, representation analysis, and the four-condition comparison are later work under a common frozen evaluation protocol. The cleaner is not invoked. Exact raw bytes in the retained invocation files are authoritative. `raw_decoded_text` is the deterministic UTF-8-else-Latin-1 representation stored in canonical JSON and checked against those bytes.
+
+**Seeds and accounting.** Two D1 training seeds are the approved final set. The absent third seed is a resource and time limitation. The one-seed M8 alternative is historical and is not executable, because both final seeds completed. Fixed raw-attempt accounting supersedes rejection and resampling. There is no replenishment.
+
+**M7 boundary.** M7 completion is the human closure recorded above. Sealed M7 manifest bytes remain unchanged. The live seed-44 replicate YAML is historical M7 state and is not M8 authority. M8 refuses an M7 configuration path, an M7 schema version, an `m7_` authorisation id, and that live seed-44 id.
+
+**Boundary:** No M8 execution is authorised. This proposal was prepared in an isolated tree. It was not staged, committed, pushed, or copied onto the live checkout.
+
+## 2026-10-08 — M8 inactive proposal revision (not applied)
+
+**Stage:** Aim 2 / modelling / M8 raw B1 and D1 generation
+
+**Status:** `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This revision stays inactive. It does not authorise an arm, bind a GPU, choose an `LD_LIBRARY_PATH`, choose free-memory or free-space thresholds, or create a run directory.
+
+**Scientific design.** The 30,000/30,000 attempt totals, the 15,000/15,000 D1 seed split, the paired blocks, the six schedule hashes, `max_seq_len = requested biological length + 1`, and the no-filter accounting are unchanged. Attempts are generated draws. Generation seeds are unique within a block and reused across paired B1/D1 arms. They are not 30,000 independent training replicates. The absent third training seed remains a resource and time limitation.
+
+**Implementation corrections.** Active generation and active assembly now have separate exact validators. A future authorization commit binds its parent, the executing implementation commit, the three implementation-file hashes, and the active configuration identity. Live HEAD is that authorization commit, not the proposal base. The interpreter path, resolved `python3.8`, and interpreter SHA-256 are bound for a future generation entry. GPU identity, compute-process absence, and storage thresholds are preflight predicates and do not move or terminate a process. Evidence writes use the complete-write, fsync, and interruption-cleanup pattern. Assembly rechecks canonical arm paths, single-link files, and every schedule field, and it has the same consume-once failure lifecycle.
+
+**Planning assumption.** Approximately 6.4–10.4 GPU-hours for all four arms, with a practical 12–16 hour reservation including verification and overhead. Actual runtime is recorded later from the manifests. Checkpoint weights are not copied. Expected evidence storage is modest, and a launch still requires a fresh free-space check.
+
+## 2026-10-08 — M8 inactive proposal revision, second pass (not applied)
+
+**Stage:** Aim 2 / modelling / M8 raw B1 and D1 generation
+
+**Status:** `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This second revision stays inactive. It does not authorise an arm, assemble a pool, query a GPU, or create a run directory.
+
+**Provenance.** The public assembly launcher hashes the exact YAML bytes it parsed. Consumption, failure, and success records store that digest as `active_configuration_raw_sha256`, separately from `active_configuration_sha256`. A missing raw digest is refused. `repository_identity.mres_commit` is the live authorization commit. `proposal_base_commit` keeps `d0f9a397b536c64ca1b22662cc9ae36aea0101f6`.
+
+**Runtime identity and history.** The controller observation inspects the running process, including `/proc/self/exe` where available. A restricted child probe returns the bound interpreter path, resolved executable, hash, and Python version before consumption, without importing the model stack or querying CUDA. Every commit after the executing implementation commit must be linear and confined to `config/experiments/M8_raw_generation.yaml`. Launch does not import `m6_pilot_contract.py`.
+
+**Paths and evidence.** Production preflight refuses a symlinked run root, checkpoint directory, arm directory, or raw directory that escapes its arm. Assembly validates the nested arm manifest, including sampler, sequence access, asset inventory, both schedule hashes, interpreter and GPU and storage claims, timestamps, and D1 `selected_set_evidence`. B1 uses an explicit not-applicable selected-set record. Isolated `HOME`, `TMPDIR`, cache, and pycache directories are created inside the consumed output before the first generation subprocess. `TMPDIR` must exist.
+
+**Boundary:** This revision was prepared in an isolated tree. It was not staged, committed, pushed, or copied onto either live checkout.
+
+## 2026-10-09 — M8 shared-GPU implementation and GPU1 revocation proposal (inactive; not applied)
+
+**Stage:** Aim 2 / modelling / M8 raw B1 and D1 generation
+
+**Status:** `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This proposal is inactive. It does not authorise generation, assembly, physical GPU 0, or a run directory. It was prepared in an isolated clone and was not committed, pushed, launched, or copied onto either live checkout.
+
+**Retired authorisation.** `m8_d1_seed44_block_b_ac371ba_gpu1_attempt1`, commit `e645925478e0110504f4dd8ce473a1a3be82d677`, is recorded as unconsumed, not launched, and superseded before dispatch. The exclusive-GPU availability gate refused it because physical GPU 1 had other compute processes. Dispatch did not occur, no controller started, no output directory was created, no consumption record exists, and no sequence was generated. That was a resource-gate refusal, not a model or scientific failure. The historical commit and the refusal archive are preserved. The authorisation is not executable. No GPU 0 authorisation entry is present.
+
+**Sharing policy.** An active generation entry must name `gpu_sharing_policy` as `exclusive` or `shared_allowed`. Absence is rejected for a new entry and does not enable sharing. `exclusive` still requires zero pre-existing compute applications on the selected GPU. `shared_allowed` permits a positive count only when that entry says so. GPU identity, processes, memory, and storage are observed once during pre-consumption validation, before output creation and model generation, and that observation is not repeated after asset verification. The launch does not terminate or signal another process. Historical `m8-arm-manifest-1` B1 and seed-43 manifests remain valid without rewriting. New manifests use `m8-arm-manifest-2` and record that single observation: the policy, the pre-existing count, the compute-app snapshot and its SHA-256, the observation time, and the selected GPU memory readings. Pre-existing processes are not generated-model processes.
+
+**Method.** Shared execution is an operational and resource-management deviation. It does not change the D1 seed-44 checkpoint, epoch 5, update 105, weight SHA-256 `d0fcb5174230b8bbbc6bfe59eabda9b37687c03800012bc1a6981cc215469ed5`, the 15,000 raw attempts, the block-B schedule, the 164 invocations, or generation seeds 900000–900163. It may change wall-clock runtime and it raises interruption and resource-contention risk. It does not by itself justify a biological or model-quality conclusion. The recommended later GPU 0 free-memory threshold is 30 GiB, exactly 32212254720 bytes, stored on that future authorisation rather than hard-coded. It is a point-in-time safety gate on the single pre-consumption observation, not a reservation or a guarantee against later growth.
+
+**Boundary:** No CUDA initialisation, no `nvidia-smi` launch probe, no output directory, and no generation were performed for this proposal.
+
+## 2026-10-09 — M8 shared-GPU selected-GPU PID correction (inactive; not applied)
+
+**Stage:** Aim 2 / modelling / M8 raw B1 and D1 generation
+
+**Status:** `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`. This revision stays inactive. It does not authorise generation, assembly, physical GPU 0, or a run directory. It was prepared in an isolated clone and was not committed, pushed, launched, or copied onto either live checkout. The previous proposal archive remains immutable.
+
+**Process rows.** `selected_preexisting_compute_count` counts every selected-GPU compute-app row whose PID is a positive decimal integer. A selected-GPU row whose PID is empty, non-decimal, zero, negative, `[N/A]`, or `[Not Found]` is rejected as malformed or indeterminate evidence. An indeterminate row for another GPU does not increment the selected-GPU count and does not by itself prevent use of the selected GPU. Production launch validation and assembly validation apply that rule through `assert_compute_app_evidence`. No path kills, signals, pauses, moves, or otherwise inspects or alters another process.
+
+**Single probe.** The GPU and storage probe still occurs once during pre-consumption validation, before output creation and model generation. It is not repeated after asset verification. Checkpoint and asset verification may occur between that observation and output-directory consumption. Concurrent workloads may grow after the observation. The 30 GiB figure remains an authorisation-level recommendation and a point-in-time safety gate. The manifest records that single observation. This revision does not add a second probe.
+
+**Boundary:** No CUDA initialisation, no `nvidia-smi`, no output directory, no authorisation consumption, and no generation were performed for this revision.
+
+## 2026-10-10 — M8 completion and evaluation handoff (inactive proposal; not applied)
+
+**Stage:** Aim 2 / modelling / M8 raw B1 and D1 generation
+
+**Status:** Raw generation and CPU assembly are complete. This proposal returns `config/experiments/M8_raw_generation.yaml` to `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`. The document is non-consumable, both authorisation lists are empty, and every execution flag is false. The retired GPU 1 seed-44 block-B record stays unconsumed and non-executable. This proposal does not authorise evaluation, filtering, or a new run. It was prepared in an isolated clone and was not applied, staged, committed, or pushed on either live checkout.
+
+**Arms.** Each arm has 15,000 raw attempts. B1 block A, manifest `bb788e862d6a7c41e8b942d53e8121d2d19722574d4956b4c2c2644f392931b9`, ledger `5e9c00664fce3a423e8c89aad43f32fcf1d1db59b8639561eff436e6fdba7d82`, elapsed 8348.671256661415 seconds, authorization commit `c08be8839d9681d4f68b9242abcf9a7ff40c4d24`, exclusive GPU 1, generation seeds 800000–800162. B1 block B, manifest `d51be51bbf10a90ca7ff809403f38007167a7cdd72704473a0dd39a2bb8510e7`, ledger `11003ba60bf191ee841ae55a7dd81f0d78d731c96855f28f564b53da4b353e61`, elapsed 8369.749910581857 seconds, authorization commit `f13e0849e19632181315bf5585ae585e16bbb127`, exclusive GPU 1, generation seeds 900000–900163. D1 training seed 43 block A, manifest `a0fde7024662ee13837e6f99b163711263b60d55fa6c60b8012db53f93873e52`, ledger `d0d16afe63f767179c8e7af261095af709ce6298cfe64673600cf04965d87473`, elapsed 8451.951393645257 seconds, weight `c0797888bde9033cc15b056c8c09e70b9f7fba0fb21b1f3840a4f1efb77031ab`, authorization commit `acc7e244926fcb9336d35d29d0d767cf1afc5743`, exclusive GPU 1, generation seeds 800000–800162, epoch 5 update 105. D1 training seed 44 block B, manifest `f38aebd53e08c9012af5c4faa8a51a07ca39538dd1ccfcd26d003719b6ea5ca3`, ledger `d007b8d8a2cfed49104be90100059a9f2fdf8ffee86933d5d68b26ba7245920b`, elapsed 8381.193621516228 seconds, weight `d0fcb5174230b8bbbc6bfe59eabda9b37687c03800012bc1a6981cc215469ed5`, authorization commit `50a41b84c7340aca5841672ea7507ceb4c1b7b94`, shared GPU 0 with two pre-existing compute processes, generation seeds 900000–900163, epoch 5 update 105.
+
+**Combined outputs.** B1 ledger `/home/laura/rnagenesis-mres-runs/m8_b1_combined_1069b63_cpu_attempt1/m8_combined_raw_attempt_ledger.jsonl`, 30,000 records, 26,427,607 bytes, SHA-256 `37ba0e1b852a6b8492a816a4adc0c6bfee15a554ba28a8ba5dd91d9e32a255d9`, authorization commit `b79e70c0d895ba34f7655732412a1c3e039b4067`. D1 ledger `/home/laura/rnagenesis-mres-runs/m8_d1_combined_1069b63_cpu_attempt1/m8_combined_raw_attempt_ledger.jsonl`, 30,000 records, 28,971,289 bytes, SHA-256 `cedcc36133f5dfb3678e1560c6d6bab703136fe89e512e939b9f93a9a6361de9`, authorization commit `c9a8cfc8cb2d720fdab8743bed088e8f900c3198`. Each combined ledger contains master indexes 0 through 29999 exactly once and 30,000 unique record ids. Training seed, generation seed, and record id stay distinct. Selected-set SHA-256 `af0c0e555a8b878feadeb17fcbde18d8b780819a42d9e0cc547d2fc0c6895f8f`. Final-selection manifest SHA-256 `49b218e3df74825e1931148e2f65b25aae057c822e2ab32d44c2960b1587c91c`.
+
+**Runtime.** Summed GPU execution time, the four `elapsed_seconds` values, is 33551.566182404757 seconds. Wall-clock scheduling time from `2026-10-08T13:55:44+00:00` to `2026-10-09T13:32:21+00:00` is 84997 seconds. The arms were sequential. The difference is idle time between arms. CPU assembly is not included in either figure.
+
+**Contract and limits.** No filtering, parsing, classification, deduplication, replacement, or replenishment was performed. Evidence is retained through at least 1 November 2026. Sealed manifests were not rewritten. Only two fine-tuning seeds were used, because of time and GPU constraints. Evaluation completeness was prioritized over a third training replicate. The training seed is coupled to the D1 technical block and generation-seed range, so pooled D1 supports condition-level evaluation and does not support clean replicate-level causal inference. Raw attempts are not yet established to be valid nucleotide sequences. No duplicate removal, training-set-match analysis, leakage analysis, biological-quality assessment, structure analysis, clustering, representation-space analysis, or functional evaluation was performed. M7 guardrail samples were not included. Seed 43 attempt 1 remains the consumed `runtime_identity` environment failure, not a model failure. Guardrails establish generation and runtime sanity only. Shared GPU use on the seed-44 arm may affect runtime and resource contention; its generated bytes and provenance remain sealed.
+
+**Handoff.** Later evaluation must apply the same declared parsing and filtering policy symmetrically across B0, B1, B2, and D1, and must not tune parameters after inspecting REF or EVAL outcomes. The evaluation worktree stays out of scope. The full record is section 8 of `docs/fine_tuning/m8_raw_generation.md`.
+
+**Boundary:** This review did not stage, commit, or push on the live checkout. It did not launch, consume, generate, assemble, filter, or evaluate. It did not modify the run root or the evaluation worktree.
+

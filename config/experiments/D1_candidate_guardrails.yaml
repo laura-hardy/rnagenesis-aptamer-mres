@@ -45,6 +45,7 @@ authorisation_schema:
   - checkpoint_directory
   - checkpoint_member_sha256
   - checkpoint_relative_name
+  - checkpoint_training_implementation_commit
   - checkpoint_weight_sha256
   - consumed
   - cuda_visible_devices
@@ -77,6 +78,7 @@ authorisation_schema:
   - seed_and_epoch
   - ranking_position_and_failed_earlier_candidates
   - checkpoint_directory_and_member_hashes
+  - sealed_checkpoint_training_implementation_commit
   - replicate_manifest_hash
   - physical_and_logical_gpu_identity
   - exact_output_directory

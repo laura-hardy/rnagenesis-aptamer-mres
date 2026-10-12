@@ -161,11 +161,11 @@ class SpecContractTests(unittest.TestCase):
         self.assertEqual(arp1_spec_hash, spec["arp1_dependency"]["spec_sha256"])
         self.assertEqual(
             spec["arp1_dependency"]["module_sha256"],
-            "020ff616caade2983743eb941e7d4ce00d505f9bb349f10b428f98adb505263b",
+            "c219af6721e66148df31bdc72329a01ffb30425e3e9d136f5b80f26ecab5613d",
         )
         self.assertEqual(
             spec["arp1_dependency"]["spec_sha256"],
-            "d32484b1dd0de0e344aa8cc5f5900fe1c184ab5261392f2dbfb941ba68d6d4a1",
+            "c1f4d5b0beb0c942f14d6fe55b2a9940e1f6c0f90bb473981eee7626a30a4b10",
         )
         self.assertEqual(hashlib.sha256(spec_bytes).hexdigest(), stored_spec_hash)
 
