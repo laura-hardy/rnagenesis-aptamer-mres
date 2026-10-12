@@ -16,7 +16,7 @@ import unittest
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CONTRACT_SHA256 = "8b4dafd36250c84b7b6b81fc0b48e22e64f0684e7978f55c3aa3e99ded630a3c"
+CONTRACT_SHA256 = "0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b"
 PLAN_SHA256 = "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
 PAPER_SHA256 = "aaf40af707acc236639dccb8ecbf1f3fb522143f0a447e71f490168896af433d"
 CSV_SHA256 = "447ce90b4fdf8fab7bbd5a4fcda1824fc91d3b7b697c6cfc7fbe466e16400852"
@@ -215,6 +215,15 @@ class EvidenceContractTests(unittest.TestCase):
         spec, _spec_bytes = arp1.load_spec()
         self.assertIn("does not apply the public implementation", spec["rules"]["sequence_alphabet"])
         self.assertIn("not adopted by ARP-1", spec["rules"]["sequence_alphabet"])
+        self.assertIn("canonical uppercase", spec["rules"]["sequence_alphabet"])
+        self.assertIn("Silent normalization is not relied upon", spec["rules"]["sequence_alphabet"])
+        self.assertIn("deliberate stricter MRes input policy", spec["rules"]["sequence_alphabet"])
+        self.assertIn("does not claim live-deployment verification", spec["rules"]["sequence_alphabet"])
+        provenance = spec["rules"]["nullable_target_pdb_id"]
+        self.assertIn("five reference columns are retained for provenance and auditability", provenance)
+        self.assertIn("deliberate stricter MRes provenance policy", provenance)
+        self.assertIn("technically requires only sequence", provenance)
+        self.assertIn("does not claim live-deployment verification", provenance)
         self.assertIs(spec["deployment_verified"], False)
         self.assertIsNone(spec["synthetic_run_profiles"]["target_free_rigorous_style"]["preset_value"])
         self.assertEqual(
@@ -233,12 +242,92 @@ class EvidenceContractTests(unittest.TestCase):
         self.assertIs(spec["provisional_camera_ready_formula_adopted"], False)
         self.assertIs(spec["scientific_result"], False)
         by_id = {item["id"]: item for item in spec["unresolved_register"]}
+        self.assertEqual(by_id["U1"]["status"], "unresolved")
+        self.assertIsNone(by_id["U1"]["value"])
+        self.assertIn("one pooled empirical REF distribution per criterion", by_id["U1"]["note"])
+        self.assertIn("does not choose or implement a competing short/long calibration", by_id["U1"]["note"])
+        self.assertIn("Local recomputation of AptaRank calibration remains disabled", by_id["U1"]["note"])
+        self.assertIn("M9C", by_id["U1"]["note"])
+        self.assertNotIn("unchosen", by_id["U1"]["note"])
+        for index in range(2, 22):
+            item = by_id["U%d" % index]
+            self.assertEqual(item["status"], "unresolved")
+            self.assertIsNone(item["value"])
+            self.assertIn("public implementation definition is established", item["note"])
+            self.assertIn("unverified", item["note"])
+            self.assertIn("Local scorer reimplementation remains disabled", item["note"])
         self.assertEqual(by_id["U2"]["status"], "unresolved")
         self.assertIsNone(by_id["U2"]["value"])
         self.assertIn("M9B evidence contract", by_id["U2"]["note"])
         self.assertIsNone(by_id["U14"]["value"])
         self.assertIn("unverified", by_id["U14"]["note"])
+        self.assertIn("30", by_id["U14"]["note"])
+        self.assertNotIn("dense", by_id["U28"]["note"])
+        self.assertIn("deterministic consecutive 1-based ordinal position", by_id["U28"]["note"])
+        self.assertIn("statistical minimum rank", by_id["U28"]["note"])
         self.assertIs(spec["scoring_boundary"]["local_recompute_empirical_ref_calibration"], False)
+
+    def test_reclassified_items_stay_out_of_the_conflict_list(self):
+        document, _payload = contract.load_contract()
+        policies = {item["id"]: item for item in document["project_input_policies"]}
+        self.assertEqual(
+            list(policies),
+            ["canonical_uppercase_acgu", "five_column_ref_provenance"],
+        )
+        for item in policies.values():
+            self.assertEqual(item["classification"], "deliberate_stricter_mres_input_provenance_policy")
+            self.assertIs(item["public_behavior_recorded"], True)
+            self.assertIs(item["compatible_with_inspected_public_loader"], True)
+            self.assertIs(item["deployment_verified"], False)
+            self.assertIs(item["scientific_or_deployment_conflict"], False)
+            self.assertIs(item["claims_live_deployment_verification"], False)
+        self.assertIn("Silent normalization is not relied upon", policies["canonical_uppercase_acgu"]["statement"])
+        self.assertIn("provenance and auditability", policies["five_column_ref_provenance"]["statement"])
+        self.assertIn("requires only sequence", policies["five_column_ref_provenance"]["statement"])
+        conflict_ids = [item["id"] for item in document["conflicts"]]
+        self.assertEqual(conflict_ids, ["strong_band_equality", "quick_preset_sample_count"])
+        for item in document["conflicts"]:
+            self.assertIs(item["resolved"], False)
+            self.assertIs(item["deployment_verified"], False)
+        self.assertNotIn("normalization_versus_arp1", conflict_ids)
+        self.assertNotIn("reference_column_enforcement", conflict_ids)
+        self.assertNotIn("two_sided_clip", conflict_ids)
+        detail = document["non_material_implementation_details"][0]
+        self.assertEqual(detail["id"], "two_sided_clip")
+        self.assertIs(detail["requires_m9c_resolution"], False)
+        self.assertIs(detail["unresolved_conflict"], False)
+        self.assertIn("already in [0, 1]", detail["statement"])
+        unresolved_ids = [item["id"] for item in document["unresolved_deployment_items"]["items"]]
+        for retained in (
+            "live_deployment_identity",
+            "effective_preset",
+            "accepted_and_dropped_ref_counts",
+            "bank_identity_and_count",
+            "runtime",
+            "live_export_behavior",
+            "band_equality",
+            "folding_tool_versions",
+        ):
+            self.assertIn(retained, unresolved_ids)
+        self.assertNotIn("two_sided_clip", unresolved_ids)
+        calibration = next(item for item in document["facts"] if item["id"] == "empirical_calibration")
+        self.assertIn("one pooled empirical REF distribution per criterion", calibration["statement"])
+        self.assertIn("does not choose or implement a competing short/long calibration", calibration["statement"])
+        self.assertNotIn("unchosen", calibration["statement"])
+        rank = next(item for item in document["facts"] if item["id"] == "rank_direction")
+        self.assertIn("deterministic consecutive 1-based ordinal position", rank["statement"])
+        self.assertIn("ascending candidate ID", rank["statement"])
+        self.assertIn("statistical minimum rank", rank["statement"])
+        self.assertNotIn("dense", rank["statement"])
+        normalization = next(item for item in document["facts"] if item["id"] == "sequence_normalization")
+        self.assertIn("strips whitespace, uppercases, and rewrites T as U", normalization["statement"])
+        reference = next(item for item in document["facts"] if item["id"] == "reference_upload_fields")
+        self.assertIn("required column is sequence only", reference["statement"])
+
+        relabelled = copy.deepcopy(document)
+        relabelled["project_input_policies"][0]["scientific_or_deployment_conflict"] = True
+        with self.assertRaises(contract.EvidenceContractError):
+            contract.validate_document(relabelled)
 
 
 if __name__ == "__main__":

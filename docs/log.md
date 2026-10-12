@@ -11866,3 +11866,19 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 **Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, models, checkpoints, and `results/` were not opened. No production upload or AptaRank scoring run was performed. No REF distribution or Tier 2 control bank was built. No overlap, leakage, or nearest-TRAIN workflow was run.
 
+## 2026-10-12 — M9B-1 AptaRank evidence clarification
+
+**Stage:** Aim 2 / modelling / M9B-1 synthetic-only AptaRank evidence review
+
+**Status:** `FROZEN_PUBLIC_EVIDENCE_SYNTHETIC_ONLY_DEPLOYMENT_UNVERIFIED`. This clarification reclassifies terminology in the frozen evidence. It does not verify the live deployment. No scientific result is claimed.
+
+**Plan:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` stays the active plan, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. It was not edited.
+
+**Contract:** `config/modelling/aptarank_evidence_contract.json`, SHA-256 `0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b`.
+
+**Reclassifications:** Canonical uppercase A/C/G/U, with no reliance on silent normalisation, is a deliberate stricter MRes input policy. The five reference columns are a deliberate stricter provenance policy retained for auditability. Both are compatible with the inspected public loader, which still normalises case and T and technically requires only `sequence`. The inspected public implementation constructs one pooled empirical REF distribution per criterion from the REF sequences it accepts. The project does not choose or implement a competing short/long calibration. Local recomputation stays disabled, and live agreement with that implementation remains for M9C. The public two-sided clip is defensive: a valid empirical CDF already keeps `1 - 2 * abs(F - 0.5)` in `[0, 1]`, so `two_sided_clip` is not an unresolved conflict and does not require M9C resolution. The exported rank is the deterministic consecutive 1-based ordinal position after sorting by descending Tier 1 score and ascending candidate ID for ties. It is not a dense rank and it is not the statistical minimum rank retained for the empirical CDF. U2–U21 stay unresolved for deployment application. Their recorded public definitions stay established, and local scorer reimplementation stays disabled.
+
+**Unresolved for M9C:** Live deployment identity and dependency versions, effective preset and runtime, the quick-preset 30-versus-0 discrepancy, accepted and dropped REF counts, bank id, hash, and realized count, live export behavior, and the strong-band equality difference. Whether the live deployment applies the inspected pooled calibration also remains for M9C.
+
+**Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, models, checkpoints, and `results/` were not opened. No production upload or AptaRank scoring run was performed. No REF distribution or Tier 2 control bank was built. No production value was instantiated.
+

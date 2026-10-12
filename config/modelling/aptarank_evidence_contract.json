@@ -80,7 +80,7 @@
     },
     {
       "id": "sequence_normalization",
-      "statement": "The public normaliser strips whitespace, uppercases, and rewrites T as U. The paper says T is accepted. ARP-1 still rejects lowercase and T and does not adopt that silent conversion.",
+      "statement": "The public normaliser strips whitespace, uppercases, and rewrites T as U. The paper says T is accepted. ARP-1 rejects lowercase and T because every prepared MRes upload must already contain canonical uppercase A, C, G, and U. Silent normalization is not relied upon. That stricter input policy is compatible with the inspected public loader. It is not an unresolved scientific or deployment conflict, and it does not claim live-deployment verification.",
       "levels": ["established_by_paper", "established_by_public_implementation"],
       "deployment_verified": false,
       "scientific_result": false,
@@ -104,7 +104,7 @@
     },
     {
       "id": "reference_upload_fields",
-      "statement": "The public default comment names id, sequence, target_name, target_pdb_id, and source_reference. The enforced required column is sequence only; the other four are optional and default to empty. The dashboard refuses a file that has none of the three provenance columns. Blank target_pdb_id is accepted by the loader. ARP-1 still requires the five-column project contract, unique nonempty ids, nonempty target_name and source_reference, and a nullable PDB cell.",
+      "statement": "The public default comment names id, sequence, target_name, target_pdb_id, and source_reference. The enforced required column is sequence only; the other four are optional and default to empty. The dashboard refuses a file that has none of the three provenance columns. Blank target_pdb_id is accepted by the loader. ARP-1 retains those five reference columns for provenance and auditability, with unique nonempty ids, nonempty target_name and source_reference, and a nullable PDB cell. That stricter provenance policy is compatible with the inspected public loader. It is not an unresolved scientific or deployment conflict, and it does not claim live-deployment verification.",
       "levels": ["established_by_public_implementation"],
       "deployment_verified": false,
       "scientific_result": false,
@@ -136,7 +136,7 @@
     },
     {
       "id": "empirical_calibration",
-      "statement": "AptaRank builds one pooled empirical reference distribution per criterion from the sequences it accepts in the uploaded reference file. The mid-rank CDF is F(x) = (count of reference values below x plus half the count of exact ties) divided by the reference count. One-sided lower-favoured scores use 1 minus F. Two-sided scores use 1 minus 2 times the absolute distance from 0.5, clipped to the unit interval. The project does not externally fit that distribution.",
+      "statement": "The inspected public implementation constructs one pooled empirical REF distribution per criterion from the REF sequences it accepts in the uploaded reference file. The mid-rank CDF is F(x) = (count of reference values below x plus half the count of exact ties) divided by the reference count. The count of reference values below x is the statistical minimum rank retained for that CDF. One-sided lower-favoured scores use 1 minus F. Two-sided scores use 1 minus 2 times the absolute distance of F from 0.5. A valid empirical CDF already keeps that expression in [0, 1], so the public clip is defensive and does not change the result. The MRes project does not choose or implement a competing short/long calibration. Local recomputation of AptaRank calibration remains disabled. Whether the live deployment matches this inspected implementation remains for M9C verification.",
       "levels": ["established_by_paper", "established_by_public_implementation"],
       "deployment_verified": false,
       "scientific_result": false,
@@ -216,7 +216,7 @@
     },
     {
       "id": "rank_direction",
-      "statement": "Public ranking sorts higher tier1_score first and breaks ties by ascending candidate id. The exported rank is the dense 1-based position. The supplied CSV lists the larger aptamer-likeness first. That agreement is not live-deployment verification.",
+      "statement": "Public ranking sorts by descending Tier 1 score and breaks ties by ascending candidate ID. The exported rank is the deterministic consecutive 1-based ordinal position after that sort. It is not the statistical minimum rank retained for the empirical CDF. The supplied CSV lists the larger aptamer-likeness first. That agreement is not live-deployment verification.",
       "levels": ["established_by_public_implementation", "observed_in_supplied_interface", "inferred"],
       "deployment_verified": false,
       "scientific_result": false,
@@ -278,7 +278,7 @@
     },
     {
       "id": "two_sided",
-      "statement": "score = clip(1 - 2 * abs(F(x) - 0.5), 0, 1) for stem_fraction and gc_fraction",
+      "statement": "score = 1 - 2 * abs(F(x) - 0.5) for stem_fraction and gc_fraction. A valid empirical CDF already keeps this value in [0, 1]. The public clip is defensive and does not change the result.",
       "production_value_instantiated": false,
       "deployment_verified": false,
       "adopted_by_arp1": false
@@ -323,21 +323,37 @@
       "equality_conflict": true
     }
   ],
+  "project_input_policies": [
+    {
+      "id": "canonical_uppercase_acgu",
+      "classification": "deliberate_stricter_mres_input_provenance_policy",
+      "statement": "All prepared MRes uploads must already contain canonical uppercase A, C, G, and U. ARP-1 rejects lowercase and T rather than relying on AptaRank's silent normalization. Silent normalization is not relied upon. The public loader still strips whitespace, uppercases, and rewrites T as U, and the paper says T is accepted. This stricter input policy is compatible with the inspected public loader. It is not an unresolved scientific or deployment conflict, and it does not claim live-deployment verification.",
+      "public_behavior_recorded": true,
+      "compatible_with_inspected_public_loader": true,
+      "deployment_verified": false,
+      "scientific_or_deployment_conflict": false,
+      "claims_live_deployment_verification": false
+    },
+    {
+      "id": "five_column_ref_provenance",
+      "classification": "deliberate_stricter_mres_input_provenance_policy",
+      "statement": "ARP-1 requires the five-column REF provenance schema id, sequence, target_name, target_pdb_id, and source_reference, although the public loader technically requires only sequence. The five reference columns are retained for provenance and auditability. This stricter provenance policy is compatible with the inspected public loader. It is not an unresolved scientific or deployment conflict, and it does not claim live-deployment verification.",
+      "public_behavior_recorded": true,
+      "compatible_with_inspected_public_loader": true,
+      "deployment_verified": false,
+      "scientific_or_deployment_conflict": false,
+      "claims_live_deployment_verification": false
+    }
+  ],
+  "non_material_implementation_details": [
+    {
+      "id": "two_sided_clip",
+      "statement": "The empirical CDF returns values in [0, 1], so 1 - 2 * abs(F - 0.5) is already in [0, 1]. The public implementation's clip is defensive and does not change the result for a valid empirical CDF. It is not an unresolved conflict and does not require M9C resolution.",
+      "requires_m9c_resolution": false,
+      "unresolved_conflict": false
+    }
+  ],
   "conflicts": [
-    {
-      "id": "normalization_versus_arp1",
-      "statement": "The paper and public code accept T by rewriting it to U and accept lowercase by uppercasing. ARP-1 rejects both. ARP-1 is unchanged.",
-      "sources": ["paper", "public_implementation", "provisional_specification"],
-      "resolved": false,
-      "deployment_verified": false
-    },
-    {
-      "id": "reference_column_enforcement",
-      "statement": "The config comment names five reference columns. The loader requires only sequence. The dashboard requires at least one provenance column. ARP-1 still requires all five.",
-      "sources": ["public_implementation", "provisional_specification"],
-      "resolved": false,
-      "deployment_verified": false
-    },
     {
       "id": "strong_band_equality",
       "statement": "Paper prose puts strong strictly above the 95th percentile and moderate through the 95th. Public code assigns strong at percentile greater than or equal to 0.95.",
@@ -348,13 +364,6 @@
     {
       "id": "quick_preset_sample_count",
       "statement": "The paper and the preset caption say a quick run samples 30 structures. In this commit, fast mode forces candidate ensemble samples to 0. The preset still writes 30 into the config, and the Tier 2 bank builder reads that config value.",
-      "sources": ["paper", "public_implementation"],
-      "resolved": false,
-      "deployment_verified": false
-    },
-    {
-      "id": "two_sided_clip",
-      "statement": "The paper writes the two-sided score without a clip. The public function clips to the unit interval. On a CDF inside that interval the two expressions match. The clip is not a separate deployed threshold.",
       "sources": ["paper", "public_implementation"],
       "resolved": false,
       "deployment_verified": false
@@ -456,6 +465,13 @@
       "path": "config/modelling/aptarank_tier1_analysis_spec.json",
       "change": "Point unresolved scorer notes at the recorded public algorithms without adopting them or closing deployment verification.",
       "validator_behavior_changed": false,
+      "deployment_verified": false,
+      "plan_v3_3_modified": false
+    },
+    {
+      "path": "config/modelling/aptarank_evidence_contract.json",
+      "change": "Record the canonical uppercase alphabet and the five-column REF schema as deliberate stricter MRes input and provenance policies. Record one pooled public calibration grain, with local recomputation disabled and live agreement left to M9C. Remove the defensive two-sided clip from the unresolved conflicts. Name the export as a consecutive ordinal rather than a dense rank. The evidence checker enforces those classifications. ARP-1 upload acceptance is unchanged.",
+      "validator_behavior_changed": true,
       "deployment_verified": false,
       "plan_v3_3_modified": false
     }

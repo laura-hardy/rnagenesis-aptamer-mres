@@ -43,6 +43,8 @@ TOP_LEVEL_KEYS = (
     "evidence_levels",
     "facts",
     "conditional_algorithms",
+    "project_input_policies",
+    "non_material_implementation_details",
     "conflicts",
     "unresolved_deployment_items",
     "prohibited_m9b_actions",
@@ -85,6 +87,55 @@ REQUIRED_HANDOFF = (
     "deployment_identity",
     "runtime",
     "live_export",
+)
+POLICY_IDS = (
+    "canonical_uppercase_acgu",
+    "five_column_ref_provenance",
+)
+POLICY_CLASSIFICATION = "deliberate_stricter_mres_input_provenance_policy"
+POLICY_KEYS = (
+    "id",
+    "classification",
+    "statement",
+    "public_behavior_recorded",
+    "compatible_with_inspected_public_loader",
+    "deployment_verified",
+    "scientific_or_deployment_conflict",
+    "claims_live_deployment_verification",
+)
+POLICY_PHRASES = {
+    "canonical_uppercase_acgu": (
+        "canonical uppercase",
+        "Silent normalization is not relied upon",
+        "compatible with the inspected public loader",
+        "does not claim live-deployment verification",
+    ),
+    "five_column_ref_provenance": (
+        "five",
+        "provenance and auditability",
+        "requires only sequence",
+        "compatible with the inspected public loader",
+        "does not claim live-deployment verification",
+    ),
+}
+RETAINED_CONFLICT_IDS = (
+    "strong_band_equality",
+    "quick_preset_sample_count",
+)
+RECLASSIFIED_IDS = (
+    "normalization_versus_arp1",
+    "reference_column_enforcement",
+    "two_sided_clip",
+)
+RETAINED_UNRESOLVED_IDS = (
+    "live_deployment_identity",
+    "effective_preset",
+    "accepted_and_dropped_ref_counts",
+    "bank_identity_and_count",
+    "runtime",
+    "live_export_behavior",
+    "band_equality",
+    "folding_tool_versions",
 )
 
 
@@ -229,12 +280,55 @@ def validate_document(document):
     for algorithm in algorithms:
         _require(algorithm.get("production_value_instantiated") is False, "production_value_refused", "a conditional algorithm instantiated a production value")
         _require(algorithm.get("deployment_verified") is False, "deployment_verified_refused", "a conditional algorithm is not deployment-verified")
+    two_sided = next((item for item in algorithms if item.get("id") == "two_sided"), None)
+    _require(isinstance(two_sided, dict), "spec_invalid", "the two-sided algorithm is missing")
+    _require("1 - 2 * abs(F(x) - 0.5)" in two_sided["statement"], "spec_invalid", "the two-sided expression drifted")
+    _require("defensive" in two_sided["statement"], "spec_invalid", "the two-sided clip must stay a defensive detail")
+
+    policies = document["project_input_policies"]
+    _require(isinstance(policies, list), "spec_invalid", "project input policies are missing")
+    _require([item.get("id") for item in policies] == list(POLICY_IDS), "spec_invalid", "project input policy ids drifted")
+    for policy in policies:
+        _exact_keys(policy, POLICY_KEYS, "spec_invalid", "a project input policy key drifted")
+        _require(policy["classification"] == POLICY_CLASSIFICATION, "policy_reclassified_as_conflict", "an input policy was not recorded as a deliberate MRes policy")
+        _require(policy["public_behavior_recorded"] is True, "spec_invalid", "public AptaRank behavior must stay recorded")
+        _require(policy["compatible_with_inspected_public_loader"] is True, "spec_invalid", "a stricter policy must stay compatible with the inspected loader")
+        _require(policy["deployment_verified"] is False, "deployment_verified_refused", "an input policy cannot verify the deployment")
+        _require(policy["scientific_or_deployment_conflict"] is False, "policy_reclassified_as_conflict", "an input policy was classified as an unresolved conflict")
+        _require(policy["claims_live_deployment_verification"] is False, "deployment_verified_refused", "an input policy claimed live-deployment verification")
+        for phrase in POLICY_PHRASES[policy["id"]]:
+            _require(phrase in policy["statement"], "spec_invalid", "an input policy statement dropped a required clause")
+
+    details = document["non_material_implementation_details"]
+    _require(isinstance(details, list) and len(details) == 1, "spec_invalid", "the non-material implementation detail is missing")
+    detail = details[0]
+    _require(detail.get("id") == "two_sided_clip", "spec_invalid", "the defensive clip detail drifted")
+    _require(detail.get("requires_m9c_resolution") is False, "spec_invalid", "the defensive clip does not require M9C resolution")
+    _require(detail.get("unresolved_conflict") is False, "spec_invalid", "the defensive clip is not an unresolved conflict")
+    _require("already in [0, 1]" in detail.get("statement", ""), "spec_invalid", "the defensive clip statement drifted")
 
     conflicts = document["conflicts"]
     _require(isinstance(conflicts, list) and conflicts, "spec_invalid", "conflicts are missing")
+    conflict_ids = [conflict.get("id") for conflict in conflicts]
+    _require(conflict_ids == list(RETAINED_CONFLICT_IDS), "spec_invalid", "the unresolved conflict list drifted")
+    for retired in RECLASSIFIED_IDS:
+        _require(retired not in conflict_ids, "policy_reclassified_as_conflict", "a reclassified item was returned to the conflict list")
     for conflict in conflicts:
         _require(conflict.get("resolved") is False, "conflict_resolved_refused", "an evidence conflict was resolved in M9B-1")
         _require(conflict.get("deployment_verified") is False, "deployment_verified_refused", "a conflict cannot verify the deployment")
+
+    by_fact = {fact["id"]: fact["statement"] for fact in facts}
+    calibration = by_fact.get("empirical_calibration", "")
+    _require("one pooled empirical REF distribution per criterion" in calibration, "spec_invalid", "the pooled calibration grain drifted")
+    _require("does not choose or implement a competing short/long calibration" in calibration, "spec_invalid", "a competing calibration grain was left open")
+    _require("Local recomputation of AptaRank calibration remains disabled" in calibration, "spec_invalid", "local calibration recomputation must stay disabled")
+    _require("remains for M9C verification" in calibration, "spec_invalid", "live calibration agreement must stay for M9C")
+    _require("unchosen" not in calibration, "spec_invalid", "the calibration grain must not stay unchosen")
+    rank = by_fact.get("rank_direction", "")
+    _require("deterministic consecutive 1-based ordinal position" in rank, "spec_invalid", "the exported ordinal wording drifted")
+    _require("ascending candidate ID" in rank, "spec_invalid", "the exported tie break drifted")
+    _require("statistical minimum rank" in rank, "spec_invalid", "the exported ordinal was not separated from the statistical minimum rank")
+    _require("dense" not in rank, "spec_invalid", "dense rank wording remains")
 
     unresolved = document["unresolved_deployment_items"]
     _require(isinstance(unresolved, dict), "spec_invalid", "unresolved deployment items are missing")
@@ -243,9 +337,13 @@ def validate_document(document):
         _require(unresolved[key] is None, "production_identity_refused", "a deployment-dependent field was populated")
     items = unresolved.get("items")
     _require(isinstance(items, list) and items, "spec_invalid", "the unresolved item list is missing")
+    unresolved_ids = [item.get("id") for item in items]
+    _require(unresolved_ids == list(RETAINED_UNRESOLVED_IDS), "spec_invalid", "the M9C unresolved list drifted")
     for item in items:
         _require(item.get("status") == "unresolved", "spec_invalid", "a deployment item was resolved")
         _require(item.get("value") is None, "production_identity_refused", "a deployment item was given a value")
+    for retired in RECLASSIFIED_IDS:
+        _require(retired not in unresolved_ids, "spec_invalid", "a reclassified item was left for M9C")
 
     prohibited = document["prohibited_m9b_actions"]
     _require(isinstance(prohibited, list) and prohibited, "spec_invalid", "prohibited actions are missing")
