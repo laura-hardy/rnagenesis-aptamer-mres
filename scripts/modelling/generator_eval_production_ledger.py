@@ -46,6 +46,8 @@ from generator_eval_source_adapters import (
 PRODUCTION_LEDGER_SCHEMA = "generator-eval-production-ledger-m9-r1"
 ACCOUNTING_SCHEMA = "generator-eval-parsing-accounting-m9-r1"
 MANIFEST_SCHEMA = "generator-eval-production-manifest-m9-r1"
+FROZEN_PARSER_CONTRACT_SHA256 = "a8cda86af2cd6aff52ed7929c1a8cdfe134394f9087c768a731e8597339fe872"
+FROZEN_SOURCE_MANIFEST_SHA256 = "89be54f49b020027d58686ececfc1d743c16e58c0ed12d0b6bae269d36c4aa6c"
 CONDITION_ORDER = ("B0", "B1", "B2", "D1")
 PRODUCTION_ATTEMPT_COUNTS = {"B0": 30080, "B1": 30000, "B2": 30000, "D1": 30000}
 PRODUCTION_COMBINED_ROWS = 120080
@@ -711,20 +713,17 @@ def validate_published_directory(directory, expected_files):
 def _refuse_existing_outputs(output_dir):
     if os.path.islink(output_dir):
         raise ProductionLedgerError("output_symlink", "the output directory is a symlink")
-    for filename in OUTPUT_NAMES.values():
-        path = os.path.join(output_dir, filename)
-        if os.path.lexists(path):
-            raise ProductionLedgerError("output_exists", "an output file already exists")
-    if os.path.exists(output_dir) and not os.path.isdir(output_dir):
-        raise ProductionLedgerError("output_exists", "the output path is not a directory")
+    if os.path.lexists(output_dir):
+        raise ProductionLedgerError("output_exists", "the output directory already exists")
 
 
 def publish_output_directory(output_dir, blobs):
-    """Write a temporary directory and promote it only after validation."""
+    """Write a temporary directory and promote it by one rename after validation."""
     output_dir = os.path.abspath(output_dir)
     _refuse_existing_outputs(output_dir)
     parent = os.path.dirname(output_dir)
     os.makedirs(parent, exist_ok=True)
+    _refuse_existing_outputs(output_dir)
     temp = tempfile.mkdtemp(prefix=".m9-production-ledger.", dir=parent)
     promoted = False
     try:
@@ -741,14 +740,9 @@ def publish_output_directory(output_dir, blobs):
                 os.close(descriptor)
             expected[filename] = {"sha256": _sha256(blob), "byte_count": len(blob), "row_count": blob.count(b"\n")}
         validate_published_directory(temp, expected)
-        if not os.path.exists(output_dir):
-            os.rename(temp, output_dir)
-            promoted = True
-        else:
-            for filename, _blob in blobs:
-                os.rename(os.path.join(temp, filename), os.path.join(output_dir, filename))
-            os.rmdir(temp)
-            promoted = True
+        _refuse_existing_outputs(output_dir)
+        os.rename(temp, output_dir)
+        promoted = True
     finally:
         if not promoted and os.path.isdir(temp):
             shutil.rmtree(temp)
@@ -810,9 +804,26 @@ def run_ledger(source_manifest_path, output_dir, locator, *, production_totals, 
     }
 
 
+def verify_frozen_production_inputs(source_manifest_path, root=REPO_ROOT):
+    """Check the pinned freeze digests. Do not open a sealed source artifact."""
+    source_blob = _read_regular_file(source_manifest_path)
+    if _sha256(source_blob) != FROZEN_SOURCE_MANIFEST_SHA256:
+        raise ProductionLedgerError(
+            "frozen_source_manifest_mismatch",
+            "the source manifest bytes are not the frozen digest",
+        )
+    contract_blob = _read_regular_file(os.path.join(root, CONTRACT_RELATIVE_PATH))
+    if _sha256(contract_blob) != FROZEN_PARSER_CONTRACT_SHA256:
+        raise ProductionLedgerError(
+            "frozen_parser_contract_mismatch",
+            "the parser contract bytes are not the frozen digest",
+        )
+    return source_blob
+
+
 def run_sealed_sources(source_manifest_path, output_dir, invocation, root=REPO_ROOT):
     """Production entry. The locator is the sealed logical-id table."""
-    blob = _read_regular_file(source_manifest_path)
+    blob = verify_frozen_production_inputs(source_manifest_path, root)
     document = _load_json_bytes(blob, "the source manifest")
     locator = sealed_source_locator(document, root)
     return run_ledger(

@@ -30,8 +30,8 @@ B0, B1, B2, and D1 share one biological parser after source adaptation.
 ``source_raw_file_relative_path`` is preserved M8 provenance. Adapter v2
 checks it with the tracked writer form and does not treat its ``/``
 separators as a filesystem argument. Other token fields stay slash-free.
-Synthetic adaptation is not production validation. This branch has not run
-production parsing.
+Synthetic adaptation is not production validation. Production parsing is the
+production-ledger entry point, not this adapter.
 """
 
 from __future__ import annotations

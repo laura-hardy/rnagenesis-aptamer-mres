@@ -7,7 +7,7 @@ with a trailing LF after every row. The accounting projection contains no
 sequence strings.
 
 A synthetic ledger is not a production derived ledger and is not production
-validation. Production derived-ledger creation remains unauthorised.
+validation. This module is not the production entry point.
 """
 
 from __future__ import annotations

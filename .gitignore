@@ -53,6 +53,9 @@ docs/run_notes/*.log
 !results/phase4_1_unadapted_rnagenesis_30k/**
 results/phase4_1_unadapted_rnagenesis_30k/.DS_Store
 
+# Regenerable M9 production JSONL ledgers. The summary and manifest stay eligible.
+results/fine_tuning/m9_generator_evaluation/*.jsonl
+
 # Data is local-only — never committed
 # (replaces the narrower /data/raw/ rule; entire top-level data/ is ignored)
 /data/

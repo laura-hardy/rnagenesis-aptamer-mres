@@ -259,6 +259,8 @@ class ProductionLedgerTests(unittest.TestCase):
         self.assertEqual(summary["conditions"]["B2"]["parser_outcome_counts"]["parsed_non_acgu"], 1)
         self.assertEqual(summary["conditions"]["D1"]["d1_training_seed_attempt_counts"], {"43": 2, "44": 2})
         self.assertFalse(summary["cross_condition_overlap_computed"])
+        self.assertFalse(summary["overall"]["cross_condition_overlap_computed"])
+        self.assertTrue(summary["overall"]["distinct_valid_sequences_are_within_condition_sums"])
         self.assertEqual(summary["overall"]["distinct_valid_sequences"], 7)
         self.assertEqual(summary["overall"]["maximum_within_condition_multiplicity"], 2)
         with open(os.path.join(self.output, runner.OUTPUT_NAMES["manifest"]), "r", encoding="utf-8") as handle:
@@ -277,6 +279,7 @@ class ProductionLedgerTests(unittest.TestCase):
         with open(self.manifest_path, "rb") as handle:
             self.assertEqual(produced["source_manifest"]["sha256"], sha256(handle.read()))
         self.assertEqual(produced["ordering"]["conditions"], ["B0", "B1", "B2", "D1"])
+        self.assertFalse(produced["duplicate_policy"]["cross_condition_overlap_computed"])
         files = {
             item["filename"]: item
             for item in produced["outputs"]
@@ -377,6 +380,87 @@ class ProductionLedgerTests(unittest.TestCase):
         with self.assertRaises(runner.ProductionLedgerError) as error:
             runner.sealed_source_locator(document, ROOT)
         self.assertEqual(error.exception.code, "source_identity_invalid")
+
+    def _guard_sealed_opens(self):
+        opened = []
+        real_open = os.open
+
+        def guarded(path, flags, mode=0o777):
+            text = os.fspath(path)
+            if "generator_eval_source_manifest" not in text and "generator_eval_parser_contract" not in text:
+                if text.endswith(".jsonl") or text.endswith(".txt") or "rnagenesis-mres-runs" in text or "phase4_1" in text:
+                    opened.append(text)
+                    raise AssertionError("opened")
+            return real_open(path, flags, mode)
+
+        return opened, real_open, guarded
+
+    def test_altered_frozen_source_manifest_is_refused_before_sources_open(self):
+        source = os.path.join(ROOT, "config/modelling/generator_eval_source_manifest.json")
+        with open(source, "rb") as handle:
+            original = handle.read()
+        self.assertEqual(runner._sha256(original), runner.FROZEN_SOURCE_MANIFEST_SHA256)
+        altered = bytearray(original)
+        altered[-1] ^= 0x01
+        altered_path = os.path.join(self.root, "altered-source-manifest.json")
+        with open(altered_path, "wb") as handle:
+            handle.write(altered)
+        opened, real_open, guarded = self._guard_sealed_opens()
+        os.open = guarded
+        try:
+            with self.assertRaises(runner.ProductionLedgerError) as error:
+                runner.run_sealed_sources(
+                    altered_path,
+                    os.path.join(self.root, "sealed-out"),
+                    {"argv": ["synthetic-frozen-manifest"], "production_totals": True},
+                    root=ROOT,
+                )
+        finally:
+            os.open = real_open
+        self.assertEqual(error.exception.code, "frozen_source_manifest_mismatch")
+        self.assertEqual(opened, [])
+        self.assertFalse(os.path.exists(os.path.join(self.root, "sealed-out")))
+        with open(source, "rb") as handle:
+            self.assertEqual(handle.read(), original)
+
+    def test_altered_parser_contract_is_refused_before_sources_open(self):
+        contract = os.path.join(ROOT, runner.CONTRACT_RELATIVE_PATH)
+        with open(contract, "rb") as handle:
+            original = handle.read()
+        self.assertEqual(runner._sha256(original), runner.FROZEN_PARSER_CONTRACT_SHA256)
+        altered = bytearray(original)
+        altered[0] ^= 0x01
+        relative_dir = os.path.join(self.root, "config", "modelling")
+        os.makedirs(relative_dir)
+        with open(os.path.join(relative_dir, "generator_eval_parser_contract.json"), "wb") as handle:
+            handle.write(altered)
+        opened, real_open, guarded = self._guard_sealed_opens()
+        os.open = guarded
+        try:
+            with self.assertRaises(runner.ProductionLedgerError) as error:
+                runner.run_sealed_sources(
+                    os.path.join(ROOT, "config/modelling/generator_eval_source_manifest.json"),
+                    os.path.join(self.root, "sealed-out"),
+                    {"argv": ["synthetic-frozen-contract"], "production_totals": True},
+                    root=self.root,
+                )
+        finally:
+            os.open = real_open
+        self.assertEqual(error.exception.code, "frozen_parser_contract_mismatch")
+        self.assertEqual(opened, [])
+        self.assertFalse(os.path.exists(os.path.join(self.root, "sealed-out")))
+        with open(contract, "rb") as handle:
+            self.assertEqual(handle.read(), original)
+
+    def test_existing_empty_output_directory_is_refused_and_unchanged(self):
+        os.makedirs(self.output)
+        with self.assertRaises(runner.ProductionLedgerError) as error:
+            runner.publish_output_directory(self.output, [(runner.OUTPUT_NAMES["summary"], b"{}\n")])
+        self.assertEqual(error.exception.code, "output_exists")
+        self.assertEqual(os.listdir(self.output), [])
+        self.assertTrue(os.path.isdir(self.output))
+        parent_names = os.listdir(self.root)
+        self.assertEqual([name for name in parent_names if name.startswith(".m9-production-ledger.")], [])
 
 
 if __name__ == "__main__":
