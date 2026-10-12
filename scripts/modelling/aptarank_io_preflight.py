@@ -23,7 +23,7 @@ PACKAGE_ID = "ARP-1"
 SCHEMA_VERSION = "aptarank-io-arp1-draft-r3"
 SPEC_RELATIVE = "config/modelling/aptarank_io_spec.json"
 FIXTURE_RELATIVE = "tests/modelling/fixtures/aptarank_arp1"
-GOVERNING_PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan.md"
+GOVERNING_PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
 PROFILE_ID = "target_free_rigorous_style"
 TARGET_FREE_SENTINEL = "not_entered_target_free"
 JOIN_KEY = "candidate_id"
@@ -405,7 +405,7 @@ def validate_spec_document(spec):
     plan = spec["governing_plan"]
     _require(isinstance(plan, dict), "spec_invalid", "the governing plan record is missing")
     _require(plan.get("path") == GOVERNING_PLAN_RELATIVE, "spec_invalid", "the governing plan path is not pinned")
-    _require(plan.get("version") == "3.2", "spec_invalid", "the governing plan version is not pinned")
+    _require(plan.get("version") == "3.3", "spec_invalid", "the governing plan version is not pinned")
     _require(isinstance(plan.get("sha256"), str) and len(plan["sha256"]) == 64, "spec_invalid", "the governing plan hash is missing")
     _require(spec["candidate_upload_column_order"] == list(CANDIDATE_COLUMNS), "spec_schema_drift", "candidate columns drifted")
     _require(spec["reference_upload_column_order"] == list(REFERENCE_COLUMNS), "spec_schema_drift", "reference columns drifted")

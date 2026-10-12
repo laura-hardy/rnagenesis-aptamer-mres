@@ -103,7 +103,7 @@ class MetricSpecTests(unittest.TestCase):
             self.assertEqual(gep1._hash_revision_path(metric["code_revision"]["path"]), metric["code_revision"]["sha256"])
             self.assertEqual(gep1._hash_revision_path(metric["config_revision"]["path"]), metric["config_revision"]["sha256"])
         self.assertEqual(spec["governing_plan"]["path"], gep1.GOVERNING_PLAN_RELATIVE)
-        self.assertEqual(spec["governing_plan"]["version"], "3.2")
+        self.assertEqual(spec["governing_plan"]["version"], "3.3")
         self.assertEqual(gep1._hash_revision_path(spec["governing_plan"]["path"]), spec["governing_plan"]["sha256"])
         for deferred in metrics.DEFERRED_BEYOND_M4:
             self.assertNotIn(deferred, found)

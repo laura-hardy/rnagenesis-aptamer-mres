@@ -10,9 +10,9 @@
   "scorer_owner": "deployed AptaRank UI",
   "provisional_camera_ready_formula_adopted": false,
   "governing_plan": {
-    "path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
-    "version": "3.2",
-    "sha256": "fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51"
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md",
+    "version": "3.3",
+    "sha256": "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
   },
   "arp2a_reconciliation": {
     "path": "docs/aptarank_arp2a_tier1_reconciliation.md",
@@ -21,13 +21,13 @@
   },
   "analysis_module": {
     "path": "scripts/modelling/aptarank_tier1_analysis.py",
-    "sha256": "5587819096585844c9359442399a3c415033156f9f42d7009b9509aabe890448"
+    "sha256": "127d20a1e14d8f72dca1913a596be0a812cba1be25c310d5ca7c1c86c32a7f6c"
   },
   "arp1_dependency": {
     "module_path": "scripts/modelling/aptarank_io_preflight.py",
-    "module_sha256": "c219af6721e66148df31bdc72329a01ffb30425e3e9d136f5b80f26ecab5613d",
+    "module_sha256": "eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01",
     "spec_path": "config/modelling/aptarank_io_spec.json",
-    "spec_sha256": "c1f4d5b0beb0c942f14d6fe55b2a9940e1f6c0f90bb473981eee7626a30a4b10",
+    "spec_sha256": "2296d4234841146fbbecdbd0bb0d16dc5adffece6e3131a791a2fd538bc8cefa",
     "schema_version": "aptarank-io-arp1-draft-r3",
     "modified_by_arp2b": false,
     "role": "Mechanical upload, export, and failure validation is reused. ARP-1 is not modified. Both pinned hashes are enforced against the files."

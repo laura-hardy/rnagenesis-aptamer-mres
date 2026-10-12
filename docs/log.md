@@ -11838,3 +11838,13 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 **Next task:** A separate plan revision making M9B synthetic/preparatory-only and leaving overlap and leakage exclusively in M9A.
 
+## 2026-10-12 — M9B preparatory boundary
+
+**Stage:** Aim 2 / modelling / M9B AptaRank full-thesis-evaluation preparation
+
+**Status:** M9B preparation has started. M9B is preparatory-only and contains no overlap or leakage analysis. M9A remains complete. M9C and M10 have not started.
+
+**Plans:** The unversioned file `docs/aptarank_full_mres_thesis_evaluation_plan.md` is retained as the immutable v3.2 governing artifact for completed M9A. Its SHA-256 remains `fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` is the active plan for M9B onward. No scientific result motivated the split.
+
+**Boundary:** This entry did not open TRAIN, VALIDATION, REF, EVAL, a production sequence ledger, a model, a checkpoint, a structure tool, or AptaRank. It did not create a result under `results/`. Frozen M9A contracts, runners, tests, manifests, and evidence were not rewritten.
+

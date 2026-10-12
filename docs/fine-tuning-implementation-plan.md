@@ -46,7 +46,7 @@ The implementation must:
 
 1. use only the frozen TRAIN role for RNAGenesis fitting;
 2. use only frozen VALIDATION for checkpoint and model-development decisions;
-3. keep REF reserved exclusively for AptaRank calibration;
+3. keep REF reserved exclusively for AptaRank's internal calibration at M9C;
 4. keep EVAL inaccessible during model development and unlock it only after the generator and ranking pipeline are frozen;
 5. preserve the complete released RNAGenesis `EncDec` representation/decoding interface;
 6. fine-tune only the latent diffusion denoiser;
@@ -188,7 +188,7 @@ ref.csv SHA256 =
 531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23
 ```
 
-**Role:** fitting/calibrating empirical AptaRank reference distributions only.
+**Role:** M9C only. AptaRank performs its own empirical calibration internally from the uploaded REF file. The project does not fit an external distribution and pass it to the UI. M9B does not open REF.
 
 REF must not be used to:
 
@@ -226,7 +226,7 @@ EVAL must not influence:
 ```text
 TRAIN      -> RNAGenesis fitting only
 VALIDATION -> RNAGenesis development decisions only
-REF        -> AptaRank calibration only
+REF        -> M9C AptaRank internal calibration only
 EVAL       -> final held-out assessment only
 ```
 
@@ -896,7 +896,7 @@ Do not use REF for generator-distribution comparison.
 
 All development-time generator comparisons use VALIDATION.
 
-REF remains untouched until AptaRank calibration.
+REF remains untouched until M9C. M9B does not open REF, and M9B contains no overlap or leakage analysis.
 
 ---
 
@@ -1819,10 +1819,14 @@ Only two fine-tuning seeds were used, because of time and GPU constraints. Evalu
 
 ---
 
+The unversioned file `docs/aptarank_full_mres_thesis_evaluation_plan.md` remains the immutable v3.2 governing artifact for completed M9A. Its SHA-256 is `fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` is the active plan for M9B onward.
+
 ### M9A — RNAGenesis generator freeze
 
+**Status: COMPLETE at commit `4a8246f0e4062ae13af161b98999f72382bd966c`.**
+
 **Objective**  
-Create an immutable generator decision record before the M9B AptaRank implementation/interface review and REF workflow.
+M9A exclusively owns parsing and validity accounting, within-condition duplicate accounting, cross-condition exact overlap, exact TRAIN leakage, nearest-TRAIN normalized edit distance, and the generator-output freeze with its provenance.
 
 **Freeze**
 
@@ -1834,14 +1838,34 @@ Create an immutable generator decision record before the M9B AptaRank implementa
 - condition definitions;
 - no further RNAGenesis training.
 
+M9B does not recompute these results and does not reopen their sequence-bearing inputs.
+
 ---
 
-### M9B — AptaRank implementation/interface review, REF setup, and freeze
+### M9B — AptaRank full-thesis-evaluation preparation, synthetic-only
 
 **Objective**  
-Review the AptaRank paper, GitHub implementation, implementation notes, and actual user interface before freezing the manual evaluation workflow.
+Prepare the full thesis evaluation workflow without overlap, leakage, REF, EVAL, or biological scoring.
 
-Laura will operate AptaRank manually through its UI. The expected workflow is:
+**Permitted inputs**
+
+- repository documentation;
+- the reviewed AptaRank paper and public implementation;
+- frozen, non-sequence aggregate manifests and summaries;
+- synthetic fixtures.
+
+**May prepare and test**
+
+- AptaRank input and output schemas;
+- candidate-ID and condition-membership conventions;
+- deterministic sampling algorithms;
+- blinding and private-key procedures;
+- upload validators;
+- downloaded-export validators;
+- manual-run checklists and provenance records;
+- synthetic examples of the full thesis evaluation workflow.
+
+Laura will later operate AptaRank manually through its UI. That execution is M10, after the M9C unlock. The expected workflow is:
 
 1. upload the frozen reference file;
 2. upload the sequence file;
@@ -1849,69 +1873,41 @@ Laura will operate AptaRank manually through its UI. The expected workflow is:
 4. run the frozen UI configuration;
 5. download the sequence file containing rankings and annotations.
 
-AptaRank performs its own reference-distribution calibration from the uploaded REF data. The MRes pipeline does not locally fit, replace, or independently recreate that calibration as a prerequisite for using the tool.
-
-Local code may calculate REF component distributions descriptively for thesis reporting, interpretation, and audit. Those calculations must be labelled descriptive and must not be represented as calibration of AptaRank.
-
-**Inputs and order**
-
-Before REF is opened:
-
-- review the paper, GitHub implementation, supplied implementation notes, and UI;
-- identify the actual deployment/version where possible;
-- verify upload schemas, target-configuration handling, effective settings, output columns, score directions, annotations, failure behaviour, and export behaviour using synthetic or non-protected inputs;
-- distinguish documented behaviour from assumptions or unavailable implementation details.
-
-After that interface review is frozen, M9B may use REF only for the manual AptaRank reference workflow. EVAL remains prohibited.
-
-**Freeze and record**
-
-Record, where the tool exposes or the implementation supports them:
-
-- AptaRank paper/source/release or deployment identity;
-- exact REF file identity and SHA-256;
-- reference-upload and sequence-upload schemas;
-- target configuration and its independent selection basis;
-- effective UI preset and settings;
-- ranking and annotation fields and their evidenced interpretation;
-- score direction where established;
-- row-preservation, missing-row, failed-row, duplicate, and sequence-conversion behaviour;
-- manual operator, timestamps, run identifiers, warnings, and rerun lineage;
-- hashes of every upload and immutable raw download;
-- local normalization/join/reporting code and configuration hashes;
-- descriptive REF-distribution outputs, separately labelled from tool calibration.
+AptaRank performs its own empirical REF calibration internally. The project does not externally fit a distribution and feed it to the UI. Descriptive REF calculations belong to M9C and are for thesis reporting and audit.
 
 **Rules**
 
 - Do not alter the frozen RNAGenesis generator.
-- Do not use TRAIN for AptaRank calibration.
-- Do not access EVAL.
+- Do not open TRAIN, VALIDATION, REF, or EVAL.
+- Do not open production sequence ledgers.
+- Do not calculate overlap, leakage, or nearest-TRAIN distances.
+- Do not instantiate actual REF distributions or the actual Tier-2 shuffled-control bank.
+- Do not upload production candidates or execute an AptaRank scoring run.
+- Do not produce biological evaluation results.
+- Duplicate-ID or duplicate-sequence rejection in an upload validator is input-integrity validation, not an overlap analysis.
 - Do not infer or reimplement undocumented scorer internals merely to fill a specification.
-- Record unavailable details as limitations.
-- Local code prepares uploads, validates downloads, joins provenance, accounts for failures, and produces prespecified summaries. The AptaRank UI remains the scorer.
 - No new combined Tier 1/Tier 2 score is introduced.
 
 **Completion**
 
-M9B is complete when the actual manual AptaRank workflow and its interpretation boundaries are frozen, the REF workflow has immutable provenance, and any descriptive REF distributions are reproducible and correctly labelled. M9B completion does not itself unlock EVAL.
+M9B is complete when the synthetic preparation above is frozen. M9B completion does not open REF and does not unlock EVAL.
 
 ---
 
-### M9C — Final end-to-end pipeline freeze
+### M9C — Controlled calibration and end-to-end preflight
 
-Freeze:
+M9C begins with separately authorized REF-only work, before EVAL is opened:
 
-- RNAGenesis D1;
-- generation settings;
-- the M9B AptaRank implementation/interface and REF-workflow record;
-- ranking/filtering configuration;
-- final evaluation metrics;
-- all condition names;
-- statistical analysis plan.
+- descriptive REF feature summaries for the thesis and audit;
+- verification of AptaRank REF accepted and dropped counts;
+- verification of the shuffled-control bank AptaRank constructs internally from the uploaded REF;
+- synthetic and manual UI preflight;
+- final environment, dependency, configuration, and provenance freeze;
+- the authorization gate before EVAL is opened.
 
-The frozen AptaRank record is the reviewed implementation, interface, and REF workflow. It is not a claim that local code calibrated AptaRank. AptaRank performs that calibration from the uploaded reference file. Descriptive local REF distributions stay labelled as descriptive.
+AptaRank performs its own empirical REF calibration internally. Independent REF calculations stay descriptive. The actual Tier-2 bank identity and realized count are recorded only after the deployed M9C verification.
 
-Write an explicit EVAL-unlock record.
+Write an explicit EVAL-unlock record. EVAL remains prohibited until that record exists.
 
 ---
 
@@ -2039,7 +2035,7 @@ Questions include:
 
 REF is not generator evaluation data.
 
-REF enters only after RNAGenesis freeze, for AptaRank empirical calibration.
+REF enters only at M9C, after the M9A generator freeze, for AptaRank's internal empirical calibration. M9B does not open REF.
 
 ### 18.3 Final evaluation
 
@@ -2088,7 +2084,7 @@ This yields the final held-out estimate of the generator/ranking pipeline select
 - multiple D1 training seeds where feasible;
 - memorisation/diversity analysis;
 - final generator freeze;
-- REF-only AptaRank calibration;
+- M9C REF-only AptaRank internal calibration;
 - EVAL-only final assessment.
 
 ### 20.2 Useful only if time remains and already supported by the core analysis
@@ -2134,8 +2130,8 @@ The MRes RNAGenesis modelling implementation is complete when:
 11. the D1 pilot passes technical and scientific guardrails;
 12. the approved final D1 configuration has been run using the prespecified final seeds or a documented deviation;
 13. selected D1 checkpoints are chosen using VALIDATION only;14. B1/B2/D1 development comparisons use VALIDATION rather than REF;
-15. RNAGenesis is frozen before REF is used for AptaRank;
-16. AptaRank is calibrated from REF only;
+15. RNAGenesis is frozen in completed M9A before REF is used for AptaRank;
+16. AptaRank's internal calibration uses REF only, and that use begins at M9C;
 17. EVAL is unlocked only after the complete pipeline freeze;
 18. every thesis result is reproducible from committed code/configuration plus recorded input/model hashes;
 19. terminology in Section 4 is used consistently in methods, results and discussion;
@@ -2151,7 +2147,7 @@ Proceed in this order:
 
 1. The M7 human gate is closed by the 8 October 2026 record. No further M7 execution is authorised. M7 completion is that human closure. Sealed M7 manifest bytes remain unchanged, including `m8_generation_performed: false`. The candidate-guardrail and final-selection documents are inactive. `D1_final_replicates.yaml` remains historical M7 state, including the live seed-44 authorisation, and is not M8 authority.
 2. M8 generation and assembly are complete. The inactive configuration has empty authorisation lists and every execution flag false. The B1 and D1 combined ledgers are the handoff inputs named in section 8 of [M8 raw generation](fine_tuning/m8_raw_generation.md). Sealed M8 manifests are not rewritten.
-3. The separate four-condition evaluation applies one declared parsing and filtering policy symmetrically across B0, B1, B2, and D1, and does not tune parameters after inspecting REF or EVAL outcomes. That evaluation is not authorised by this closure. The evaluation worktree stays out of scope.
+3. M9A is complete. The unversioned v3.2 evaluation plan remains its immutable governing artifact. v3.3 is the active plan for M9B onward. M9B is preparatory-only and contains no overlap or leakage analysis. Actual REF access waits for M9C. EVAL waits for the M9C unlock. This closure does not authorise those later stages.
 
 ---
 

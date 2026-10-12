@@ -4,9 +4,9 @@
   "freeze_status": "draft",
   "aggregate_generator_quality_score": false,
   "governing_plan": {
-    "path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
-    "sha256": "fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51",
-    "version": "3.2",
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md",
+    "sha256": "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe",
+    "version": "3.3",
     "revision_date": "12 October 2026"
   },
   "field_schema": [

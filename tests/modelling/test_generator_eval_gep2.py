@@ -291,7 +291,7 @@ class SpecContractTests(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)))
         self.assertEqual(spec["freeze_status"], "draft")
         self.assertFalse(spec["aggregate_generator_quality_score"])
-        self.assertEqual(spec["governing_plan"]["version"], "3.2")
+        self.assertEqual(spec["governing_plan"]["version"], "3.3")
         self.assertEqual(spec["governing_plan"]["revision_date"], "12 October 2026")
         self.assertEqual(spec["governing_plan"]["sha256"], preflight._hash_revision_path(spec["governing_plan"]["path"]))
         analysis_path = os.path.join(ROOT, "scripts/modelling/generator_eval_analysis.py")

@@ -21,7 +21,7 @@ PACKAGE_ID = "ARP-2B"
 SCHEMA_VERSION = "aptarank-tier1-arp2b-draft-r2"
 SPEC_RELATIVE = "config/modelling/aptarank_tier1_analysis_spec.json"
 ARP2A_RELATIVE = "docs/aptarank_arp2a_tier1_reconciliation.md"
-GOVERNING_PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan.md"
+GOVERNING_PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
 FIXTURE_RELATIVE = "tests/modelling/fixtures/aptarank_arp2"
 SCORER_OWNER = "deployed AptaRank UI"
 JOIN_KEY = "candidate_id"
@@ -343,7 +343,7 @@ def validate_spec_document(spec):
     plan = spec["governing_plan"]
     _require(isinstance(plan, dict), "spec_invalid", "the governing plan record is missing")
     _require(plan.get("path") == GOVERNING_PLAN_RELATIVE, "spec_invalid", "the governing plan path is not pinned")
-    _require(plan.get("version") == "3.2", "spec_invalid", "the governing plan version is not pinned")
+    _require(plan.get("version") == "3.3", "spec_invalid", "the governing plan version is not pinned")
     _require(isinstance(plan.get("sha256"), str) and len(plan["sha256"]) == 64, "spec_invalid", "the governing plan hash is missing")
     arp2a = spec["arp2a_reconciliation"]
     _require(isinstance(arp2a, dict), "spec_invalid", "the ARP-2A record is missing")
