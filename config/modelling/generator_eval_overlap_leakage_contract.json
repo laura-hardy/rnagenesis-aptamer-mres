@@ -1,0 +1,143 @@
+{
+  "schema_version": "generator-eval-overlap-leakage-m9a-r1",
+  "contract_id": "m9a-overlap-leakage-definitions-v1",
+  "status": "FROZEN_DEFINITIONS_SYNTHETIC_ONLY_PRODUCTION_INPUTS_UNOPENED",
+  "synthetic_execution_is_production_validation": false,
+  "m9a_complete": false,
+  "m9b_complete": false,
+  "m9c_complete": false,
+  "filesystem_production_entry_point": false,
+  "production_train_loader": false,
+  "production_inputs_opened": false,
+  "references": {
+    "parser_version": "m9-biological-parser-v1",
+    "adapter_version": "m9-source-adapter-v2",
+    "runner_commit": "378f574b1620a9ff999082262868bffbe647d063",
+    "hardening_commit": "f703a8c721384e821337eba9a59093918f8decfe",
+    "evidence_commit": "1c74fb9b3c92247b524dbe40a744f59525d18bd2",
+    "production_manifest": {
+      "filename": "m9_production_manifest.json",
+      "sha256": "9aa5f60f939a8b25d031967ed3466a26d9d8e2d0610c76ec0b5db4cb43c2cc80",
+      "opened_by_this_contract": false
+    },
+    "combined_ledger": {
+      "filename": "m9_all_conditions_derived_attempt_ledger.jsonl",
+      "sha256": "d50c30e85b26e39e8a25ea2660f9a7fa07433417de757364eb36799ca8c6073e",
+      "valid_canonical_attempt_rows": 120080,
+      "opened_by_this_contract": false
+    },
+    "governing_plan": {
+      "path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
+      "version": "3.2",
+      "revision_date": "12 October 2026",
+      "sha256": "fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51"
+    },
+    "gep2_metric_specification": {
+      "path": "config/modelling/generator_eval_metric_spec.json",
+      "schema_version": "generator-eval-metric-spec-gep2-draft-r4",
+      "freeze_status": "draft",
+      "remains_draft": true
+    },
+    "ref_closed": true,
+    "eval_closed": true,
+    "cross_condition_overlap_computed_on_production_rows": false,
+    "train_leakage_computed_on_production_rows": false,
+    "within_condition_duplicates_occurred_only_in": ["B1"]
+  },
+  "within_condition_distinct_sum_label": {
+    "field": "overall.distinct_valid_sequences",
+    "value": 120063,
+    "meaning": "sum of within-condition distinct valid-sequence counts",
+    "is_global_distinctness": false
+  },
+  "definitions": {
+    "cross_condition_overlap": {
+      "numerator": "For source condition A and target condition B, the number of valid canonical rows in A whose parsed sequence occurs at least once among valid canonical sequences in B.",
+      "denominator": "The number of valid canonical rows in A. Invalid attempts stay in attempt accounting and do not enter this denominator.",
+      "grain": "valid_canonical_row",
+      "direction": "both_directions_for_each_unordered_pair",
+      "condition_pairs": [
+        ["B0", "B1"],
+        ["B0", "B2"],
+        ["B0", "D1"],
+        ["B1", "B2"],
+        ["B1", "D1"],
+        ["B2", "D1"]
+      ],
+      "rate": "numerator divided by denominator; null when the denominator is zero, with numerator and denominator still reported",
+      "duplicate_policy": "A repeated sequence contributes once per source row. It contributes only membership when its condition is the target. Duplicate rows are not removed or downweighted.",
+      "b0_role": "external_comparator",
+      "b0_pooled_into_b1_b2_d1_aggregate": false,
+      "b0_included_in_causal_comparison": false,
+      "input_population": "valid_canonical_parsed_rows_only"
+    },
+    "distinct_sequence_sensitivity": {
+      "numerator": "The distinct shared-sequence count |S_A intersect S_B|.",
+      "denominator": "For directional distinct coverage, the source condition's distinct valid-sequence count. For Jaccard overlap, the distinct union count |S_A union S_B|.",
+      "grain": "distinct_valid_sequence",
+      "direction": "a_distinct_coverage_by_b_and_b_distinct_coverage_by_a",
+      "shared_sequence_count": "|S_A intersect S_B|",
+      "union_count": "|S_A union S_B|",
+      "jaccard": "intersection divided by union; null when the union is zero",
+      "zero_denominator": "A zero required denominator yields a null rate. It does not become zero."
+    },
+    "global_sequence_free_accounting": {
+      "global_distinct_valid_sequence_count": "|S_B0 union S_B1 union S_B2 union S_D1|",
+      "exactly_n_conditions": [1, 2, 3, 4],
+      "membership_patterns": "one count for each observed nonempty condition-membership pattern",
+      "reconciliation": "membership-pattern counts sum to the global union size",
+      "sequence_strings_emitted": false,
+      "sequence_hashes_emitted": false
+    },
+    "exact_train_leakage": {
+      "numerator": "Valid generated rows whose full parsed sequence belongs to the caller-supplied TRAIN core set.",
+      "denominator": "Valid generated rows.",
+      "grain": "valid_generated_row",
+      "direction": "lower",
+      "match": "full_parsed_string_membership",
+      "partial_match": false,
+      "substring_match": false,
+      "identity_threshold": null,
+      "historical_0_01_guardrail_used_as_decision_threshold": false,
+      "train_cores": "nonempty canonical ^[ACGU]+$ strings supplied in memory",
+      "duplicate_train_cores": "refused; duplicates are not silently removed",
+      "production_train_loader": false,
+      "distinct_sequence_sensitivity": "matching distinct generated sequences divided by distinct valid generated sequences",
+      "zero_denominator": "A zero required denominator yields a null rate except for the frozen D1 seed report, which fails closed.",
+      "d1": {
+        "expected_training_seeds": [43, 44],
+        "seed_specific_valid_conditional_row_rates": true,
+        "unweighted_arithmetic_mean_of_seed_specific_row_rates": true,
+        "observed_minimum_maximum_range": true,
+        "actual_attempt_pooled_separately_labelled": true,
+        "confidence_interval": false,
+        "bootstrap": false,
+        "hypothesis_test": false,
+        "missing_seed_or_zero_valid_denominator": "explicit failure; not replaced with a pooled estimate"
+      }
+    },
+    "nearest_train_normalized_edit_distance": {
+      "numerator": "Global Levenshtein distance to the nearest supplied TRAIN core.",
+      "denominator": "Length of the longer of the valid generated sequence and that TRAIN core.",
+      "grain": "valid_generated_row",
+      "direction": "higher",
+      "execution": "retained_for_later_execution_on_caller_supplied_cores",
+      "production_train_loader": false,
+      "maximum_edit_similarity": "one minus the nearest normalized distance",
+      "edit_similarity_is_sequence_identity": false,
+      "distinct_sequence_projection": "Compute the distance once per distinct generated sequence and project it back to rows.",
+      "row_quantile_convention": "int(round(p * (n - 1))) on values sorted ascending",
+      "quantile_keys": ["count", "minimum", "p25", "median", "p75", "maximum", "mean"],
+      "d1_seed_specific_distance_summaries": true,
+      "pooled_equal_mixture_distance_quantile": {
+        "rule": "inclusive_cumulative_weight_exact_v2",
+        "reuses_existing_rule": true,
+        "new_rule_invented": false,
+        "weight": "1 / (participating seeds × valid rows for that seed)",
+        "absent_when": "A required D1 seed is missing, or a D1 seed has a zero valid-row count. The existing weight is undefined at a zero valid-row count, and dropping that seed would be a different rule."
+      },
+      "thresholds_defined": false,
+      "historical_0_01_guardrail_used_as_decision_threshold": false
+    }
+  }
+}
