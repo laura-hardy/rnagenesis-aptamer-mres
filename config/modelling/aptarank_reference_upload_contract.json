@@ -1,7 +1,7 @@
 {
   "package_id": "M9C-1",
   "schema_version": "m9c-reference-upload-v1",
-  "status": "POLICY_FROZEN_REF_UNOPENED",
+  "status": "POLICY_FROZEN_SEALED_PREPARATION_AUTHORIZED",
   "stage": "M9C-1",
   "scientific_result": false,
   "production_inputs_opened": false,
@@ -12,7 +12,7 @@
   "local_calibration_substitute": false,
   "aptarank_execution": false,
   "deployment_verified": false,
-  "sealed_review_authorized": false,
+  "sealed_review_authorized": true,
   "governing_plan": {
     "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md",
     "version": "3.3",
@@ -172,8 +172,9 @@
   "external_ref": {
     "relative_path": "data/processed/ref.csv",
     "sha256": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
-    "locator": "inactive_until_review",
-    "review_authorized": false
+    "byte_size": 211993,
+    "locator": "authorized_not_invoked",
+    "review_authorized": true
   },
   "frozen_target_mapping": {
     "structure_file_sha256": "2e185a205c9be0bf76484e8ffb96ae225880723ed68eaaf25dffbbccaf01ff51",
@@ -192,7 +193,13 @@
     ],
     "duplicate_provenance": "restricted_identity_ledger",
     "written_by_default": false,
-    "production_directory": false
+    "production_directory": false,
+    "atomic_members": [
+      "reference_upload.csv",
+      "duplicate_provenance.jsonl",
+      "preparation_manifest.json"
+    ],
+    "sealed_entry_point_invoked": false
   },
   "inputs": {
     "accepted_form": "caller_supplied_bytes",

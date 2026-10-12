@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Status | `POLICY_FROZEN_REF_UNOPENED` |
+| Status | `POLICY_FROZEN_SEALED_PREPARATION_AUTHORIZED` |
 | Stage | M9C-1. The rest of M9C is not complete. |
-| Contract | `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `b0387bc6d7c8d5328ccdbea05ad263b203b3405f80d7f359a6440751eb4e1b0f` |
+| Contract | `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `4bba54b5d8080b15287ce37f8645bbfc3e07a149c53bb0f647dfa3e34042d46b` |
 | Plan | `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md`, version 3.3, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe` |
 | Reused validator | `scripts/modelling/aptarank_io_preflight.py`, SHA-256 `eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01` |
 
@@ -48,6 +48,6 @@ The target-upload digest is stored separately from the structure-file digest and
 
 ## Boundary
 
-`prepare_reference_upload` accepts in-memory bytes. A filesystem path is refused. `prepare_sealed_reference` may locate and verify the external REF bytes only after review. That authorization is false in this package, and the call returns before any external path is opened. The no-argument command checks the pins and prints the status. It does not write a production directory, and it does not run an end-to-end rehearsal.
+`prepare_reference_upload` accepts in-memory bytes. A filesystem path is refused. Sealed review is authorized for the verified REF file, 211,993 bytes, SHA-256 `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`. `prepare_sealed_reference` remains uninvoked and returns before any external path is opened. `write_sealed_preparation_outputs` atomically writes caller-supplied preparation bytes and does not call that entry point. The no-argument command checks the pins and prints the status. It does not write a production directory, and it does not run an end-to-end rehearsal.
 
 Unit tests use synthetic fixtures only. TRAIN, VALIDATION, REF, EVAL, production candidate sources, target-mapping files, and `results/` were not opened.

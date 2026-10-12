@@ -19,10 +19,10 @@ import sys
 
 PACKAGE_ID = "M9C-1"
 SCHEMA_VERSION = "m9c-reference-upload-v1"
-STATUS = "POLICY_FROZEN_REF_UNOPENED"
+STATUS = "POLICY_FROZEN_SEALED_PREPARATION_AUTHORIZED"
 STAGE = "M9C-1"
 CONTRACT_RELATIVE = "config/modelling/aptarank_reference_upload_contract.json"
-CONTRACT_SHA256 = "b0387bc6d7c8d5328ccdbea05ad263b203b3405f80d7f359a6440751eb4e1b0f"
+CONTRACT_SHA256 = "4bba54b5d8080b15287ce37f8645bbfc3e07a149c53bb0f647dfa3e34042d46b"
 PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
 PLAN_SHA256 = "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
 IO_SPEC_RELATIVE = "config/modelling/aptarank_io_spec.json"
@@ -30,8 +30,15 @@ IO_SPEC_SHA256 = "46ba6c8be873dad4c086e9f6b889b51702ba31212fa502d00f26e267a22da7
 IO_MODULE_RELATIVE = "scripts/modelling/aptarank_io_preflight.py"
 IO_MODULE_SHA256 = "eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01"
 REF_SHA256 = "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23"
+REF_BYTE_SIZE = 211993
 EXTERNAL_REF_RELATIVE = "data/processed/ref.csv"
-SEALED_REVIEW_AUTHORIZED = False
+SEALED_REVIEW_AUTHORIZED = True
+SEALED_ENTRY_POINT_INVOKED = False
+OUTPUT_MEMBERS = (
+    "reference_upload.csv",
+    "duplicate_provenance.jsonl",
+    "preparation_manifest.json",
+)
 SOURCE_COLUMN_COUNT = 85
 SOURCE_IDENTITY_ROWS = 131
 DISTINCT_SEQUENCE_CORES = 113
@@ -178,9 +185,11 @@ def validate_contract_document(document, blobs):
         "local_calibration_substitute",
         "aptarank_execution",
         "deployment_verified",
-        "sealed_review_authorized",
     ):
         _require(document[key] is False, "spec_invalid", "a closed policy flag is no longer false")
+    _require(document["sealed_review_authorized"] is True, "spec_invalid", "sealed review is not authorized")
+    _require(SEALED_REVIEW_AUTHORIZED is True, "review_required", "sealed review is not authorized")
+    _require(SEALED_ENTRY_POINT_INVOKED is False, "spec_invalid", "the sealed entry point stays uninvoked")
     plan = document["governing_plan"]
     _exact_keys(plan, ("path", "version", "revision_date", "sha256"), "spec_invalid", "the governing plan record changed")
     _require(plan["path"] == PLAN_RELATIVE, "spec_invalid", "the governing plan path changed")
@@ -313,15 +322,16 @@ def validate_contract_document(document, blobs):
     external = document["external_ref"]
     _exact_keys(
         external,
-        ("relative_path", "sha256", "locator", "review_authorized"),
+        ("relative_path", "sha256", "byte_size", "locator", "review_authorized"),
         "spec_invalid",
         "the external REF record changed",
     )
     _require(external["relative_path"] == EXTERNAL_REF_RELATIVE, "spec_invalid", "the external REF path changed")
     _require(external["sha256"] == REF_SHA256, "spec_invalid", "the external REF digest changed")
-    _require(external["locator"] == "inactive_until_review", "spec_invalid", "the sealed locator is not inactive")
-    _require(external["review_authorized"] is False, "spec_invalid", "sealed review is not authorized")
-    _require(SEALED_REVIEW_AUTHORIZED is False, "review_required", "sealed review is not authorized")
+    _require(external["byte_size"] == REF_BYTE_SIZE, "spec_invalid", "the authorized REF byte size changed")
+    _require(type(external["byte_size"]) is int, "spec_invalid", "the authorized REF byte size changed")
+    _require(external["locator"] == "authorized_not_invoked", "spec_invalid", "the sealed locator is not authorized")
+    _require(external["review_authorized"] is True, "spec_invalid", "sealed review is not authorized")
     mapping = document["frozen_target_mapping"]
     _exact_keys(
         mapping,
@@ -344,7 +354,14 @@ def validate_contract_document(document, blobs):
     outputs = document["outputs"]
     _exact_keys(
         outputs,
-        ("reference_upload_columns", "duplicate_provenance", "written_by_default", "production_directory"),
+        (
+            "reference_upload_columns",
+            "duplicate_provenance",
+            "written_by_default",
+            "production_directory",
+            "atomic_members",
+            "sealed_entry_point_invoked",
+        ),
         "spec_invalid",
         "the output record changed",
     )
@@ -353,6 +370,8 @@ def validate_contract_document(document, blobs):
     _require(outputs["duplicate_provenance"] == "restricted_identity_ledger", "spec_invalid", "the provenance ledger kind changed")
     _require(outputs["written_by_default"] is False, "spec_invalid", "preparation must not write by default")
     _require(outputs["production_directory"] is False, "spec_invalid", "preparation has no production directory")
+    _require(outputs["atomic_members"] == list(OUTPUT_MEMBERS), "spec_invalid", "the atomic output members changed")
+    _require(outputs["sealed_entry_point_invoked"] is False, "spec_invalid", "the sealed entry point stays uninvoked")
     inputs = document["inputs"]
     _exact_keys(inputs, ("accepted_form", "filesystem_paths", "sealed_locator_requires_review"), "spec_invalid", "the input record changed")
     _require(inputs["accepted_form"] == "caller_supplied_bytes", "spec_invalid", "the accepted input form changed")
@@ -590,10 +609,124 @@ def prepare_reference_upload(payload, *, enforce_production_identity=False, **fo
     }
 
 
-def _read_external_ref():
-    """Read the frozen REF path after review authorization. Symlinks are refused."""
+def _refuse_protected_output_directory(directory):
+    if type(directory) is not str or directory == "" or os.path.isabs(directory) is False:
+        raise ReferenceUploadError("output_refused", "the output directory must be an absolute path")
+    if "\x00" in directory:
+        raise ReferenceUploadError("output_refused", "the output directory must be an absolute path")
+    root = os.path.abspath(repo_root())
+    absolute = os.path.abspath(directory)
+    for relative in ("data", "results"):
+        protected = os.path.abspath(os.path.join(root, relative))
+        if absolute == protected or absolute.startswith(protected + os.sep):
+            raise ReferenceUploadError("output_refused", "preparation outputs cannot be written under data or results")
+
+
+def _write_atomic_bytes(directory, name, blob):
+    """Write one file through an exclusive temporary, fsync, link, and directory fsync."""
+    if type(name) is not str or name == "" or "/" in name or "\\" in name or name in (".", ".."):
+        raise ReferenceUploadError("output_refused", "a preparation output name is not a single file name")
+    target = os.path.join(directory, name)
+    try:
+        os.lstat(target)
+    except FileNotFoundError:
+        pass
+    else:
+        raise ReferenceUploadError("output_exists", "a preparation output already exists")
+    temporary = target + ".partial"
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    linked = False
+    descriptor = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY | nofollow, 0o644)
+    try:
+        try:
+            view = memoryview(blob)
+            while len(view) > 0:
+                written = os.write(descriptor, view)
+                if written <= 0:
+                    raise OSError("short write made no progress")
+                view = view[written:]
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        try:
+            os.link(temporary, target)
+        except FileExistsError as exc:
+            raise ReferenceUploadError("output_exists", "a preparation output already exists") from exc
+        linked = True
+        os.unlink(temporary)
+        directory_flags = os.O_RDONLY | nofollow
+        if hasattr(os, "O_DIRECTORY"):
+            directory_flags |= os.O_DIRECTORY
+        directory_descriptor = os.open(directory, directory_flags)
+        try:
+            os.fsync(directory_descriptor)
+        finally:
+            os.close(directory_descriptor)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        if linked:
+            try:
+                os.unlink(target)
+            except OSError:
+                pass
+        raise
+    return target
+
+
+def write_sealed_preparation_outputs(directory, prepared):
+    """Atomically write caller-supplied preparation bytes.
+
+    This wrapper does not locate REF and does not call the sealed entry point.
+    """
+    if SEALED_REVIEW_AUTHORIZED is not True:
+        raise ReferenceUploadError("review_required", "the sealed preparation is not authorized to write outputs")
+    if type(prepared) is not dict:
+        raise ReferenceUploadError("input_type_invalid", "preparation outputs must be a mapping of byte strings")
+    for key in ("observed_ui_accepted_count", "observed_ui_dropped_count", "accepted_count", "dropped_count"):
+        if key in prepared:
+            raise ReferenceUploadError("ui_observation_refused", "preparation outputs cannot record an observed AptaRank UI count")
+    _refuse_protected_output_directory(directory)
+    load_pinned_contract()
+    try:
+        info = os.lstat(directory)
+    except OSError as exc:
+        raise ReferenceUploadError("output_refused", "the output directory is not a regular directory") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        raise ReferenceUploadError("output_refused", "the output directory is not a regular directory")
+    members = (
+        (OUTPUT_MEMBERS[0], prepared.get("reference_upload")),
+        (OUTPUT_MEMBERS[1], prepared.get("duplicate_provenance")),
+        (OUTPUT_MEMBERS[2], prepared.get("preparation_manifest")),
+    )
+    for _name, blob in members:
+        _require_bytes(blob)
+    written = {}
+    try:
+        for name, blob in members:
+            written[name] = _write_atomic_bytes(directory, name, blob)
+    except BaseException:
+        for path in written.values():
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+        raise
+    return written
+
+
+def _require_sealed_invocation():
     if SEALED_REVIEW_AUTHORIZED is not True:
         raise ReferenceUploadError("review_required", "the sealed preparation is not authorized to locate external REF bytes")
+    if SEALED_ENTRY_POINT_INVOKED is not True:
+        raise ReferenceUploadError("sealed_entry_point_not_invoked", "sealed preparation is authorized and the entry point has not been invoked")
+
+
+def _read_external_ref():
+    """Read the frozen REF path after the sealed entry point is invoked. Symlinks are refused."""
+    _require_sealed_invocation()
     relative = EXTERNAL_REF_RELATIVE
     if type(relative) is not str or os.path.isabs(relative) or ".." in relative.split("/"):
         raise ReferenceUploadError("pin_invalid", "the external REF path is not repository-relative")
@@ -605,6 +738,8 @@ def _read_external_ref():
         raise ReferenceUploadError("external_ref_unavailable", "the external REF bytes cannot be verified") from exc
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
         raise ReferenceUploadError("external_ref_unavailable", "the external REF bytes cannot be verified")
+    if info.st_size != REF_BYTE_SIZE:
+        raise ReferenceUploadError("external_ref_unavailable", "the external REF byte size does not match the authorized size")
     resolved = os.path.realpath(path)
     if os.path.commonpath([root, resolved]) != root:
         raise ReferenceUploadError("pin_invalid", "the external REF path leaves the repository")
@@ -613,13 +748,12 @@ def _read_external_ref():
 
 
 def prepare_sealed_reference():
-    """Locate and verify external REF bytes only after a reviewed authorization.
+    """Locate and verify external REF bytes only when the entry point is invoked.
 
-    This package leaves that authorization false. The call fails before any
-    external path is opened.
+    Review is authorized. Invocation stays false, so this call returns before
+    any external path is opened. The package entry point does not call it.
     """
-    if SEALED_REVIEW_AUTHORIZED is not True:
-        raise ReferenceUploadError("review_required", "the sealed preparation is not authorized to locate external REF bytes")
+    _require_sealed_invocation()
     payload = _read_external_ref()
     if sha256_bytes(payload) != REF_SHA256:
         raise ReferenceUploadError("digest_mismatch", "the external REF bytes do not match the frozen digest")
@@ -652,7 +786,7 @@ def verify_frozen_target_mapping(structure_bytes, selection_bytes, target_upload
 
 
 def main(argv=None):
-    """Check pins and print the status. There is no production runner."""
+    """Check pins and print the status. The sealed entry point is not called."""
     if argv is None:
         argv = sys.argv[1:]
     if argv:

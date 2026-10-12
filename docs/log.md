@@ -12052,3 +12052,13 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Contract:** `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `b0387bc6d7c8d5328ccdbea05ad263b203b3405f80d7f359a6440751eb4e1b0f`. The previous M9C-1 digest was `21a46064edf346d2eba1f369f80290d7801818ee038442f1092e80219428a21b`.
 
 **Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_reference_upload` passed 14 tests, including a simulated production REF preparation that cannot populate observed UI counts. REF, EVAL, and production candidate sources were not opened.
+
+## 2026-10-13 — M9C-1 sealed-preparation authorization
+
+**Stage:** Aim 2 / modelling / M9C-1 sealed-preparation authorization
+
+**Status:** `POLICY_FROZEN_SEALED_PREPARATION_AUTHORIZED`. The independently verified REF file is the ignored path `data/processed/ref.csv`, 211,993 bytes, SHA-256 `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`. Sealed review is authorized. `prepare_sealed_reference` stays uninvoked and returns before any external path is opened. `write_sealed_preparation_outputs` writes caller-supplied preparation bytes atomically and does not call the sealed entry point. Observed UI counts stay unwritable. EVAL stays closed.
+
+**Contract:** `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `4bba54b5d8080b15287ce37f8645bbfc3e07a149c53bb0f647dfa3e34042d46b`. The previous digest was `b0387bc6d7c8d5328ccdbea05ad263b203b3405f80d7f359a6440751eb4e1b0f`.
+
+**Tests:** Synthetic fixtures and temporary directories only. `tests.modelling.test_aptarank_reference_upload` passed 15 tests. The sealed entry point was not called. REF, EVAL, production candidate sources, and AptaRank were not opened.

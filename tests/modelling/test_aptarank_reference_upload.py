@@ -12,7 +12,9 @@ import hashlib
 import io
 import json
 import os
+import stat
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
@@ -26,7 +28,7 @@ if MODELLING not in sys.path:
 
 import aptarank_reference_upload as upload
 
-CONTRACT_SHA256 = "b0387bc6d7c8d5328ccdbea05ad263b203b3405f80d7f359a6440751eb4e1b0f"
+CONTRACT_SHA256 = "4bba54b5d8080b15287ce37f8645bbfc3e07a149c53bb0f647dfa3e34042d46b"
 CORE_A = "ACGUACGUACGUACGUACGU"
 CORE_B = "GCAUGCAUGCAUGCAUGCAU"
 CORE_C = "ACGU"
@@ -102,7 +104,7 @@ class ReferenceUploadTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), CONTRACT_SHA256)
         self.assertEqual(upload.CONTRACT_SHA256, CONTRACT_SHA256)
         document = _document()
-        self.assertEqual(document["status"], "POLICY_FROZEN_REF_UNOPENED")
+        self.assertEqual(document["status"], "POLICY_FROZEN_SEALED_PREPARATION_AUTHORIZED")
         self.assertFalse(document["ref_opened"])
         self.assertFalse(document["eval_opened"])
         self.assertFalse(document["production_candidates_opened"])
@@ -122,8 +124,15 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertIsNone(expected["observed_ui_dropped_count"])
         self.assertNotIn("live_result", document)
         self.assertFalse(document["retention"]["later_rows_are_biological_or_quality_exclusions"])
-        self.assertFalse(document["sealed_review_authorized"])
-        self.assertFalse(upload.SEALED_REVIEW_AUTHORIZED)
+        self.assertTrue(document["sealed_review_authorized"])
+        self.assertTrue(upload.SEALED_REVIEW_AUTHORIZED)
+        self.assertFalse(upload.SEALED_ENTRY_POINT_INVOKED)
+        self.assertEqual(document["external_ref"]["byte_size"], 211993)
+        self.assertEqual(document["external_ref"]["locator"], "authorized_not_invoked")
+        self.assertTrue(document["external_ref"]["review_authorized"])
+        self.assertEqual(document["outputs"]["atomic_members"], list(upload.OUTPUT_MEMBERS))
+        self.assertFalse(document["outputs"]["sealed_entry_point_invoked"])
+        self.assertFalse(document["outputs"]["written_by_default"])
         buffer = io.StringIO()
         with redirect_stdout(buffer):
             self.assertEqual(upload.main([]), 0)
@@ -316,14 +325,85 @@ class ReferenceUploadTests(unittest.TestCase):
     def test_paths_and_sealed_locator_do_not_open_inputs(self):
         with patch("builtins.open", side_effect=AssertionError("opened")):
             with self.assertRaises(upload.ReferenceUploadError) as caught_path:
-                upload.prepare_reference_upload("data/processed/ref.csv")
+                upload.prepare_reference_upload(os.path.join("data", "processed", "ref.csv"))
             self.assertEqual(caught_path.exception.code, "filesystem_path_refused")
-            with self.assertRaises(upload.ReferenceUploadError) as caught_sealed:
-                upload.prepare_sealed_reference()
-            self.assertEqual(caught_sealed.exception.code, "review_required")
         with self.assertRaises(upload.ReferenceUploadError) as caught_runner:
             upload.main(["--live"])
         self.assertEqual(caught_runner.exception.code, "production_runner_refused")
+        source = _read_text(os.path.join(MODELLING, "aptarank_reference_upload.py"))
+        tree = ast.parse(source)
+        functions = {
+            node.name: node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+        }
+        def first_call(function):
+            for statement in function.body:
+                if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Constant):
+                    continue
+                self.assertIsInstance(statement, ast.Expr)
+                self.assertIsInstance(statement.value, ast.Call)
+                return statement.value
+            self.fail("missing call")
+
+        sealed_call = first_call(functions["prepare_sealed_reference"])
+        self.assertEqual(sealed_call.func.id, "_require_sealed_invocation")
+        self.assertFalse(upload.SEALED_ENTRY_POINT_INVOKED)
+        main_calls = []
+        for child in ast.walk(functions["main"]):
+            if isinstance(child, ast.Call) and isinstance(child.func, ast.Name):
+                main_calls.append(child.func.id)
+        self.assertNotIn("prepare_sealed_reference", main_calls)
+        self.assertNotIn("_read_external_ref", main_calls)
+        reader_call = first_call(functions["_read_external_ref"])
+        self.assertEqual(reader_call.func.id, "_require_sealed_invocation")
+        size_check = ast.dump(functions["_read_external_ref"])
+        self.assertLess(size_check.index("st_size"), size_check.index("id='open'"))
+
+    def test_atomic_wrapper_writes_caller_bytes_without_the_sealed_entry_point(self):
+        prepared = {
+            "reference_upload": b"id,sequence\n",
+            "duplicate_provenance": b"{}\n",
+            "preparation_manifest": b'{"aptarank_ui_executed":false}\n',
+        }
+        with patch.object(upload, "prepare_sealed_reference", side_effect=AssertionError("invoked")):
+            with patch.object(upload, "_read_external_ref", side_effect=AssertionError("read")):
+                with tempfile.TemporaryDirectory() as directory:
+                    with self.assertRaises(upload.ReferenceUploadError) as caught_ui:
+                        upload.write_sealed_preparation_outputs(directory, {**prepared, "observed_ui_accepted_count": 113})
+                    self.assertEqual(caught_ui.exception.code, "ui_observation_refused")
+                    self.assertEqual(os.listdir(directory), [])
+                    for relative in ("data", "results"):
+                        protected = os.path.join(upload.repo_root(), relative, "child")
+                        with self.assertRaises(upload.ReferenceUploadError) as caught_protected:
+                            upload.write_sealed_preparation_outputs(protected, prepared)
+                        self.assertEqual(caught_protected.exception.code, "output_refused")
+                    link = os.path.join(directory, "linked")
+                    os.symlink(directory, link)
+                    with self.assertRaises(upload.ReferenceUploadError) as caught_link:
+                        upload.write_sealed_preparation_outputs(link, prepared)
+                    self.assertEqual(caught_link.exception.code, "output_refused")
+                    with patch("os.write", side_effect=OSError("short write")):
+                        with self.assertRaises(OSError):
+                            upload.write_sealed_preparation_outputs(directory, prepared)
+                    self.assertEqual(os.listdir(directory), ["linked"])
+                    written = upload.write_sealed_preparation_outputs(directory, prepared)
+                    for name, blob in (
+                        ("reference_upload.csv", prepared["reference_upload"]),
+                        ("duplicate_provenance.jsonl", prepared["duplicate_provenance"]),
+                        ("preparation_manifest.json", prepared["preparation_manifest"]),
+                    ):
+                        path = os.path.join(directory, name)
+                        info = os.lstat(path)
+                        self.assertFalse(stat.S_ISLNK(info.st_mode))
+                        self.assertTrue(stat.S_ISREG(info.st_mode))
+                        with open(path, "rb") as handle:
+                            self.assertEqual(handle.read(), blob)
+                        self.assertEqual(written[name], path)
+                    self.assertFalse(any(name.endswith(".partial") for name in os.listdir(directory)))
+                    with self.assertRaises(upload.ReferenceUploadError) as caught_exists:
+                        upload.write_sealed_preparation_outputs(directory, prepared)
+                    self.assertEqual(caught_exists.exception.code, "output_exists")
 
     def test_target_mapping_digests_are_recorded_separately(self):
         document = _document()
@@ -397,7 +477,10 @@ class ReferenceUploadTests(unittest.TestCase):
                 imported.add(node.module.split(".")[0])
         self.assertFalse(imported & {"numpy", "scipy", "sklearn", "RNA", "viennarna", "requests"})
         self.assertFalse(defined & {"calibrate", "fit_reference_distribution", "empirical_cdf", "score_candidates"})
-        self.assertEqual(sorted(opens), ["_read_external_ref", "_read_pinned_file"])
+        self.assertEqual(
+            sorted(opens),
+            ["_read_external_ref", "_read_pinned_file", "_write_atomic_bytes", "_write_atomic_bytes"],
+        )
         self.assertNotIn("eval.csv", source)
 
 
