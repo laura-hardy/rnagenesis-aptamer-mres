@@ -11992,3 +11992,29 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_export_validation` passed 14 tests. With the M9B-2 preparation suite, the AptaRank evidence, I/O, and Tier 1 suites, the generator-eval synthetic suites, and `tests.modelling.test_modelling_contract`, 276 tests passed.
 
 **Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, production uploads, real AptaRank downloads, the UI, the API, and `results/` were not opened. AptaRank was not modified or run. No overlap, leakage, nearest-TRAIN, biological summary, Tier 1, or Tier 2 score was calculated.
+
+## 2026-10-12 — M9B-4 synthetic manual-run provenance
+
+**Stage:** Aim 2 / modelling / M9B-4 synthetic-only manual AptaRank run provenance and target-configuration validation
+
+**Status:** `DEFINED_SYNTHETIC_ONLY_MANUAL_RUN_UNRESOLVED`. This stage checks a target-configuration record and a prepared or completed manual-run record. It does not select a target, inspect a structure file, or resolve the live deployment. No scientific result is claimed.
+
+**Plan:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` stays the active plan, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. It was not edited.
+
+**Contract:** `config/modelling/aptarank_manual_run_contract.json`, SHA-256 `f1ed83b155c787c51e3d23198db1e5bc4a72c28e0c2a0adc5675b294c0f93125`.
+
+**Preparation contract:** `config/modelling/aptarank_candidate_preparation_contract.json`, SHA-256 `3bcfbdf14cd7e777a0b2746f91d0335ba4876195f5012610157e5aa23e083096`.
+
+**Reused modules:** Preparation module `scripts/modelling/aptarank_candidate_preparation.py`, SHA-256 `a4f5b047f2803e775d9521c226287487412495055446e192681957c3d42879ca`. Record parser `scripts/modelling/generator_eval_parser.py`, SHA-256 `4a59ff8e557ee1948410c7f705a9c3772fe2570d4255b0d2185acee99137eaa2`.
+
+**Target configuration:** The exact record identifies the schema and configuration, the target and its display name, the structure and chain, the binding mode, and either selected site residues or a frozen site rule. `selection_status` must be `completed_independently_before_m9b`. SHA-256 fields are syntax-checked. Unknown fields, empty required strings, duplicate or invalid residue tokens, and filesystem paths fail closed. The structure file is not opened and the biological choice is not judged.
+
+**Manual run:** A `prepared` or `completed` record stores the operator, the target, manifest, upload, private-key, and reference digests, the expected candidate count, a caller-supplied deployment identifier, a caller-supplied requested preset, unresolved effective settings, warnings, and rerun lineage. A completed record also stores timestamps, exported, missing, rejected, and failed counts, the raw export digest, and a run-artefact digest when one was captured. The four counts must sum to the expected candidate count. No missing or failed reason is invented. A parent run requires a nonempty rerun reason; a first run must not have one.
+
+**Unresolved for M9C:** Deployment identity, the effective preset, and live export behaviour stay unresolved. They are not inferred.
+
+**Binding:** Caller-supplied bytes must show that the upload and private-key digests match the M9B-2 preparation manifest, that the manifest pins the corrected M9B-2 contract, that the manual-run record contains those three digests, and that the target-record bytes match the target-configuration digest. Upload and private-key bytes are hashed only.
+
+**Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_manual_run` passed 10 tests. With the M9B-2 preparation suite and the M9B-3 export-validation suite, 45 tests passed.
+
+**Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, production uploads, real AptaRank downloads, the UI, the API, the completed target-selection directory, and `results/` were not opened. AptaRank was not modified or run. No target was selected. No overlap, leakage, biological summary, Tier 1, or Tier 2 score was calculated.

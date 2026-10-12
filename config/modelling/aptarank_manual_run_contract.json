@@ -1,0 +1,151 @@
+{
+  "package_id": "M9B-4",
+  "schema_version": "m9b-aptarank-manual-run-provenance-v1",
+  "status": "DEFINED_SYNTHETIC_ONLY_MANUAL_RUN_UNRESOLVED",
+  "stage": "M9B-4",
+  "deployment_verified": false,
+  "effective_preset_resolved": false,
+  "live_export_behavior": "unresolved",
+  "scientific_result": false,
+  "production_inputs_opened": false,
+  "aptarank_execution": false,
+  "target_selected_by_package": false,
+  "structure_file_inspected": false,
+  "scores_calculated": false,
+  "overlap_or_leakage_calculated": false,
+  "reasons_invented": false,
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md",
+    "version": "3.3",
+    "revision_date": "12 October 2026",
+    "sha256": "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
+  },
+  "candidate_preparation_contract": {
+    "path": "config/modelling/aptarank_candidate_preparation_contract.json",
+    "package_id": "M9B-2",
+    "schema_version": "m9b-aptarank-candidate-preparation-v1",
+    "sha256": "3bcfbdf14cd7e777a0b2746f91d0335ba4876195f5012610157e5aa23e083096"
+  },
+  "reused_modules": [
+    {
+      "role": "candidate_preparation_module",
+      "path": "scripts/modelling/aptarank_candidate_preparation.py",
+      "sha256": "a4f5b047f2803e775d9521c226287487412495055446e192681957c3d42879ca"
+    },
+    {
+      "role": "record_parser_module",
+      "path": "scripts/modelling/generator_eval_parser.py",
+      "sha256": "4a59ff8e557ee1948410c7f705a9c3772fe2570d4255b0d2185acee99137eaa2"
+    }
+  ],
+  "target_configuration": {
+    "schema_version": "m9b-target-configuration-v1",
+    "keys": [
+      "schema_version",
+      "configuration_id",
+      "target_id",
+      "display_name",
+      "selection_status",
+      "structure_id",
+      "chain_id",
+      "binding_mode",
+      "site_definition_method",
+      "selected_site_residues",
+      "frozen_site_rule",
+      "structure_file_sha256",
+      "target_selection_record_sha256",
+      "notes"
+    ],
+    "selection_status": "completed_independently_before_m9b",
+    "site_definition_methods": ["selected_residues", "frozen_site_rule"],
+    "residue_pattern": "^[1-9][0-9]{0,4}[A-Z]?$",
+    "duplicate_residues": "fail_closed",
+    "structure_file_inspected": false,
+    "biological_choice_judged": false,
+    "filesystem_paths": false
+  },
+  "manual_run": {
+    "schema_version": "m9b-manual-run-v1",
+    "states": ["prepared", "completed"],
+    "prepared_keys": [
+      "schema_version",
+      "run_id",
+      "state",
+      "operator",
+      "target_configuration_sha256",
+      "preparation_manifest_sha256",
+      "candidate_upload_sha256",
+      "private_membership_key_sha256",
+      "reference_file_sha256",
+      "expected_candidate_count",
+      "deployment_id",
+      "requested_preset",
+      "effective_settings",
+      "warnings",
+      "parent_run_id",
+      "rerun_reason"
+    ],
+    "completed_additional_keys": [
+      "started_at",
+      "completed_at",
+      "exported_count",
+      "missing_count",
+      "rejected_count",
+      "failed_count",
+      "raw_export_sha256",
+      "run_artefact_sha256"
+    ],
+    "completed_counts": ["exported_count", "missing_count", "rejected_count", "failed_count"],
+    "count_sum_equals_expected": true,
+    "reasons_invented": false,
+    "timestamp_pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$",
+    "run_artefact_sha256": "sha256_or_null",
+    "raw_export_sha256": "sha256_required",
+    "rerun": {
+      "parent_requires_nonempty_reason": true,
+      "first_run_reason": null
+    },
+    "effective_settings": {
+      "keys": ["effective_preset", "live_export_behavior"],
+      "effective_preset": null,
+      "live_export_behavior": "unresolved",
+      "resolved_in_m9b": false
+    },
+    "deployment_inferred": false,
+    "requested_preset_inferred": false,
+    "live_export_behavior": "unresolved"
+  },
+  "binding": {
+    "inputs": "caller_supplied_bytes",
+    "candidate_upload_hash_matches_manifest": true,
+    "private_membership_key_hash_matches_manifest": true,
+    "manifest_pinned_to_corrected_m9b2_contract": true,
+    "manual_run_contains_same_three_hashes": true,
+    "target_record_bytes_match_manual_run_hash": true,
+    "sampling_duplicated": false,
+    "export_validation_duplicated": false,
+    "filesystem_paths": false
+  },
+  "inputs": {
+    "accepted_forms": ["caller_supplied_object", "caller_supplied_bytes"],
+    "filesystem_paths": false,
+    "production_uploads": false,
+    "real_downloads": false,
+    "target_selection_directory": false,
+    "aptarank_ui_or_api": false
+  },
+  "prohibited": [
+    "Opening TRAIN, VALIDATION, REF, EVAL, or a production sequence ledger",
+    "Reading or writing results/",
+    "Opening the completed target-selection directory",
+    "Calling the AptaRank UI or API",
+    "Modifying or reproducing AptaRank",
+    "Selecting, comparing, optimising, or scoring targets",
+    "Calculating overlap, leakage, Tier 1 scores, or Tier 2 scores",
+    "Calculating a biological summary",
+    "Inspecting a structure file",
+    "Inferring deployment identity, the effective preset, or live export behaviour",
+    "Inventing reasons for missing or failed rows",
+    "Duplicating M9B-2 sampling, identifier, provenance, or export-validation logic"
+  ]
+}
