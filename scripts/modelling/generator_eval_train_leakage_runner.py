@@ -14,9 +14,14 @@ generated sequence and then read back by the frozen summary. That cache does
 not replace ``nearest_train_distance_summaries``.
 
 ``run_sealed_train_leakage`` is the production entry. It remains unexecuted.
-It opens the sealed combined ledger and the documented development TRAIN files
-only. Synthetic tests must not call it. A synthetic run is not production
-validation and does not complete M9A.
+Before any sealed source is opened, it validates the invocation and production
+identity bundle, validates the root and output paths, refuses an existing
+output destination, verifies the pinned contracts, and verifies that the runner
+commit is available. It then opens the combined ledger, the TRAIN CSV, and the
+TRAIN text one at a time, verifying each production digest before the next
+open, and only then parses. The in-memory core repeats those checks. Synthetic
+tests must not call it. A synthetic run is not production validation and does
+not complete M9A.
 """
 
 from __future__ import annotations
@@ -63,7 +68,7 @@ EXACT_SUMMARY_SCHEMA = "generator-eval-exact-train-leakage-summary-m9a-r1"
 NEAREST_SUMMARY_SCHEMA = "generator-eval-nearest-train-distance-summary-m9a-r1"
 MANIFEST_SCHEMA = "generator-eval-train-leakage-manifest-m9a-r1"
 RUNNER_CONTRACT_ID = "m9a-train-leakage-runner-v1"
-RUNNER_CONTRACT_SHA256 = "a5c688c7c4afad8db1912c2eca2532abdea1eddce78cf0a36fcb67588aba7d52"
+RUNNER_CONTRACT_SHA256 = "ef68b1575df4d770af2bdd622eeb84f647a18db9d4cbd115e0b8a60de5dce528"
 FROZEN_DATA_CONTRACT_ID = "rnagenesis_corrected_669_core_m0"
 FROZEN_DATA_CONTRACT_SHA256 = "396c83c3dbf9afc656ad5c60ec05c94fce3c5a684990c3cc1cebfb2411ccd5ff"
 M9A_CONTRACT_SHA256 = "6aeaa2338776cbe7aceffef63ee4ca7dfd7ed3643aa7d1e400fd54a02d113535"
@@ -138,6 +143,27 @@ GENERIC_READ_BAN = FORBIDDEN_BASENAMES | frozenset(("m9_all_conditions_derived_a
 TEMP_PREFIX = ".m9-train-leakage-runner."
 COMPARISON_POPULATION = "corpus_final_text_equal_to_train_csv_first_occurrence_cores"
 SERIALIZATION = "UTF-8 JSON, trailing LF, indent 2, ensure_ascii, constructed key order, allow_nan false"
+SEALED_SOURCE_OPENING_ORDER = {
+    "before_any_sealed_source_is_opened": [
+        "validate_invocation_and_production_identity_bundle",
+        "validate_root_and_output_paths",
+        "refuse_existing_output_destination_including_empty_directory_or_symlink",
+        "verify_pinned_m9a_contract",
+        "verify_pinned_governing_plan",
+        "verify_pinned_frozen_data_contract",
+        "verify_pinned_runner_contract",
+        "verify_runner_commit_available",
+    ],
+    "then_open_and_verify_each_digest_before_the_next_open": [
+        "combined_ledger",
+        "train_csv",
+        "train_text",
+    ],
+    "parsing_and_metric_computation_after_all_three_digests_match": True,
+    "in_memory_core_rechecks_digests_schema_counts_provenance_and_output_destination": True,
+    "source_parsed_before_its_digest_matches": False,
+}
+SEALED_SOURCE_LABELS = ("combined_ledger", "train_csv", "train_text")
 
 
 class TrainLeakageRunnerError(ValueError):
@@ -517,6 +543,21 @@ def _load_runner_contract(root):
         or boundary.get("synthetic_execution_is_production_validation") is not False
     ):
         raise TrainLeakageRunnerError("runner_contract_identity_mismatch", "the runner contract is not the sealed runner identity")
+    order = document.get("sealed_source_opening_order")
+    if (
+        type(order) is not dict
+        or set(order) != set(SEALED_SOURCE_OPENING_ORDER)
+        or order.get("before_any_sealed_source_is_opened") != SEALED_SOURCE_OPENING_ORDER["before_any_sealed_source_is_opened"]
+        or order.get("then_open_and_verify_each_digest_before_the_next_open")
+        != SEALED_SOURCE_OPENING_ORDER["then_open_and_verify_each_digest_before_the_next_open"]
+        or order.get("parsing_and_metric_computation_after_all_three_digests_match") is not True
+        or order.get("in_memory_core_rechecks_digests_schema_counts_provenance_and_output_destination") is not True
+        or order.get("source_parsed_before_its_digest_matches") is not False
+    ):
+        raise TrainLeakageRunnerError(
+            "runner_contract_identity_mismatch",
+            "the runner contract does not state the sealed source-opening order",
+        )
     return blob, digest, document
 
 
@@ -1125,31 +1166,140 @@ def run_train_leakage(
     }
 
 
-def run_sealed_train_leakage(output_dir, invocation, root=REPO_ROOT):
-    """Production entry. Remains unexecuted by this implementation.
+def _validate_sealed_paths(output_dir, root):
+    """Reject a protected root or output path. Do not open a sealed source."""
+    _refuse_protected_path(output_dir)
+    _refuse_protected_path(root)
+    output_text = os.fspath(output_dir)
+    root_text = os.fspath(root)
+    if output_text == "" or root_text == "":
+        raise TrainLeakageRunnerError("identity_invalid", "the output or root path is empty")
+    output_dir = os.path.abspath(output_text)
+    root = os.path.abspath(root_text)
+    if not os.path.isdir(root) or os.path.islink(root):
+        raise TrainLeakageRunnerError("input_unreadable", "the runner root is not a real directory")
+    return output_dir, root
 
-    Opens the sealed combined ledger and the documented development TRAIN CSV
-    and TRAIN text. It does not open VALIDATION, REF, or EVAL. It enforces the
-    frozen production identities. Synthetic tests and this implementation task
-    must not call this function.
+
+def preflight_sealed_train_leakage(output_dir, invocation, root=REPO_ROOT):
+    """Check sealed invocation, identities, paths, destination, pins, and commit.
+
+    Does not open the combined ledger or either TRAIN file.
     """
     if type(invocation) is not dict or invocation.get("production_identities") is not True:
         raise TrainLeakageRunnerError(
             "production_identity_mismatch",
             "the sealed entry always enforces production identities",
         )
-    allowlist = _sealed_allowlist(root)
-    ledger_blob = _read_allowlisted(sealed_combined_ledger_path(root), allowlist)
-    csv_blob = _read_allowlisted(DEVELOPMENT_TRAIN_CSV, allowlist)
-    text_blob = _read_allowlisted(DEVELOPMENT_TRAIN_TEXT, allowlist)
+    checked = validate_identities(sealed_identities(), enforce_production_identities=True)
+    output_dir, root = _validate_sealed_paths(output_dir, root)
+    _refuse_existing_outputs(output_dir)
+    _load_m9a_contract(root)
+    _load_governing_plan(root)
+    _load_frozen_data_contract(root)
+    _load_runner_contract(root)
+    commit = _git_head(root)
+    return {
+        "output_dir": output_dir,
+        "root": root,
+        "identities": checked,
+        "runner_git_commit": commit,
+        "invocation": invocation,
+    }
+
+
+def open_verified_sealed_sources(source_paths, expected_digests, reader):
+    """Open the ledger, then TRAIN CSV, then TRAIN text.
+
+    Each digest is checked before the next source is opened. Nothing is parsed.
+    The sealed caller passes only the validated production digests.
+    """
+    descriptions = {
+        "combined_ledger": "the combined ledger",
+        "train_csv": "the TRAIN CSV",
+        "train_text": "the TRAIN text",
+    }
+    codes = {
+        "combined_ledger": "combined_ledger_hash_mismatch",
+        "train_csv": "train_csv_hash_mismatch",
+        "train_text": "train_text_hash_mismatch",
+    }
+    if type(source_paths) is not tuple or len(source_paths) != 3:
+        raise TrainLeakageRunnerError("sealed_input_refused", "sealed sources are the ledger, TRAIN CSV, and TRAIN text")
+    if type(expected_digests) is not dict or set(expected_digests) != set(SEALED_SOURCE_LABELS):
+        raise TrainLeakageRunnerError("identity_invalid", "sealed source digests are incomplete")
+    if not callable(reader):
+        raise TrainLeakageRunnerError("identity_invalid", "the sealed source reader is not callable")
+    blobs = []
+    for label, path in zip(SEALED_SOURCE_LABELS, source_paths):
+        expected = _require_sha256(expected_digests[label], label)
+        blob = _require_bytes(reader(path), descriptions[label])
+        _assert_payload_digest(blob, expected, codes[label], descriptions[label])
+        blobs.append(blob)
+    return tuple(blobs)
+
+
+def prepare_sealed_train_inputs(output_dir, invocation, root, source_paths, reader):
+    """Preflight, then open sealed sources in ledger, TRAIN CSV, TRAIN text order.
+
+    Digests come only from the validated production identity bundle. A mismatch
+    stops before the next source is opened. This does not parse any source.
+    """
+    if type(source_paths) is not tuple or len(source_paths) != 3:
+        raise TrainLeakageRunnerError("sealed_input_refused", "sealed sources are the ledger, TRAIN CSV, and TRAIN text")
+    if not callable(reader):
+        raise TrainLeakageRunnerError("identity_invalid", "the sealed source reader is not callable")
+    prepared = preflight_sealed_train_leakage(output_dir, invocation, root)
+    identities = prepared["identities"]
+    blobs = open_verified_sealed_sources(
+        source_paths,
+        {
+            "combined_ledger": identities["combined_ledger_sha256"],
+            "train_csv": identities["train_csv_sha256"],
+            "train_text": identities["train_text_sha256"],
+        },
+        reader,
+    )
+    return prepared, blobs
+
+
+def run_sealed_train_leakage(output_dir, invocation, root=REPO_ROOT):
+    """Production entry. Remains unexecuted by this implementation.
+
+    Before any sealed source is opened, validates the invocation and the
+    production identity bundle, validates the root and output paths, refuses an
+    existing output destination, verifies the pinned contracts, and verifies
+    that the runner commit is available. It then opens the combined ledger and
+    verifies its production digest, opens the development TRAIN CSV and
+    verifies its production digest, opens the development TRAIN text and
+    verifies its production digest, and only then parses and computes metrics.
+    The in-memory core repeats the digest, schema, count, provenance, and
+    output-destination checks. It does not open VALIDATION, REF, or EVAL.
+    Synthetic tests and this implementation task must not call this function.
+    """
+
+    def reader(path):
+        return _read_allowlisted(path, _sealed_allowlist(root))
+
+    prepared, (ledger_blob, csv_blob, text_blob) = prepare_sealed_train_inputs(
+        output_dir,
+        invocation,
+        root,
+        (
+            sealed_combined_ledger_path(root),
+            DEVELOPMENT_TRAIN_CSV,
+            DEVELOPMENT_TRAIN_TEXT,
+        ),
+        reader,
+    )
     return run_train_leakage(
         ledger_blob,
         csv_blob,
         text_blob,
         sealed_identities(),
-        output_dir,
+        prepared["output_dir"],
         enforce_production_identities=True,
-        root=root,
+        root=prepared["root"],
         invocation=invocation,
         sealed_inputs_opened=True,
     )

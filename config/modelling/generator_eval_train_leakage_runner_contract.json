@@ -130,6 +130,26 @@
     "train_identity_ids_emitted": false,
     "target_labels_emitted": false
   },
+  "sealed_source_opening_order": {
+    "before_any_sealed_source_is_opened": [
+      "validate_invocation_and_production_identity_bundle",
+      "validate_root_and_output_paths",
+      "refuse_existing_output_destination_including_empty_directory_or_symlink",
+      "verify_pinned_m9a_contract",
+      "verify_pinned_governing_plan",
+      "verify_pinned_frozen_data_contract",
+      "verify_pinned_runner_contract",
+      "verify_runner_commit_available"
+    ],
+    "then_open_and_verify_each_digest_before_the_next_open": [
+      "combined_ledger",
+      "train_csv",
+      "train_text"
+    ],
+    "parsing_and_metric_computation_after_all_three_digests_match": true,
+    "in_memory_core_rechecks_digests_schema_counts_provenance_and_output_destination": true,
+    "source_parsed_before_its_digest_matches": false
+  },
   "protected_data_boundary": {
     "validation_opened": false,
     "ref_opened": false,

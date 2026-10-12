@@ -749,9 +749,44 @@ class TrainLeakageRunnerTests(unittest.TestCase):
             prose = handle.read()
         self.assertIn(runner.RUNNER_CONTRACT_SHA256, prose)
         self.assertIn("remains unexecuted", prose)
+        self.assertIn("Before any sealed source is opened", prose)
+        self.assertIn("before opening either TRAIN file", prose)
+        self.assertIn("before opening TRAIN text", prose)
         self.assertIn(runner.DEVELOPMENT_TRAIN_CSV, prose)
         self.assertIn(runner.DEVELOPMENT_TRAIN_TEXT, prose)
+        self.assertEqual(document["sealed_source_opening_order"], runner.SEALED_SOURCE_OPENING_ORDER)
+        self.assertEqual(
+            document["sealed_source_opening_order"]["then_open_and_verify_each_digest_before_the_next_open"],
+            ["combined_ledger", "train_csv", "train_text"],
+        )
+        self.assertFalse(document["sealed_source_opening_order"]["source_parsed_before_its_digest_matches"])
+        self.assertTrue(
+            document["sealed_source_opening_order"][
+                "in_memory_core_rechecks_digests_schema_counts_provenance_and_output_destination"
+            ]
+        )
         source = inspect.getsource(runner.run_sealed_train_leakage)
+        self.assertLess(source.index("prepare_sealed_train_inputs("), source.index("run_train_leakage("))
+        prepare_source = inspect.getsource(runner.prepare_sealed_train_inputs)
+        self.assertLess(prepare_source.index("preflight_sealed_train_leakage("), prepare_source.index("open_verified_sealed_sources("))
+        self.assertIn('identities["combined_ledger_sha256"]', prepare_source)
+        self.assertIn('identities["train_csv_sha256"]', prepare_source)
+        self.assertIn('identities["train_text_sha256"]', prepare_source)
+        preflight_source = inspect.getsource(runner.preflight_sealed_train_leakage)
+        self.assertNotIn("open_verified_sealed_sources", preflight_source)
+        self.assertNotIn("_read_allowlisted", preflight_source)
+        markers = [
+            "validate_identities(",
+            "_validate_sealed_paths(",
+            "_refuse_existing_outputs(",
+            "_load_m9a_contract(",
+            "_load_governing_plan(",
+            "_load_frozen_data_contract(",
+            "_load_runner_contract(",
+            "_git_head(",
+        ]
+        positions = [preflight_source.index(marker) for marker in markers]
+        self.assertEqual(positions, sorted(positions))
         self.assertIn("enforce_production_identities=True", source)
         self.assertIn("DEVELOPMENT_TRAIN_CSV", source)
         self.assertIn("DEVELOPMENT_TRAIN_TEXT", source)
@@ -773,6 +808,211 @@ class TrainLeakageRunnerTests(unittest.TestCase):
         self._run()
         _exact, _nearest, manifest, _blobs = self._read()
         self.assertEqual(manifest["runner_git_commit"], head)
+
+    def _assert_production_identities_unchanged(self):
+        self.assertEqual(runner.COMBINED_LEDGER_SHA256, "d50c30e85b26e39e8a25ea2660f9a7fa07433417de757364eb36799ca8c6073e")
+        self.assertEqual(runner.TRAIN_CSV_SHA256, "84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0")
+        self.assertEqual(runner.TRAIN_TEXT_SHA256, "d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d")
+        self.assertEqual(runner.PRODUCTION_ROW_COUNTS, {"B0": 30080, "B1": 30000, "B2": 30000, "D1": 30000, "combined": 120080})
+        self.assertEqual(runner.PRODUCTION_TRAIN_IDENTITY_ROWS, 726)
+        self.assertEqual(runner.PRODUCTION_TRAIN_DISTINCT_CORES, 669)
+
+    def _synthetic_sources(self):
+        directory = os.path.join(self.temp.name, "synthetic-sources")
+        os.makedirs(directory, exist_ok=True)
+        payloads = {
+            "ledger": b"synthetic-ledger-bytes\n",
+            "csv": b"synthetic-csv-bytes\n",
+            "text": b"synthetic-text-bytes\n",
+        }
+        paths = {
+            "ledger": os.path.join(directory, "synthetic-ledger.bin"),
+            "csv": os.path.join(directory, "synthetic-train-table.csv"),
+            "text": os.path.join(directory, "synthetic-train-lines.txt"),
+        }
+        for label, payload in payloads.items():
+            with open(paths[label], "wb") as handle:
+                handle.write(payload)
+        return paths, payloads
+
+    def test_existing_output_destination_makes_no_sealed_source_read(self):
+        self._assert_production_identities_unchanged()
+        attempts = []
+
+        def reader(path):
+            attempts.append(os.fspath(path))
+            raise AssertionError("sealed source read attempted")
+
+        empty_root = os.path.join(self.temp.name, "empty-root")
+        os.makedirs(empty_root)
+        os.makedirs(self.output)
+        paths = ("synthetic-ledger", "synthetic-csv", "synthetic-text")
+        with self.assertRaises(runner.TrainLeakageRunnerError) as existing:
+            runner.prepare_sealed_train_inputs(
+                self.output,
+                {"production_identities": True},
+                empty_root,
+                paths,
+                reader,
+            )
+        self.assertEqual(existing.exception.code, "output_exists")
+        self.assertEqual(os.listdir(self.output), [])
+        link = os.path.join(self.temp.name, "output-link")
+        os.symlink(self.output, link)
+        with self.assertRaises(runner.TrainLeakageRunnerError) as linked:
+            runner.prepare_sealed_train_inputs(
+                link,
+                {"production_identities": True},
+                empty_root,
+                paths,
+                reader,
+            )
+        self.assertEqual(linked.exception.code, "output_symlink")
+        self.assertEqual(attempts, [])
+
+    def test_pinned_contract_mismatch_makes_no_sealed_source_read(self):
+        self._assert_production_identities_unchanged()
+        relatives = (
+            (runner.M9A_CONTRACT_RELATIVE, "m9a_contract_digest_mismatch"),
+            (runner.GOVERNING_PLAN_RELATIVE, "governing_plan_digest_mismatch"),
+            (runner.FROZEN_DATA_CONTRACT_RELATIVE, "frozen_data_contract_digest_mismatch"),
+            (runner.RUNNER_CONTRACT_RELATIVE, "runner_contract_digest_mismatch"),
+        )
+        originals = {}
+        for relative, _code in relatives:
+            with open(os.path.join(ROOT, relative), "rb") as handle:
+                originals[relative] = handle.read()
+        attempts = []
+
+        def reader(path):
+            attempts.append(os.fspath(path))
+            raise AssertionError("sealed source read attempted")
+
+        for relative, code in relatives:
+            root = os.path.join(self.temp.name, "pin-" + code)
+            for item, blob in originals.items():
+                destination = os.path.join(root, item)
+                os.makedirs(os.path.dirname(destination), exist_ok=True)
+                payload = bytearray(blob)
+                if item == relative:
+                    payload[-1] ^= 0x01
+                with open(destination, "wb") as handle:
+                    handle.write(payload)
+            output = os.path.join(self.temp.name, "pin-out-" + code)
+            with self.assertRaises(runner.TrainLeakageRunnerError) as caught:
+                runner.prepare_sealed_train_inputs(
+                    output,
+                    {"production_identities": True},
+                    root,
+                    ("synthetic-ledger", "synthetic-csv", "synthetic-text"),
+                    reader,
+                )
+            self.assertEqual(caught.exception.code, code)
+            self.assertFalse(os.path.exists(output))
+            self.assertEqual(attempts, [])
+        for relative, blob in originals.items():
+            with open(os.path.join(ROOT, relative), "rb") as handle:
+                self.assertEqual(handle.read(), blob)
+
+    def test_ledger_digest_mismatch_stops_before_train_sources(self):
+        self._assert_production_identities_unchanged()
+        paths, payloads = self._synthetic_sources()
+        attempts = []
+
+        def reader(path):
+            attempts.append(os.fspath(path))
+            with open(path, "rb") as handle:
+                return handle.read()
+
+        output = os.path.join(self.temp.name, "ledger-mismatch-out")
+        with self.assertRaises(runner.TrainLeakageRunnerError) as caught:
+            runner.prepare_sealed_train_inputs(
+                output,
+                {"production_identities": True},
+                ROOT,
+                (paths["ledger"], paths["csv"], paths["text"]),
+                reader,
+            )
+        self.assertEqual(caught.exception.code, "combined_ledger_hash_mismatch")
+        self.assertEqual(attempts, [paths["ledger"]])
+        self.assertNotEqual(sha256(payloads["ledger"]), runner.COMBINED_LEDGER_SHA256)
+        self.assertFalse(os.path.exists(output))
+
+    def test_train_csv_digest_mismatch_stops_before_train_text(self):
+        self._assert_production_identities_unchanged()
+        paths, payloads = self._synthetic_sources()
+        attempts = []
+
+        def reader(path):
+            attempts.append(os.fspath(path))
+            with open(path, "rb") as handle:
+                return handle.read()
+
+        with self.assertRaises(runner.TrainLeakageRunnerError) as caught:
+            runner.open_verified_sealed_sources(
+                (paths["ledger"], paths["csv"], paths["text"]),
+                {
+                    "combined_ledger": sha256(payloads["ledger"]),
+                    "train_csv": "0" * 64,
+                    "train_text": sha256(payloads["text"]),
+                },
+                reader,
+            )
+        self.assertEqual(caught.exception.code, "train_csv_hash_mismatch")
+        self.assertEqual(attempts, [paths["ledger"], paths["csv"]])
+        self.assertNotIn(paths["text"], attempts)
+        self.assertNotEqual(sha256(payloads["csv"]), runner.TRAIN_CSV_SHA256)
+
+    def test_synthetic_staged_reads_follow_ledger_csv_text_order(self):
+        self._assert_production_identities_unchanged()
+        paths, payloads = self._synthetic_sources()
+        attempts = []
+        parsed = []
+
+        def reader(path):
+            attempts.append(os.fspath(path))
+            with open(path, "rb") as handle:
+                return handle.read()
+
+        def refuse(name):
+            def wrapped(*_args, **_kwargs):
+                parsed.append(name)
+                raise AssertionError(name + " was called during staged reads")
+
+            return wrapped
+
+        originals = {
+            "parse_combined_ledger": runner.parse_combined_ledger,
+            "parse_train_csv": runner.parse_train_csv,
+            "parse_train_text": runner.parse_train_text,
+            "prepare_train_cores": runner.prepare_train_cores,
+            "run_train_leakage": runner.run_train_leakage,
+        }
+        for name, original in originals.items():
+            setattr(runner, name, refuse(name))
+        try:
+            blobs = runner.open_verified_sealed_sources(
+                (paths["ledger"], paths["csv"], paths["text"]),
+                {
+                    "combined_ledger": sha256(payloads["ledger"]),
+                    "train_csv": sha256(payloads["csv"]),
+                    "train_text": sha256(payloads["text"]),
+                },
+                reader,
+            )
+        finally:
+            for name, original in originals.items():
+                setattr(runner, name, original)
+        self.assertEqual(attempts, [paths["ledger"], paths["csv"], paths["text"]])
+        self.assertEqual(blobs, (payloads["ledger"], payloads["csv"], payloads["text"]))
+        self.assertEqual(parsed, [])
+        for path in attempts:
+            self.assertNotIn("rnagenesis-mres-data", path)
+            self.assertNotIn("m9_all_conditions_derived_attempt_ledger", path)
+            self.assertFalse(path.endswith(".jsonl"))
+        self.assertNotEqual(sha256(payloads["ledger"]), runner.COMBINED_LEDGER_SHA256)
+        self.assertNotEqual(sha256(payloads["csv"]), runner.TRAIN_CSV_SHA256)
+        self.assertNotEqual(sha256(payloads["text"]), runner.TRAIN_TEXT_SHA256)
 
 
 if __name__ == "__main__":
