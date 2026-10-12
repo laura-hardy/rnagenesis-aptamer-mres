@@ -1,0 +1,145 @@
+{
+  "schema_version": "generator-eval-source-manifest-m9-r1",
+  "status": "FROZEN_SOURCE_IDENTITY_CONTRACT_NOT_EVIDENCE_OF_PRODUCTION_PARSING",
+  "production_parsing_performed": false,
+  "evidence_of_production_parsing": false,
+  "filesystem_path_is_scientific_identity": false,
+  "scientific_results_computed": false,
+  "synthetic_execution_is_production_validation": false,
+  "ref_is_an_input": false,
+  "eval_is_an_input": false,
+  "prohibited_operations": [
+    "replacement",
+    "replenishment",
+    "filtering",
+    "deduplication",
+    "dropping",
+    "source_rewriting"
+  ],
+  "conditions": {
+    "B0": {
+      "logical_artifact_id": "b0:released-aptamer-adapted-pool",
+      "condition_id": "B0_released_aptamer_rnagenesis",
+      "scientific_label": "B0_released_aptamer_adapted_RNAGenesis",
+      "comparison_role": "external_comparator",
+      "attempt_count": 30080,
+      "source_chunk_count": 10,
+      "biological_requested_length": null,
+      "nominal_max_seq_len": 37,
+      "nominal_max_seq_len_is_requested_biological_length": false,
+      "later_production_seed_order": [4201, 4202, 4203, 4204, 4205, 4206, 4207, 4208, 4209, 4210],
+      "later_production_seed_order_used_by_parser": false,
+      "checksum_manifest": {
+        "logical_artifact_id": "b0:checksum-manifest",
+        "git_blob": "65ca7441eb29b5f9bf6c8a3ffad371e86e5ce6b2",
+        "sha256": "ad3a75fe157248be50427757357cbc5c060be3ddb664d3be64ef178ac90b85c3"
+      },
+      "numeric_raw_concatenation_sha256": "ed612277105c6b8747fc7365cc6b67fa8a94e8e5e8e64ee535ecadcb37ff4aaa",
+      "numeric_concatenation_order": "chunk and seed order 4201-4210",
+      "source_chunks": [
+        {"logical_artifact_id": "b0:chunk:1:seed:4201", "seed": 4201, "raw_sha256": "12df7c26eed40f68241455f43b20aed190de81c27d47f06d2117aaef0866f1f6"},
+        {"logical_artifact_id": "b0:chunk:2:seed:4202", "seed": 4202, "raw_sha256": "1f8b9b082dc4cf01570d5aedb9d2fd1a71fb746c6ee63cde4fbef9c10a943cd6"},
+        {"logical_artifact_id": "b0:chunk:3:seed:4203", "seed": 4203, "raw_sha256": "49c6ff2ce0979ef406e7c63aeabf0fc6226ca2f5498b7b08f6c2fbf2b31e1ff3"},
+        {"logical_artifact_id": "b0:chunk:4:seed:4204", "seed": 4204, "raw_sha256": "cdd853c1a7d5a27e4c5ee7c242a7f0808b212aa7464d3d3bb41c11b78742d236"},
+        {"logical_artifact_id": "b0:chunk:5:seed:4205", "seed": 4205, "raw_sha256": "f1bd2686fa5fb494bf9a270424fbdfbeb6b158669da09b4fc86694d6c5bd40f8"},
+        {"logical_artifact_id": "b0:chunk:6:seed:4206", "seed": 4206, "raw_sha256": "275b744eeb2dd1cdc7b6042de65b5ea08cd159c1e90896d53f6300b1331d3904"},
+        {"logical_artifact_id": "b0:chunk:7:seed:4207", "seed": 4207, "raw_sha256": "db64a6e3c52980cbd62590f6b190774b55f079dfb8b552b27b3043141e4771ca"},
+        {"logical_artifact_id": "b0:chunk:8:seed:4208", "seed": 4208, "raw_sha256": "63c21618be699ad1323570bbf2041db31fac6aa2d2b8c03691da767dfdd36b27"},
+        {"logical_artifact_id": "b0:chunk:9:seed:4209", "seed": 4209, "raw_sha256": "1ec36b36e11fc966a870327b3cc02653c037382ffd9ce44cea7952cce6e0be0f"},
+        {"logical_artifact_id": "b0:chunk:10:seed:4210", "seed": 4210, "raw_sha256": "b4e5f2e8ae9187d711dc614fd523e89f83dbc84b792b28c8f951cf343a38f511"}
+      ]
+    },
+    "B1": {
+      "logical_artifact_id": "b1:m8-combined-raw-attempt-ledger",
+      "condition_id": "B1_generic_released_rnagenesis",
+      "attempt_count": 30000,
+      "combined_ledger_sha256": "37ba0e1b852a6b8492a816a4adc0c6bfee15a554ba28a8ba5dd91d9e32a255d9",
+      "combined_ledger_bytes": 26427607,
+      "assembly_manifest_sha256": "f217e2e8ce922eef42b5f761159c7d96b7938585b4840922321454076d95d458",
+      "assembly_manifest_bytes": 2886,
+      "d1_training_seed": null,
+      "equal_seed_weighting_applied": false
+    },
+    "B2": {
+      "logical_artifact_id": "b2:empirical-null-raw-jsonl",
+      "condition_id": "B2_train_matched_empirical_null",
+      "attempt_count": 30000,
+      "raw_jsonl_sha256": "bbe35f448db0d7fc02ad0156865798382b0b41e9ad047b4e52eddf7cff740c83",
+      "manifest_sha256": "31c07fb966c462263307569b383b112ecfb39725adb9b1b2fd2f93a95d3d8baa",
+      "empirical_null_seed": 42,
+      "empirical_null_seed_is_parser_rule": false,
+      "empirical_null_seed_is_training_seed": false
+    },
+    "D1": {
+      "logical_artifact_id": "d1:m8-combined-raw-attempt-ledger",
+      "condition_id": "D1_mres_curated_aptamer_diffusion_adapted",
+      "attempt_count": 30000,
+      "combined_ledger_sha256": "cedcc36133f5dfb3678e1560c6d6bab703136fe89e512e939b9f93a9a6361de9",
+      "combined_ledger_bytes": 28971289,
+      "assembly_manifest_sha256": "5ec79e1485b201d801ca819d9d60a2ee4383abd9cccfbbb011c6e11a9a59bbcb",
+      "assembly_manifest_bytes": 2939,
+      "equal_seed_weighting_applied": false,
+      "seed_allocation_meaning": "descriptive_source_allocation_only",
+      "seed_allocation": [
+        {
+          "d1_training_seed": 43,
+          "technical_block": "A",
+          "attempts": 15000,
+          "generation_seed_first": 800000,
+          "generation_seed_last": 800162
+        },
+        {
+          "d1_training_seed": 44,
+          "technical_block": "B",
+          "attempts": 15000,
+          "generation_seed_first": 900000,
+          "generation_seed_last": 900163
+        }
+      ]
+    }
+  },
+  "m7_selected_set": {
+    "logical_artifact_id": "m7:final-selection-manifest",
+    "logical_directory_identity": "m7_d1_final_selection_b5de24327ed5_attempt1",
+    "manifest_sha256": "49b218e3df74825e1931148e2f65b25aae057c822e2ab32d44c2960b1587c91c",
+    "manifest_bytes": 13124,
+    "selected_set_sha256": "af0c0e555a8b878feadeb17fcbde18d8b780819a42d9e0cc547d2fc0c6895f8f"
+  },
+  "checkpoint_weight_sha256": {
+    "seed_43": "c0797888bde9033cc15b056c8c09e70b9f7fba0fb21b1f3840a4f1efb77031ab",
+    "seed_44": "d0fcb5174230b8bbbc6bfe59eabda9b37687c03800012bc1a6981cc215469ed5"
+  },
+  "checkpoint_logical_names": {
+    "seed_43": "D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-43__epoch-5__update-105__git-c150894b9982d7afebfb2b3390b0797a4da146b5",
+    "seed_44": "D1_generic-diffusion__data-d6cbc41a__lr-3e-5__ebs-32__seed-44__epoch-5__update-105__git-2cb1b6a26391ed36754ec21685a4501d659d50ef"
+  },
+  "excluded_sources": {
+    "method": "declared_source_lineage_and_directory_identity",
+    "sequence_comparison": false,
+    "statement": "M7 diagnostic and guardrail samples, and the M4 and M7 1,000-attempt pools, are outside the sealed 30,000-attempt ledgers. Exclusion uses declared lineage and directory identity. It does not compare sequences.",
+    "lineages": [
+      {
+        "logical_directory_identity": "m6_d1_update21_diagnostic_6953687e2e9_gpu0_attempt1",
+        "kind": "m6_diagnostic_sample",
+        "included_in_evaluation_sources": false
+      },
+      {
+        "logical_id": "m7_candidate_guardrail_seed_43",
+        "kind": "m7_guardrail_sample",
+        "manifest_sha256": "988e21546e5d8dc8a5c7a6683de228b5f7afcd7cf0b9de4007e995219bc42c1e",
+        "included_in_evaluation_sources": false
+      },
+      {
+        "logical_id": "m7_candidate_guardrail_seed_44",
+        "kind": "m7_guardrail_sample",
+        "manifest_sha256": "51bd0436fe7d53bd0ec1c43f767bb728e5608405d425c357f4aff105a243e26b",
+        "included_in_evaluation_sources": false
+      },
+      {
+        "logical_id": "m4_and_m7_1000_attempt_pools",
+        "kind": "diagnostic_pool",
+        "included_in_evaluation_sources": false
+      }
+    ]
+  }
+}

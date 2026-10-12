@@ -1,0 +1,40 @@
+{
+  "fixture_role": "SYNTHETIC",
+  "note": "Invented sequences and hashes. Not a production source, not a production derived ledger, and not production validation.",
+  "invented_sha256": {
+    "alpha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "beta": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "string_cases": [
+    {"id": "leading_11", "raw": "11ACGU", "prefix": "11", "body": "ACGU", "suffix": "", "outcome": "valid_canonical_sequence"},
+    {"id": "trailing_2", "raw": "ACGU2", "prefix": "", "body": "ACGU", "suffix": "2", "outcome": "valid_canonical_sequence"},
+    {"id": "both_markers", "raw": "11ACGU22", "prefix": "11", "body": "ACGU", "suffix": "22", "outcome": "valid_canonical_sequence"},
+    {"id": "marker_only", "raw": "1122", "prefix": "1122", "body": "", "suffix": "", "outcome": "empty_output"},
+    {"id": "overlap_121", "raw": "121", "prefix": "121", "body": "", "suffix": "", "outcome": "empty_output"},
+    {"id": "internal_1", "raw": "A1C", "prefix": "", "body": "A1C", "suffix": "", "outcome": "parsed_non_acgu"},
+    {"id": "internal_between_markers", "raw": "11A1C2", "prefix": "11", "body": "A1C", "suffix": "2", "outcome": "parsed_non_acgu"},
+    {"id": "lowercase", "raw": "acgu", "prefix": "", "body": "acgu", "suffix": "", "outcome": "parsed_non_acgu"},
+    {"id": "whitespace", "raw": "AC GU", "prefix": "", "body": "AC GU", "suffix": "", "outcome": "parsed_non_acgu"},
+    {"id": "trailing_space", "raw": "ACGU ", "prefix": "", "body": "ACGU ", "suffix": "", "outcome": "parsed_non_acgu"},
+    {"id": "t_base", "raw": "ACGT", "prefix": "", "body": "ACGT", "suffix": "", "outcome": "parsed_non_acgu"},
+    {"id": "single_t", "raw": "T", "prefix": "", "body": "T", "suffix": "", "outcome": "parsed_non_acgu"},
+    {"id": "empty_string", "raw": "", "prefix": "", "body": "", "suffix": "", "outcome": "empty_output"},
+    {"id": "already_clean", "raw": "ACGU", "prefix": "", "body": "ACGU", "suffix": "", "outcome": "valid_canonical_sequence"}
+  ],
+  "split_cases": [
+    {"id": "lf", "text": "11ACGU\nACGU2\n", "records": ["11ACGU", "ACGU2"]},
+    {"id": "crlf", "text": "11ACGU\r\nACGU2\r\n", "records": ["11ACGU", "ACGU2"]},
+    {"id": "trailing_newline", "text": "ACGU\n", "records": ["ACGU"]},
+    {"id": "internal_empty", "text": "ACGU\n\nACGU\n", "records": ["ACGU", "", "ACGU"]},
+    {"id": "empty_file", "text": "", "records": []},
+    {"id": "only_newline", "text": "\n", "records": [""]},
+    {"id": "no_trailing_newline", "text": "ACGU\nACGU", "records": ["ACGU", "ACGU"]},
+    {"id": "bare_cr_kept", "text": "AC\rGU\n", "records": ["AC\rGU"]}
+  ],
+  "non_string_cases": [
+    {"id": "json_null", "payload": null, "outcome": "non_sequence_output"},
+    {"id": "json_number", "payload": 4, "outcome": "non_sequence_output"},
+    {"id": "json_bool", "payload": true, "outcome": "non_sequence_output"},
+    {"id": "json_list", "payload": ["ACGU"], "outcome": "non_sequence_output"}
+  ]
+}

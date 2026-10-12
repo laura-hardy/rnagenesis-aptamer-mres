@@ -1,0 +1,143 @@
+{
+  "schema_version": "generator-eval-parser-contract-m9-r1",
+  "status": "M9_PARSER_IMPLEMENTED_SYNTHETIC_ONLY_NOT_AUTHORISED_FOR_PRODUCTION",
+  "production_execution_authorised": false,
+  "production_derived_ledger_creation_authorised": false,
+  "production_parsing_performed": false,
+  "scientific_results_computed": false,
+  "synthetic_execution_is_production_validation": false,
+  "parser_version": "m9-biological-parser-v1",
+  "adapter_version": "m9-source-adapter-v1",
+  "derived_ledger_schema": "generator-eval-derived-ledger-m9-r1",
+  "pinned_parser_provenance": {
+    "rnagenesis_repository_commit": "e3b855bbf4d1af376f43747643fa30afd662828c",
+    "cleaner_repository_path": "scripts/audit_generation_output.py",
+    "cleaner_introducing_commit": "112a120282667c382790031fe74942f89f7b84eb",
+    "cleaner_git_blob": "3480af2dd758f4824655b3f7c8a5276214a61682",
+    "cleaner_file_sha256": "4d0c56a7d931a2c3c5c049cfeabd4937134b3d1125ef7a68b10472527d2fd2a2",
+    "local_reproduction": [
+      "split_raw_records",
+      "strip_boundary_markers"
+    ],
+    "local_reproduction_scope": "On valid UTF-8 records, splitting, boundary removal, and validity classification reproduce the pinned RNAGenesis cleaner. This contract does not claim byte-for-byte behavioural identity with the pinned cleaner for whole-file UTF-8 failure. The M9 source-adapter layer deliberately extends failure accounting by allowing a uniquely identifiable undecodable record to be represented as unparseable_output. That extension is not a change to boundary removal or biological validity, and it is not permission to continue after a source-hash failure or loss of attempt identity."
+  },
+  "utf8_extension": {
+    "valid_utf8_records": "On valid UTF-8 records, splitting, boundary removal, and validity classification reproduce the pinned RNAGenesis cleaner.",
+    "failure_accounting": "The M9 source-adapter layer deliberately extends failure accounting by allowing a uniquely identifiable undecodable record to be represented as unparseable_output.",
+    "not_a_change_to_boundary_removal_or_biological_validity": true,
+    "not_permission_to_continue_after_source_hash_failure_or_loss_of_attempt_identity": true,
+    "whole_file_utf8_failure": "This contract does not claim byte-for-byte behavioural identity with the pinned cleaner for whole-file UTF-8 failure.",
+    "sealed_sources_expected_to_pass_source_integrity_gates": true,
+    "production_parsing_performed_on_this_branch": false
+  },
+  "source_integrity": {
+    "bytes_adapters_hash_exact_supplied_bytes": true,
+    "expected_hash_compared_before_trusted_parsing": true,
+    "malformed_expected_hash_fails_closed": true,
+    "mismatch_fails_closed": true,
+    "derived_rows_carry_recomputed_digest": true,
+    "caller_supplied_hash_is_not_copied": true,
+    "decoded_objects_are_not_a_production_entry_point": true
+  },
+  "failure_layers": {
+    "statement": "Source-container integrity and biological-output classification are different layers.",
+    "source_level_hard_failures": [
+      "source_hash_mismatch",
+      "malformed_expected_hash",
+      "jsonl_structural_failure",
+      "missing_required_identity_field",
+      "duplicate_source_identity",
+      "corruption_that_prevents_reliable_attempt_identity"
+    ],
+    "do_not_invent_b1_or_d1_record_id": true,
+    "do_not_invent_b2_attempt_index": true,
+    "unparseable_output_requires_unique_source_attempt": true,
+    "b0_byte_boundaries_and_chunk_metadata_establish_identity_before_decode": true,
+    "schema_valid_null_or_uninterpretable_payload_may_be_accounted_outcome": true,
+    "malformed_json_without_recoverable_identity_fails_the_source": true
+  },
+  "biological_parser": {
+    "applies_to": ["B0", "B1", "B2", "D1"],
+    "applied_after_source_adaptation": true,
+    "rules": [
+      "Preserve one derived row for every source attempt.",
+      "Remove the leading run of characters drawn from 1 and 2.",
+      "From what remains, remove the trailing run of characters drawn from 1 and 2.",
+      "The leading and trailing removals must not overlap.",
+      "Do not alter internal characters.",
+      "Do not uppercase, strip whitespace, convert T to U, repair, truncate, pad, deduplicate, replace, replenish, or silently drop an attempt.",
+      "A nonempty body matching ^[ACGU]+$ is valid.",
+      "Boundary-marker removal is parsing, not outcome-dependent filtering.",
+      "Do not call boundary-marker strings biologically invalid before boundary removal."
+    ],
+    "canonical_pattern": "^[ACGU]+$",
+    "boundary_markers": ["1", "2"],
+    "marker_only_removal": "The whole marker-only string is the removed prefix and the suffix is empty."
+  },
+  "outcome_vocabulary": [
+    "valid_canonical_sequence",
+    "empty_output",
+    "unparseable_output",
+    "non_sequence_output",
+    "parsed_non_acgu"
+  ],
+  "outcome_rules": {
+    "valid_canonical_sequence": "Retain the parsed body. Failure reason is null.",
+    "empty_output": "Sequence is null. Failure reason is empty_output. Parsed length is 0.",
+    "parsed_non_acgu": "Retain the parsed body. Failure reason is parsed_non_acgu.",
+    "non_sequence_output": "Sequence is null. Failure reason is non_sequence_output. The decoded payload is not a string.",
+    "unparseable_output": "Sequence is null. Failure reason is unparseable_output. Permitted only when a unique source attempt is already established and that attempt payload cannot be decoded or interpreted. Malformed JSON that prevents recovery of the required record identity is a source-container failure, not this outcome."
+  },
+  "successfully_parsed_outputs": "Valid canonical sequences plus parsed non-ACGU bodies. Empty, unparseable, and non-sequence outcomes are not successfully parsed outputs.",
+  "public_api": {
+    "accepts": ["in-memory source bytes"],
+    "decoded_objects": "Refused. Decoded objects cannot verify original source bytes and are not a production entry point.",
+    "rejects": [
+      "filesystem paths",
+      "open files",
+      "roles TRAIN, VALIDATION, REF, and EVAL",
+      "basenames corpus_final.txt, ft_train.csv, ft_validation.csv, ref.csv, and eval.csv",
+      "production run-root paths",
+      "an EVAL unlock",
+      "requests to replenish, filter, deduplicate, or drop rows"
+    ]
+  },
+  "source_adapters": {
+    "B0": {
+      "input": "Newline-delimited raw bytes plus explicit synthetic chunk metadata. The source SHA-256 is computed from those bytes and compared with the expected hash before record decoding.",
+      "record_splitting": "LF delimiter; CR removed only as part of CRLF; trailing newline does not create an extra record; internal empty records are preserved; empty file has zero records; a file containing only one newline has one empty record.",
+      "stable_id": "b0:seed:{seed}:line:{one_based_line_number}",
+      "preserved": ["seed", "line_number", "chunk_id", "source_artifact_sha256"],
+      "requested_biological_length": null,
+      "nominal_max_seq_len": 37,
+      "nominal_max_seq_len_is_requested_biological_length": false,
+      "comparison_role": "external_comparator",
+      "production_seed_order_used_by_this_stage": false
+    },
+    "B1": {
+      "input": "In-memory JSONL bytes matching the M8 raw-attempt schema. A decoded object is not a production entry point.",
+      "sequence_field": "raw_decoded_text",
+      "record_id": "preserved unchanged when recovered from a schema-valid record; never invented",
+      "d1_training_seed": null,
+      "equal_seed_weighting": false
+    },
+    "D1": {
+      "input": "In-memory JSONL bytes matching the M8 raw-attempt schema. A decoded object is not a production entry point.",
+      "sequence_field": "raw_decoded_text",
+      "record_id": "preserved unchanged when recovered from a schema-valid record; never invented",
+      "d1_training_seed": "integer",
+      "equal_seed_weighting": false,
+      "seed_counts": "descriptive observed source allocation only"
+    },
+    "B2": {
+      "input": "In-memory JSONL bytes matching the B2 schema. A decoded object is not a production entry point.",
+      "sequence_field": "sequence",
+      "validity_authority": "recomputed by the common parser",
+      "valid_acgu_is_validity_authority": false,
+      "stable_id": "b2:attempt:{attempt_index_as_five_digits}",
+      "seed_field": "empirical_null_seed",
+      "seed_is_training_seed": false,
+      "seed_42_is_a_general_parser_rule": false
+    }
+  }
+}
