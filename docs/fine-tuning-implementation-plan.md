@@ -1844,6 +1844,8 @@ M9B does not recompute these results and does not reopen their sequence-bearing 
 
 ### M9B — AptaRank full-thesis-evaluation preparation, synthetic-only
 
+**Status: COMPLETE — 12 October 2026, at commit `f7aba126170fce7c6da8cf7653ee282402b2f0e4`.** The synthetic preparation is frozen. This completion does not open REF and does not unlock EVAL.
+
 **Objective**  
 Prepare the full thesis evaluation workflow without overlap, leakage, REF, EVAL, or biological scoring.
 
@@ -1906,6 +1908,8 @@ M9C begins with separately authorized REF-only work, before EVAL is opened:
 - the authorization gate before EVAL is opened.
 
 AptaRank performs its own empirical REF calibration internally. Independent REF calculations stay descriptive. The actual Tier-2 bank identity and realized count are recorded only after the deployed M9C verification.
+
+**Reference-upload policy — frozen 12 October 2026.** Contract `config/modelling/aptarank_reference_upload_contract.json`. Walk the frozen 131-row REF CSV in its existing order and upload one row per distinct canonical `sequence_core`, in first-occurrence order. Retain the first identity row for `id`, `target_name`, `target_pdb_id`, and `source_reference`. Record every contributing source identity in a restricted duplicate-provenance ledger. The 18 later identity rows are duplicate-core collapses, not biological or quality exclusions. The expected live result is 113 accepted rows and zero dropped rows; any other live result stops M9C. A malformed schema, noncanonical core, conflicting row count, duplicate identity, missing required field, or digest mismatch fails closed. No other exclusion, normalization, T-to-U conversion, length filter, or replacement is permitted. AptaRank performs the single pooled empirical REF calibration. Local calibration is not implemented. The sealed locator stays unauthorized and does not open REF. The frozen target mapping records structure-file digest `2e185a205c9be0bf76484e8ffb96ae225880723ed68eaaf25dffbbccaf01ff51`, selection-record digest `08f0c96af349ce4909d40c3004804317661777f72828cd807823341e0e4f0d04`, and, separately, AptaRank target-upload digest `46471bb0643125ce86300ec050d6f0d3a09faa1d06dc325141c67cd1acdd5922`. This policy freeze does not complete M9C and does not unlock EVAL.
 
 Write an explicit EVAL-unlock record. EVAL remains prohibited until that record exists.
 
@@ -2147,7 +2151,7 @@ Proceed in this order:
 
 1. The M7 human gate is closed by the 8 October 2026 record. No further M7 execution is authorised. M7 completion is that human closure. Sealed M7 manifest bytes remain unchanged, including `m8_generation_performed: false`. The candidate-guardrail and final-selection documents are inactive. `D1_final_replicates.yaml` remains historical M7 state, including the live seed-44 authorisation, and is not M8 authority.
 2. M8 generation and assembly are complete. The inactive configuration has empty authorisation lists and every execution flag false. The B1 and D1 combined ledgers are the handoff inputs named in section 8 of [M8 raw generation](fine_tuning/m8_raw_generation.md). Sealed M8 manifests are not rewritten.
-3. M9A is complete. The unversioned v3.2 evaluation plan remains its immutable governing artifact. v3.3 is the active plan for M9B onward. M9B is preparatory-only and contains no overlap or leakage analysis. Actual REF access waits for M9C. EVAL waits for the M9C unlock. This closure does not authorise those later stages.
+3. M9A is complete. M9B is complete at `f7aba126170fce7c6da8cf7653ee282402b2f0e4`. The unversioned v3.2 evaluation plan remains the immutable governing artifact for M9A. v3.3 remains the byte-stable active plan for M9B onward and is not rewritten by the M9B completion. M9C has frozen the reference-upload policy and has not opened REF. EVAL remains locked until the M9C unlock. This closure does not authorise EVAL.
 
 ---
 

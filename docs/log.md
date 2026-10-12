@@ -12018,3 +12018,27 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_manual_run` passed 10 tests. With the M9B-2 preparation suite and the M9B-3 export-validation suite, 45 tests passed.
 
 **Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, production uploads, real AptaRank downloads, the UI, the API, the completed target-selection directory, and `results/` were not opened. AptaRank was not modified or run. No target was selected. No overlap, leakage, biological summary, Tier 1, or Tier 2 score was calculated.
+
+## 2026-10-12 — M9B completion and M9C-1 reference-upload policy
+
+**Stage:** Aim 2 / modelling / M9C-1 reference-upload policy. M9B synthetic preparation is complete.
+
+**Status:** M9B is COMPLETE at commit `f7aba126170fce7c6da8cf7653ee282402b2f0e4`. M9C-1 is `POLICY_FROZEN_REF_UNOPENED`. This record does not complete the rest of M9C and does not unlock EVAL. No scientific result is claimed.
+
+**Plan:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` stays the active plan, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. It was not edited. The implementation plan and this log now mark M9B complete.
+
+**Contract:** `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `21a46064edf346d2eba1f369f80290d7801818ee038442f1092e80219428a21b`.
+
+**Preparation module:** `scripts/modelling/aptarank_reference_upload.py`, SHA-256 `482668c83861a83b07a1919008c827d21cc6f9faedc64f137b88e9330c117e69`. It reuses `scripts/modelling/aptarank_io_preflight.py`, SHA-256 `eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01`.
+
+**Reference upload:** Walk the frozen 131-row REF CSV in its existing order. Upload one row per distinct canonical `sequence_core`, in first-occurrence order. The first identity row supplies `id`, `target_name`, `target_pdb_id`, and `source_reference`, from `scientific_identity_id`, `canonical_target_name`, `pdb_id`, and `publication`. The expected live result is 113 accepted rows and zero dropped rows. The 18 later identity rows are duplicate-core collapses, not biological or quality exclusions. Their source identities are recorded in a restricted ledger that does not contain sequence text. A malformed schema, noncanonical core, conflicting row count, duplicate identity, missing required field, or digest mismatch fails closed. No other exclusion, normalization, T-to-U conversion, length filter, or replacement is permitted. The frozen REF digest is `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`.
+
+**Calibration:** AptaRank performs its own single pooled empirical REF calibration. Local calibration is not implemented and is not substituted.
+
+**Frozen target mapping:** Structure-file digest `2e185a205c9be0bf76484e8ffb96ae225880723ed68eaaf25dffbbccaf01ff51`. Selection-record digest `08f0c96af349ce4909d40c3004804317661777f72828cd807823341e0e4f0d04`. AptaRank target-upload digest, recorded separately, `46471bb0643125ce86300ec050d6f0d3a09faa1d06dc325141c67cd1acdd5922`. Those files were not opened.
+
+**Sealed locator:** `prepare_sealed_reference` may locate and verify the external REF bytes after review. That authorization is false. The call returns before any external path is opened.
+
+**Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_reference_upload` passed 13 tests. No end-to-end rehearsal was added.
+
+**Boundary:** TRAIN, VALIDATION, REF, EVAL, production candidate sources, target-mapping files, and `results/` were not opened. AptaRank was not modified or run. No production upload or calibration artefact was written. Nothing was pushed.
