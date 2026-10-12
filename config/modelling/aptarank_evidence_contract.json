@@ -1,0 +1,470 @@
+{
+  "package_id": "M9B-1",
+  "schema_version": "m9b-aptarank-evidence-contract-v1",
+  "status": "FROZEN_PUBLIC_EVIDENCE_SYNTHETIC_ONLY_DEPLOYMENT_UNVERIFIED",
+  "stage": "M9B-1",
+  "deployment_verified": false,
+  "scientific_result": false,
+  "overlap_leakage_workflow": false,
+  "public_commit_is_live_deployment": false,
+  "camera_ready_sample_is_mres_protocol": false,
+  "arp1_adopts_public_normalization": false,
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md",
+    "version": "3.3",
+    "revision_date": "12 October 2026",
+    "sha256": "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
+  },
+  "external_evidence": [
+    {
+      "filename": "aptarank_paper.pdf",
+      "bytes": 1254624,
+      "sha256": "aaf40af707acc236639dccb8ecbf1f3fb522143f0a447e71f490168896af433d",
+      "role": "paper",
+      "adopt_as_mres_outcome": false,
+      "adopt_as_mres_target": false
+    },
+    {
+      "filename": "example_shortlist.csv",
+      "bytes": 280,
+      "sha256": "447ce90b4fdf8fab7bbd5a4fcda1824fc91d3b7b697c6cfc7fbe466e16400852",
+      "role": "supplied_csv",
+      "adopt_as_mres_outcome": false,
+      "adopt_as_mres_target": false
+    },
+    {
+      "filename": "example_results_screenshot.png",
+      "bytes": 492122,
+      "sha256": "ffbc22abfd874af242623536ce516f35a8eda17bbc4b52048c39cae63e5c1e63",
+      "role": "supplied_screenshot",
+      "adopt_as_mres_outcome": false,
+      "adopt_as_mres_target": false
+    }
+  ],
+  "public_repository": {
+    "url": "https://github.com/alishahsvnd/AptaRank",
+    "inspected_commit": "bd934ca54a6649eb8cf241f56a95d5903c873d91",
+    "inspected_commit_subject": "Remove implementation spec details from README",
+    "comparison_commit": "49a85609e3529adace60d3267ee88550159bba29",
+    "comparison_commit_available": true,
+    "comparison_commit_subject": "update",
+    "implementation_code_changed": false,
+    "documentation_only_paths": [
+      "IMPLEMENTATION_SPEC.md",
+      "Project Proposal.md",
+      "README.md",
+      "REFINEMENTS_SPEC.md"
+    ],
+    "non_markdown_diff": "empty",
+    "retrieved_utc": "2026-10-12T07:24:37Z",
+    "inspection_location": "temporary directory outside the MRes repository",
+    "public_package_version": "0.1.0",
+    "is_live_deployment": false,
+    "deployment_identity_established": false
+  },
+  "evidence_levels": [
+    "established_by_paper",
+    "established_by_public_implementation",
+    "observed_in_supplied_interface",
+    "inferred",
+    "deployment_dependent"
+  ],
+  "facts": [
+    {
+      "id": "candidate_upload",
+      "statement": "The public candidate reader accepts CSV with a required sequence column and an optional id column, plus FASTA and line-oriented text. Header matching is case-insensitive. ARP-1's project upload contract remains exactly id, sequence.",
+      "levels": ["established_by_paper", "established_by_public_implementation"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/ingest.py:read_records", "src/aptarank/ingest.py:_read_csv", "dashboard/newrun.py:_step_sequences"]
+    },
+    {
+      "id": "sequence_normalization",
+      "statement": "The public normaliser strips whitespace, uppercases, and rewrites T as U. The paper says T is accepted. ARP-1 still rejects lowercase and T and does not adopt that silent conversion.",
+      "levels": ["established_by_paper", "established_by_public_implementation"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/ingest.py:normalise_sequence", "src/aptarank/ingest.py:validate_sequence"]
+    },
+    {
+      "id": "length_limits",
+      "statement": "The paper and the public default config bound candidate length to 20 through 100 nucleotides. Those bounds are config values. The supplied sequences, lengths 24 and 90, sit inside that default and do not by themselves prove the bound.",
+      "levels": ["established_by_paper", "established_by_public_implementation", "inferred"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["configs/default.yaml:input", "src/aptarank/ingest.py:validate_sequence"]
+    },
+    {
+      "id": "duplicate_handling",
+      "statement": "The public candidate ingest collapses duplicate normalised sequences, keeps the first row, and increments duplicate_count. Blank CSV sequence cells are skipped without a rejection record. Invalid non-empty sequences are returned as rejections. The reference loader drops duplicate sequences. ARP-1 still rejects duplicate ids, and ARP-2B still rejects a repeated canonical sequence inside the supplied candidate upload.",
+      "levels": ["established_by_paper", "established_by_public_implementation"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/ingest.py:ingest", "src/aptarank/tier1/corpus.py:load_corpus_table"]
+    },
+    {
+      "id": "reference_upload_fields",
+      "statement": "The public default comment names id, sequence, target_name, target_pdb_id, and source_reference. The enforced required column is sequence only; the other four are optional and default to empty. The dashboard refuses a file that has none of the three provenance columns. Blank target_pdb_id is accepted by the loader. ARP-1 still requires the five-column project contract, unique nonempty ids, nonempty target_name and source_reference, and a nullable PDB cell.",
+      "levels": ["established_by_public_implementation"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/tier1/corpus.py:REQUIRED_COLUMNS", "src/aptarank/tier1/corpus.py:load_corpus_table", "dashboard/inputs.py:inspect_library"]
+    },
+    {
+      "id": "shortlist_export_columns",
+      "statement": "The public shortlist table and the supplied CSV use rank, candidate, aptamer-likeness, compatibility, shuffle, len, sequence, in that order. That matches the ARP-1 export contract.",
+      "levels": ["established_by_public_implementation", "observed_in_supplied_interface"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["dashboard/views.py:ranked_table"]
+    },
+    {
+      "id": "opaque_id_preservation",
+      "statement": "The public parser copies supplied ids only when every accepted row has a nonempty id and those ids are unique. Otherwise it assigns generated c-prefixed ids. The supplied CSV preserves synthetic-long and synthetic-short in the candidate column, which is consistent with that all-ids-present branch and does not prove the other branch.",
+      "levels": ["established_by_public_implementation", "observed_in_supplied_interface", "inferred"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/ingest.py:ingest"]
+    },
+    {
+      "id": "tier1_components",
+      "statement": "Five components are defined: mfe_norm lower-favoured, ensemble_defect lower-favoured, positional_entropy_mean lower-favoured and equal to the mean of per-position entropies, stem_fraction two-sided, and gc_fraction two-sided. Display labels are Structure stability, Fold definition, Fold certainty, Structural composition, and Sequence composition. The screenshot shows those labels and does not contribute component outcomes.",
+      "levels": ["established_by_paper", "established_by_public_implementation", "observed_in_supplied_interface"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/config.py:CRITERIA", "src/aptarank/tier1/folding.py:_finish", "src/aptarank/tier1/elements.py:parse_elements"]
+    },
+    {
+      "id": "empirical_calibration",
+      "statement": "AptaRank builds one pooled empirical reference distribution per criterion from the sequences it accepts in the uploaded reference file. The mid-rank CDF is F(x) = (count of reference values below x plus half the count of exact ties) divided by the reference count. One-sided lower-favoured scores use 1 minus F. Two-sided scores use 1 minus 2 times the absolute distance from 0.5, clipped to the unit interval. The project does not externally fit that distribution.",
+      "levels": ["established_by_paper", "established_by_public_implementation"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/tier1/scoring.py:empirical_cdf", "src/aptarank/tier1/scoring.py:two_sided_score", "src/aptarank/tier1/corpus.py:reference_distributions"]
+    },
+    {
+      "id": "weights_and_composite",
+      "statement": "The public default weight of each of the five criteria is 1. The default composite is the weighted mean, sum of weight times score divided by the sum of positive weights. A missing weight is an error. The paper states the same default. Config can override the weights and can select batch-rank aggregation instead. Neither override is adopted for the MRes deployment.",
+      "levels": ["established_by_paper", "established_by_public_implementation"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/tier1/scoring.py:weighted_mean", "configs/default.yaml:tier1.weights"]
+    },
+    {
+      "id": "shuffle_procedure",
+      "statement": "Public shuffles are ushuffle k=2. The structural subscore is the weighted mean of mfe_norm, ensemble_defect, positional_entropy_mean, and stem_fraction. GC fraction and length are excluded. p equals (1 plus the number of controls scoring at least as high as the candidate) divided by (M plus 1). Pass is p less than or equal to alpha, default 0.05. The per-candidate seed is derive_seed(run seed, candidate id, sequence, shuffle).",
+      "levels": ["established_by_paper", "established_by_public_implementation"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/tier1/shuffles.py:evaluate", "src/aptarank/tier1/features.py:run_job", "src/aptarank/provenance.py:derive_seed"]
+    },
+    {
+      "id": "tier2_disagreement_direction",
+      "statement": "Tier 2 disagreement is an absolute geometric mismatch. Lower disagreement is better agreement. The control percentile counts controls with greater disagreement, plus half the exact ties, divided by the bank size, so a higher percentile is better agreement. The shortlist CSV does not contain that raw mismatch or percentile.",
+      "levels": ["established_by_paper", "established_by_public_implementation", "observed_in_supplied_interface"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/tier2/calibration.py:ControlDistribution.percentile", "src/aptarank/tier2/geometry.py:compatibility"]
+    },
+    {
+      "id": "control_bank_allocation",
+      "statement": "The public bank draws an equal number of dinucleotide shuffles from every unique reference sequence. per-source count is the maximum of 1 and the ceiling of configured bank size over the unique-source count, and the constructed total is that per-source count times the source count. Sources are unique sequences sorted by sequence. The bank id is the corpus id joined to a signature over corpus hash, tool signature, folding model settings, bank size, k, ensemble-sample setting, run seed, and the loop definition. No production bank id, hash, or realized count is claimed.",
+      "levels": ["established_by_paper", "established_by_public_implementation"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/tier2/calibration.py:bank_signature", "src/aptarank/tier2/calibration.py:build_or_load"]
+    },
+    {
+      "id": "percentile_bands",
+      "statement": "Public defaults label a finite percentile at or above 0.95 as strong, at or above 0.75 as moderate, and otherwise weak. A non-finite percentile is not_evaluated. The paper's prose says weak below the 75th, moderate from the 75th through the 95th, and strong above the 95th. Equality at the strong threshold is a conflict and is not resolved.",
+      "levels": ["established_by_paper", "established_by_public_implementation", "deployment_dependent"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/tier2/calibration.py:assign_band", "configs/default.yaml:tier2.band_percentiles"]
+    },
+    {
+      "id": "target_configuration",
+      "statement": "A run may omit a target. With a target, the public UI asks for a PDB or UniProt id, chain, binding mode pocket or surface, and optional site residues. Groove is named and not implemented. Tier 2 annotates the Tier 1 order and does not reorder it. The default annotation cap is the first 1000 ranked candidates. The supplied screenshot shows a target panel and is not an MRes target choice.",
+      "levels": ["established_by_paper", "established_by_public_implementation", "observed_in_supplied_interface"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["dashboard/newrun.py:_step_target", "src/aptarank/tier2/service.py:run", "src/aptarank/config.py:BINDING_MODES"]
+    },
+    {
+      "id": "csv_absent_fields",
+      "statement": "The public shortlist CSV omits component scores, raw Tier 2 disagreement, control percentile, shuffle p-value, shuffle count, preset, seed, weights, bank identity, deployment identity, runtime, and target configuration. The supplied CSV matches that omission. The screenshot shows component labels and a target panel that are absent from the CSV.",
+      "levels": ["established_by_public_implementation", "observed_in_supplied_interface"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["dashboard/views.py:ranked_table", "dashboard/streamlit_app.py"]
+    },
+    {
+      "id": "manual_ui_provenance",
+      "statement": "Settings absent from the CSV have to be captured from the UI or the run artifact. The public provenance panel shows reference sequence count, dropped count, composite method, scoring signature, tool versions, and git commit. ARP-1's existing capture list remains the project checklist. This inspection does not fill it.",
+      "levels": ["established_by_public_implementation", "deployment_dependent"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["dashboard/views.py:run_configuration"]
+    },
+    {
+      "id": "export_tokens",
+      "statement": "Public compatibility labels are strong, moderate, weak, and the two-word literal not evaluated. Shuffle export is pass, fail, or U+2014 em dash when pass is neither true nor false. The supplied CSV uses weak and U+2014. ARP-1's target-free profile still accepts only not evaluated, pass, and fail.",
+      "levels": ["established_by_public_implementation", "observed_in_supplied_interface"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["dashboard/theme.py:BAND_LABEL", "dashboard/views.py:ranked_table"]
+    },
+    {
+      "id": "rank_direction",
+      "statement": "Public ranking sorts higher tier1_score first and breaks ties by ascending candidate id. The exported rank is the dense 1-based position. The supplied CSV lists the larger aptamer-likeness first. That agreement is not live-deployment verification.",
+      "levels": ["established_by_public_implementation", "observed_in_supplied_interface", "inferred"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["src/aptarank/tier1/service.py:run"]
+    },
+    {
+      "id": "presets_defined_not_selected",
+      "statement": "The public UI defines quick, standard, and evaluation presets. Standard is the UI default radio. Evaluation is the paper's rigorous setting of 99 shuffles and 200 sampled structures. The effective preset of a future MRes run is not selected here.",
+      "levels": ["established_by_paper", "established_by_public_implementation", "deployment_dependent"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["dashboard/jobs.py:preset_settings", "dashboard/newrun.py:_step_settings"]
+    },
+    {
+      "id": "code_unchanged_since_49a8560",
+      "statement": "On 2026-10-12 the inspected public HEAD was bd934ca54a6649eb8cf241f56a95d5903c873d91. Commit 49a85609e3529adace60d3267ee88550159bba29 was present. The diff between them changes only README.md and deletes three markdown files. No non-markdown path differs.",
+      "levels": ["established_by_public_implementation"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["git diff 49a85609e3529adace60d3267ee88550159bba29 bd934ca54a6649eb8cf241f56a95d5903c873d91"]
+    },
+    {
+      "id": "sample_is_interface_only",
+      "statement": "The supplied CSV and screenshot are interface and input-output evidence. They do not choose an MRes target, a threshold, a validation result, or a scientific outcome. The visible target label is not adopted.",
+      "levels": ["observed_in_supplied_interface"],
+      "deployment_verified": false,
+      "scientific_result": false,
+      "anchors": ["example_shortlist.csv", "example_results_screenshot.png"]
+    }
+  ],
+  "conditional_algorithms": [
+    {
+      "id": "sequence_normalization",
+      "statement": "strip whitespace, uppercase, replace T with U, then require A, C, G, and U and the configured length bounds",
+      "production_value_instantiated": false,
+      "deployment_verified": false,
+      "adopted_by_arp1": false
+    },
+    {
+      "id": "opaque_id_condition",
+      "statement": "use supplied ids only when every accepted row has a nonempty unique id; otherwise generate c-prefixed ids with width at least 5",
+      "production_value_instantiated": false,
+      "deployment_verified": false,
+      "adopted_by_arp1": false
+    },
+    {
+      "id": "empirical_cdf",
+      "statement": "F(x) = (count(reference < x) + 0.5 * count(reference == x)) / reference_count",
+      "production_value_instantiated": false,
+      "deployment_verified": false,
+      "adopted_by_arp1": false
+    },
+    {
+      "id": "one_sided_lower",
+      "statement": "score = 1 - F(x) for mfe_norm, ensemble_defect, and positional_entropy_mean",
+      "production_value_instantiated": false,
+      "deployment_verified": false,
+      "adopted_by_arp1": false
+    },
+    {
+      "id": "two_sided",
+      "statement": "score = clip(1 - 2 * abs(F(x) - 0.5), 0, 1) for stem_fraction and gc_fraction",
+      "production_value_instantiated": false,
+      "deployment_verified": false,
+      "adopted_by_arp1": false
+    },
+    {
+      "id": "composite",
+      "statement": "default corpus weighted mean with each default weight 1; denominator is the sum of positive weights",
+      "production_value_instantiated": false,
+      "deployment_verified": false,
+      "adopted_by_arp1": false
+    },
+    {
+      "id": "shuffle_p",
+      "statement": "p = (1 + count(control_score >= real_score)) / (M + 1); pass when p <= alpha; public default alpha is 0.05",
+      "production_value_instantiated": false,
+      "deployment_verified": false,
+      "adopted_by_arp1": false
+    },
+    {
+      "id": "bank_allocation",
+      "statement": "per_source = max(1, ceil(configured_bank_size / n_unique_sources)); total = per_source * n_unique_sources; sources are unique sequences sorted by sequence",
+      "production_value_instantiated": false,
+      "deployment_verified": false,
+      "adopted_by_arp1": false,
+      "configured_bank_size_default": 5000,
+      "configured_bank_size_default_label": "public_config_default_not_a_realized_bank_count",
+      "realized_count": null
+    },
+    {
+      "id": "tier2_percentile",
+      "statement": "P = (count(control_disagreement > candidate_disagreement) + 0.5 * count(equal)) / bank_count; higher P is better agreement",
+      "production_value_instantiated": false,
+      "deployment_verified": false,
+      "adopted_by_arp1": false
+    },
+    {
+      "id": "band_assignment",
+      "statement": "public code: strong if P >= strong_threshold, else moderate if P >= moderate_threshold, else weak; defaults 0.95 and 0.75. Paper prose uses a strict greater-than at the 95th. Equality is unresolved.",
+      "production_value_instantiated": false,
+      "deployment_verified": false,
+      "adopted_by_arp1": false,
+      "equality_conflict": true
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "normalization_versus_arp1",
+      "statement": "The paper and public code accept T by rewriting it to U and accept lowercase by uppercasing. ARP-1 rejects both. ARP-1 is unchanged.",
+      "sources": ["paper", "public_implementation", "provisional_specification"],
+      "resolved": false,
+      "deployment_verified": false
+    },
+    {
+      "id": "reference_column_enforcement",
+      "statement": "The config comment names five reference columns. The loader requires only sequence. The dashboard requires at least one provenance column. ARP-1 still requires all five.",
+      "sources": ["public_implementation", "provisional_specification"],
+      "resolved": false,
+      "deployment_verified": false
+    },
+    {
+      "id": "strong_band_equality",
+      "statement": "Paper prose puts strong strictly above the 95th percentile and moderate through the 95th. Public code assigns strong at percentile greater than or equal to 0.95.",
+      "sources": ["paper", "public_implementation"],
+      "resolved": false,
+      "deployment_verified": false
+    },
+    {
+      "id": "quick_preset_sample_count",
+      "statement": "The paper and the preset caption say a quick run samples 30 structures. In this commit, fast mode forces candidate ensemble samples to 0. The preset still writes 30 into the config, and the Tier 2 bank builder reads that config value.",
+      "sources": ["paper", "public_implementation"],
+      "resolved": false,
+      "deployment_verified": false
+    },
+    {
+      "id": "two_sided_clip",
+      "statement": "The paper writes the two-sided score without a clip. The public function clips to the unit interval. On a CDF inside that interval the two expressions match. The clip is not a separate deployed threshold.",
+      "sources": ["paper", "public_implementation"],
+      "resolved": false,
+      "deployment_verified": false
+    }
+  ],
+  "unresolved_deployment_items": {
+    "accepted_ref_count": null,
+    "dropped_ref_count": null,
+    "bank_id": null,
+    "bank_sha256": null,
+    "bank_realized_count": null,
+    "deployment_version": null,
+    "deployment_schema_version": null,
+    "deployment_code_revision": null,
+    "effective_preset": null,
+    "runtime_seconds": null,
+    "items": [
+      {
+        "id": "live_deployment_identity",
+        "status": "unresolved",
+        "value": null,
+        "statement": "Version, schema, and code revision of the live UI are not established. The inspected public commit is not claimed as that deployment."
+      },
+      {
+        "id": "effective_preset",
+        "status": "unresolved",
+        "value": null,
+        "statement": "The MRes preset, including shuffle count and ensemble-sample count, remains for M9C."
+      },
+      {
+        "id": "accepted_and_dropped_ref_counts",
+        "status": "unresolved",
+        "value": null,
+        "statement": "Accepted and dropped counts from the uploaded REF are M9C observations."
+      },
+      {
+        "id": "bank_identity_and_count",
+        "status": "unresolved",
+        "value": null,
+        "statement": "Bank id, hash, and realized control count are M9C observations. The allocation formula is recorded without those values."
+      },
+      {
+        "id": "runtime",
+        "status": "unresolved",
+        "value": null,
+        "statement": "No runtime was measured."
+      },
+      {
+        "id": "live_export_behavior",
+        "status": "unresolved",
+        "value": null,
+        "statement": "Whether a future download matches this public shortlist table is unverified."
+      },
+      {
+        "id": "band_equality",
+        "status": "unresolved",
+        "value": null,
+        "statement": "The paper and the public code disagree at the strong-band equality."
+      },
+      {
+        "id": "folding_tool_versions",
+        "status": "unresolved",
+        "value": null,
+        "statement": "The paper cites ViennaRNA 2.7.2 and forgi 2.2.3 for its own runs. Those versions are not pinned as the future deployment."
+      }
+    ]
+  },
+  "prohibited_m9b_actions": [
+    "Open TRAIN, VALIDATION, REF, or EVAL.",
+    "Open a production sequence ledger.",
+    "Open a model or a checkpoint.",
+    "Upload production candidates or execute an AptaRank scoring run.",
+    "Instantiate actual REF distributions.",
+    "Instantiate the actual Tier-2 shuffled-control bank.",
+    "Claim an accepted REF count, a dropped REF count, a bank id, a bank hash, or a realized bank count.",
+    "Run an overlap, leakage, or nearest-TRAIN workflow.",
+    "Treat the camera-ready sample as a target choice, a threshold, or a validation result.",
+    "Produce a biological evaluation output or write under results/."
+  ],
+  "m9c_handoff": [
+    "Verify live deployment_identity independently of the inspected public commit.",
+    "Record the effective_preset and the settings absent from the CSV.",
+    "Open only the authorized REF and record accepted_ref_count and dropped_ref_count.",
+    "Verify bank_identity and bank_realized_count for the internally constructed REF-derived bank.",
+    "Record runtime from the deployed run.",
+    "Check live_export columns, tokens, and raw-score absence against this contract.",
+    "Leave descriptive REF summaries labelled descriptive.",
+    "Do not treat this contract as deployment verification."
+  ],
+  "specification_corrections": [
+    {
+      "path": "config/modelling/aptarank_io_spec.json",
+      "change": "State that ARP-1 rejects lowercase and T, while the public parser normalises them, and that supplied-id preservation is conditional in the public parser.",
+      "validator_behavior_changed": false,
+      "deployment_verified": false,
+      "plan_v3_3_modified": false
+    },
+    {
+      "path": "config/modelling/aptarank_tier1_analysis_spec.json",
+      "change": "Point unresolved scorer notes at the recorded public algorithms without adopting them or closing deployment verification.",
+      "validator_behavior_changed": false,
+      "deployment_verified": false,
+      "plan_v3_3_modified": false
+    }
+  ],
+  "excluded_from_mres_protocol": {
+    "paper_evaluation_outcomes": true,
+    "sample_target_choices": true,
+    "sample_scores_as_outcomes": true,
+    "overlap_or_leakage": true,
+    "note": "Paper held-out counts, medians, and named demonstration targets, and the screenshot target label, stay outside the MRes protocol."
+  }
+}

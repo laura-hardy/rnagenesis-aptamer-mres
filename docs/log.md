@@ -11848,3 +11848,21 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 **Boundary:** This entry did not open TRAIN, VALIDATION, REF, EVAL, a production sequence ledger, a model, a checkpoint, a structure tool, or AptaRank. It did not create a result under `results/`. Frozen M9A contracts, runners, tests, manifests, and evidence were not rewritten.
 
+## 2026-10-12 — M9B-1 public AptaRank evidence freeze
+
+**Stage:** Aim 2 / modelling / M9B-1 synthetic-only AptaRank evidence review
+
+**Status:** `FROZEN_PUBLIC_EVIDENCE_SYNTHETIC_ONLY_DEPLOYMENT_UNVERIFIED`. This review freezes the paper, the public implementation, and the supplied interface files. It does not verify the live deployment. M9A remains complete. M9C and M10 have not started. No scientific result is claimed.
+
+**Plan:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` stays the active plan, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. It was not edited. The conflicts found do not require a plan change.
+
+**Evidence:** Paper `aptarank_paper.pdf`, 1,254,624 bytes, SHA-256 `aaf40af707acc236639dccb8ecbf1f3fb522143f0a447e71f490168896af433d`. CSV `example_shortlist.csv`, 280 bytes, SHA-256 `447ce90b4fdf8fab7bbd5a4fcda1824fc91d3b7b697c6cfc7fbe466e16400852`. Screenshot `example_results_screenshot.png`, 492,122 bytes, SHA-256 `ffbc22abfd874af242623536ce516f35a8eda17bbc4b52048c39cae63e5c1e63`. The CSV and screenshot are interface evidence only.
+
+**Public code:** Retrieved 2026-10-12T07:24:37Z from `https://github.com/alishahsvnd/AptaRank`. Inspected commit `bd934ca54a6649eb8cf241f56a95d5903c873d91`. Comparison commit `49a85609e3529adace60d3267ee88550159bba29` is present. Implementation code is unchanged between them; the diff is documentation only. Neither commit is claimed as the live deployment.
+
+**Corrections:** ARP-1 now states that it rejects lowercase and T while the public parser normalises them, and that supplied-id preservation is conditional in the public parser. The validator behavior is unchanged. ARP-2B notes now cite the recorded public algorithms and leave every U item unresolved. Local recomputation stays off.
+
+**Unresolved for M9C:** Live deployment identity, effective preset, accepted and dropped REF counts, bank id, hash, and realized count, runtime, live export behavior, the strong-band equality conflict, and the deployed folding-tool versions.
+
+**Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, models, checkpoints, and `results/` were not opened. No production upload or AptaRank scoring run was performed. No REF distribution or Tier 2 control bank was built. No overlap, leakage, or nearest-TRAIN workflow was run.
+

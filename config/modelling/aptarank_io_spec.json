@@ -54,9 +54,9 @@
     }
   },
   "rules": {
-    "opaque_id_preservation": "The upload id is copied unchanged into the export candidate column.",
-    "sequence_alphabet": "Sequences must be nonempty uppercase A, C, G and U. Lowercase bases, T, and other characters are rejected.",
-    "unique_ids": "Candidate upload ids are unique and nonempty. Reference upload ids are unique and nonempty.",
+    "opaque_id_preservation": "ARP-1 requires the upload id to be copied unchanged into the export candidate column. The public parser preserves a supplied id only when every accepted row has a nonempty unique id; otherwise it assigns a generated id. That condition is recorded in config/modelling/aptarank_evidence_contract.json. ARP-1 does not adopt generated ids.",
+    "sequence_alphabet": "ARP-1 requires a nonempty uppercase A, C, G and U sequence and rejects lowercase bases, T, and other characters. It does not apply the public implementation's silent whitespace stripping, uppercasing, and T-to-U normalization. That public behavior is recorded in config/modelling/aptarank_evidence_contract.json and is not adopted by ARP-1.",
+    "unique_ids": "Candidate upload ids are unique and nonempty. Reference upload ids are unique and nonempty. The public parser collapses duplicate sequences and keeps the first accepted row. ARP-1 still rejects duplicate ids. Duplicate-sequence rejection inside a candidate upload remains the separate ARP-2B check.",
     "nullable_target_pdb_id": "target_pdb_id may be blank when an unambiguous PDB is unavailable. A blank cell stays blank. ARP-1 does not replace it with a sentinel or an invented identifier. A nonempty value with leading or trailing whitespace is rejected. id stays nonempty and unique, sequence stays nonempty uppercase A/C/G/U, source_reference stays nonempty, and target_name stays nonempty in this corrected reference contract. Nullable PDB provenance preserves the full unique-core REF calibration set without inventing structural evidence.",
     "id_set_reconciliation": "The expected candidate id set equals the candidate upload id set. Exported candidate ids plus explicit failure ids equal that set exactly.",
     "sequence_round_trip": "The exported sequence is accepted only when it is character-for-character identical to the uploaded sequence for the same id.",
@@ -257,7 +257,7 @@
     "direction": null,
     "comparison_scope": "unresolved",
     "absence_from_provisional_shortlist_is_not_definitional": true,
-    "note": "A provisional shortlist did not include a raw Tier 2 geometric score. That observation does not define the score as unavailable, and ARP-1 does not supply an equation, direction, or comparison scope."
+    "note": "A provisional shortlist and the supplied camera-ready CSV did not include a raw Tier 2 geometric score. Public code keeps that score out of the shortlist CSV and inside the run artifact. That observation does not define the live deployment, and ARP-1 does not supply an equation, direction, or comparison scope."
   },
   "control_bank": {
     "identifier": null,
@@ -310,19 +310,19 @@
       "id": "raw_tier2_score_availability",
       "status": "unresolved",
       "value": null,
-      "note": "Availability stays unresolved. Absence from one provisional shortlist does not define the deployment."
+      "note": "Availability stays unresolved. The public shortlist table and the supplied camera-ready CSV omit a raw Tier 2 score. That omission does not define the live deployment."
     },
     {
       "id": "raw_tier2_equation",
       "status": "unresolved",
       "value": null,
-      "note": "ARP-1 does not supply an equation."
+      "note": "ARP-1 does not supply an equation. The public geometric display transform is recorded in the M9B evidence contract and is not adopted here."
     },
     {
       "id": "raw_tier2_direction",
       "status": "unresolved",
       "value": null,
-      "note": "ARP-1 does not supply a score direction."
+      "note": "ARP-1 does not supply a score direction. Public code treats lower disagreement as better agreement and a higher control percentile as better agreement. Live export of that direction remains unresolved."
     },
     {
       "id": "raw_tier2_comparison_scope",
@@ -334,19 +334,19 @@
       "id": "control_bank_identifier",
       "status": "unresolved",
       "value": null,
-      "note": "No control-bank identifier is adopted."
+      "note": "No control-bank identifier is adopted. The public allocation formula is recorded in the M9B evidence contract without a bank id, hash, or realized count."
     },
     {
       "id": "control_bank_hash",
       "status": "unresolved",
       "value": null,
-      "note": "No control-bank hash is adopted."
+      "note": "No control-bank hash is adopted. M9C verifies the deployed bank hash."
     },
     {
       "id": "control_bank_provenance",
       "status": "unresolved",
       "value": null,
-      "note": "No control-bank provenance is adopted."
+      "note": "No control-bank provenance is adopted. The public signature inputs are recorded and are not a production bank."
     },
     {
       "id": "deployment_version",
@@ -370,19 +370,19 @@
       "id": "preset_value",
       "status": "unresolved",
       "value": null,
-      "note": "The governing plan requires the actual preset to be verified. ARP-1 does not adopt a preset value."
+      "note": "The governing plan requires the actual preset to be verified. Public presets are quick, standard, and evaluation. ARP-1 does not adopt one."
     },
     {
       "id": "compatibility_token_meaning",
       "status": "unresolved",
       "value": null,
-      "note": "The target-free profile accepts an observed literal and does not define it."
+      "note": "The target-free profile accepts only the literal not evaluated and does not define it. The supplied camera-ready CSV also shows weak. That token is not added to this profile."
     },
     {
       "id": "shuffle_token_meaning",
       "status": "unresolved",
       "value": null,
-      "note": "pass and fail are observed literals. ARP-1 does not assign a threshold to them."
+      "note": "pass and fail remain the target-free literals. The supplied camera-ready CSV uses an em dash, which the public UI emits when shuffle pass is absent. ARP-1 does not assign a threshold and does not add the em dash to this profile."
     }
   ],
   "schema_change_policy": "A header that differs in name, order, or membership from this draft fails closed. ARP-1 does not rename, reorder, add, or drop columns to accept the file. A single leading UTF-8 BOM is encoding normalization, not schema adaptation: it is stripped only for decoding and logical header validation, and the SHA-256 covers the original bytes. A BOM anywhere else is rejected. A difference in column name, order, or membership requires a reviewed specification revision.",

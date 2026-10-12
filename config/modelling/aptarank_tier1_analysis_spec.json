@@ -27,10 +27,10 @@
     "module_path": "scripts/modelling/aptarank_io_preflight.py",
     "module_sha256": "eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01",
     "spec_path": "config/modelling/aptarank_io_spec.json",
-    "spec_sha256": "2296d4234841146fbbecdbd0bb0d16dc5adffece6e3131a791a2fd538bc8cefa",
+    "spec_sha256": "3c9ac25c74939026f778b7eb8e627c4785734e992a8401e79691c375b565b96b",
     "schema_version": "aptarank-io-arp1-draft-r3",
     "modified_by_arp2b": false,
-    "role": "Mechanical upload, export, and failure validation is reused. ARP-1 is not modified. Both pinned hashes are enforced against the files."
+    "role": "Mechanical upload, export, and failure validation is reused. M9B-1 corrected ARP-1 wording without changing its validator. Both pinned hashes are enforced against the files. ARP-2B did not modify ARP-1."
   },
   "production_design_constants": {
     "ref_calibration_cores": 113,
@@ -283,127 +283,127 @@
       "id": "U1",
       "status": "unresolved",
       "value": null,
-      "note": "The calibration grain, pooled across 113 REF cores or split by frozen length regime, is not chosen."
+      "note": "The public implementation pools one reference distribution per criterion. It does not implement an MRes short/long split. The project grain remains unchosen, and deployment application is unverified."
     },
     {
       "id": "U2",
       "status": "unresolved",
       "value": null,
-      "note": "The empirical CDF formula and mid-rank tie rule remain provisional and are not adopted."
+      "note": "The public mid-rank CDF is recorded in the M9B evidence contract. ARP-2B does not adopt it for local recomputation. Live deployment use is unverified."
     },
     {
       "id": "U3",
       "status": "unresolved",
       "value": null,
-      "note": "Lower-favoured direction is fixed. The transform into the CDF argument is not."
+      "note": "Lower-favoured direction is fixed for MFE, ensemble defect, and positional entropy. The public transform is 1 minus the mid-rank CDF. It is recorded and not locally recomputed. Deployment use is unverified."
     },
     {
       "id": "U4",
       "status": "unresolved",
       "value": null,
-      "note": "Stem fraction is centred on the REF median. The centrality algebra is not written."
+      "note": "Public stem fraction uses the two-sided score that peaks at mid-rank 0.5. The algebra is recorded in the M9B evidence contract and is not locally recomputed. Deployment use is unverified."
     },
     {
       "id": "U5",
       "status": "unresolved",
       "value": null,
-      "note": "The GC centrality reference point is not restated by the plan."
+      "note": "Public GC fraction uses the same two-sided mid-rank transform as stem fraction. It is recorded and not locally recomputed. Deployment use is unverified."
     },
     {
       "id": "U6",
       "status": "unresolved",
       "value": null,
-      "note": "Treatment of values outside the REF sample is not adopted."
+      "note": "The public CDF places values outside the reference sample on the corresponding tail. No separate winsorization is coded. Deployment use is unverified."
     },
     {
       "id": "U7",
       "status": "unresolved",
       "value": null,
-      "note": "Numeric weights and the weighted-mean denominator are not adopted."
+      "note": "The public default weight of each criterion is 1 and the default composite divides by the sum of positive weights. Config can override both. ARP-2B does not adopt a production weight vector. Deployment use is unverified."
     },
     {
       "id": "U8",
       "status": "unresolved",
       "value": null,
-      "note": "Missing-component policy inside the composite is not implemented."
+      "note": "Public code fails a candidate whose criterion column is missing or whose feature is non-finite. It does not impute a component. Deployment policy is unverified."
     },
     {
       "id": "U9",
       "status": "unresolved",
       "value": null,
-      "note": "Exported score range, direction, and rounding remain unverified."
+      "note": "Public composite scores lie in the unit interval when the components do, and higher scores rank first. The shortlist CSV keeps the full decimal; the UI metric formats three decimals. Live rounding and direction remain unverified."
     },
     {
       "id": "U10",
       "status": "unresolved",
       "value": null,
-      "note": "Whether positional entropy is a mean is not fixed by the plan."
+      "note": "Public positional entropy is the mean of per-position ViennaRNA entropies. That definition is recorded and not locally recomputed. Deployment use is unverified."
     },
     {
       "id": "U11",
       "status": "unresolved",
       "value": null,
-      "note": "Component equations and folding settings are absent."
+      "note": "Public folding uses ViennaRNA MFE, ensemble defect of the MFE structure, and uniq_ML set to 1. Other model numbers are installed ViennaRNA defaults. The paper's tool versions are not the future deployment. Local recomputation stays blocked."
     },
     {
       "id": "U12",
       "status": "unresolved",
       "value": null,
-      "note": "The structural components inside the shuffle subscore are not adopted."
+      "note": "The public structural subscore uses normalised MFE, ensemble defect, mean positional entropy, and stem fraction. GC fraction and length are excluded. The set is recorded and not locally recomputed. Deployment use is unverified."
     },
     {
       "id": "U13",
       "status": "unresolved",
       "value": null,
-      "note": "The structural-subscore equation is absent."
+      "note": "The public structural subscore is the same weighted mean over its four components. It is recorded and not locally recomputed. Deployment use is unverified."
     },
     {
       "id": "U14",
       "status": "unresolved",
       "value": null,
-      "note": "The effective preset, including structure and shuffle counts, is unverified."
+      "note": "Public presets are quick, standard, and evaluation. Evaluation uses 99 shuffles and 200 samples. The effective MRes preset is unverified. Fast mode in this public commit forces candidate ensemble samples to 0, which conflicts with the paper's quick-run count of 30."
     },
     {
       "id": "U15",
       "status": "unresolved",
       "value": null,
-      "note": "The shuffle seed and stream are not recorded."
+      "note": "The public per-candidate shuffle seed is derive_seed of the run seed, candidate id, sequence, and the label shuffle. The seed a future UI run uses is unverified."
     },
     {
       "id": "U16",
       "status": "unresolved",
       "value": null,
-      "note": "The dinucleotide-preserving algorithm is named and not specified."
+      "note": "The public algorithm is ushuffle with k equal to 2. It is recorded and not locally recomputed. Deployment use is unverified."
     },
     {
       "id": "U17",
       "status": "unresolved",
       "value": null,
-      "note": "Shuffle comparison direction and inclusive counting are not adopted."
+      "note": "Public wins are a strictly greater structural subscore. The descriptive percentile gives ties half credit. The p-value counts controls at least as high as the candidate. Deployment use is unverified."
     },
     {
       "id": "U18",
       "status": "unresolved",
       "value": null,
-      "note": "The plus-one p-value correction is not adopted."
+      "note": "The public p-value is (1 plus the count of controls at least as high) divided by (M plus 1), with pass at p less than or equal to alpha. Default alpha is 0.05. ARP-2B does not adopt it as an export rule. Deployment use is unverified."
     },
     {
       "id": "U19",
       "status": "unresolved",
       "value": null,
-      "note": "Export pass is not bound to the p <= 0.05 rule."
+      "note": "Public export pass follows the p-value rule when a shuffle result exists. The supplied camera-ready CSV uses an em dash, which is absence of that boolean, not a pass. Binding the future export to the rule remains unverified."
     },
     {
       "id": "U20",
       "status": "unresolved",
       "value": null,
-      "note": "Failed shuffles inside the UI are separate from an export technical failure and are unresolved."
+      "note": "A public folding failure is separate from shuffle fail. Fast mode disables shuffles. How the live UI will report either remains unverified."
     },
     {
       "id": "U21",
       "status": "unresolved",
       "value": null,
-      "note": "Whether the export carries p-values, labels, or both is unverified."
+      "note": "The public shortlist CSV carries pass, fail, or an em dash and does not carry p-values. The JSON artifact carries p-values. Whether a future download matches that split is unverified."
     },
     {
       "id": "U22",
@@ -445,13 +445,13 @@
       "id": "U28",
       "status": "unresolved",
       "value": null,
-      "note": "Consecutive ranks, rank ties, and monotonic score order are not checked as a ranking rule."
+      "note": "Public code exports a dense rank after sorting higher aptamer-likeness first and breaking ties by ascending candidate id. ARP-2B still does not check that rule. Live ranking remains unverified."
     },
     {
       "id": "U29",
       "status": "unresolved",
       "value": null,
-      "note": "The live favourable direction of aptamer-likeness is unverified."
+      "note": "Public code and the supplied CSV order a higher aptamer-likeness first. The live favourable direction remains unverified until M9C."
     },
     {
       "id": "U30",
