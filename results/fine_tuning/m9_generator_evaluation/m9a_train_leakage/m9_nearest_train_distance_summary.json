@@ -1,0 +1,221 @@
+{
+  "schema": "generator-eval-nearest-train-distance-summary-m9a-r1",
+  "runner_contract_id": "m9a-train-leakage-runner-v1",
+  "m9a_contract_id": "m9a-overlap-leakage-definitions-v1",
+  "synthetic_execution_is_production_validation": false,
+  "production_identities_enforced": true,
+  "m9a_complete": false,
+  "m9b_complete": false,
+  "m9c_complete": false,
+  "comparison_population": "corpus_final_text_equal_to_train_csv_first_occurrence_cores",
+  "train_identity_row_count": 726,
+  "train_distinct_core_count": 669,
+  "train_text_line_count": 669,
+  "csv_rows_silently_deduplicated": false,
+  "cores_rewritten": false,
+  "historical_0_01_guardrail_used_as_decision_threshold": false,
+  "b0_role": "external_comparator",
+  "b0_pooled_into_b1_b2_d1_aggregate": false,
+  "b0_included_in_causal_comparison": false,
+  "validation_accessed": false,
+  "ref_accessed": false,
+  "eval_accessed": false,
+  "sequence_strings_emitted": false,
+  "sequence_hashes_emitted": false,
+  "attempt_identifiers_emitted": false,
+  "nearest_neighbour_identities_emitted": false,
+  "train_identity_ids_emitted": false,
+  "target_labels_emitted": false,
+  "expected_ledger_row_counts": {
+    "B0": 30080,
+    "B1": 30000,
+    "B2": 30000,
+    "D1": 30000,
+    "combined": 120080
+  },
+  "supplied_distinct_train_core_count": 669,
+  "distance": "global_levenshtein_divided_by_longer_length",
+  "scalar_per_globally_distinct_generated_sequence": true,
+  "projected_to_rows_conditions_and_seeds": true,
+  "replaces_frozen_implementation": false,
+  "pooled_equal_mixture_rule_name": "inclusive_cumulative_weight_exact_v2",
+  "by_condition": {
+    "B0": {
+      "valid_row_count": 30080,
+      "distinct_valid_sequence_count": 30080,
+      "distinct_distance_computations": 30080,
+      "row_distance_projections": 30080,
+      "nearest_train_normalized_edit_distance": {
+        "count": 30080,
+        "minimum": 0.25,
+        "p25": 0.4,
+        "median": 0.4166666666666667,
+        "p75": 0.43243243243243246,
+        "maximum": 0.5,
+        "mean": 0.41545819620172686
+      },
+      "maximum_edit_similarity_to_train": 0.75,
+      "maximum_edit_similarity_definition": "1 - minimum over TRAIN of (Levenshtein distance / length of the longer sequence); an edit-based similarity, not a sequence identity",
+      "edit_similarity_is_sequence_identity": false,
+      "thresholds_defined": false,
+      "historical_0_01_guardrail_used_as_decision_threshold": false,
+      "quantile_convention": "int(round(p * (n - 1))) on values sorted ascending",
+      "role": "external_comparator",
+      "pooled_into_b1_b2_d1_aggregate": false
+    },
+    "B1": {
+      "valid_row_count": 30000,
+      "distinct_valid_sequence_count": 29983,
+      "distinct_distance_computations": 29983,
+      "row_distance_projections": 30000,
+      "nearest_train_normalized_edit_distance": {
+        "count": 30000,
+        "minimum": 0.3,
+        "p25": 0.425,
+        "median": 0.4444444444444444,
+        "p75": 0.46153846153846156,
+        "maximum": 0.5185185185185185,
+        "mean": 0.44176636634257527
+      },
+      "maximum_edit_similarity_to_train": 0.7,
+      "maximum_edit_similarity_definition": "1 - minimum over TRAIN of (Levenshtein distance / length of the longer sequence); an edit-based similarity, not a sequence identity",
+      "edit_similarity_is_sequence_identity": false,
+      "thresholds_defined": false,
+      "historical_0_01_guardrail_used_as_decision_threshold": false,
+      "quantile_convention": "int(round(p * (n - 1))) on values sorted ascending",
+      "role": "generation_condition",
+      "pooled_into_b1_b2_d1_aggregate": false
+    },
+    "B2": {
+      "valid_row_count": 30000,
+      "distinct_valid_sequence_count": 30000,
+      "distinct_distance_computations": 30000,
+      "row_distance_projections": 30000,
+      "nearest_train_normalized_edit_distance": {
+        "count": 30000,
+        "minimum": 0.2857142857142857,
+        "p25": 0.425,
+        "median": 0.4411764705882353,
+        "p75": 0.4567901234567901,
+        "maximum": 0.5086206896551724,
+        "mean": 0.4392924775296769
+      },
+      "maximum_edit_similarity_to_train": 0.7142857142857143,
+      "maximum_edit_similarity_definition": "1 - minimum over TRAIN of (Levenshtein distance / length of the longer sequence); an edit-based similarity, not a sequence identity",
+      "edit_similarity_is_sequence_identity": false,
+      "thresholds_defined": false,
+      "historical_0_01_guardrail_used_as_decision_threshold": false,
+      "quantile_convention": "int(round(p * (n - 1))) on values sorted ascending",
+      "role": "generation_condition",
+      "pooled_into_b1_b2_d1_aggregate": false
+    },
+    "D1": {
+      "valid_row_count": 30000,
+      "distinct_valid_sequence_count": 30000,
+      "distinct_distance_computations": 30000,
+      "row_distance_projections": 30000,
+      "nearest_train_normalized_edit_distance": {
+        "count": 30000,
+        "minimum": 0.2916666666666667,
+        "p25": 0.4246575342465753,
+        "median": 0.44,
+        "p75": 0.4576271186440678,
+        "maximum": 0.5288461538461539,
+        "mean": 0.43908546452868824
+      },
+      "maximum_edit_similarity_to_train": 0.7083333333333333,
+      "maximum_edit_similarity_definition": "1 - minimum over TRAIN of (Levenshtein distance / length of the longer sequence); an edit-based similarity, not a sequence identity",
+      "edit_similarity_is_sequence_identity": false,
+      "thresholds_defined": false,
+      "historical_0_01_guardrail_used_as_decision_threshold": false,
+      "quantile_convention": "int(round(p * (n - 1))) on values sorted ascending",
+      "role": "generation_condition",
+      "pooled_into_b1_b2_d1_aggregate": false
+    }
+  },
+  "d1": {
+    "by_training_seed": {
+      "43": {
+        "valid_row_count": 15000,
+        "distinct_valid_sequence_count": 15000,
+        "distinct_distance_computations": 15000,
+        "row_distance_projections": 15000,
+        "nearest_train_normalized_edit_distance": {
+          "count": 15000,
+          "minimum": 0.2916666666666667,
+          "p25": 0.425,
+          "median": 0.4418604651162791,
+          "p75": 0.4594594594594595,
+          "maximum": 0.5238095238095238,
+          "mean": 0.44011668474137594
+        },
+        "maximum_edit_similarity_to_train": 0.7083333333333333,
+        "maximum_edit_similarity_definition": "1 - minimum over TRAIN of (Levenshtein distance / length of the longer sequence); an edit-based similarity, not a sequence identity",
+        "edit_similarity_is_sequence_identity": false,
+        "thresholds_defined": false,
+        "historical_0_01_guardrail_used_as_decision_threshold": false,
+        "quantile_convention": "int(round(p * (n - 1))) on values sorted ascending"
+      },
+      "44": {
+        "valid_row_count": 15000,
+        "distinct_valid_sequence_count": 15000,
+        "distinct_distance_computations": 15000,
+        "row_distance_projections": 15000,
+        "nearest_train_normalized_edit_distance": {
+          "count": 15000,
+          "minimum": 0.3,
+          "p25": 0.4225352112676056,
+          "median": 0.44,
+          "p75": 0.45569620253164556,
+          "maximum": 0.5288461538461539,
+          "mean": 0.4380542443160006
+        },
+        "maximum_edit_similarity_to_train": 0.7,
+        "maximum_edit_similarity_definition": "1 - minimum over TRAIN of (Levenshtein distance / length of the longer sequence); an edit-based similarity, not a sequence identity",
+        "edit_similarity_is_sequence_identity": false,
+        "thresholds_defined": false,
+        "historical_0_01_guardrail_used_as_decision_threshold": false,
+        "quantile_convention": "int(round(p * (n - 1))) on values sorted ascending"
+      }
+    },
+    "pooled_equal_mixture_distance_quantiles": {
+      "count": 30000,
+      "total_weight": 1.0,
+      "total_weight_exact": {
+        "numerator": 1,
+        "denominator": 1
+      },
+      "minimum": 0.2916666666666667,
+      "p25": 0.4246575342465753,
+      "median": 0.44,
+      "p75": 0.4576271186440678,
+      "maximum": 0.5288461538461539,
+      "mean": 0.43908546452868824,
+      "mean_exact": {
+        "numerator": 29661977016528021629,
+        "denominator": 67553994410557440000
+      },
+      "quantile_rule": "inclusive_cumulative_weight_exact_v2",
+      "probabilities_exact": {
+        "p25": {
+          "numerator": 1,
+          "denominator": 4
+        },
+        "median": {
+          "numerator": 1,
+          "denominator": 2
+        },
+        "p75": {
+          "numerator": 3,
+          "denominator": 4
+        }
+      },
+      "weight_arithmetic": "exact_rational",
+      "float_boundary_fallback": false
+    },
+    "pooled_equal_mixture_distance_quantiles_absent": false,
+    "pooled_equal_mixture_absent_reason": null,
+    "pooled_equal_mixture_rule": "inclusive_cumulative_weight_exact_v2",
+    "new_quantile_rule_invented": false
+  }
+}

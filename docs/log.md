@@ -11810,3 +11810,31 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 **Next gate:** TRAIN exact leakage and nearest-TRAIN-distance remain outstanding.
 
+## 2026-10-12 — M9A TRAIN leakage evidence and M9A closure
+
+**Stage:** Aim 2 / modelling / M9A overlap and leakage
+
+**Status:** M9A is complete. M9B and M9C remain incomplete.
+
+**Prior exact overlap:** `results/fine_tuning/m9_generator_evaluation/m9a_exact_cross_condition_overlap/`. Summary SHA-256 `03e2b8f6d1dd21181c2d5521a552ec4aac6f78ad4fbd0dc5260ca105e849c32e`. Manifest SHA-256 `555159f1f0ca2cf2311ed4c797c2f22538e0a230e725f79eff90e8dcc94259c9`. Only B1–D1 had nonzero exact overlap: 1/30,000 rows in each direction, B1 distinct coverage 1/29,983, D1 distinct coverage 1/30,000, and Jaccard 1/59,982. The other five pairs were zero at both grains. B0 stayed an external comparator.
+
+**TRAIN leakage:** `results/fine_tuning/m9_generator_evaluation/m9a_train_leakage/`. Sealed production execution succeeded once with no retry. Runner commit `532bbba34f3918b6f5fc3b4d09d48de0d92be54e`. Runner-contract digest `ef68b1575df4d770af2bdd622eeb84f647a18db9d4cbd115e0b8a60de5dce528`. M9A contract digest `6aeaa2338776cbe7aceffef63ee4ca7dfd7ed3643aa7d1e400fd54a02d113535`. Governing-plan digest `fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51`.
+
+**Identities:** Combined ledger `m9_all_conditions_derived_attempt_ledger.jsonl`, SHA-256 `d50c30e85b26e39e8a25ea2660f9a7fa07433417de757364eb36799ca8c6073e`, 120,080 rows. TRAIN CSV `ft_train.csv`, SHA-256 `84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0`, 726 identity rows and 669 distinct cores. TRAIN text `corpus_final.txt`, SHA-256 `d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d`, 669 lines, equal to the CSV first-occurrence cores. These identities are taken from the leakage manifest. This closure did not reopen the ledger or the TRAIN sources.
+
+**Result:** Exact TRAIN leakage is zero for B0, B1, B2, and D1 at row and distinct-sequence grain. D1 seeds 43 and 44 each have zero exact leakage, 0/15,000 at both grains. Nearest-TRAIN distance is global Levenshtein distance divided by the longer length. Maximum edit similarity is not sequence identity. B0 remains an external comparator. No threshold, bootstrap, confidence interval, or hypothesis test was introduced.
+
+**Hashes:**
+
+- `m9_exact_train_leakage_summary.json` — `f7d10f7f41777a091cc2b2bf3dfeec555d5e8d84b3b89850328be7cdcf15e0d3`
+- `m9_nearest_train_distance_summary.json` — `c68fa997207a657a7049e53dd074e8d593333f84152008d631cae0d6565c1d66`
+- `m9_train_leakage_manifest.json` — `e2b97da3b1f39859c1d4fc3a652dd4abb6e4da5836e2a5e9c067ce1b87491d88`
+
+**Boundary:** VALIDATION, REF, and EVAL were not accessed. Models, checkpoints, structure tools, and AptaRank were not accessed. No sequence-bearing JSONL file is committed. The generated JSON fields `m9a_complete=false` stay immutable and do not self-certify the milestone.
+
+**Review:** Independent local review passed. Review archive SHA-256 `9af7253146647301fbbf5d0e765b4a104d1e5e263f1d27e451a069976720bc72`.
+
+**Completion:** M9A became complete only when the exact-overlap evidence, this TRAIN-leakage evidence, independent review, documentation, and this closure commit were all present.
+
+**Next task:** A separate plan revision making M9B synthetic/preparatory-only and leaving overlap and leakage exclusively in M9A.
+

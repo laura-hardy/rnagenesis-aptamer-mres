@@ -1,0 +1,192 @@
+{
+  "schema": "generator-eval-train-leakage-manifest-m9a-r1",
+  "runner_git_commit": "532bbba34f3918b6f5fc3b4d09d48de0d92be54e",
+  "runner_contract": {
+    "contract_id": "m9a-train-leakage-runner-v1",
+    "relative_path": "config/modelling/generator_eval_train_leakage_runner_contract.json",
+    "expected_sha256": "ef68b1575df4d770af2bdd622eeb84f647a18db9d4cbd115e0b8a60de5dce528",
+    "recomputed_sha256": "ef68b1575df4d770af2bdd622eeb84f647a18db9d4cbd115e0b8a60de5dce528",
+    "byte_count": 7666
+  },
+  "m9a_contract": {
+    "contract_id": "m9a-overlap-leakage-definitions-v1",
+    "relative_path": "config/modelling/generator_eval_overlap_leakage_contract.json",
+    "expected_sha256": "6aeaa2338776cbe7aceffef63ee4ca7dfd7ed3643aa7d1e400fd54a02d113535",
+    "recomputed_sha256": "6aeaa2338776cbe7aceffef63ee4ca7dfd7ed3643aa7d1e400fd54a02d113535",
+    "byte_count": 7434
+  },
+  "governing_plan": {
+    "relative_path": "docs/aptarank_full_mres_thesis_evaluation_plan.md",
+    "expected_sha256": "fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51",
+    "recomputed_sha256": "fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51",
+    "byte_count": 52036
+  },
+  "frozen_data_contract": {
+    "contract_id": "rnagenesis_corrected_669_core_m0",
+    "relative_path": "config/modelling/frozen_data_contract.json",
+    "expected_sha256": "396c83c3dbf9afc656ad5c60ec05c94fce3c5a684990c3cc1cebfb2411ccd5ff",
+    "recomputed_sha256": "396c83c3dbf9afc656ad5c60ec05c94fce3c5a684990c3cc1cebfb2411ccd5ff",
+    "byte_count": 5150
+  },
+  "combined_ledger": {
+    "filename": "m9_all_conditions_derived_attempt_ledger.jsonl",
+    "supplied_as": "sealed_locator",
+    "relative_path": "results/fine_tuning/m9_generator_evaluation/m9_all_conditions_derived_attempt_ledger.jsonl",
+    "expected_sha256": "d50c30e85b26e39e8a25ea2660f9a7fa07433417de757364eb36799ca8c6073e",
+    "recomputed_sha256": "d50c30e85b26e39e8a25ea2660f9a7fa07433417de757364eb36799ca8c6073e",
+    "byte_count": 188521569,
+    "row_count": 120080,
+    "row_counts": {
+      "B0": 30080,
+      "B1": 30000,
+      "B2": 30000,
+      "D1": 30000,
+      "combined": 120080
+    }
+  },
+  "train_csv": {
+    "filename": "ft_train.csv",
+    "supplied_as": "development_locator",
+    "path": "/home/laura/rnagenesis-mres-data/development/ft_train.csv",
+    "expected_sha256": "84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0",
+    "recomputed_sha256": "84c4a357abb314b9a3b0cb667a4b7c194c96f70c032adec9aac26e66d3204bd0",
+    "byte_count": 1201524,
+    "identity_row_count": 726,
+    "distinct_core_count": 669,
+    "csv_rows_silently_deduplicated": false,
+    "cores_rewritten": false
+  },
+  "train_text": {
+    "filename": "corpus_final.txt",
+    "supplied_as": "development_locator",
+    "path": "/home/laura/rnagenesis-mres-data/development/corpus_final.txt",
+    "expected_sha256": "d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d",
+    "recomputed_sha256": "d6cbc41a36b4a83e393e5593598a2bda246bc6e9df151d236381885734e05c9d",
+    "byte_count": 37700,
+    "line_count": 669,
+    "equals_csv_first_occurrence_order": true,
+    "comparison_population": "corpus_final_text_equal_to_train_csv_first_occurrence_cores"
+  },
+  "outputs": [
+    {
+      "filename": "m9_exact_train_leakage_summary.json",
+      "byte_count": 4737,
+      "sha256": "f7d10f7f41777a091cc2b2bf3dfeec555d5e8d84b3b89850328be7cdcf15e0d3",
+      "row_count": null
+    },
+    {
+      "filename": "m9_nearest_train_distance_summary.json",
+      "byte_count": 8889,
+      "sha256": "c68fa997207a657a7049e53dd074e8d593333f84152008d631cae0d6565c1d66",
+      "row_count": null
+    }
+  ],
+  "metric_grain_and_denominator_rules": {
+    "exact_train_leakage": {
+      "numerator": "Valid generated rows whose full parsed sequence belongs to the caller-supplied TRAIN core set.",
+      "denominator": "Valid generated rows.",
+      "grain": "valid_generated_row",
+      "direction": "lower",
+      "match": "full_parsed_string_membership",
+      "partial_match": false,
+      "substring_match": false,
+      "identity_threshold": null,
+      "historical_0_01_guardrail_used_as_decision_threshold": false,
+      "train_cores": "nonempty canonical ^[ACGU]+$ strings supplied in memory",
+      "duplicate_train_cores": "refused; duplicates are not silently removed",
+      "production_train_loader": false,
+      "distinct_sequence_sensitivity": "matching distinct generated sequences divided by distinct valid generated sequences",
+      "zero_denominator": "A zero required denominator yields a null rate except for the frozen D1 seed report, which fails closed.",
+      "d1": {
+        "expected_training_seeds": [
+          43,
+          44
+        ],
+        "seed_specific_valid_conditional_row_rates": true,
+        "unweighted_arithmetic_mean_of_seed_specific_row_rates": true,
+        "observed_minimum_maximum_range": true,
+        "actual_attempt_pooled_separately_labelled": true,
+        "confidence_interval": false,
+        "bootstrap": false,
+        "hypothesis_test": false,
+        "missing_seed_or_zero_valid_denominator": "explicit failure; not replaced with a pooled estimate"
+      }
+    },
+    "nearest_train_normalized_edit_distance": {
+      "numerator": "Global Levenshtein distance to the nearest supplied TRAIN core.",
+      "denominator": "Length of the longer of the valid generated sequence and that TRAIN core.",
+      "grain": "valid_generated_row",
+      "direction": "higher",
+      "execution": "retained_for_later_execution_on_caller_supplied_cores",
+      "production_train_loader": false,
+      "maximum_edit_similarity": "one minus the nearest normalized distance",
+      "edit_similarity_is_sequence_identity": false,
+      "distinct_sequence_projection": "Compute the distance once per distinct generated sequence and project it back to rows.",
+      "row_quantile_convention": "int(round(p * (n - 1))) on values sorted ascending",
+      "quantile_keys": [
+        "count",
+        "minimum",
+        "p25",
+        "median",
+        "p75",
+        "maximum",
+        "mean"
+      ],
+      "d1_seed_specific_distance_summaries": true,
+      "pooled_equal_mixture_distance_quantile": {
+        "rule": "inclusive_cumulative_weight_exact_v2",
+        "reuses_existing_rule": true,
+        "new_rule_invented": false,
+        "weight": "1 / (participating seeds \u00d7 valid rows for that seed)",
+        "absent_when": "A required D1 seed is missing, or a D1 seed has a zero valid-row count. The existing weight is undefined at a zero valid-row count, and dropping that seed would be a different rule."
+      },
+      "thresholds_defined": false,
+      "historical_0_01_guardrail_used_as_decision_threshold": false
+    }
+  },
+  "nearest_distance_execution": {
+    "scalar_per_globally_distinct_generated_sequence": true,
+    "projected_to_rows_conditions_and_seeds": true,
+    "replaces_frozen_implementation": false,
+    "frozen_function": "nearest_train_distance_summaries"
+  },
+  "serialization": "UTF-8 JSON, trailing LF, indent 2, ensure_ascii, constructed key order, allow_nan false",
+  "deterministic_serialization": true,
+  "access_boundary": {
+    "train_files_opened": true,
+    "train_bytes_supplied": true,
+    "validation_accessed": false,
+    "ref_accessed": false,
+    "eval_accessed": false,
+    "models_accessed": false,
+    "checkpoints_accessed": false,
+    "structure_tools_accessed": false,
+    "aptarank_accessed": false,
+    "representation_analysis_accessed": false,
+    "sealed_inputs_opened": true,
+    "validation_opened": false,
+    "production_identities_enforced": true,
+    "rows_repaired": false,
+    "rows_reordered": false,
+    "rows_deduplicated": false,
+    "rows_replenished": false,
+    "rows_rewritten": false,
+    "train_cores_rewritten": false,
+    "csv_rows_silently_deduplicated": false,
+    "historical_0_01_guardrail_used_as_decision_threshold": false,
+    "b0_pooled_into_b1_b2_d1_aggregate": false,
+    "synthetic_execution_is_production_validation": false,
+    "sealed_production_entry_remains_unexecuted_by_definition": false
+  },
+  "invocation": {
+    "entrypoint": "sealed_train_leakage",
+    "production_identities": true
+  },
+  "future_output_relative_directory": "results/fine_tuning/m9_generator_evaluation/m9a_train_leakage",
+  "manifest_file": {
+    "filename": "m9_train_leakage_manifest.json",
+    "schema": "generator-eval-train-leakage-manifest-m9a-r1",
+    "sha256_embedded": false,
+    "statement": "The SHA-256 of this manifest is the digest of these exact file bytes. It is not embedded, because embedding it would change the digest."
+  }
+}

@@ -1,0 +1,165 @@
+{
+  "schema": "generator-eval-exact-train-leakage-summary-m9a-r1",
+  "runner_contract_id": "m9a-train-leakage-runner-v1",
+  "m9a_contract_id": "m9a-overlap-leakage-definitions-v1",
+  "synthetic_execution_is_production_validation": false,
+  "production_identities_enforced": true,
+  "m9a_complete": false,
+  "m9b_complete": false,
+  "m9c_complete": false,
+  "comparison_population": "corpus_final_text_equal_to_train_csv_first_occurrence_cores",
+  "train_identity_row_count": 726,
+  "train_distinct_core_count": 669,
+  "train_text_line_count": 669,
+  "csv_rows_silently_deduplicated": false,
+  "cores_rewritten": false,
+  "historical_0_01_guardrail_used_as_decision_threshold": false,
+  "b0_role": "external_comparator",
+  "b0_pooled_into_b1_b2_d1_aggregate": false,
+  "b0_included_in_causal_comparison": false,
+  "validation_accessed": false,
+  "ref_accessed": false,
+  "eval_accessed": false,
+  "sequence_strings_emitted": false,
+  "sequence_hashes_emitted": false,
+  "attempt_identifiers_emitted": false,
+  "nearest_neighbour_identities_emitted": false,
+  "train_identity_ids_emitted": false,
+  "target_labels_emitted": false,
+  "expected_ledger_row_counts": {
+    "B0": 30080,
+    "B1": 30000,
+    "B2": 30000,
+    "D1": 30000,
+    "combined": 120080
+  },
+  "match": "full_parsed_string_membership",
+  "partial_match": false,
+  "substring_match": false,
+  "identity_threshold": null,
+  "supplied_distinct_train_core_count": 669,
+  "by_condition": {
+    "B0": {
+      "role": "external_comparator",
+      "pooled_into_b1_b2_d1_aggregate": false,
+      "row_leakage": {
+        "numerator": 0,
+        "denominator": 30080,
+        "rate": 0.0
+      },
+      "distinct_sequence_sensitivity": {
+        "numerator": 0,
+        "denominator": 30080,
+        "rate": 0.0
+      },
+      "partial_match": false,
+      "substring_match": false,
+      "identity_threshold": null,
+      "historical_0_01_guardrail_used_as_decision_threshold": false
+    },
+    "B1": {
+      "role": "generation_condition",
+      "pooled_into_b1_b2_d1_aggregate": false,
+      "row_leakage": {
+        "numerator": 0,
+        "denominator": 30000,
+        "rate": 0.0
+      },
+      "distinct_sequence_sensitivity": {
+        "numerator": 0,
+        "denominator": 29983,
+        "rate": 0.0
+      },
+      "partial_match": false,
+      "substring_match": false,
+      "identity_threshold": null,
+      "historical_0_01_guardrail_used_as_decision_threshold": false
+    },
+    "B2": {
+      "role": "generation_condition",
+      "pooled_into_b1_b2_d1_aggregate": false,
+      "row_leakage": {
+        "numerator": 0,
+        "denominator": 30000,
+        "rate": 0.0
+      },
+      "distinct_sequence_sensitivity": {
+        "numerator": 0,
+        "denominator": 30000,
+        "rate": 0.0
+      },
+      "partial_match": false,
+      "substring_match": false,
+      "identity_threshold": null,
+      "historical_0_01_guardrail_used_as_decision_threshold": false
+    },
+    "D1": {
+      "role": "generation_condition",
+      "pooled_into_b1_b2_d1_aggregate": false,
+      "row_leakage": {
+        "numerator": 0,
+        "denominator": 30000,
+        "rate": 0.0
+      },
+      "distinct_sequence_sensitivity": {
+        "numerator": 0,
+        "denominator": 30000,
+        "rate": 0.0
+      },
+      "partial_match": false,
+      "substring_match": false,
+      "identity_threshold": null,
+      "historical_0_01_guardrail_used_as_decision_threshold": false
+    }
+  },
+  "d1": {
+    "expected_training_seeds": [
+      43,
+      44
+    ],
+    "seed_43_valid_conditional_row_rate": {
+      "numerator": 0,
+      "denominator": 15000,
+      "rate": 0.0
+    },
+    "seed_44_valid_conditional_row_rate": {
+      "numerator": 0,
+      "denominator": 15000,
+      "rate": 0.0
+    },
+    "seed_43_distinct_sequence_sensitivity": {
+      "numerator": 0,
+      "denominator": 15000,
+      "rate": 0.0
+    },
+    "seed_44_distinct_sequence_sensitivity": {
+      "numerator": 0,
+      "denominator": 15000,
+      "rate": 0.0
+    },
+    "unweighted_arithmetic_mean_of_seed_specific_row_rates": 0.0,
+    "observed_range": {
+      "minimum": 0.0,
+      "maximum": 0.0
+    },
+    "observed_range_statement": "This is an observed range across D1 training seeds. It is not a confidence interval.",
+    "confidence_interval": null,
+    "bootstrap": false,
+    "hypothesis_test": false,
+    "actual_attempt_pooled": {
+      "label": "actual_attempt_pooled",
+      "separately_labelled": true,
+      "replaces_seed_specific_rates": false,
+      "row_leakage": {
+        "numerator": 0,
+        "denominator": 30000,
+        "rate": 0.0
+      },
+      "distinct_sequence_sensitivity": {
+        "numerator": 0,
+        "denominator": 30000,
+        "rate": 0.0
+      }
+    }
+  }
+}
