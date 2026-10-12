@@ -1,0 +1,193 @@
+{
+  "package_id": "M9B-2",
+  "schema_version": "m9b-aptarank-candidate-preparation-v1",
+  "status": "DEFINED_SYNTHETIC_ONLY_PRODUCTION_INPUTS_UNOPENED",
+  "stage": "M9B-2",
+  "deployment_verified": false,
+  "scientific_result": false,
+  "production_inputs_opened": false,
+  "production_membership_count": null,
+  "production_blinding_key": null,
+  "production_upload": null,
+  "production_runner": false,
+  "sealed_production_entry_point": false,
+  "aptarank_execution": false,
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md",
+    "version": "3.3",
+    "revision_date": "12 October 2026",
+    "sha256": "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
+  },
+  "evidence_contract": {
+    "path": "config/modelling/aptarank_evidence_contract.json",
+    "package_id": "M9B-1",
+    "sha256": "0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b"
+  },
+  "reused_specifications_and_modules": [
+    {
+      "role": "aptarank_io_specification",
+      "path": "config/modelling/aptarank_io_spec.json",
+      "sha256": "46ba6c8be873dad4c086e9f6b889b51702ba31212fa502d00f26e267a22da732"
+    },
+    {
+      "role": "aptarank_io_module",
+      "path": "scripts/modelling/aptarank_io_preflight.py",
+      "sha256": "eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01"
+    },
+    {
+      "role": "evidence_contract_module",
+      "path": "scripts/modelling/aptarank_evidence_contract.py",
+      "sha256": "08e780e03108c0008174a4559840ce59a56d567b99376d3ad0272eb29a69bbcb"
+    }
+  ],
+  "conditions": ["B0", "B1", "B2", "D1"],
+  "comparison_roles": {
+    "B0": "external_baseline",
+    "B1": "primary_causal_comparison",
+    "B2": "secondary_data_scale_comparator",
+    "D1": "primary_causal_comparison"
+  },
+  "comparison_role_placement": "private_membership_provenance_not_candidate_id",
+  "technical_eligibility": {
+    "source_fact_id": "length_limits",
+    "source_statement_pin": "20 through 100",
+    "minimum_length": 20,
+    "maximum_length": 100,
+    "inclusive": true,
+    "alphabet": "canonical_uppercase_ACGU",
+    "silent_normalization": false
+  },
+  "input_contract": {
+    "grain": "one_row_per_within_condition_distinct_eligible_sequence_membership",
+    "accepted_forms": ["in_memory_records", "caller_supplied_utf8_jsonl_bytes"],
+    "production_source_paths": false,
+    "record_keys": ["condition", "source_identity", "sequence", "length", "provenance"],
+    "jsonl_record_splitting": "existing_parser_split_raw_record_bytes",
+    "repeated_within_condition_membership": "fail_closed",
+    "silent_deduplication": false,
+    "source_identity_unique": true,
+    "provenance_by_condition": {
+      "B0": {
+        "keys": ["b0_seed", "b0_chunk_id", "line_number", "source_artifact_id", "source_artifact_sha256"],
+        "b0_seed_role": "chunk_seed_not_training_seed",
+        "d1_training_seed": "absent",
+        "empirical_null_seed": "absent"
+      },
+      "B1": {
+        "keys": ["checkpoint_identity", "generation_seed", "requested_biological_length", "invocation_index", "master_attempt_index", "technical_block", "source_artifact_id", "source_artifact_sha256", "d1_training_seed"],
+        "d1_training_seed": null,
+        "technical_block_values": ["A", "B"]
+      },
+      "B2": {
+        "keys": ["attempt_index", "empirical_null_seed", "sampled_length", "source_artifact_id", "source_artifact_sha256"],
+        "empirical_null_seed_role": "empirical_null_seed_not_training_seed",
+        "d1_training_seed": "absent"
+      },
+      "D1": {
+        "keys": ["checkpoint_identity", "generation_seed", "requested_biological_length", "invocation_index", "master_attempt_index", "technical_block", "source_artifact_id", "source_artifact_sha256", "d1_training_seed"],
+        "training_seeds": [43, 44],
+        "training_seed_technical_block": [
+          {"training_seed": 43, "technical_block": "A"},
+          {"training_seed": 44, "technical_block": "B"}
+        ]
+      }
+    }
+  },
+  "sampling": {
+    "domain_separator": "m9b2-candidate-sample-v1",
+    "sampling_seed": "m9b2-fixed-sampling-seed-v1",
+    "algorithm": "sha256_length_delimited_priority",
+    "encoding": "Each component is UTF-8. Encode it as a 4-byte big-endian unsigned byte length followed by those bytes. Concatenate components in order. The priority is the SHA-256 digest of that concatenation.",
+    "priority_components": ["domain_separator", "sampling_seed", "condition", "source_identity", "canonical_sequence"],
+    "selection": "lowest_priority_without_replacement",
+    "tie_break": ["sha256_priority_bytes", "source_identity_utf8", "canonical_sequence_utf8"],
+    "permitted_membership_counts": [200, 150, 100],
+    "production_membership_count_chosen": false,
+    "same_count_for_every_condition": true,
+    "d1_balance": "equal_memberships_per_recorded_training_seed",
+    "d1_seed_membership_counts": [
+      {"membership_count": 200, "per_training_seed": 100},
+      {"membership_count": 150, "per_training_seed": 75},
+      {"membership_count": 100, "per_training_seed": 50}
+    ],
+    "equal_seed_weighting_applied": false,
+    "cross_seed_replenishment": false,
+    "score_replenishment": false,
+    "library_prng": false,
+    "python_hash_randomization": false,
+    "depends_on_input_order": false,
+    "depends_on_filesystem_order": false
+  },
+  "upload_integrity": {
+    "label": "one_row_per_globally_distinct_selected_sequence",
+    "operation": "After independent within-condition selection, a sequence selected in more than one condition is written once in the candidate upload. Every selected condition membership stays in the private key. Later condition denominators use membership grain. The candidate upload uses globally distinct sequence grain.",
+    "not_a_cross_condition_metric": true,
+    "pair_table_emitted": false,
+    "shared_sequence_counts_emitted": false,
+    "replenish_after_upload_grouping": false
+  },
+  "opaque_candidate_id": {
+    "domain_separator": "m9b2-candidate-id-v1",
+    "algorithm": "hmac_sha256",
+    "encoding": "Length-delimited UTF-8 components in the order domain separator, then canonical sequence. The HMAC key is the caller-supplied 32-byte secret and is not a component.",
+    "key_length_bytes": 32,
+    "truncation_bytes": 16,
+    "textual_form": "cand_<lowercase_hex>",
+    "prefix": "cand_",
+    "hex_length": 32,
+    "arp1_column_type": "nonempty_opaque_id",
+    "collision_policy": "fail_closed",
+    "lengthen_on_collision": false,
+    "rename_on_collision": false,
+    "same_sequence_same_id_across_conditions": true,
+    "id_changes_when_secret_changes": true,
+    "sample_membership_changes_when_secret_changes": false,
+    "excluded_from_id": ["condition", "training_seed", "source_identity", "sequence_prefix", "target", "rank", "comparison_role"],
+    "production_key_embedded": false
+  },
+  "outputs": {
+    "candidate_upload": {
+      "filename": "candidate_upload.csv",
+      "columns": ["id", "sequence"],
+      "grain": "globally_distinct_selected_sequence",
+      "sequence_preserved_exactly": true
+    },
+    "private_membership_key": {
+      "filename": "private_membership_key.jsonl",
+      "grain": "selected_condition_membership",
+      "keys": ["candidate_id", "condition", "comparison_role", "source_identity", "length", "provenance"],
+      "sequence_included": false,
+      "invented_provenance": false
+    },
+    "preparation_manifest": {
+      "filename": "preparation_manifest.json",
+      "own_sha256_embedded": false,
+      "includes_sequence_strings": false,
+      "includes_source_identifiers": false,
+      "includes_candidate_identifiers": false,
+      "includes_hmac_key": false,
+      "includes_per_condition_shared_sequence_counts": false
+    }
+  },
+  "publication": {
+    "helper": "publish_directory",
+    "destination_must_not_exist": true,
+    "refuse": ["file", "existing_directory", "symlink"],
+    "temporary_sibling": true,
+    "verify_bytes_and_sha256": true,
+    "promote_by_one_rename": true,
+    "clean_temporary_output_on_failure": true,
+    "production_locator": false,
+    "results_directory_refused": true
+  },
+  "prohibited": [
+    "Opening TRAIN, VALIDATION, REF, EVAL, or a production sequence ledger",
+    "Inspecting generated production sequences",
+    "Calculating overlap, leakage, or nearest-TRAIN results",
+    "Running AptaRank or calling its UI or API",
+    "Reproducing Tier 1 or Tier 2 scoring",
+    "Creating a results directory artifact",
+    "Instantiating a production sample, blinding key, upload, or private key",
+    "Embedding a production blinding key"
+  ]
+}

@@ -11882,3 +11882,23 @@ M0 reproducibility/data-contract/code-integration implementation.
 
 **Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, models, checkpoints, and `results/` were not opened. No production upload or AptaRank scoring run was performed. No REF distribution or Tier 2 control bank was built. No production value was instantiated.
 
+
+## 2026-10-12 — M9B-2 synthetic candidate preparation
+
+**Stage:** Aim 2 / modelling / M9B-2 synthetic-only AptaRank candidate preparation
+
+**Status:** `DEFINED_SYNTHETIC_ONLY_PRODUCTION_INPUTS_UNOPENED`. This stage defines score-blind condition sampling, opaque candidate ids, and synthetic upload bytes. It does not choose the production membership count or verify the live deployment. No scientific result is claimed.
+
+**Plan:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` stays the active plan, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. It was not edited.
+
+**Contract:** `config/modelling/aptarank_candidate_preparation_contract.json`, SHA-256 `99c0ff690f716e6b4560a22d04d9a968e7f039288454cc3669c89a1beb65f3b9`.
+
+**Evidence contract:** `config/modelling/aptarank_evidence_contract.json`, SHA-256 `0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b`.
+
+**Reused pins:** ARP-1 specification `config/modelling/aptarank_io_spec.json`, SHA-256 `46ba6c8be873dad4c086e9f6b889b51702ba31212fa502d00f26e267a22da732`. ARP-1 module `scripts/modelling/aptarank_io_preflight.py`, SHA-256 `eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01`. Evidence module `scripts/modelling/aptarank_evidence_contract.py`, SHA-256 `08e780e03108c0008174a4559840ce59a56d567b99376d3ad0272eb29a69bbcb`.
+
+**Sampling:** SHA-256 length-delimited priority using domain `m9b2-candidate-sample-v1` and fixed seed `m9b2-fixed-sampling-seed-v1`. Permitted caller-supplied counts are 200, 150, and 100. D1 selects 100/100, 75/75, or 50/50 across training seeds 43 and 44. A short seed is not filled from the other seed.
+
+**Opaque ids:** HMAC-SHA-256 of the canonical sequence, truncated to 16 bytes, textual form `cand_` plus lowercase hex. The caller supplies the 32-byte key. No production key is embedded.
+
+**Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, models, checkpoints, and `results/` were not opened. No production upload or AptaRank scoring run was performed. No production sample, blinding key, or private key was instantiated. No overlap, leakage, or nearest-TRAIN workflow was run.
