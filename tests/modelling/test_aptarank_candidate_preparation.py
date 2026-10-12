@@ -8,6 +8,7 @@ production sample or instantiate a production blinding key.
 from __future__ import annotations
 
 import ast
+import copy
 import csv
 import hashlib
 import hmac
@@ -29,7 +30,7 @@ if MODELLING not in sys.path:
 
 import aptarank_candidate_preparation as preparation
 
-CONTRACT_SHA256 = "99c0ff690f716e6b4560a22d04d9a968e7f039288454cc3669c89a1beb65f3b9"
+CONTRACT_SHA256 = "3bcfbdf14cd7e777a0b2746f91d0335ba4876195f5012610157e5aa23e083096"
 PLAN_SHA256 = "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
 EVIDENCE_SHA256 = "0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b"
 IO_SPEC_SHA256 = "46ba6c8be873dad4c086e9f6b889b51702ba31212fa502d00f26e267a22da732"
@@ -89,17 +90,93 @@ def membership(condition, index, sequence, seed=None, requested_length=20, sampl
     seed_label = "na" if seed is None else str(seed)
     return {
         "condition": condition,
-        "source_identity": "synthetic-%s-%s-%04d" % (condition, seed_label, index),
         "sequence": sequence,
         "length": len(sequence),
-        "provenance": provenance_for(
-            condition,
-            index,
-            seed=seed,
-            requested_length=requested_length,
-            sampled_length=sampled_length,
-        ),
+        "multiplicity": 1,
+        "source_occurrences": [
+            {
+                "source_identity": "synthetic-%s-%s-%04d" % (condition, seed_label, index),
+                "provenance": provenance_for(
+                    condition,
+                    index,
+                    seed=seed,
+                    requested_length=requested_length,
+                    sampled_length=sampled_length,
+                ),
+            }
+        ],
     }
+
+
+def source_ids(row):
+    return [item["source_identity"] for item in row["source_occurrences"]]
+
+
+def training_seed(row):
+    return row["source_occurrences"][0]["provenance"]["d1_training_seed"]
+
+
+def occurrence_copy(occurrence, source_identity, **provenance_updates):
+    provenance = dict(occurrence["provenance"])
+    provenance.update(provenance_updates)
+    return {"source_identity": source_identity, "provenance": provenance}
+
+
+def canonical_occurrences(condition, occurrences):
+    """Independent canonical order: recorded provenance keys, then source identity."""
+    keys = {
+        "B0": ("b0_seed", "b0_chunk_id", "line_number", "source_artifact_id", "source_artifact_sha256"),
+        "B1": (
+            "checkpoint_identity",
+            "generation_seed",
+            "requested_biological_length",
+            "invocation_index",
+            "master_attempt_index",
+            "technical_block",
+            "source_artifact_id",
+            "source_artifact_sha256",
+            "d1_training_seed",
+        ),
+        "B2": (
+            "attempt_index",
+            "empirical_null_seed",
+            "sampled_length",
+            "source_artifact_id",
+            "source_artifact_sha256",
+        ),
+        "D1": (
+            "checkpoint_identity",
+            "generation_seed",
+            "requested_biological_length",
+            "invocation_index",
+            "master_attempt_index",
+            "technical_block",
+            "source_artifact_id",
+            "source_artifact_sha256",
+            "d1_training_seed",
+        ),
+    }[condition]
+
+    def token(value):
+        if type(value) is int:
+            return (0, value, b"")
+        if type(value) is str:
+            return (1, 0, value.encode("utf-8"))
+        if value is None:
+            return (2, 0, b"")
+        raise AssertionError("unexpected provenance value")
+
+    def sort_key(occurrence):
+        ordered = [token(occurrence["provenance"][key]) for key in keys]
+        ordered.append((1, 0, occurrence["source_identity"].encode("utf-8")))
+        return tuple(ordered)
+
+    return sorted(occurrences, key=sort_key)
+
+
+def selected_sequences(result, condition):
+    table = {row["id"]: row["sequence"] for row in upload_table(result)}
+    return [table[row["candidate_id"]] for row in private_rows(result) if row["condition"] == condition]
 
 
 def build_pool(per_condition, extra_non_d1=0, extra_per_seed=0, shared=False):
@@ -118,14 +195,23 @@ def build_pool(per_condition, extra_non_d1=0, extra_per_seed=0, shared=False):
             sequence = shared_sequence if shared and seed == 43 and offset == 0 else sequence_for(serial)
             rows.append(membership("D1", serial, sequence, seed=seed))
             serial += 1
-    identities = [row["source_identity"] for row in rows]
+    identities = [identity for row in rows for identity in source_ids(row)]
     pairs = [(row["condition"], row["sequence"]) for row in rows]
     if len(identities) != len(set(identities)) or len(pairs) != len(set(pairs)):
         raise AssertionError("synthetic memberships collided")
     return rows
 
 
-def independent_priority(condition, source_identity, sequence):
+def independent_priority(condition, sequence):
+    blob = b""
+    for part in (SAMPLING_DOMAIN, SAMPLING_SEED, condition, sequence):
+        encoded = part.encode("utf-8")
+        blob += len(encoded).to_bytes(4, "big") + encoded
+    return hashlib.sha256(blob).digest()
+
+
+def legacy_attempt_priority(condition, source_identity, sequence):
+    """Rejected ranking. It changes when a different duplicate attempt is chosen."""
     blob = b""
     for part in (SAMPLING_DOMAIN, SAMPLING_SEED, condition, source_identity, sequence):
         encoded = part.encode("utf-8")
@@ -144,8 +230,7 @@ def independent_candidate_id(sequence, key):
 def independent_selection(rows, membership_count):
     def rank(row):
         return (
-            independent_priority(row["condition"], row["source_identity"], row["sequence"]),
-            row["source_identity"].encode("utf-8"),
+            independent_priority(row["condition"], row["sequence"]),
             row["sequence"].encode("utf-8"),
         )
 
@@ -154,13 +239,9 @@ def independent_selection(rows, membership_count):
         pool = [row for row in rows if row["condition"] == condition]
         selected.extend(sorted(pool, key=rank)[:membership_count])
     for seed in (43, 44):
-        pool = [
-            row
-            for row in rows
-            if row["condition"] == "D1" and row["provenance"]["d1_training_seed"] == seed
-        ]
+        pool = [row for row in rows if row["condition"] == "D1" and training_seed(row) == seed]
         selected.extend(sorted(pool, key=rank)[: membership_count // 2])
-    return [(row["condition"], row["source_identity"]) for row in selected]
+    return [(row["condition"], tuple(source_ids(row))) for row in selected]
 
 
 def private_rows(result):
@@ -323,7 +404,7 @@ class CandidatePreparationTests(unittest.TestCase):
             self.prepare([mismatched])
         self.assertEqual(caught.exception.code, "length_invalid")
         duplicated = [membership("B0", 1, sequence_for(1)), membership("B1", 2, sequence_for(2))]
-        duplicated[1]["source_identity"] = duplicated[0]["source_identity"]
+        duplicated[1]["source_occurrences"][0]["source_identity"] = source_ids(duplicated[0])[0]
         with self.assertRaises(preparation.CandidatePreparationError) as caught:
             self.prepare(duplicated)
         self.assertEqual(caught.exception.code, "duplicate_source_identity")
@@ -341,24 +422,24 @@ class CandidatePreparationTests(unittest.TestCase):
 
     def test_seed_roles_are_not_invented(self):
         b1 = membership("B1", 1, sequence_for(1))
-        b1["provenance"]["d1_training_seed"] = 43
+        b1["source_occurrences"][0]["provenance"]["d1_training_seed"] = 43
         with self.assertRaises(preparation.CandidatePreparationError) as caught:
             self.prepare([b1])
         self.assertEqual(caught.exception.code, "d1_training_seed_invalid")
         for condition in ("B0", "B2"):
             row = membership(condition, 1, sequence_for(1))
-            row["provenance"]["d1_training_seed"] = None
+            row["source_occurrences"][0]["provenance"]["d1_training_seed"] = None
             with self.assertRaises(preparation.CandidatePreparationError) as caught:
                 self.prepare([row])
             self.assertEqual(caught.exception.code, "provenance_invalid")
         for seed in (42, 45, None, True):
             row = membership("D1", 1, sequence_for(1), seed=43)
-            row["provenance"]["d1_training_seed"] = seed
+            row["source_occurrences"][0]["provenance"]["d1_training_seed"] = seed
             with self.assertRaises(preparation.CandidatePreparationError) as caught:
                 self.prepare([row])
             self.assertEqual(caught.exception.code, "d1_training_seed_invalid")
         swapped = membership("D1", 1, sequence_for(1), seed=43)
-        swapped["provenance"]["technical_block"] = "B"
+        swapped["source_occurrences"][0]["provenance"]["technical_block"] = "B"
         with self.assertRaises(preparation.CandidatePreparationError) as caught:
             self.prepare([swapped])
         self.assertEqual(caught.exception.code, "d1_training_seed_invalid")
@@ -392,18 +473,19 @@ class CandidatePreparationTests(unittest.TestCase):
 
     def test_deterministic_sampling_and_exact_d1_balance(self):
         result = self.prepare(self.sampling_rows)
-        observed = [(row["condition"], row["source_identity"]) for row in private_rows(result)]
+        observed = [(row["condition"], tuple(source_ids(row))) for row in private_rows(result)]
         self.assertEqual(observed, independent_selection(self.sampling_rows, 100))
-        seeds = [row["provenance"]["d1_training_seed"] for row in private_rows(result) if row["condition"] == "D1"]
+        seeds = [training_seed(row) for row in private_rows(result) if row["condition"] == "D1"]
         self.assertEqual(seeds, [43] * 50 + [44] * 50)
         sample = self.sampling_rows[0]
         self.assertEqual(
-            preparation.membership_priority(sample["condition"], sample["source_identity"], sample["sequence"]),
-            independent_priority(sample["condition"], sample["source_identity"], sample["sequence"]),
+            preparation.membership_priority(sample["condition"], sample["sequence"]),
+            independent_priority(sample["condition"], sample["sequence"]),
         )
+        self.assertNotIn("source_identity", preparation.membership_priority.__code__.co_varnames)
 
     def test_shortage_is_exact_and_does_not_replenish_d1_seeds(self):
-        short_b0 = [row for row in self.exact[100] if row["source_identity"] != "synthetic-B0-na-0001"]
+        short_b0 = [row for row in self.exact[100] if "synthetic-B0-na-0001" not in source_ids(row)]
         self.assertEqual(sum(1 for row in short_b0 if row["condition"] == "B0"), 99)
         with self.assertRaises(preparation.CandidatePreparationError) as caught:
             self.prepare(short_b0)
@@ -423,7 +505,7 @@ class CandidatePreparationTests(unittest.TestCase):
         dropped = False
         short_seed = []
         for row in self.exact[100]:
-            if not dropped and row["condition"] == "D1" and row["provenance"]["d1_training_seed"] == 44:
+            if not dropped and row["condition"] == "D1" and training_seed(row) == 44:
                 dropped = True
                 continue
             short_seed.append(row)
@@ -446,7 +528,7 @@ class CandidatePreparationTests(unittest.TestCase):
         only_44 = [
             row
             for row in self.exact[100]
-            if not (row["condition"] == "D1" and row["provenance"]["d1_training_seed"] == 43)
+            if not (row["condition"] == "D1" and training_seed(row) == 43)
         ]
         with self.assertRaises(preparation.CandidatePreparationError) as caught:
             self.prepare(only_44)
@@ -459,7 +541,7 @@ class CandidatePreparationTests(unittest.TestCase):
         second = self.prepare(self.shared, blinding_key=OTHER_TEST_KEY)
         def membership_view(result):
             return [
-                (row["condition"], row["source_identity"], row["provenance"], row["length"])
+                (row["condition"], row["multiplicity"], row["source_occurrences"], row["length"])
                 for row in private_rows(result)
             ]
         self.assertEqual(membership_view(first), membership_view(second))
@@ -489,7 +571,8 @@ class CandidatePreparationTests(unittest.TestCase):
         for row in rows:
             candidate_id = row["candidate_id"]
             self.assertRegex(candidate_id, r"^cand_[0-9a-f]{32}\Z")
-            self.assertNotIn(row["source_identity"], candidate_id)
+            for identity in source_ids(row):
+                self.assertNotIn(identity, candidate_id)
             self.assertNotIn(row["condition"], candidate_id)
             self.assertNotIn(row["comparison_role"], candidate_id)
             self.assertNotIn("synthetic", candidate_id)
@@ -511,8 +594,8 @@ class CandidatePreparationTests(unittest.TestCase):
         rows = build_pool(100)
         for row in rows:
             if row["condition"] == "B1":
-                row["provenance"]["technical_block"] = "B"
-                row["provenance"]["requested_biological_length"] = 40
+                row["source_occurrences"][0]["provenance"]["technical_block"] = "B"
+                row["source_occurrences"][0]["provenance"]["requested_biological_length"] = 40
         long_row = next(row for row in rows if row["condition"] == "B1")
         long_sequence = sequence_for(900000, 100)
         long_row["sequence"] = long_sequence
@@ -522,21 +605,24 @@ class CandidatePreparationTests(unittest.TestCase):
         boundary["length"] = 20
         result = self.prepare(rows)
         private = private_rows(result)
-        b1 = next(row for row in private if row["source_identity"] == long_row["source_identity"])
+        b1 = next(row for row in private if source_ids(long_row)[0] in source_ids(row))
+        b1_provenance = b1["source_occurrences"][0]["provenance"]
         self.assertEqual(b1["length"], 100)
-        self.assertIsNone(b1["provenance"]["d1_training_seed"])
-        self.assertEqual(b1["provenance"]["technical_block"], "B")
-        self.assertEqual(b1["provenance"]["requested_biological_length"], 40)
+        self.assertEqual(b1["multiplicity"], 1)
+        self.assertIsNone(b1_provenance["d1_training_seed"])
+        self.assertEqual(b1_provenance["technical_block"], "B")
+        self.assertEqual(b1_provenance["requested_biological_length"], 40)
         self.assertNotIn("sequence", b1)
+        self.assertNotIn("sequence", b1["source_occurrences"][0])
         self.assertNotIn(long_sequence.encode("ascii"), result["private_membership_key"])
         upload = {row["sequence"]: row["id"] for row in upload_table(result)}
         self.assertEqual(upload[long_sequence], b1["candidate_id"])
         b0 = next(row for row in private if row["condition"] == "B0")
-        self.assertEqual(b0["provenance"]["b0_seed"], 7)
-        self.assertNotIn("d1_training_seed", b0["provenance"])
+        self.assertEqual(b0["source_occurrences"][0]["provenance"]["b0_seed"], 7)
+        self.assertNotIn("d1_training_seed", b0["source_occurrences"][0]["provenance"])
         b2 = next(row for row in private if row["condition"] == "B2")
-        self.assertEqual(b2["provenance"]["empirical_null_seed"], 7)
-        self.assertNotIn("d1_training_seed", b2["provenance"])
+        self.assertEqual(b2["source_occurrences"][0]["provenance"]["empirical_null_seed"], 7)
+        self.assertNotIn("d1_training_seed", b2["source_occurrences"][0]["provenance"])
         self.assertEqual(boundary["length"], 20)
 
     def test_manifest_has_no_forbidden_metrics_or_identifiers(self):
@@ -551,7 +637,8 @@ class CandidatePreparationTests(unittest.TestCase):
             self.assertNotIn(token, text)
         for row in self.shared:
             self.assertNotIn(row["sequence"], text)
-            self.assertNotIn(row["source_identity"], text)
+            for identity in source_ids(row):
+                self.assertNotIn(identity, text)
         self.assertEqual(manifest["status"], preparation.STATUS)
         self.assertIs(manifest["synthetic"], True)
         self.assertIs(manifest["production_inputs_opened"], False)
@@ -714,6 +801,247 @@ class CandidatePreparationTests(unittest.TestCase):
             self.assertFalse(os.path.exists(cleanup_destination))
             self.assertEqual([name for name in os.listdir(tmp) if name.startswith(preparation.TEMP_PREFIX)], [])
             self.assertFalse(stat.S_ISLNK(os.lstat(destination).st_mode))
+
+    def _b1_duplicate_pool(self):
+        """Distinct B1 sequences with same-block and cross-block duplicate attempts.
+
+        The dropped sequence also carries a probe attempt whose source identity
+        would change a ranking that used one chosen attempt.
+        """
+        rows = copy.deepcopy(self.sampling_rows)
+        ranked = sorted(
+            [row for row in rows if row["condition"] == "B1"],
+            key=lambda row: (independent_priority("B1", row["sequence"]), row["sequence"].encode("utf-8")),
+        )
+        self.assertGreater(len(ranked), 100)
+        same_block = ranked[0]
+        across_blocks = ranked[1]
+        dropped = ranked[100]
+        same_original = same_block["source_occurrences"][0]
+        same_added = occurrence_copy(
+            same_original,
+            "synthetic-B1-same-block-extra",
+            invocation_index=0,
+            master_attempt_index=0,
+        )
+        self.assertEqual(same_added["provenance"]["technical_block"], same_original["provenance"]["technical_block"])
+        self.assertLess(same_added["provenance"]["invocation_index"], same_original["provenance"]["invocation_index"])
+        same_block["source_occurrences"] = [same_original, same_added]
+        same_block["multiplicity"] = 2
+        cross_original = across_blocks["source_occurrences"][0]
+        cross_added = occurrence_copy(cross_original, "synthetic-B1-other-block-extra", technical_block="B")
+        self.assertEqual(cross_original["provenance"]["technical_block"], "A")
+        self.assertEqual(cross_added["provenance"]["technical_block"], "B")
+        across_blocks["source_occurrences"] = [cross_added, cross_original]
+        across_blocks["multiplicity"] = 2
+        probe = None
+        original_dropped = dropped["source_occurrences"][0]
+        for index in range(5000):
+            candidate = "synthetic-A-probe-%05d" % index
+            probe_occurrence = occurrence_copy(original_dropped, candidate, invocation_index=0)
+            dropped["source_occurrences"] = [probe_occurrence, original_dropped]
+            dropped["multiplicity"] = 2
+
+            def legacy_rank(row):
+                identity = row["source_occurrences"][0]["source_identity"]
+                return (
+                    legacy_attempt_priority("B1", identity, row["sequence"]),
+                    identity.encode("utf-8"),
+                    row["sequence"].encode("utf-8"),
+                )
+
+            legacy_chosen = [
+                row["sequence"]
+                for row in sorted((row for row in rows if row["condition"] == "B1"), key=legacy_rank)[:100]
+            ]
+            if dropped["sequence"] in legacy_chosen:
+                probe = candidate
+                break
+        self.assertIsNotNone(probe)
+        oracle = [row["sequence"] for row in ranked[:100]]
+        self.assertNotIn(dropped["sequence"], oracle)
+        return {
+            "rows": rows,
+            "oracle": oracle,
+            "same_block": same_block,
+            "across_blocks": across_blocks,
+            "dropped": dropped,
+            "probe": probe,
+        }
+
+    def test_duplicate_b1_attempts_same_block_and_across_blocks(self):
+        fixture = self._b1_duplicate_pool()
+        result = self.prepare(fixture["rows"])
+        self.assertEqual(selected_sequences(result, "B1"), fixture["oracle"])
+        self.assertNotIn(fixture["dropped"]["sequence"], selected_sequences(result, "B1"))
+        self.assertNotIn(fixture["probe"].encode("ascii"), result["private_membership_key"])
+        private = private_rows(result)
+        same = next(row for row in private if "synthetic-B1-same-block-extra" in source_ids(row))
+        across = next(row for row in private if "synthetic-B1-other-block-extra" in source_ids(row))
+        self.assertEqual(
+            [item["provenance"]["technical_block"] for item in same["source_occurrences"]],
+            ["A", "A"],
+        )
+        self.assertEqual(
+            [item["source_identity"] for item in same["source_occurrences"]],
+            ["synthetic-B1-same-block-extra", source_ids(fixture["same_block"])[0]],
+        )
+        self.assertEqual(same["multiplicity"], 2)
+        self.assertEqual(
+            [item["provenance"]["technical_block"] for item in across["source_occurrences"]],
+            ["A", "B"],
+        )
+        self.assertEqual(
+            [item["source_identity"] for item in across["source_occurrences"]],
+            [source_ids(fixture["across_blocks"])[1], "synthetic-B1-other-block-extra"],
+        )
+        self.assertEqual(across["multiplicity"], 2)
+        self.assertEqual(len(private), 400)
+        seeds = [training_seed(row) for row in private if row["condition"] == "D1"]
+        self.assertEqual(seeds, [43] * 50 + [44] * 50)
+        self.assertEqual(
+            preparation.membership_priority("B1", fixture["same_block"]["sequence"]),
+            independent_priority("B1", fixture["same_block"]["sequence"]),
+        )
+
+    def test_distinct_sequence_input_order_is_invariant(self):
+        fixture = self._b1_duplicate_pool()
+        forward = self.prepare(fixture["rows"])
+        reversed_rows = []
+        for row in reversed(fixture["rows"]):
+            copied = copy.deepcopy(row)
+            copied["source_occurrences"] = list(reversed(copied["source_occurrences"]))
+            reversed_rows.append(reorder(copied))
+        backward = self.prepare(reversed_rows)
+        self.assertEqual(backward["candidate_upload"], forward["candidate_upload"])
+        self.assertEqual(backward["private_membership_key"], forward["private_membership_key"])
+        self.assertEqual(backward["preparation_manifest"], forward["preparation_manifest"])
+        self.assertEqual(selected_sequences(backward, "B1"), fixture["oracle"])
+
+    def test_complete_provenance_retention(self):
+        fixture = self._b1_duplicate_pool()
+        result = self.prepare(fixture["rows"])
+        private = private_rows(result)
+        upload = {row["id"]: row["sequence"] for row in upload_table(result)}
+        grouped = {(row["condition"], row["sequence"]): row for row in fixture["rows"]}
+        retained_ids = []
+        for row in private:
+            self.assertNotIn("sequence", row)
+            sequence = upload[row["candidate_id"]]
+            self.assertNotIn(sequence.encode("ascii"), result["private_membership_key"])
+            source = grouped[(row["condition"], sequence)]
+            expected = canonical_occurrences(row["condition"], source["source_occurrences"])
+            self.assertEqual(row["source_occurrences"], expected)
+            self.assertEqual(row["multiplicity"], len(expected))
+            self.assertEqual(row["multiplicity"], source["multiplicity"])
+            retained_ids.extend(source_ids(row))
+        unselected = [
+            identity
+            for row in fixture["rows"]
+            for identity in source_ids(row)
+            if identity not in retained_ids
+        ]
+        self.assertIn(fixture["probe"], unselected)
+        for identity in unselected:
+            self.assertNotIn(identity.encode("ascii"), result["private_membership_key"])
+        manifest_text = result["preparation_manifest"].decode("ascii")
+        self.assertNotIn(b"cand_", result["preparation_manifest"])
+        for token in ("overlap", "jaccard", "leakage", "nearest"):
+            self.assertNotIn(token, manifest_text)
+        for row in fixture["rows"]:
+            self.assertNotIn(row["sequence"], manifest_text)
+            for identity in source_ids(row):
+                self.assertNotIn(identity, manifest_text)
+
+    def test_multiplicity_mismatch_fails_closed(self):
+        sequence = sequence_for(7)
+        base = membership("B1", 1, sequence)
+        extra = occurrence_copy(base["source_occurrences"][0], "synthetic-B1-extra-attempt", invocation_index=2)
+        mismatched = []
+        declared_high = copy.deepcopy(base)
+        declared_high["multiplicity"] = 2
+        mismatched.append(declared_high)
+        declared_low = copy.deepcopy(base)
+        declared_low["source_occurrences"] = [base["source_occurrences"][0], extra]
+        declared_low["multiplicity"] = 1
+        mismatched.append(declared_low)
+        zero = copy.deepcopy(base)
+        zero["multiplicity"] = 0
+        zero["source_occurrences"] = []
+        mismatched.append(zero)
+        boolean = copy.deepcopy(base)
+        boolean["multiplicity"] = True
+        mismatched.append(boolean)
+        for row in mismatched:
+            with self.assertRaises(preparation.CandidatePreparationError) as caught:
+                self.prepare([row])
+            self.assertEqual(caught.exception.code, "multiplicity_mismatch")
+            self.assertNotIn(sequence, caught.exception.detail)
+        ungrouped = [membership("B1", 1, sequence), membership("B1", 2, sequence)]
+        with self.assertRaises(preparation.CandidatePreparationError) as caught:
+            self.prepare(ungrouped)
+        self.assertEqual(caught.exception.code, "repeated_within_condition_membership")
+        self.assertNotIn(sequence, caught.exception.detail)
+        duplicated_identity = copy.deepcopy(base)
+        duplicated_identity["source_occurrences"] = [
+            base["source_occurrences"][0],
+            occurrence_copy(base["source_occurrences"][0], source_ids(base)[0], invocation_index=3),
+        ]
+        duplicated_identity["multiplicity"] = 2
+        with self.assertRaises(preparation.CandidatePreparationError) as caught:
+            self.prepare([duplicated_identity])
+        self.assertEqual(caught.exception.code, "duplicate_source_identity")
+
+    def test_ambiguous_d1_provenance_fails_closed(self):
+        rows = copy.deepcopy(self.exact[100])
+        target = next(row for row in rows if row["condition"] == "D1" and training_seed(row) == 43)
+        original = target["source_occurrences"][0]
+        other_seed = occurrence_copy(
+            original,
+            "synthetic-D1-seed-44-attempt",
+            d1_training_seed=44,
+            technical_block="B",
+            invocation_index=0,
+        )
+        target["source_occurrences"] = [other_seed, original]
+        target["multiplicity"] = 2
+        with self.assertRaises(preparation.CandidatePreparationError) as caught:
+            self.prepare(rows)
+        self.assertEqual(caught.exception.code, "ambiguous_d1_provenance")
+        self.assertNotIn(target["sequence"], caught.exception.detail)
+        self.assertIn("no seed is invented or assigned", caught.exception.detail)
+        balanced = copy.deepcopy(self.exact[100])
+        kept = next(row for row in balanced if row["condition"] == "D1" and training_seed(row) == 43)
+        kept_original = kept["source_occurrences"][0]
+        same_seed = occurrence_copy(kept_original, "synthetic-D1-same-seed-extra", invocation_index=0)
+        kept["source_occurrences"] = [kept_original, same_seed]
+        kept["multiplicity"] = 2
+        result = self.prepare(balanced)
+        manifest = manifest_of(result)
+        self.assertEqual(
+            manifest["d1_selected_membership_count_by_training_seed"],
+            [
+                {"training_seed": 43, "selected_membership_count": 50},
+                {"training_seed": 44, "selected_membership_count": 50},
+            ],
+        )
+        self.assertEqual(len(private_rows(result)), 400)
+        retained = next(row for row in private_rows(result) if "synthetic-D1-same-seed-extra" in source_ids(row))
+        self.assertEqual(retained["multiplicity"], 2)
+        self.assertEqual(
+            [item["provenance"]["d1_training_seed"] for item in retained["source_occurrences"]],
+            [43, 43],
+        )
+        self.assertEqual(
+            [item["source_identity"] for item in retained["source_occurrences"]],
+            ["synthetic-D1-same-seed-extra", source_ids(kept)[0]],
+        )
+        self.assertNotIn("sequence", retained)
+        self.assertNotIn(kept["sequence"].encode("ascii"), result["private_membership_key"])
+        manifest_text = result["preparation_manifest"].decode("ascii")
+        self.assertNotIn(kept["sequence"], manifest_text)
+        self.assertNotIn("synthetic-D1-same-seed-extra", manifest_text)
+        self.assertNotIn(b"cand_", result["preparation_manifest"])
 
     def test_module_has_no_production_runner_or_protected_locator(self):
         source_path = os.path.join(MODELLING, "aptarank_candidate_preparation.py")

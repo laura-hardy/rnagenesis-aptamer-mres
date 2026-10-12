@@ -11902,3 +11902,21 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Opaque ids:** HMAC-SHA-256 of the canonical sequence, truncated to 16 bytes, textual form `cand_` plus lowercase hex. The caller supplies the 32-byte key. No production key is embedded.
 
 **Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, models, checkpoints, and `results/` were not opened. No production upload or AptaRank scoring run was performed. No production sample, blinding key, or private key was instantiated. No overlap, leakage, or nearest-TRAIN workflow was run.
+
+## 2026-10-12 — M9B-2 distinct-sequence provenance correction
+
+**Stage:** Aim 2 / modelling / M9B-2 synthetic-only AptaRank candidate preparation
+
+**Status:** `DEFINED_SYNTHETIC_ONLY_PRODUCTION_INPUTS_UNOPENED`. This correction removes the dependence of distinct-sequence sampling on an arbitrarily chosen duplicate attempt. It does not choose the production membership count, open a production ledger, or verify the live deployment. No scientific result is claimed.
+
+**Plan:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` stays the active plan, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. It was not edited.
+
+**Contract:** `config/modelling/aptarank_candidate_preparation_contract.json`, SHA-256 `3bcfbdf14cd7e777a0b2746f91d0335ba4876195f5012610157e5aa23e083096`. The previous M9B-2 digest was `99c0ff690f716e6b4560a22d04d9a968e7f039288454cc3669c89a1beb65f3b9`.
+
+**Sampling:** Priority is SHA-256 over the frozen domain `m9b2-candidate-sample-v1`, the frozen seed `m9b2-fixed-sampling-seed-v1`, the condition, and the canonical sequence. Source identity and attempt provenance are not priority components. One record is one within-condition distinct sequence. Declared multiplicity must equal the number of source occurrences; a mismatch fails closed and is not repaired by dropping or choosing an attempt. Every source occurrence is kept in canonical provenance order in the private membership key. Sequences stay out of that key. The public manifest stays free of sequences, source identifiers, candidate identifiers, and overlap metrics.
+
+**D1:** Exact balance remains 100/100, 75/75, and 50/50 distinct memberships for seeds 43 and 44. A distinct D1 membership whose occurrences do not share one training seed fails closed. No seed is invented and no representative seed is assigned.
+
+**Tests:** Synthetic fixtures only. `tests.modelling.test_aptarank_candidate_preparation` passed 21 tests. The AptaRank evidence, I/O, and Tier 1 suites, the generator-eval synthetic suites, and `tests.modelling.test_modelling_contract` passed 241 tests.
+
+**Boundary:** TRAIN, VALIDATION, REF, EVAL, production sequence ledgers, models, checkpoints, and `results/` were not opened. No production upload or AptaRank scoring run was performed. No production sample, blinding key, or private key was instantiated. No overlap, leakage, or nearest-TRAIN workflow was run.

@@ -58,14 +58,22 @@
     "silent_normalization": false
   },
   "input_contract": {
-    "grain": "one_row_per_within_condition_distinct_eligible_sequence_membership",
+    "grain": "one_record_per_within_condition_distinct_eligible_sequence",
     "accepted_forms": ["in_memory_records", "caller_supplied_utf8_jsonl_bytes"],
     "production_source_paths": false,
-    "record_keys": ["condition", "source_identity", "sequence", "length", "provenance"],
+    "record_keys": ["condition", "sequence", "length", "multiplicity", "source_occurrences"],
+    "source_occurrence_keys": ["source_identity", "provenance"],
     "jsonl_record_splitting": "existing_parser_split_raw_record_bytes",
-    "repeated_within_condition_membership": "fail_closed",
+    "declared_multiplicity": "must_equal_source_occurrence_count",
+    "multiplicity_mismatch": "fail_closed",
     "silent_deduplication": false,
+    "representative_occurrence_chosen": false,
+    "repeated_within_condition_membership": "fail_closed",
     "source_identity_unique": true,
+    "canonical_source_occurrence_order": "recorded_provenance_keys_then_source_identity_utf8",
+    "ambiguous_d1_multi_seed_provenance": "fail_closed",
+    "invented_d1_training_seed": false,
+    "representative_d1_training_seed": false,
     "provenance_by_condition": {
       "B0": {
         "keys": ["b0_seed", "b0_chunk_id", "line_number", "source_artifact_id", "source_artifact_sha256"],
@@ -98,9 +106,12 @@
     "sampling_seed": "m9b2-fixed-sampling-seed-v1",
     "algorithm": "sha256_length_delimited_priority",
     "encoding": "Each component is UTF-8. Encode it as a 4-byte big-endian unsigned byte length followed by those bytes. Concatenate components in order. The priority is the SHA-256 digest of that concatenation.",
-    "priority_components": ["domain_separator", "sampling_seed", "condition", "source_identity", "canonical_sequence"],
+    "priority_components": ["domain_separator", "sampling_seed", "condition", "canonical_sequence"],
     "selection": "lowest_priority_without_replacement",
-    "tie_break": ["sha256_priority_bytes", "source_identity_utf8", "canonical_sequence_utf8"],
+    "tie_break": ["sha256_priority_bytes", "canonical_sequence_utf8"],
+    "priority_uses_source_identity": false,
+    "priority_uses_attempt_provenance": false,
+    "sampled_unit": "within_condition_distinct_sequence",
     "permitted_membership_counts": [200, 150, 100],
     "production_membership_count_chosen": false,
     "same_count_for_every_condition": true,
@@ -120,7 +131,7 @@
   },
   "upload_integrity": {
     "label": "one_row_per_globally_distinct_selected_sequence",
-    "operation": "After independent within-condition selection, a sequence selected in more than one condition is written once in the candidate upload. Every selected condition membership stays in the private key. Later condition denominators use membership grain. The candidate upload uses globally distinct sequence grain.",
+    "operation": "After independent within-condition selection of distinct sequences, a sequence selected in more than one condition is written once in the candidate upload. Every selected condition membership stays in the private key with every source occurrence. Later condition denominators use distinct-membership grain. The candidate upload uses globally distinct sequence grain. Within-condition duplicate attempts are not dropped and are not an overlap result.",
     "not_a_cross_condition_metric": true,
     "pair_table_emitted": false,
     "shared_sequence_counts_emitted": false,
@@ -154,10 +165,14 @@
     },
     "private_membership_key": {
       "filename": "private_membership_key.jsonl",
-      "grain": "selected_condition_membership",
-      "keys": ["candidate_id", "condition", "comparison_role", "source_identity", "length", "provenance"],
+      "grain": "selected_within_condition_distinct_sequence",
+      "keys": ["candidate_id", "condition", "comparison_role", "length", "multiplicity", "source_occurrences"],
+      "source_occurrence_keys": ["source_identity", "provenance"],
+      "source_occurrences_complete": true,
+      "source_occurrence_order": "canonical",
       "sequence_included": false,
-      "invented_provenance": false
+      "invented_provenance": false,
+      "representative_occurrence_chosen": false
     },
     "preparation_manifest": {
       "filename": "preparation_manifest.json",
@@ -166,7 +181,8 @@
       "includes_source_identifiers": false,
       "includes_candidate_identifiers": false,
       "includes_hmac_key": false,
-      "includes_per_condition_shared_sequence_counts": false
+      "includes_per_condition_shared_sequence_counts": false,
+      "includes_overlap_metrics": false
     }
   },
   "publication": {

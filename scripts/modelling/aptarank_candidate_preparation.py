@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """M9B-2 synthetic-only AptaRank candidate preparation.
 
-The preparation entry point accepts in-memory membership records or
-caller-supplied JSONL bytes. It samples a caller-supplied permitted count,
-assigns opaque ids with a caller-supplied 32-byte key, and returns upload,
-private-key, and manifest bytes. It does not open a protected ledger, choose
-the production sample size, embed a production blinding key, or call AptaRank.
+The preparation entry point accepts in-memory distinct-sequence records or
+caller-supplied JSONL bytes. Each record keeps every source occurrence for one
+within-condition sequence. Sampling uses the condition and canonical sequence
+only. It assigns opaque ids with a caller-supplied 32-byte key and returns
+upload, private-key, and manifest bytes. It does not open a protected ledger,
+choose the production sample size, embed a production blinding key, or call
+AptaRank.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ SCHEMA_VERSION = "m9b-aptarank-candidate-preparation-v1"
 STATUS = "DEFINED_SYNTHETIC_ONLY_PRODUCTION_INPUTS_UNOPENED"
 STAGE = "M9B-2"
 CONTRACT_RELATIVE = "config/modelling/aptarank_candidate_preparation_contract.json"
-CONTRACT_SHA256 = "99c0ff690f716e6b4560a22d04d9a968e7f039288454cc3669c89a1beb65f3b9"
+CONTRACT_SHA256 = "3bcfbdf14cd7e777a0b2746f91d0335ba4876195f5012610157e5aa23e083096"
 PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
 PLAN_SHA256 = "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
 EVIDENCE_CONTRACT_RELATIVE = "config/modelling/aptarank_evidence_contract.json"
@@ -57,7 +59,9 @@ ID_DOMAIN = "m9b2-candidate-id-v1"
 ID_PREFIX = "cand_"
 TRUNCATION_BYTES = 16
 KEY_LENGTH = 32
-RECORD_KEYS = ("condition", "source_identity", "sequence", "length", "provenance")
+RECORD_KEYS = ("condition", "sequence", "length", "multiplicity", "source_occurrences")
+OCCURRENCE_KEYS = ("source_identity", "provenance")
+CANONICAL_OCCURRENCE_ORDER = "recorded_provenance_keys_then_source_identity_utf8"
 B0_PROVENANCE_KEYS = (
     "b0_seed",
     "b0_chunk_id",
@@ -87,9 +91,9 @@ PRIVATE_KEY_KEYS = (
     "candidate_id",
     "condition",
     "comparison_role",
-    "source_identity",
     "length",
-    "provenance",
+    "multiplicity",
+    "source_occurrences",
 )
 RESULT_KEYS = (
     "candidate_upload",
@@ -182,11 +186,14 @@ def length_delimited_bytes(components):
     return b"".join(chunks)
 
 
-def membership_priority(condition, source_identity, sequence):
-    """SHA-256 priority. Lower digests are selected first."""
-    payload = length_delimited_bytes(
-        [SAMPLING_DOMAIN, SAMPLING_SEED, condition, source_identity, sequence]
-    )
+def membership_priority(condition, sequence):
+    """SHA-256 priority of one distinct sequence. Lower digests are selected first.
+
+    The preimage is the frozen domain, the frozen sampling seed, the condition,
+    and the canonical sequence. It does not include a source identity or any
+    attempt provenance, so a duplicate attempt cannot change the priority.
+    """
+    payload = length_delimited_bytes([SAMPLING_DOMAIN, SAMPLING_SEED, condition, sequence])
     return hashlib.sha256(payload).digest()
 
 
@@ -361,22 +368,55 @@ def validate_contract_document(document):
             "accepted_forms",
             "production_source_paths",
             "record_keys",
+            "source_occurrence_keys",
             "jsonl_record_splitting",
-            "repeated_within_condition_membership",
+            "declared_multiplicity",
+            "multiplicity_mismatch",
             "silent_deduplication",
+            "representative_occurrence_chosen",
+            "repeated_within_condition_membership",
             "source_identity_unique",
+            "canonical_source_occurrence_order",
+            "ambiguous_d1_multi_seed_provenance",
+            "invented_d1_training_seed",
+            "representative_d1_training_seed",
             "provenance_by_condition",
         ),
         "spec_invalid",
         "the input contract drifted",
     )
+    _require(
+        incoming["grain"] == "one_record_per_within_condition_distinct_eligible_sequence",
+        "spec_invalid",
+        "the input grain drifted",
+    )
     _require(incoming["accepted_forms"] == ["in_memory_records", "caller_supplied_utf8_jsonl_bytes"], "spec_invalid", "the accepted input forms drifted")
     _require(incoming["production_source_paths"] is False, "spec_invalid", "production source paths must stay refused")
     _require(tuple(incoming["record_keys"]) == RECORD_KEYS, "spec_invalid", "the input record keys drifted")
+    _require(tuple(incoming["source_occurrence_keys"]) == OCCURRENCE_KEYS, "spec_invalid", "the source-occurrence keys drifted")
     _require(incoming["jsonl_record_splitting"] == "existing_parser_split_raw_record_bytes", "spec_invalid", "JSONL splitting must reuse the parser")
+    _require(
+        incoming["declared_multiplicity"] == "must_equal_source_occurrence_count",
+        "spec_invalid",
+        "declared multiplicity must be checked against the source occurrences",
+    )
+    _require(incoming["multiplicity_mismatch"] == "fail_closed", "spec_invalid", "a multiplicity mismatch must fail closed")
     _require(incoming["repeated_within_condition_membership"] == "fail_closed", "spec_invalid", "repeated membership must fail closed")
     _require(incoming["silent_deduplication"] is False, "spec_invalid", "silent deduplication must stay off")
+    _require(incoming["representative_occurrence_chosen"] is False, "spec_invalid", "a representative occurrence must not be chosen")
     _require(incoming["source_identity_unique"] is True, "spec_invalid", "source identity must stay unique")
+    _require(
+        incoming["canonical_source_occurrence_order"] == CANONICAL_OCCURRENCE_ORDER,
+        "spec_invalid",
+        "the canonical source-occurrence order drifted",
+    )
+    _require(
+        incoming["ambiguous_d1_multi_seed_provenance"] == "fail_closed",
+        "spec_invalid",
+        "ambiguous D1 seed provenance must fail closed",
+    )
+    _require(incoming["invented_d1_training_seed"] is False, "spec_invalid", "a D1 training seed must not be invented")
+    _require(incoming["representative_d1_training_seed"] is False, "spec_invalid", "a representative D1 training seed must not be assigned")
     provenance = incoming["provenance_by_condition"]
     _require(tuple(provenance) == CONDITIONS, "spec_invalid", "provenance condition order drifted")
     _exact_keys(
@@ -440,6 +480,9 @@ def validate_contract_document(document):
             "priority_components",
             "selection",
             "tie_break",
+            "priority_uses_source_identity",
+            "priority_uses_attempt_provenance",
+            "sampled_unit",
             "permitted_membership_counts",
             "production_membership_count_chosen",
             "same_count_for_every_condition",
@@ -461,15 +504,22 @@ def validate_contract_document(document):
     _require(sampling["algorithm"] == "sha256_length_delimited_priority", "spec_invalid", "the sampling algorithm drifted")
     _require(
         sampling["priority_components"]
-        == ["domain_separator", "sampling_seed", "condition", "source_identity", "canonical_sequence"],
+        == ["domain_separator", "sampling_seed", "condition", "canonical_sequence"],
         "spec_invalid",
         "the priority components drifted",
     )
     _require(sampling["selection"] == "lowest_priority_without_replacement", "spec_invalid", "the selection rule drifted")
     _require(
-        sampling["tie_break"] == ["sha256_priority_bytes", "source_identity_utf8", "canonical_sequence_utf8"],
+        sampling["tie_break"] == ["sha256_priority_bytes", "canonical_sequence_utf8"],
         "spec_invalid",
         "the tie break drifted",
+    )
+    _require(sampling["priority_uses_source_identity"] is False, "spec_invalid", "sampling priority must not use a source identity")
+    _require(sampling["priority_uses_attempt_provenance"] is False, "spec_invalid", "sampling priority must not use attempt provenance")
+    _require(
+        sampling["sampled_unit"] == "within_condition_distinct_sequence",
+        "spec_invalid",
+        "the sampled unit must stay the within-condition distinct sequence",
     )
     _require(tuple(sampling["permitted_membership_counts"]) == PERMITTED_COUNTS, "spec_invalid", "the permitted counts drifted")
     _require(sampling["production_membership_count_chosen"] is False, "production_value_refused", "M9B-2 must not choose the production count")
@@ -573,10 +623,20 @@ def validate_contract_document(document):
     _require(outputs["candidate_upload"]["filename"] == UPLOAD_NAME, "spec_invalid", "the upload filename drifted")
     _require(outputs["candidate_upload"]["columns"] == ["id", "sequence"], "spec_invalid", "the upload columns drifted")
     _require(outputs["candidate_upload"]["sequence_preserved_exactly"] is True, "spec_invalid", "uploaded sequences must be preserved")
-    _require(outputs["private_membership_key"]["filename"] == PRIVATE_KEY_NAME, "spec_invalid", "the private-key filename drifted")
-    _require(tuple(outputs["private_membership_key"]["keys"]) == PRIVATE_KEY_KEYS, "spec_invalid", "the private-key fields drifted")
-    _require(outputs["private_membership_key"]["sequence_included"] is False, "spec_invalid", "the private key must not carry sequences")
-    _require(outputs["private_membership_key"]["invented_provenance"] is False, "spec_invalid", "provenance must not be invented")
+    private_key = outputs["private_membership_key"]
+    _require(private_key["filename"] == PRIVATE_KEY_NAME, "spec_invalid", "the private-key filename drifted")
+    _require(
+        private_key["grain"] == "selected_within_condition_distinct_sequence",
+        "spec_invalid",
+        "the private-key grain drifted",
+    )
+    _require(tuple(private_key["keys"]) == PRIVATE_KEY_KEYS, "spec_invalid", "the private-key fields drifted")
+    _require(tuple(private_key["source_occurrence_keys"]) == OCCURRENCE_KEYS, "spec_invalid", "the private-key occurrence keys drifted")
+    _require(private_key["source_occurrences_complete"] is True, "spec_invalid", "the private key must retain every source occurrence")
+    _require(private_key["source_occurrence_order"] == "canonical", "spec_invalid", "private-key occurrences must stay in canonical order")
+    _require(private_key["sequence_included"] is False, "spec_invalid", "the private key must not carry sequences")
+    _require(private_key["invented_provenance"] is False, "spec_invalid", "provenance must not be invented")
+    _require(private_key["representative_occurrence_chosen"] is False, "spec_invalid", "the private key must not choose a representative occurrence")
     _require(outputs["preparation_manifest"]["filename"] == MANIFEST_NAME, "spec_invalid", "the manifest filename drifted")
     _require(outputs["preparation_manifest"]["own_sha256_embedded"] is False, "spec_invalid", "the manifest must not embed its own hash")
     for flag in (
@@ -585,6 +645,7 @@ def validate_contract_document(document):
         "includes_candidate_identifiers",
         "includes_hmac_key",
         "includes_per_condition_shared_sequence_counts",
+        "includes_overlap_metrics",
     ):
         _require(outputs["preparation_manifest"][flag] is False, "spec_invalid", flag + " must remain false")
 
@@ -838,13 +899,87 @@ def _freeze_provenance(condition, provenance):
     return {key: provenance[key] for key in B2_PROVENANCE_KEYS}
 
 
+def _provenance_keys(condition):
+    if condition == "B0":
+        return B0_PROVENANCE_KEYS
+    if condition in ("B1", "D1"):
+        return M8_PROVENANCE_KEYS
+    return B2_PROVENANCE_KEYS
+
+
+def _order_token(value):
+    """Comparable token for one frozen provenance value."""
+    if type(value) is int:
+        return (0, value, b"")
+    if type(value) is str:
+        return (1, 0, value.encode("utf-8"))
+    if value is None:
+        return (2, 0, b"")
+    raise CandidatePreparationError("provenance_invalid", "a provenance value cannot be ordered")
+
+
+def _occurrence_sort_key(condition, occurrence):
+    """Canonical order: recorded provenance keys, then source identity UTF-8."""
+    provenance = occurrence["provenance"]
+    tokens = [_order_token(provenance[key]) for key in _provenance_keys(condition)]
+    tokens.append((1, 0, occurrence["source_identity"].encode("utf-8")))
+    return tuple(tokens)
+
+
+def _freeze_occurrences(condition, multiplicity, raw_occurrences):
+    """Keep every supplied occurrence. Do not drop one to fit a declared count."""
+    if type(multiplicity) is not int or multiplicity < 1:
+        raise CandidatePreparationError(
+            "multiplicity_mismatch",
+            "declared multiplicity must be a positive integer equal to the source-occurrence count",
+        )
+    if type(raw_occurrences) is not list:
+        raise CandidatePreparationError("source_occurrence_invalid", "source occurrences must be a list")
+    if len(raw_occurrences) != multiplicity:
+        raise CandidatePreparationError(
+            "multiplicity_mismatch",
+            "declared multiplicity does not equal the source-occurrence count",
+        )
+    frozen = []
+    for raw in raw_occurrences:
+        if type(raw) is not dict:
+            raise CandidatePreparationError("source_occurrence_invalid", "a source occurrence is not an object")
+        _exact_keys(raw, OCCURRENCE_KEYS, "source_occurrence_invalid", "a source occurrence does not match the input contract")
+        if not _token(raw["source_identity"]):
+            raise CandidatePreparationError("source_identity_invalid", "a source identity is not a stable token")
+        provenance = _freeze_provenance(condition, raw["provenance"])
+        frozen.append({"source_identity": raw["source_identity"], "provenance": provenance})
+    if condition == "D1":
+        seeds = {item["provenance"]["d1_training_seed"] for item in frozen}
+        if len(seeds) != 1:
+            raise CandidatePreparationError(
+                "ambiguous_d1_provenance",
+                "a distinct D1 membership has more than one training seed; no seed is invented or assigned",
+            )
+    frozen.sort(key=lambda item: _occurrence_sort_key(condition, item))
+    return frozen
+
+
+def _membership_training_seed(row):
+    """Return the single recorded D1 seed. Mixed seeds are not reduced to one."""
+    seeds = []
+    for occurrence in row["source_occurrences"]:
+        seed = occurrence["provenance"]["d1_training_seed"]
+        if seed not in seeds:
+            seeds.append(seed)
+    if len(seeds) != 1 or seeds[0] not in D1_SEEDS:
+        raise CandidatePreparationError(
+            "ambiguous_d1_provenance",
+            "a distinct D1 membership has more than one training seed; no seed is invented or assigned",
+        )
+    return seeds[0]
+
+
 def _normalize_one(raw):
     _exact_keys(raw, RECORD_KEYS, "input_invalid", "a membership record does not match the input contract")
     condition = raw["condition"]
     if condition not in CONDITIONS:
         raise CandidatePreparationError("condition_invalid", "condition must be B0, B1, B2, or D1")
-    if not _token(raw["source_identity"]):
-        raise CandidatePreparationError("source_identity_invalid", "a source identity is not a stable token")
     arp1 = _arp1()
     sequence = raw["sequence"]
     if type(sequence) is not str or arp1.SEQUENCE_TEXT.fullmatch(sequence) is None:
@@ -854,14 +989,14 @@ def _normalize_one(raw):
         raise CandidatePreparationError("length_invalid", "a membership length does not match its sequence")
     if length < LENGTH_MIN or length > LENGTH_MAX:
         raise CandidatePreparationError("length_ineligible", "a membership length is outside 20 through 100 inclusive")
-    provenance = _freeze_provenance(condition, raw["provenance"])
+    occurrences = _freeze_occurrences(condition, raw["multiplicity"], raw["source_occurrences"])
     return {
         "condition": condition,
-        "source_identity": raw["source_identity"],
         "sequence": sequence,
         "length": length,
         "comparison_role": COMPARISON_ROLES[condition],
-        "provenance": provenance,
+        "multiplicity": len(occurrences),
+        "source_occurrences": occurrences,
     }
 
 
@@ -875,12 +1010,14 @@ def _normalize_records(raw_records):
         if type(raw) is not dict:
             raise CandidatePreparationError("malformed_input", "a membership record is not an object")
         row = _normalize_one(raw)
-        if row["source_identity"] in source_ids:
-            raise CandidatePreparationError(
-                "duplicate_source_identity",
-                "source identity %s is duplicated" % row["source_identity"],
-            )
-        source_ids.add(row["source_identity"])
+        for occurrence in row["source_occurrences"]:
+            identity = occurrence["source_identity"]
+            if identity in source_ids:
+                raise CandidatePreparationError(
+                    "duplicate_source_identity",
+                    "source identity %s is duplicated" % identity,
+                )
+            source_ids.add(identity)
         membership = (row["condition"], row["sequence"])
         if membership in memberships:
             raise CandidatePreparationError(
@@ -919,8 +1056,7 @@ def _records_from_payload(payload):
 
 def _rank_key(row):
     return (
-        membership_priority(row["condition"], row["source_identity"], row["sequence"]),
-        row["source_identity"].encode("utf-8"),
+        membership_priority(row["condition"], row["sequence"]),
         row["sequence"].encode("utf-8"),
     )
 
@@ -962,7 +1098,7 @@ def select_memberships(rows, membership_count):
             selected.extend(sorted(pool, key=_rank_key)[:membership_count])
     by_seed = {seed: [] for seed in D1_SEEDS}
     for row in grouped["D1"]:
-        by_seed[row["provenance"]["d1_training_seed"]].append(row)
+        by_seed[_membership_training_seed(row)].append(row)
     for seed in D1_SEEDS:
         pool = by_seed[seed]
         if len(pool) < per_seed:
@@ -1009,15 +1145,24 @@ def _validate_upload(payload, ids):
 def _private_key_bytes(selected, ids):
     lines = []
     for row in selected:
+        if len(row["source_occurrences"]) != row["multiplicity"]:
+            raise CandidatePreparationError(
+                "multiplicity_mismatch",
+                "a selected membership does not retain its declared source occurrences",
+            )
+        if row["condition"] == "D1":
+            _membership_training_seed(row)
         document = {
             "candidate_id": ids[row["sequence"]],
             "condition": row["condition"],
             "comparison_role": row["comparison_role"],
-            "source_identity": row["source_identity"],
             "length": row["length"],
-            "provenance": row["provenance"],
+            "multiplicity": row["multiplicity"],
+            "source_occurrences": row["source_occurrences"],
         }
         _exact_keys(document, PRIVATE_KEY_KEYS, "private_key_invalid", "a private-key row drifted")
+        if "sequence" in document:
+            raise CandidatePreparationError("private_key_invalid", "the private key must not carry sequences")
         lines.append(canonical_json_bytes(document))
     if not lines:
         raise CandidatePreparationError("private_key_invalid", "the private key has no memberships")
@@ -1035,7 +1180,7 @@ def _count_rows(selected, membership_count):
         selected_counts.append({"condition": condition, "selected_membership_count": count})
     for row in selected:
         if row["condition"] == "D1":
-            seed_counts[row["provenance"]["d1_training_seed"]] += 1
+            seed_counts[_membership_training_seed(row)] += 1
     if seed_counts[43] != per_seed or seed_counts[44] != per_seed:
         raise CandidatePreparationError("selection_count_invalid", "the D1 seed balance drifted")
     return selected_counts, [
@@ -1123,7 +1268,11 @@ def _assert_manifest_closed(document, payload, rows, ids, blinding_key):
             raise CandidatePreparationError("manifest_firewall", "the preparation manifest contains a forbidden metric token")
     observed = set(_walk_strings(document))
     sequences = {row["sequence"] for row in rows}
-    sources = {row["source_identity"] for row in rows}
+    sources = {
+        occurrence["source_identity"]
+        for row in rows
+        for occurrence in row["source_occurrences"]
+    }
     if observed & sequences or observed & sources or observed & set(ids.values()):
         raise CandidatePreparationError("manifest_firewall", "the preparation manifest contains a membership identifier")
 
