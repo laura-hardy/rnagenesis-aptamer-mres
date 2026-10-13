@@ -28,7 +28,7 @@ SCHEMA_VERSION = "m9c-reference-upload-v2"
 STATUS = "POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED"
 STAGE = "M9C-1"
 CONTRACT_RELATIVE = "config/modelling/aptarank_reference_upload_contract.json"
-CONTRACT_SHA256 = "732f53607231e9d61dccb5a6e625a6c1c1402e3e6ab1331ca6791aa1507684a3"
+CONTRACT_SHA256 = "980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e"
 PRODUCTION_DESTINATION = "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation"
 PRODUCTION_PUBLICATION_METHOD = "atomic_rename_of_verified_temporary_sibling"
 PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
@@ -40,6 +40,9 @@ IO_MODULE_SHA256 = "eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c4
 REF_SHA256 = "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23"
 REF_BYTE_SIZE = 211993
 EXTERNAL_REF_RELATIVE = "data/processed/ref.csv"
+EXTERNAL_REF_LOCATOR = "opened_and_verified_in_attempt_1_corrected_retry_not_invoked"
+MANIFEST_STATUS = "REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN"
+PUBLICATION_ATTEMPT = 2
 SEALED_REVIEW_AUTHORIZED = True
 SEALED_ENTRY_POINT_INVOKED = False
 OUTPUT_MEMBERS = (
@@ -105,6 +108,7 @@ MANIFEST_KEYS = (
     "package_id",
     "schema_version",
     "status",
+    "publication_attempt",
     "source_sha256",
     "source_row_count",
     "distinct_sequence_cores",
@@ -224,8 +228,6 @@ def validate_contract_document(document, blobs):
     _require(document["stage"] == STAGE, "spec_invalid", "the stage changed")
     for key in (
         "scientific_result",
-        "production_inputs_opened",
-        "ref_opened",
         "eval_opened",
         "production_candidates_opened",
         "local_calibration",
@@ -234,6 +236,8 @@ def validate_contract_document(document, blobs):
         "deployment_verified",
     ):
         _require(document[key] is False, "spec_invalid", "a closed policy flag is no longer false")
+    _require(document["production_inputs_opened"] is True, "spec_invalid", "attempt 1 opened the production REF input")
+    _require(document["ref_opened"] is True, "spec_invalid", "attempt 1 opened and verified REF")
     _require(document["sealed_review_authorized"] is True, "spec_invalid", "sealed review is not authorized")
     _require(SEALED_REVIEW_AUTHORIZED is True, "review_required", "sealed review is not authorized")
     _require(SEALED_ENTRY_POINT_INVOKED is False, "spec_invalid", "the sealed entry point stays uninvoked")
@@ -371,7 +375,8 @@ def validate_contract_document(document, blobs):
     _require(attempt["observed_error_field"] == "publication", "spec_invalid", "the first attempt required publication")
     _require(attempt["output_published"] is False, "spec_invalid", "the first attempt published no output")
     _require(attempt["aptarank_run"] is False, "spec_invalid", "the first attempt did not run AptaRank")
-    _require(attempt["retried"] is False, "spec_invalid", "the failed publication was not retried")
+    # retried stays false because this revision has not invoked the corrected publication.
+    _require(attempt["retried"] is False, "spec_invalid", "attempt 1 stays unretried in this pre-retry revision")
     for source_name in FIELD_MAP.values():
         _require(source_name in columns, "schema_mismatch", "a retained source field is absent from the header")
     _require("partition" in columns and "sequence_core_sha256" in columns, "schema_mismatch", "the frozen REF header is incomplete")
@@ -417,7 +422,11 @@ def validate_contract_document(document, blobs):
     _require(external["sha256"] == REF_SHA256, "spec_invalid", "the external REF digest changed")
     _require(external["byte_size"] == REF_BYTE_SIZE, "spec_invalid", "the authorized REF byte size changed")
     _require(type(external["byte_size"]) is int, "spec_invalid", "the authorized REF byte size changed")
-    _require(external["locator"] == "authorized_not_invoked", "spec_invalid", "the sealed locator is not authorized")
+    _require(
+        external["locator"] == EXTERNAL_REF_LOCATOR,
+        "spec_invalid",
+        "the external REF locator must record that attempt 1 opened and verified REF and that the corrected retry is not invoked",
+    )
     _require(external["review_authorized"] is True, "spec_invalid", "sealed review is not authorized")
     mapping = document["frozen_target_mapping"]
     _exact_keys(
@@ -471,10 +480,11 @@ def validate_contract_document(document, blobs):
     _require(outputs["written_by_default"] is False, "spec_invalid", "preparation must not write by default")
     _require(outputs["production_directory"] == PRODUCTION_DESTINATION, "spec_invalid", "the production publication path changed")
     _require(outputs["publication_method"] == PRODUCTION_PUBLICATION_METHOD, "spec_invalid", "the publication method changed")
-    _require(outputs["publication_invoked"] is False, "spec_invalid", "sealed publication stays uninvoked")
+    # False here is this corrected revision's pre-retry state. Attempt 1 already opened REF.
+    _require(outputs["publication_invoked"] is False, "spec_invalid", "corrected publication stays uninvoked before retry")
     _require(outputs["existing_destination_refused"] is True, "spec_invalid", "an existing publication destination must stay refused")
     _require(outputs["atomic_members"] == list(OUTPUT_MEMBERS), "spec_invalid", "the atomic output members changed")
-    _require(outputs["sealed_entry_point_invoked"] is False, "spec_invalid", "the sealed entry point stays uninvoked")
+    _require(outputs["sealed_entry_point_invoked"] is False, "spec_invalid", "the sealed entry point stays uninvoked before retry")
     inputs = document["inputs"]
     _exact_keys(
         inputs,
@@ -682,11 +692,24 @@ def _ledger_bytes(retained):
     return payload
 
 
+def _validate_manifest_record(document):
+    """Reject a manifest that copies the pre-retry contract status."""
+    _exact_keys(document, MANIFEST_KEYS, "manifest_invalid", "the preparation manifest schema drifted")
+    if document["status"] == STATUS or document["status"] != MANIFEST_STATUS:
+        raise ReferenceUploadError(
+            "manifest_invalid",
+            "a preparation manifest status is REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN and does not copy the pre-retry contract status",
+        )
+    if type(document["publication_attempt"]) is not int or document["publication_attempt"] != PUBLICATION_ATTEMPT:
+        raise ReferenceUploadError("manifest_invalid", "a preparation manifest records publication attempt 2")
+
+
 def _manifest_bytes(source_digest, source_rows, retained_count, collapses, upload_hash, ledger_hash):
     document = {
         "package_id": PACKAGE_ID,
         "schema_version": SCHEMA_VERSION,
-        "status": STATUS,
+        "status": MANIFEST_STATUS,
+        "publication_attempt": PUBLICATION_ATTEMPT,
         "source_sha256": source_digest,
         "source_row_count": source_rows,
         "distinct_sequence_cores": retained_count,
@@ -700,7 +723,7 @@ def _manifest_bytes(source_digest, source_rows, retained_count, collapses, uploa
         "observed_ui_accepted_count": None,
         "observed_ui_dropped_count": None,
     }
-    _exact_keys(document, MANIFEST_KEYS, "manifest_invalid", "the preparation manifest schema drifted")
+    _validate_manifest_record(document)
     return canonical_json_bytes(document) + b"\n"
 
 
@@ -1001,7 +1024,7 @@ def _prepared_members(prepared):
         manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ReferenceUploadError("manifest_invalid", "the preparation manifest is not readable JSON") from exc
-    _exact_keys(manifest, MANIFEST_KEYS, "manifest_invalid", "the preparation manifest schema drifted")
+    _validate_manifest_record(manifest)
     if manifest["reference_upload_sha256"] != sha256_bytes(prepared["reference_upload"]):
         raise ReferenceUploadError("publication_verify_failed", "the manifest upload digest does not match the prepared bytes")
     if manifest["duplicate_provenance_sha256"] != sha256_bytes(prepared["duplicate_provenance"]):

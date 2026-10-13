@@ -29,7 +29,7 @@ if MODELLING not in sys.path:
 
 import aptarank_reference_upload as upload
 
-CONTRACT_SHA256 = "732f53607231e9d61dccb5a6e625a6c1c1402e3e6ab1331ca6791aa1507684a3"
+CONTRACT_SHA256 = "980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e"
 CORE_A = "ACGUACGUACGUACGUACGU"
 CORE_B = "GCAUGCAUGCAUGCAUGCAU"
 CORE_C = "ACGU"
@@ -145,10 +145,15 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertTrue(document["outputs"]["existing_destination_refused"])
         self.assertTrue(document["inputs"]["sealed_publication_requires_invocation"])
         self.assertFalse(document["outputs"]["written_by_default"])
-        self.assertFalse(document["ref_opened"])
+        self.assertTrue(document["production_inputs_opened"])
+        self.assertTrue(document["ref_opened"])
         self.assertFalse(document["eval_opened"])
         self.assertFalse(document["production_candidates_opened"])
+        self.assertFalse(document["scientific_result"])
+        self.assertFalse(document["aptarank_execution"])
+        self.assertFalse(document["deployment_verified"])
         self.assertFalse(document["local_calibration"])
+        self.assertFalse(document["local_calibration_substitute"])
         self.assertEqual(document["calibration"]["performer"], "aptarank")
         self.assertEqual(document["calibration"]["method"], "single_pooled_empirical_ref")
         self.assertFalse(document["calibration"]["project_implementation"])
@@ -168,7 +173,11 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertTrue(upload.SEALED_REVIEW_AUTHORIZED)
         self.assertFalse(upload.SEALED_ENTRY_POINT_INVOKED)
         self.assertEqual(document["external_ref"]["byte_size"], 211993)
-        self.assertEqual(document["external_ref"]["locator"], "authorized_not_invoked")
+        self.assertEqual(document["external_ref"]["locator"], upload.EXTERNAL_REF_LOCATOR)
+        self.assertEqual(
+            document["external_ref"]["locator"],
+            "opened_and_verified_in_attempt_1_corrected_retry_not_invoked",
+        )
         self.assertTrue(document["external_ref"]["review_authorized"])
         self.assertEqual(document["outputs"]["atomic_members"], list(upload.OUTPUT_MEMBERS))
         self.assertFalse(document["outputs"]["sealed_entry_point_invoked"])
@@ -219,6 +228,10 @@ class ReferenceUploadTests(unittest.TestCase):
             self.assertNotIn(core, prepared["duplicate_provenance"].decode("utf-8"))
             self.assertNotIn(core, prepared["preparation_manifest"].decode("utf-8"))
         manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
+        self.assertEqual(manifest["status"], "REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN")
+        self.assertNotEqual(manifest["status"], upload.STATUS)
+        self.assertEqual(manifest["publication_attempt"], 2)
+        self.assertIs(type(manifest["publication_attempt"]), int)
         self.assertEqual(manifest["prepared_upload_row_count"], 3)
         self.assertNotIn("accepted_count", manifest)
         self.assertNotIn("dropped_count", manifest)
@@ -453,6 +466,9 @@ class ReferenceUploadTests(unittest.TestCase):
                 )
         self.assertEqual(caught.exception.code, "ui_observation_refused")
         manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
+        self.assertEqual(manifest["status"], upload.MANIFEST_STATUS)
+        self.assertNotEqual(manifest["status"], upload.STATUS)
+        self.assertEqual(manifest["publication_attempt"], 2)
         self.assertTrue(prepared["production_ref_identity_verified"])
         self.assertTrue(manifest["production_ref_identity_verified"])
         self.assertEqual(manifest["prepared_upload_row_count"], 113)
@@ -698,6 +714,35 @@ class ReferenceUploadTests(unittest.TestCase):
                 upload._publish_prepared_directory(os.path.join(linked_parent, "m9c_reference_preparation"), _synthetic_prepared())
             self.assertEqual(caught_link.exception.code, "output_refused")
             self.assertEqual(os.listdir(parent), ["linked"])
+
+    def test_publication_rejects_a_pre_retry_contract_status_or_other_attempt(self):
+        prepared = _synthetic_prepared()
+        manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
+        self.assertEqual(manifest["status"], "REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN")
+        self.assertNotEqual(manifest["status"], "POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED")
+        self.assertEqual(manifest["publication_attempt"], 2)
+
+        def refuse(changed):
+            blob = (json.dumps(changed, ensure_ascii=True, separators=(",", ":")) + "\n").encode("utf-8")
+            bad = dict(prepared)
+            bad["preparation_manifest"] = blob
+            bad["preparation_manifest_sha256"] = hashlib.sha256(blob).hexdigest()
+            with tempfile.TemporaryDirectory() as parent:
+                destination = os.path.join(parent, "m9c_reference_preparation")
+                with self.assertRaises(upload.ReferenceUploadError) as caught:
+                    upload._publish_prepared_directory(destination, bad)
+                self.assertEqual(caught.exception.code, "manifest_invalid")
+                self.assertFalse(os.path.lexists(destination))
+
+        copied = dict(manifest)
+        copied["status"] = upload.STATUS
+        refuse(copied)
+        copied = dict(manifest)
+        copied["publication_attempt"] = 1
+        refuse(copied)
+        copied = dict(manifest)
+        copied["publication_attempt"] = True
+        refuse(copied)
 
     def test_publication_preflight_precedes_ref_and_stays_uninvoked(self):
         source = _read_text(os.path.join(MODELLING, "aptarank_reference_upload.py"))

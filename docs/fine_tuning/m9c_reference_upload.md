@@ -2,10 +2,11 @@
 
 | Item | Value |
 |---|---|
-| Status | `POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED` |
+| Status | `POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED`. This is the contract's pre-retry authorization state. A preparation manifest does not copy it. |
+| Manifest status | `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`, with `publication_attempt` 2 |
 | Stage | M9C-1. The rest of M9C is not complete. |
 | Schema | `m9c-reference-upload-v2` |
-| Contract | `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `732f53607231e9d61dccb5a6e625a6c1c1402e3e6ab1331ca6791aa1507684a3` |
+| Contract | `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e` |
 | Previous contract | SHA-256 `eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591`, schema `m9c-reference-upload-v1` |
 | Plan | `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md`, version 3.3, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe` |
 | Finished-upload validator | `validate_reference_upload` in `scripts/modelling/aptarank_reference_upload.py` |
@@ -34,6 +35,16 @@ No other row is removed. Case, whitespace, and alphabet are not normalized. `T` 
 ## First failed publication attempt
 
 `publish_sealed_reference_preparation(invoke=True)` was invoked once against commit `3d5a4beafc723ab154a2ff7d3a6d6835841b3b48` and contract SHA-256 `eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591`. REF was opened and verified. Preparation stopped because the obsolete five-column contract required `publication` (`missing_required_field`). No output was published. AptaRank was not run. The attempt was not retried, and this correction does not reopen REF.
+
+## Recordkeeping
+
+`production_inputs_opened` and `ref_opened` are true because attempt 1 opened and verified REF. `scientific_result`, `eval_opened`, `production_candidates_opened`, `local_calibration`, `local_calibration_substitute`, `aptarank_execution`, and `deployment_verified` stay false.
+
+`external_ref.locator` is `opened_and_verified_in_attempt_1_corrected_retry_not_invoked`. That value means REF was opened and verified in attempt 1, and the corrected retry has not been invoked.
+
+The contract status remains the pre-retry authorization state `POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED`. A generated preparation manifest does not copy that status. Its status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`, and `publication_attempt` is 2. Both fields are validated before publication.
+
+`outputs.publication_invoked`, `outputs.sealed_entry_point_invoked`, and attempt-1 `retried` stay false. Those three values are this corrected revision's pre-retry state. They do not deny that attempt 1 opened and verified REF.
 
 ## Supersession of the five-column assumption
 

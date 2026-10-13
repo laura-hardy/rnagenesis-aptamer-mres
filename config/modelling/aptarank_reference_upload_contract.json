@@ -4,8 +4,8 @@
   "status": "POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED",
   "stage": "M9C-1",
   "scientific_result": false,
-  "production_inputs_opened": false,
-  "ref_opened": false,
+  "production_inputs_opened": true,
+  "ref_opened": true,
   "eval_opened": false,
   "production_candidates_opened": false,
   "local_calibration": false,
@@ -196,7 +196,7 @@
     "relative_path": "data/processed/ref.csv",
     "sha256": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
     "byte_size": 211993,
-    "locator": "authorized_not_invoked",
+    "locator": "opened_and_verified_in_attempt_1_corrected_retry_not_invoked",
     "review_authorized": true
   },
   "frozen_target_mapping": {

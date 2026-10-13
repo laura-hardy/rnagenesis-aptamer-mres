@@ -12096,3 +12096,19 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Tests:** Synthetic fixtures and temporary directories only. `tests.modelling.test_aptarank_reference_upload` passed 22 tests, including the one-column header, 113-style collapse and order, duplicate-sequence refusal, private row numbers, and absence of metadata columns.
 
 **Boundary:** REF was not reopened. Production publication was not retried. EVAL, production candidate sources, AptaRank, and the production destination were not opened. Nothing was pushed.
+
+## 2026-10-13 — M9C-1 reference-upload recordkeeping
+
+**Stage:** Aim 2 / modelling / M9C-1 recordkeeping correction. No scientific policy changed.
+
+**Status:** The contract status stays `POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED`, the pre-retry authorization state. A generated preparation manifest does not copy it. The manifest status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`, and `publication_attempt` is 2. Both fields are validated before publication.
+
+**Contract:** `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e`. The previous digest was `732f53607231e9d61dccb5a6e625a6c1c1402e3e6ab1331ca6791aa1507684a3`.
+
+**Opened inputs:** `production_inputs_opened` and `ref_opened` are true because attempt 1 opened and verified REF. `scientific_result`, `eval_opened`, `production_candidates_opened`, calibration, `aptarank_execution`, and `deployment_verified` stay false. `external_ref.locator` is `opened_and_verified_in_attempt_1_corrected_retry_not_invoked`.
+
+**Pre-retry qualification:** `outputs.publication_invoked`, `outputs.sealed_entry_point_invoked`, and attempt-1 `retried` stay false. That is this corrected revision's pre-retry state. It does not deny that attempt 1 opened REF.
+
+**Tests:** Synthetic fixtures and temporary directories only. `tests.modelling.test_aptarank_reference_upload` passed 23 tests, including the manifest status, publication attempt 2, and refusal of the pre-retry contract status.
+
+**Boundary:** REF was not reopened. Production publication was not retried. EVAL, production candidates, and AptaRank were not opened. Nothing was pushed.
