@@ -1,7 +1,7 @@
 {
   "package_id": "M9C-1",
-  "schema_version": "m9c-reference-upload-v1",
-  "status": "POLICY_FROZEN_SEALED_PUBLICATION_PATH_AUTHORIZED",
+  "schema_version": "m9c-reference-upload-v2",
+  "status": "POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED",
   "stage": "M9C-1",
   "scientific_result": false,
   "production_inputs_opened": false,
@@ -145,16 +145,39 @@
     "representative": "first_identity_row",
     "replacement": false,
     "upload_fields_from_first_identity": {
-      "id": "scientific_identity_id",
-      "sequence": "sequence_core",
-      "target_name": "canonical_target_name",
-      "target_pdb_id": "pdb_id",
-      "source_reference": "publication"
+      "sequence": "sequence_core"
     },
     "later_identity_rows": "duplicate_core_collapses",
     "later_rows_are_biological_or_quality_exclusions": false,
     "provenance_ledger": "all_source_identities_in_source_order",
-    "provenance_includes_sequence": false
+    "provenance_includes_sequence": false,
+    "provenance_upload_row_number": "deterministic_1_based",
+    "provenance_is_aptarank_input": false
+  },
+  "reference_upload_interface": {
+    "authority": "user_confirmed_live_interface",
+    "columns": [
+      "sequence"
+    ],
+    "rejected_columns": [
+      "id",
+      "target_name",
+      "target_pdb_id",
+      "source_reference"
+    ],
+    "target_configuration": "supplied_separately",
+    "provenance_fields_in_upload": false,
+    "header_exact": true,
+    "sequence_pattern": "^[ACGU]+$",
+    "unique_sequences": true,
+    "normalization": false,
+    "sequence_rewriting": false,
+    "private_ledger_is_aptarank_input": false,
+    "supersedes_five_column_reference_upload": true,
+    "supersession_scope": "m9c_reference_upload_only",
+    "historical_m9b_artifacts": "preserved",
+    "historical_m9b_results_rewritten": false,
+    "candidate_and_export_behavior_changed": false
   },
   "expected_live_ui_result": {
     "label": "expectation_not_observed_ui_result",
@@ -185,13 +208,16 @@
   },
   "outputs": {
     "reference_upload_columns": [
-      "id",
-      "sequence",
-      "target_name",
-      "target_pdb_id",
-      "source_reference"
+      "sequence"
     ],
-    "duplicate_provenance": "restricted_identity_ledger",
+    "duplicate_provenance": "private_project_audit_ledger",
+    "duplicate_provenance_fields": [
+      "upload_row_number",
+      "retained_id",
+      "source_identities",
+      "collapsed_source_identities"
+    ],
+    "duplicate_provenance_is_aptarank_input": false,
     "written_by_default": false,
     "production_directory": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation",
     "publication_method": "atomic_rename_of_verified_temporary_sibling",
@@ -203,6 +229,20 @@
       "preparation_manifest.json"
     ],
     "sealed_entry_point_invoked": false
+  },
+  "first_failed_publication_attempt": {
+    "attempt": 1,
+    "parent_commit": "3d5a4beafc723ab154a2ff7d3a6d6835841b3b48",
+    "obsolete_contract_sha256": "eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591",
+    "ref_opened": true,
+    "ref_verified": true,
+    "preparation_stopped": true,
+    "stop_reason": "obsolete_five_column_contract_required_publication",
+    "observed_error_code": "missing_required_field",
+    "observed_error_field": "publication",
+    "output_published": false,
+    "aptarank_run": false,
+    "retried": false
   },
   "inputs": {
     "accepted_form": "caller_supplied_bytes",
@@ -219,7 +259,12 @@
     "Normalizing case, whitespace, or alphabet",
     "Converting T to U",
     "Applying a length filter",
-    "Replacing a retained first-identity field with a later identity",
+    "Replacing a retained first-identity sequence with a later identity",
+    "Putting id, target_name, target_pdb_id, or source_reference on the reference upload",
+    "Inventing provenance fields for the reference upload",
+    "Sending the private duplicate-provenance ledger to AptaRank",
+    "Putting sequence text in the private duplicate-provenance ledger",
+    "Rewriting frozen M9B artifacts or historical M9B results",
     "Implementing or substituting local REF calibration",
     "Calling the AptaRank UI or API",
     "Running an end-to-end production rehearsal"

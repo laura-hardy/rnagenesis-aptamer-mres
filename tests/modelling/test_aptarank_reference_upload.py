@@ -29,7 +29,7 @@ if MODELLING not in sys.path:
 
 import aptarank_reference_upload as upload
 
-CONTRACT_SHA256 = "eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591"
+CONTRACT_SHA256 = "732f53607231e9d61dccb5a6e625a6c1c1402e3e6ab1331ca6791aa1507684a3"
 CORE_A = "ACGUACGUACGUACGUACGU"
 CORE_B = "GCAUGCAUGCAUGCAUGCAU"
 CORE_C = "ACGU"
@@ -105,7 +105,40 @@ class ReferenceUploadTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), CONTRACT_SHA256)
         self.assertEqual(upload.CONTRACT_SHA256, CONTRACT_SHA256)
         document = _document()
-        self.assertEqual(document["status"], "POLICY_FROZEN_SEALED_PUBLICATION_PATH_AUTHORIZED")
+        self.assertEqual(document["status"], "POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED")
+        self.assertEqual(document["schema_version"], "m9c-reference-upload-v2")
+        interface = document["reference_upload_interface"]
+        self.assertEqual(interface["columns"], ["sequence"])
+        self.assertEqual(interface["rejected_columns"], ["id", "target_name", "target_pdb_id", "source_reference"])
+        self.assertEqual(interface["target_configuration"], "supplied_separately")
+        self.assertFalse(interface["provenance_fields_in_upload"])
+        self.assertTrue(interface["unique_sequences"])
+        self.assertFalse(interface["normalization"])
+        self.assertFalse(interface["sequence_rewriting"])
+        self.assertFalse(interface["private_ledger_is_aptarank_input"])
+        self.assertTrue(interface["supersedes_five_column_reference_upload"])
+        self.assertEqual(interface["supersession_scope"], "m9c_reference_upload_only")
+        self.assertEqual(interface["historical_m9b_artifacts"], "preserved")
+        self.assertFalse(interface["historical_m9b_results_rewritten"])
+        self.assertFalse(interface["candidate_and_export_behavior_changed"])
+        self.assertEqual(document["outputs"]["reference_upload_columns"], ["sequence"])
+        self.assertEqual(document["outputs"]["duplicate_provenance_fields"], list(upload.LEDGER_KEYS))
+        self.assertFalse(document["outputs"]["duplicate_provenance_is_aptarank_input"])
+        self.assertEqual(document["retention"]["upload_fields_from_first_identity"], {"sequence": "sequence_core"})
+        self.assertEqual(document["retention"]["provenance_upload_row_number"], "deterministic_1_based")
+        attempt = document["first_failed_publication_attempt"]
+        self.assertEqual(attempt["attempt"], 1)
+        self.assertEqual(attempt["parent_commit"], "3d5a4beafc723ab154a2ff7d3a6d6835841b3b48")
+        self.assertEqual(attempt["obsolete_contract_sha256"], "eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591")
+        self.assertTrue(attempt["ref_opened"])
+        self.assertTrue(attempt["ref_verified"])
+        self.assertTrue(attempt["preparation_stopped"])
+        self.assertEqual(attempt["stop_reason"], "obsolete_five_column_contract_required_publication")
+        self.assertEqual(attempt["observed_error_code"], "missing_required_field")
+        self.assertEqual(attempt["observed_error_field"], "publication")
+        self.assertFalse(attempt["output_published"])
+        self.assertFalse(attempt["aptarank_run"])
+        self.assertFalse(attempt["retried"])
         self.assertEqual(document["outputs"]["production_directory"], upload.PRODUCTION_DESTINATION)
         self.assertEqual(document["outputs"]["publication_method"], upload.PRODUCTION_PUBLICATION_METHOD)
         self.assertFalse(document["outputs"]["publication_invoked"])
@@ -162,15 +195,13 @@ class ReferenceUploadTests(unittest.TestCase):
         )
         prepared = upload.prepare_reference_upload(payload)
         header, rows = _parsed_upload(prepared["reference_upload"])
-        self.assertEqual(header, ["id", "sequence", "target_name", "target_pdb_id", "source_reference"])
+        self.assertEqual(header, ["sequence"])
+        self.assertEqual(list(rows[0]), ["sequence"])
         self.assertEqual([row["sequence"] for row in rows], [CORE_B, CORE_A, CORE_C])
-        self.assertEqual(rows[0]["id"], "S5I_synthetic_01")
-        self.assertEqual(rows[0]["target_name"], "Beta, target")
-        self.assertEqual(rows[0]["target_pdb_id"], "1BBB")
-        self.assertEqual(rows[0]["source_reference"], "Doe et al. 2020")
-        self.assertEqual(rows[1]["target_pdb_id"], "")
-        self.assertNotIn("Later beta", prepared["reference_upload"].decode("utf-8"))
-        self.assertNotIn("9ZZZ", prepared["reference_upload"].decode("utf-8"))
+        upload_text = prepared["reference_upload"].decode("utf-8")
+        self.assertEqual(upload_text.splitlines()[0], "sequence")
+        for forbidden in ("id", "target_name", "target_pdb_id", "source_reference", "S5I_synthetic_01", "Beta, target", "1BBB", "Doe et al. 2020", "Later beta", "9ZZZ"):
+            self.assertNotIn(forbidden, upload_text)
         self.assertEqual(prepared["source_row_count"], 4)
         self.assertEqual(prepared["prepared_upload_row_count"], 3)
         self.assertNotIn("accepted_count", prepared)
@@ -178,6 +209,7 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertEqual(prepared["duplicate_core_collapses"], 1)
         self.assertFalse(prepared["production_ref_identity_verified"])
         ledger = [json.loads(line) for line in prepared["duplicate_provenance"].decode("utf-8").splitlines()]
+        self.assertEqual([item["upload_row_number"] for item in ledger], [1, 2, 3])
         self.assertEqual(ledger[0]["retained_id"], "S5I_synthetic_01")
         self.assertEqual(ledger[0]["source_identities"], ["S5I_synthetic_01", "S5I_synthetic_03"])
         self.assertEqual(ledger[0]["collapsed_source_identities"], ["S5I_synthetic_03"])
@@ -197,6 +229,108 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertIsNone(manifest["observed_ui_accepted_count"])
         self.assertIsNone(manifest["observed_ui_dropped_count"])
         self.assertNotIn("sequence_core", manifest)
+
+    def test_one_column_header_and_113_style_collapse_preserve_order(self):
+        def core_token(index):
+            alphabet = "ACGU"
+            chars = []
+            value = index
+            for _ in range(4):
+                chars.append(alphabet[value % 4])
+                value //= 4
+            return "GG" + "".join(reversed(chars)) + "UU"
+
+        first_seen = []
+        seen = set()
+        prefix = [5, 1, 5, 0, 1]
+        for index in prefix + [index for index in range(113) if index not in (5, 1, 0)]:
+            if index not in seen:
+                first_seen.append(index)
+                seen.add(index)
+        self.assertEqual(len(first_seen), 113)
+        source_order = prefix + [index for index in range(113) if index not in (5, 1, 0)] + [first_seen[0]] * 16
+        self.assertEqual(len(source_order), 131)
+        self.assertEqual(len(source_order) - len(set(source_order)), 18)
+        records = []
+        for row_number, core_index in enumerate(source_order, start=1):
+            records.append(
+                _identity(
+                    row_number,
+                    core_token(core_index),
+                    canonical_target_name="TARGET-NOT-UPLOADED-%02d" % row_number,
+                    pdb_id=" PDB-NOT-UPLOADED",
+                    publication="",
+                )
+            )
+        prepared = upload.prepare_reference_upload(_source_bytes(records))
+        header, rows = _parsed_upload(prepared["reference_upload"])
+        self.assertEqual(header, ["sequence"])
+        self.assertEqual([row["sequence"] for row in rows], [core_token(index) for index in first_seen])
+        self.assertNotEqual([row["sequence"] for row in rows], sorted(row["sequence"] for row in rows))
+        upload_text = prepared["reference_upload"].decode("utf-8")
+        self.assertEqual(upload_text.splitlines()[0], "sequence")
+        for forbidden in ("id", "target_name", "target_pdb_id", "source_reference", "TARGET-NOT-UPLOADED", "PDB-NOT-UPLOADED"):
+            self.assertNotIn(forbidden, upload_text)
+        self.assertEqual(prepared["source_row_count"], 131)
+        self.assertEqual(prepared["prepared_upload_row_count"], 113)
+        self.assertEqual(prepared["duplicate_core_collapses"], 18)
+        self.assertFalse(prepared["production_ref_identity_verified"])
+        ledger = [json.loads(line) for line in prepared["duplicate_provenance"].decode("utf-8").splitlines()]
+        self.assertEqual([item["upload_row_number"] for item in ledger], list(range(1, 114)))
+        ledger_text = prepared["duplicate_provenance"].decode("utf-8")
+        groups = {}
+        for row_number, core_index in enumerate(source_order, start=1):
+            identity = "S5I_synthetic_%02d" % row_number
+            groups.setdefault(core_index, []).append(identity)
+        for item, core_index in zip(ledger, first_seen):
+            identities = groups[core_index]
+            self.assertEqual(list(item), ["upload_row_number", "retained_id", "source_identities", "collapsed_source_identities"])
+            self.assertEqual(item["retained_id"], identities[0])
+            self.assertEqual(item["source_identities"], identities)
+            self.assertEqual(item["collapsed_source_identities"], identities[1:])
+            self.assertNotIn(core_token(core_index), ledger_text)
+        self.assertEqual(sum(len(item["collapsed_source_identities"]) for item in ledger), 18)
+        self.assertEqual(upload.validate_reference_upload(prepared["reference_upload"]), [core_token(index) for index in first_seen])
+
+    def test_finished_upload_refuses_duplicate_sequences_and_metadata_columns(self):
+        duplicate = ("sequence\n%s\n%s\n" % (CORE_A, CORE_A)).encode("utf-8")
+        with self.assertRaises(upload.ReferenceUploadError) as caught:
+            upload.validate_reference_upload(duplicate)
+        self.assertEqual(caught.exception.code, "duplicate_sequence")
+        five_column = b"id,sequence,target_name,target_pdb_id,source_reference\nS5I,ACGUACGUACGUACGUACGU,Target,1ABC,Paper\n"
+        with self.assertRaises(upload.ReferenceUploadError) as caught_header:
+            upload.validate_reference_upload(five_column)
+        self.assertEqual(caught_header.exception.code, "upload_header_invalid")
+        for payload in (
+            b"sequence,id\nACGUACGUACGUACGUACGU,S5I\n",
+            b"Sequence\nACGUACGUACGUACGUACGU\n",
+            b"id\nACGUACGUACGUACGUACGU\n",
+            b"target_name\nACGUACGUACGUACGUACGU\n",
+            b"target_pdb_id\nACGUACGUACGUACGUACGU\n",
+            b"source_reference\nACGUACGUACGUACGUACGU\n",
+            b"\xef\xbb\xbfsequence\nACGUACGUACGUACGUACGU\n",
+        ):
+            with self.assertRaises(upload.ReferenceUploadError) as caught_meta:
+                upload.validate_reference_upload(payload)
+            self.assertEqual(caught_meta.exception.code, "upload_header_invalid")
+        jagged = ("sequence\n%s,S5I_synthetic_01\n" % CORE_A).encode("utf-8")
+        with self.assertRaises(upload.ReferenceUploadError) as caught_jagged:
+            upload.validate_reference_upload(jagged)
+        self.assertEqual(caught_jagged.exception.code, "metadata_column_refused")
+        thymine = b"sequence\nACGTACGTACGTACGTACGT\n"
+        with self.assertRaises(upload.ReferenceUploadError) as caught_thymine:
+            upload.validate_reference_upload(thymine)
+        self.assertEqual(caught_thymine.exception.code, "noncanonical_core")
+        lowered = ("sequence\n%s\n" % CORE_A.lower()).encode("utf-8")
+        with self.assertRaises(upload.ReferenceUploadError) as caught_lower:
+            upload.validate_reference_upload(lowered)
+        self.assertEqual(caught_lower.exception.code, "noncanonical_core")
+        spaced = ("sequence\n%s \n" % CORE_A).encode("utf-8")
+        with self.assertRaises(upload.ReferenceUploadError) as caught_space:
+            upload.validate_reference_upload(spaced)
+        self.assertEqual(caught_space.exception.code, "noncanonical_core")
+        accepted = upload.validate_reference_upload(("sequence\n%s\n%s\n" % (CORE_B, CORE_A)).encode("utf-8"))
+        self.assertEqual(accepted, [CORE_B, CORE_A])
 
     def test_duplicate_identity_fails_closed(self):
         payload = _source_bytes(
@@ -222,22 +356,29 @@ class ReferenceUploadTests(unittest.TestCase):
             upload.prepare_reference_upload(lowered)
         self.assertEqual(caught_lower.exception.code, "noncanonical_core")
 
-    def test_missing_required_field_and_bad_pdb_fail_closed(self):
-        missing = _source_bytes([_identity(1, CORE_A, publication="")])
+    def test_missing_identity_fails_and_blank_provenance_is_not_an_exclusion(self):
+        missing = _source_bytes([_identity(1, CORE_A, scientific_identity_id="")])
         with self.assertRaises(upload.ReferenceUploadError) as caught:
             upload.prepare_reference_upload(missing)
         self.assertEqual(caught.exception.code, "missing_required_field")
-        blank_target = _source_bytes([_identity(1, CORE_A, canonical_target_name="  ")])
-        with self.assertRaises(upload.ReferenceUploadError) as caught_target:
-            upload.prepare_reference_upload(blank_target)
-        self.assertEqual(caught_target.exception.code, "missing_required_field")
-        padded = _source_bytes([_identity(1, CORE_A, pdb_id=" 1ABC")])
-        with self.assertRaises(upload.ReferenceUploadError) as caught_pdb:
-            upload.prepare_reference_upload(padded)
-        self.assertEqual(caught_pdb.exception.code, "invalid_target_pdb_id")
-        kept = upload.prepare_reference_upload(_source_bytes([_identity(1, CORE_A, pdb_id="")]))
-        _, rows = _parsed_upload(kept["reference_upload"])
-        self.assertEqual(rows[0]["target_pdb_id"], "")
+        kept = upload.prepare_reference_upload(
+            _source_bytes(
+                [
+                    _identity(
+                        1,
+                        CORE_A,
+                        canonical_target_name="  ",
+                        pdb_id=" 1ABC",
+                        publication="",
+                    )
+                ]
+            )
+        )
+        header, rows = _parsed_upload(kept["reference_upload"])
+        self.assertEqual(header, ["sequence"])
+        self.assertEqual(rows, [{"sequence": CORE_A}])
+        self.assertNotIn("1ABC", kept["reference_upload"].decode("utf-8"))
+        self.assertEqual(kept["duplicate_core_collapses"], 0)
 
     def test_malformed_schema_and_wrong_partition_fail_closed(self):
         document = _document()

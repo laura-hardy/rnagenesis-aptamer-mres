@@ -2,9 +2,11 @@
 """M9C-1 reference-upload preparation.
 
 One upload row is retained for each distinct canonical REF sequence_core.
-The no-argument command checks pins only. It does not locate REF, EVAL, or a
-production candidate source, and it does not calibrate AptaRank. The sealed
-publication entry point stays idle unless its invocation flag is passed.
+The AptaRank upload is a one-column CSV named sequence. The private ledger
+is a project audit artifact and is not an AptaRank input. The no-argument
+command checks pins only. It does not locate REF, EVAL, or a production
+candidate source, and it does not calibrate AptaRank. The sealed publication
+entry point stays idle unless its invocation flag is passed.
 """
 
 from __future__ import annotations
@@ -22,11 +24,11 @@ import sys
 import tempfile
 
 PACKAGE_ID = "M9C-1"
-SCHEMA_VERSION = "m9c-reference-upload-v1"
-STATUS = "POLICY_FROZEN_SEALED_PUBLICATION_PATH_AUTHORIZED"
+SCHEMA_VERSION = "m9c-reference-upload-v2"
+STATUS = "POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED"
 STAGE = "M9C-1"
 CONTRACT_RELATIVE = "config/modelling/aptarank_reference_upload_contract.json"
-CONTRACT_SHA256 = "eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591"
+CONTRACT_SHA256 = "732f53607231e9d61dccb5a6e625a6c1c1402e3e6ab1331ca6791aa1507684a3"
 PRODUCTION_DESTINATION = "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation"
 PRODUCTION_PUBLICATION_METHOD = "atomic_rename_of_verified_temporary_sibling"
 PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
@@ -54,14 +56,51 @@ EXPECTED_UI_DROPPED_COUNT = 0
 STRUCTURE_FILE_SHA256 = "2e185a205c9be0bf76484e8ffb96ae225880723ed68eaaf25dffbbccaf01ff51"
 SELECTION_RECORD_SHA256 = "08f0c96af349ce4909d40c3004804317661777f72828cd807823341e0e4f0d04"
 TARGET_UPLOAD_SHA256 = "46471bb0643125ce86300ec050d6f0d3a09faa1d06dc325141c67cd1acdd5922"
-FIELD_MAP = {
-    "id": "scientific_identity_id",
-    "sequence": "sequence_core",
-    "target_name": "canonical_target_name",
-    "target_pdb_id": "pdb_id",
-    "source_reference": "publication",
-}
-LEDGER_KEYS = ("retained_id", "source_identities", "collapsed_source_identities")
+UPLOAD_COLUMNS = ("sequence",)
+REJECTED_UPLOAD_COLUMNS = ("id", "target_name", "target_pdb_id", "source_reference")
+HISTORICAL_FIVE_COLUMN_REFERENCE_UPLOAD = (
+    "id",
+    "sequence",
+    "target_name",
+    "target_pdb_id",
+    "source_reference",
+)
+FIELD_MAP = {"sequence": "sequence_core"}
+LEDGER_KEYS = ("upload_row_number", "retained_id", "source_identities", "collapsed_source_identities")
+INTERFACE_KEYS = (
+    "authority",
+    "columns",
+    "rejected_columns",
+    "target_configuration",
+    "provenance_fields_in_upload",
+    "header_exact",
+    "sequence_pattern",
+    "unique_sequences",
+    "normalization",
+    "sequence_rewriting",
+    "private_ledger_is_aptarank_input",
+    "supersedes_five_column_reference_upload",
+    "supersession_scope",
+    "historical_m9b_artifacts",
+    "historical_m9b_results_rewritten",
+    "candidate_and_export_behavior_changed",
+)
+ATTEMPT_KEYS = (
+    "attempt",
+    "parent_commit",
+    "obsolete_contract_sha256",
+    "ref_opened",
+    "ref_verified",
+    "preparation_stopped",
+    "stop_reason",
+    "observed_error_code",
+    "observed_error_field",
+    "output_published",
+    "aptarank_run",
+    "retried",
+)
+OBSOLETE_CONTRACT_SHA256 = "eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591"
+FAILED_ATTEMPT_COMMIT = "3d5a4beafc723ab154a2ff7d3a6d6835841b3b48"
 MANIFEST_KEYS = (
     "package_id",
     "schema_version",
@@ -99,10 +138,12 @@ TOP_LEVEL_KEYS = (
     "calibration",
     "source_schema",
     "retention",
+    "reference_upload_interface",
     "expected_live_ui_result",
     "external_ref",
     "frozen_target_mapping",
     "outputs",
+    "first_failed_publication_attempt",
     "inputs",
     "prohibited",
 )
@@ -277,6 +318,8 @@ def validate_contract_document(document, blobs):
             "later_rows_are_biological_or_quality_exclusions",
             "provenance_ledger",
             "provenance_includes_sequence",
+            "provenance_upload_row_number",
+            "provenance_is_aptarank_input",
         ),
         "spec_invalid",
         "the retention record changed",
@@ -291,6 +334,44 @@ def validate_contract_document(document, blobs):
     _require(retention["later_rows_are_biological_or_quality_exclusions"] is False, "spec_invalid", "a collapse is not an exclusion")
     _require(retention["provenance_ledger"] == "all_source_identities_in_source_order", "spec_invalid", "the provenance ledger changed")
     _require(retention["provenance_includes_sequence"] is False, "spec_invalid", "the provenance ledger must omit sequences")
+    _require(retention["provenance_upload_row_number"] == "deterministic_1_based", "spec_invalid", "the provenance row number changed")
+    _require(retention["provenance_is_aptarank_input"] is False, "spec_invalid", "the private ledger is not an AptaRank input")
+    interface = document["reference_upload_interface"]
+    _exact_keys(interface, INTERFACE_KEYS, "spec_invalid", "the reference-upload interface changed")
+    _require(interface["authority"] == "user_confirmed_live_interface", "spec_invalid", "the live interface authority changed")
+    _require(interface["columns"] == list(UPLOAD_COLUMNS), "spec_invalid", "the live reference upload is exactly the sequence column")
+    _require(interface["rejected_columns"] == list(REJECTED_UPLOAD_COLUMNS), "spec_invalid", "a rejected reference-upload column changed")
+    _require(interface["target_configuration"] == "supplied_separately", "spec_invalid", "target configuration stays separate from the upload")
+    _require(interface["provenance_fields_in_upload"] is False, "spec_invalid", "the upload must not carry provenance fields")
+    _require(interface["header_exact"] is True, "spec_invalid", "the upload header must be exact")
+    _require(interface["sequence_pattern"] == "^[ACGU]+$", "spec_invalid", "the upload sequence pattern changed")
+    _require(interface["unique_sequences"] is True, "spec_invalid", "upload sequences must be unique")
+    _require(interface["normalization"] is False, "spec_invalid", "upload normalization is refused")
+    _require(interface["sequence_rewriting"] is False, "spec_invalid", "sequence rewriting is refused")
+    _require(interface["private_ledger_is_aptarank_input"] is False, "spec_invalid", "the private ledger is not an AptaRank input")
+    _require(interface["supersedes_five_column_reference_upload"] is True, "spec_invalid", "the five-column reference upload is superseded for M9C")
+    _require(interface["supersession_scope"] == "m9c_reference_upload_only", "spec_invalid", "the supersession scope changed")
+    _require(interface["historical_m9b_artifacts"] == "preserved", "spec_invalid", "frozen M9B artifacts stay preserved")
+    _require(interface["historical_m9b_results_rewritten"] is False, "spec_invalid", "historical M9B results stay unchanged")
+    _require(interface["candidate_and_export_behavior_changed"] is False, "spec_invalid", "candidate and export behavior stays unchanged")
+    attempt = document["first_failed_publication_attempt"]
+    _exact_keys(attempt, ATTEMPT_KEYS, "spec_invalid", "the first failed publication attempt record changed")
+    _require(attempt["attempt"] == 1, "spec_invalid", "the first failed attempt number changed")
+    _require(attempt["parent_commit"] == FAILED_ATTEMPT_COMMIT, "spec_invalid", "the first failed attempt commit changed")
+    _require(attempt["obsolete_contract_sha256"] == OBSOLETE_CONTRACT_SHA256, "spec_invalid", "the obsolete contract digest changed")
+    _require(attempt["ref_opened"] is True, "spec_invalid", "the first attempt opened REF")
+    _require(attempt["ref_verified"] is True, "spec_invalid", "the first attempt verified REF")
+    _require(attempt["preparation_stopped"] is True, "spec_invalid", "the first attempt stopped during preparation")
+    _require(
+        attempt["stop_reason"] == "obsolete_five_column_contract_required_publication",
+        "spec_invalid",
+        "the first attempt stopped because the obsolete five-column contract required publication",
+    )
+    _require(attempt["observed_error_code"] == "missing_required_field", "spec_invalid", "the first attempt error code changed")
+    _require(attempt["observed_error_field"] == "publication", "spec_invalid", "the first attempt required publication")
+    _require(attempt["output_published"] is False, "spec_invalid", "the first attempt published no output")
+    _require(attempt["aptarank_run"] is False, "spec_invalid", "the first attempt did not run AptaRank")
+    _require(attempt["retried"] is False, "spec_invalid", "the failed publication was not retried")
     for source_name in FIELD_MAP.values():
         _require(source_name in columns, "schema_mismatch", "a retained source field is absent from the header")
     _require("partition" in columns and "sequence_core_sha256" in columns, "schema_mismatch", "the frozen REF header is incomplete")
@@ -363,6 +444,8 @@ def validate_contract_document(document, blobs):
         (
             "reference_upload_columns",
             "duplicate_provenance",
+            "duplicate_provenance_fields",
+            "duplicate_provenance_is_aptarank_input",
             "written_by_default",
             "production_directory",
             "publication_method",
@@ -375,8 +458,16 @@ def validate_contract_document(document, blobs):
         "the output record changed",
     )
     arp1 = _arp1()
-    _require(outputs["reference_upload_columns"] == list(arp1.REFERENCE_COLUMNS), "spec_invalid", "the upload columns drifted from ARP-1")
-    _require(outputs["duplicate_provenance"] == "restricted_identity_ledger", "spec_invalid", "the provenance ledger kind changed")
+    _require(outputs["reference_upload_columns"] == list(UPLOAD_COLUMNS), "spec_invalid", "the upload columns are exactly sequence")
+    _require(outputs["reference_upload_columns"] != list(arp1.REFERENCE_COLUMNS), "spec_invalid", "M9C no longer uses the five-column reference upload")
+    _require(
+        list(arp1.REFERENCE_COLUMNS) == list(HISTORICAL_FIVE_COLUMN_REFERENCE_UPLOAD),
+        "spec_invalid",
+        "the historical five-column reference schema was rewritten",
+    )
+    _require(outputs["duplicate_provenance"] == "private_project_audit_ledger", "spec_invalid", "the provenance ledger kind changed")
+    _require(outputs["duplicate_provenance_fields"] == list(LEDGER_KEYS), "spec_invalid", "the private ledger fields changed")
+    _require(outputs["duplicate_provenance_is_aptarank_input"] is False, "spec_invalid", "the private ledger is not an AptaRank input")
     _require(outputs["written_by_default"] is False, "spec_invalid", "preparation must not write by default")
     _require(outputs["production_directory"] == PRODUCTION_DESTINATION, "spec_invalid", "the production publication path changed")
     _require(outputs["publication_method"] == PRODUCTION_PUBLICATION_METHOD, "spec_invalid", "the publication method changed")
@@ -401,7 +492,13 @@ def validate_contract_document(document, blobs):
     except arp1.AptaRankIOError as exc:
         raise ReferenceUploadError(exc.code, exc.detail) from exc
     _require(sha256_bytes(spec_bytes) == IO_SPEC_SHA256, "pin_mismatch", "the loaded I/O specification pin does not match")
-    _require(spec["reference_upload_column_order"] == list(arp1.REFERENCE_COLUMNS), "spec_schema_drift", "ARP-1 reference columns drifted")
+    _require(
+        spec["reference_upload_column_order"] == list(HISTORICAL_FIVE_COLUMN_REFERENCE_UPLOAD),
+        "spec_schema_drift",
+        "the preserved ARP-1 reference columns drifted",
+    )
+    _require(spec["candidate_upload_column_order"] == ["id", "sequence"], "spec_schema_drift", "candidate upload columns drifted")
+    _require(spec["shortlist_export_column_order"] == list(arp1.SHORTLIST_COLUMNS), "spec_schema_drift", "shortlist export columns drifted")
 
 
 def load_pinned_contract():
@@ -435,37 +532,26 @@ def _parse_source(payload, document):
     return rows
 
 
-def _required_text(value, label):
-    arp1 = _arp1()
-    if type(value) is not str or arp1.UNINTERPRETED_TEXT.fullmatch(value) is None:
-        raise ReferenceUploadError("missing_required_field", "a required REF field is missing: " + label)
-
-
 def _check_source_row(row, document):
     arp1 = _arp1()
     schema = document["source_schema"]
     mapping = document["retention"]["upload_fields_from_first_identity"]
-    identity = row[mapping["id"]]
+    _require(mapping["sequence"] == schema["core_column"], "spec_invalid", "the upload sequence does not come from sequence_core")
+    identity = row[schema["identity_column"]]
     if type(identity) is not str or arp1.ID_TEXT.fullmatch(identity) is None:
         raise ReferenceUploadError("missing_required_field", "a required REF field is missing: scientific_identity_id")
-    core = row[mapping["sequence"]]
+    core = row[schema["core_column"]]
     if type(core) is not str or arp1.SEQUENCE_TEXT.fullmatch(core) is None:
         raise ReferenceUploadError("noncanonical_core", "a REF sequence_core is not canonical uppercase A, C, G and U")
     recorded = row[schema["core_digest_column"]]
     if type(recorded) is not str or recorded != sha256_bytes(core.encode("utf-8")):
         raise ReferenceUploadError("digest_mismatch", "a REF sequence_core digest does not match the core bytes")
-    _required_text(row[mapping["target_name"]], "canonical_target_name")
-    _required_text(row[mapping["source_reference"]], "publication")
-    pdb_id = row[mapping["target_pdb_id"]]
-    if type(pdb_id) is not str or (pdb_id != "" and arp1.UNINTERPRETED_TEXT.fullmatch(pdb_id) is None):
-        raise ReferenceUploadError("invalid_target_pdb_id", "a REF pdb_id must be blank or free of surrounding whitespace")
     if row[schema["partition_column"]] != schema["partition_value"]:
         raise ReferenceUploadError("schema_mismatch", "a source row is not in the REF partition")
     return identity, core
 
 
 def _retain_rows(rows, document):
-    mapping = document["retention"]["upload_fields_from_first_identity"]
     seen_identities = set()
     order = []
     groups = {}
@@ -477,11 +563,8 @@ def _retain_rows(rows, document):
         group = groups.get(core)
         if group is None:
             groups[core] = {
-                "id": identity,
                 "sequence": core,
-                "target_name": row[mapping["target_name"]],
-                "target_pdb_id": row[mapping["target_pdb_id"]],
-                "source_reference": row[mapping["source_reference"]],
+                "retained_id": identity,
                 "source_identities": [identity],
             }
             order.append(core)
@@ -495,56 +578,108 @@ def _retain_rows(rows, document):
 
 
 def _upload_bytes(retained):
-    arp1 = _arp1()
     buffer = io.StringIO(newline="")
     writer = csv.writer(buffer, lineterminator="\n")
-    writer.writerow(list(arp1.REFERENCE_COLUMNS))
+    writer.writerow(list(UPLOAD_COLUMNS))
     for item in retained:
-        writer.writerow([item["id"], item["sequence"], item["target_name"], item["target_pdb_id"], item["source_reference"]])
+        writer.writerow([item["sequence"]])
     return buffer.getvalue().encode("utf-8")
 
 
-def _validate_upload(payload, retained):
-    arp1 = _arp1()
-    errors = arp1.ErrorList()
-    parsed = arp1.parse_csv_rows(payload, arp1.REFERENCE_COLUMNS, errors, "reference upload")
-    arp1._check_reference_rows(parsed, errors)
+def validate_reference_upload(payload):
+    """Accept a finished upload only when its header is exactly sequence.
+
+    Each data row is one canonical uppercase A, C, G and U sequence. Sequences
+    are unique. Metadata columns are refused. Nothing in the cell is rewritten.
+    """
+    _require_bytes(payload)
+    if payload.startswith(b"\xef\xbb\xbf") or payload == b"":
+        raise ReferenceUploadError("upload_header_invalid", "the reference upload header is not exactly sequence")
     try:
-        errors.raise_if_any()
-    except arp1.AptaRankIOError as exc:
-        raise ReferenceUploadError("upload_validation_failed", "the reference upload failed the reused validator") from exc
-    if parsed is None or len(parsed) != len(retained):
-        raise ReferenceUploadError("upload_validation_failed", "the reference upload row count drifted")
-    for item, actual in zip(retained, parsed):
-        expected = {
-            "id": item["id"],
-            "sequence": item["sequence"],
-            "target_name": item["target_name"],
-            "target_pdb_id": item["target_pdb_id"],
-            "source_reference": item["source_reference"],
-        }
-        if actual != expected:
-            raise ReferenceUploadError("upload_validation_failed", "a reference upload field was not preserved")
+        text = payload.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ReferenceUploadError("upload_validation_failed", "the reference upload is not UTF-8") from exc
+    try:
+        rows = list(csv.reader(io.StringIO(text, newline="")))
+    except csv.Error as exc:
+        raise ReferenceUploadError("upload_validation_failed", "the reference upload is not a one-column sequence CSV") from exc
+    if not rows or rows[0] != list(UPLOAD_COLUMNS):
+        raise ReferenceUploadError("upload_header_invalid", "the reference upload header is not exactly sequence")
+    if set(REJECTED_UPLOAD_COLUMNS) & set(rows[0]):
+        raise ReferenceUploadError("metadata_column_refused", "the reference upload accepts only the sequence column")
+    arp1 = _arp1()
+    sequences = []
+    seen = set()
+    for row in rows[1:]:
+        if len(row) != 1:
+            raise ReferenceUploadError("metadata_column_refused", "the reference upload accepts only the sequence column")
+        sequence = row[0]
+        if type(sequence) is not str or arp1.SEQUENCE_TEXT.fullmatch(sequence) is None:
+            raise ReferenceUploadError("noncanonical_core", "a reference upload sequence is not canonical uppercase A, C, G and U")
+        if sequence in seen:
+            raise ReferenceUploadError("duplicate_sequence", "a reference upload sequence is duplicated")
+        seen.add(sequence)
+        sequences.append(sequence)
+    return sequences
+
+
+def _validate_upload(payload, retained):
+    sequences = validate_reference_upload(payload)
+    expected = [item["sequence"] for item in retained]
+    if sequences != expected:
+        raise ReferenceUploadError("upload_validation_failed", "a reference upload sequence was not preserved")
+    return sequences
+
+
+def _validate_private_ledger(payload, sequences):
+    """Check the project-only ledger. It never contains sequence text."""
+    _require_bytes(payload)
+    try:
+        text = payload.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ReferenceUploadError("provenance_invalid", "the private provenance ledger is not UTF-8") from exc
+    lines = text.splitlines()
+    if text not in ("",) and not text.endswith("\n"):
+        raise ReferenceUploadError("provenance_invalid", "the private provenance ledger is incomplete")
+    if len(lines) != len(sequences):
+        raise ReferenceUploadError("provenance_invalid", "the private provenance ledger does not match the upload rows")
+    for number, (line, sequence) in enumerate(zip(lines, sequences), start=1):
+        try:
+            document = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ReferenceUploadError("provenance_invalid", "the private provenance ledger is not JSON") from exc
+        _exact_keys(document, LEDGER_KEYS, "provenance_invalid", "the provenance ledger schema drifted")
+        if type(document["upload_row_number"]) is not int or document["upload_row_number"] != number:
+            raise ReferenceUploadError("provenance_invalid", "the upload row number is not the deterministic 1-based position")
+        identities = document["source_identities"]
+        if type(identities) is not list or not identities or identities[0] != document["retained_id"]:
+            raise ReferenceUploadError("provenance_invalid", "the retained identity is not the first source identity")
+        if document["collapsed_source_identities"] != identities[1:]:
+            raise ReferenceUploadError("provenance_invalid", "collapsed identities are not the later source identities")
+        if type(document["retained_id"]) is not str or document["retained_id"] == "":
+            raise ReferenceUploadError("provenance_invalid", "the retained identity is missing")
+        if sequence in line or "sequence" in document:
+            raise ReferenceUploadError("provenance_invalid", "the provenance ledger must omit sequences")
+    return lines
 
 
 def _ledger_bytes(retained):
     lines = []
-    for item in retained:
+    for number, item in enumerate(retained, start=1):
         identities = list(item["source_identities"])
         document = {
-            "retained_id": item["id"],
+            "upload_row_number": number,
+            "retained_id": item["retained_id"],
             "source_identities": identities,
             "collapsed_source_identities": identities[1:],
         }
-        _exact_keys(document, LEDGER_KEYS, "provenance_invalid", "the provenance ledger schema drifted")
-        if document["source_identities"][0] != document["retained_id"]:
-            raise ReferenceUploadError("provenance_invalid", "the retained identity is not the first source identity")
-        if item["sequence"] in document["source_identities"] or item["sequence"] in document["collapsed_source_identities"]:
+        encoded = canonical_json_bytes(document)
+        if item["sequence"].encode("utf-8") in encoded:
             raise ReferenceUploadError("provenance_invalid", "the provenance ledger must omit sequences")
-        lines.append(canonical_json_bytes(document))
-    if not lines:
-        return b""
-    return b"\n".join(lines) + b"\n"
+        lines.append(encoded)
+    payload = b"" if not lines else b"\n".join(lines) + b"\n"
+    _validate_private_ledger(payload, [item["sequence"] for item in retained])
+    return payload
 
 
 def _manifest_bytes(source_digest, source_rows, retained_count, collapses, upload_hash, ledger_hash):
@@ -875,6 +1010,10 @@ def _prepared_members(prepared):
         raise ReferenceUploadError("ui_observation_refused", "preparation outputs cannot record an observed AptaRank UI count")
     if manifest["local_calibration"] is not False:
         raise ReferenceUploadError("publication_verify_failed", "the preparation manifest records local calibration")
+    sequences = validate_reference_upload(prepared["reference_upload"])
+    if manifest["prepared_upload_row_count"] != len(sequences):
+        raise ReferenceUploadError("publication_verify_failed", "the prepared upload row count does not match the one-column upload")
+    _validate_private_ledger(prepared["duplicate_provenance"], sequences)
     return members
 
 

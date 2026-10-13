@@ -12074,3 +12074,25 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Git:** `reference_upload.csv` and `duplicate_provenance.jsonl` stay ignored. `preparation_manifest.json` is not ignored, so a later publication can be reviewed while it is untracked. The manifest was not created.
 
 **Tests:** Synthetic fixtures and temporary directories only. `tests.modelling.test_aptarank_reference_upload` passed 20 tests. The sealed publication entry point and the sealed REF entry point were not invoked. REF, EVAL, production candidate sources, AptaRank, and the production destination were not opened.
+
+## 2026-10-13 — M9C-1 one-column reference upload
+
+**Stage:** Aim 2 / modelling / M9C-1 reference-upload correction
+
+**Status:** `POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED`. Schema `m9c-reference-upload-v2`. The user-confirmed live AptaRank reference upload accepts exactly one CSV column, `sequence`. It does not accept `id`, `target_name`, `target_pdb_id`, or `source_reference`. Target configuration is supplied separately. The upload carries no provenance fields. No scientific result is claimed.
+
+**Contract:** `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `732f53607231e9d61dccb5a6e625a6c1c1402e3e6ab1331ca6791aa1507684a3`. The previous digest was `eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591`.
+
+**Preparation module:** `scripts/modelling/aptarank_reference_upload.py`, SHA-256 `a37b7188ee5886208f13d299dc8bbc680255d96d4b8f5403b8a9fc218ee8725b`. `validate_reference_upload` checks the finished CSV. The preserved source parser remains `scripts/modelling/aptarank_io_preflight.py`, SHA-256 `eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01`.
+
+**Frozen procedure:** 131 source identity rows, one upload row per distinct canonical `sequence_core`, 113 rows in first-occurrence order, and 18 duplicate-core collapses. Collapses are not biological or quality exclusions. Sequences are copied, not normalized or rewritten. Blank publication, target-name, or PDB cells are not exclusions.
+
+**Private ledger:** Project-only audit artifact, never an AptaRank input. Each object has a deterministic 1-based `upload_row_number`, the retained source identity, every contributing source identity, and the collapsed identities. It contains no sequence text.
+
+**First failed attempt:** On commit `3d5a4beafc723ab154a2ff7d3a6d6835841b3b48`, `publish_sealed_reference_preparation(invoke=True)` opened and verified REF, then stopped because the obsolete five-column contract required `publication` (`missing_required_field`). No output was published. AptaRank was not run. This correction does not retry that publication and does not reopen REF.
+
+**Supersession:** The five-column reference-upload assumption in frozen M9B artifacts is superseded for this M9C reference upload by the user-confirmed live interface. ARP-1 specification SHA-256 `46ba6c8be873dad4c086e9f6b889b51702ba31212fa502d00f26e267a22da732`, the ARP-1 module hash above, and evidence contract SHA-256 `0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b` are unchanged historical evidence. Historical M9B results are not rewritten. Candidate and export behavior is unchanged.
+
+**Tests:** Synthetic fixtures and temporary directories only. `tests.modelling.test_aptarank_reference_upload` passed 22 tests, including the one-column header, 113-style collapse and order, duplicate-sequence refusal, private row numbers, and absence of metadata columns.
+
+**Boundary:** REF was not reopened. Production publication was not retried. EVAL, production candidate sources, AptaRank, and the production destination were not opened. Nothing was pushed.
