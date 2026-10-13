@@ -12138,3 +12138,29 @@ The manifest status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN` and `publica
 **Review:** Review archive SHA-256 `4da503a1b4b9162da19f1c0862b285ae1e972e4d8c2f8196f38b2563b1d7cf57`.
 
 **Boundary:** This record does not complete M9C and does not unlock EVAL. The upload CSV and the provenance ledger stay uncommitted. Preparation was not run again. Nothing was pushed.
+
+## 2026-10-13 — M9C-1 four-column reference library
+
+**Stage:** Aim 2 / modelling / M9C-1 reference-upload correction
+
+**Status:** `POLICY_FROZEN_FOUR_COLUMN_REFERENCE_UPLOAD_ATTEMPT3_NOT_PUBLISHED`. Schema `m9c-reference-upload-v3`. The user-observed live UI on 13 October 2026 requires the reference-library header `id,sequence,target_name,target_pdb_id`. No scientific result is claimed.
+
+**Live UI:** The one-column attempt-2 file was rejected before Run as candidate-like. AptaRank did not accept the library, did not calibrate it, and did not score anything. No observed accepted count, dropped count, or control-bank fact exists yet. Candidate input accepts a CSV with `sequence` and an optional `id`, plain text, or FASTA. Candidate sequences must be 20–100 nt. The UI accepts `T` as `U`. The MRes policy continues to provide canonical uppercase A/C/G/U and does not rely on that conversion.
+
+**Contract:** `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `34912929e77a0a835a01e36ba0291160b49b60dcdfb12a2d2aeb57090c794d02`. The previous digest was `980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e`.
+
+**Preparation module:** `scripts/modelling/aptarank_reference_upload.py`, SHA-256 `7bcea98e8246c2d0064d6908de756ce0f02e9a282f1e10beea29484bd1553029`. The preserved source parser remains `scripts/modelling/aptarank_io_preflight.py`, SHA-256 `eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01`.
+
+**Mapping:** The retained first identity supplies `id` from `scientific_identity_id`, `sequence` from `sequence_core`, `target_name` from `canonical_target_name`, and `target_pdb_id` from `pdb_id`. IDs are unique and nonempty. Sequences are unique and canonical. Target names are nonempty. `target_pdb_id` is required and stays blank when `pdb_id` is blank. A PDB identifier is not invented. `source_reference`, `publication`, and any additional column are refused.
+
+**Frozen procedure:** 131 source identity rows, one upload row per distinct canonical `sequence_core`, 113 rows in first-occurrence order, and 18 duplicate-core collapses. The private ledger still uses a deterministic 1-based `upload_row_number` and does not contain sequence text. Collapses are not biological or quality exclusions.
+
+**Attempt 2:** The directory `results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation` is preserved as a superseded UI-rejected preparation. Its upload, provenance ledger, and manifest bytes are unchanged. Its manifest remains schema `m9c-reference-upload-v2`, status `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`, and `publication_attempt` 2.
+
+**Attempt 3:** The publication destination is `/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3`. A generated manifest records `publication_attempt` 3 and status `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`. That directory was not created. Publication was not invoked.
+
+**Supersession:** Frozen M9B artifacts stay historical evidence, superseded for this reference upload by the 13 October 2026 live UI observation. ARP-1 specification SHA-256 `46ba6c8be873dad4c086e9f6b889b51702ba31212fa502d00f26e267a22da732`, the ARP-1 module hash above, and evidence contract SHA-256 `0494ea740b1a2402032bfa695c23a422b142cda6a2bc043d1da87dbb9ddb092b` are unchanged. Historical M9B results are not rewritten. Candidate and export behavior is unchanged.
+
+**Tests:** Synthetic fixtures and temporary directories only. `tests.modelling.test_aptarank_reference_upload` passed 28 tests, including the exact four-column header, first-identity mappings, unique IDs and sequences, nullable PDB values, refusal of `source_reference` and extra columns, and the attempt-3 path and prepared-not-run status.
+
+**Boundary:** REF was not reopened. The attempt-3 directory was not created. EVAL, production candidates, and AptaRank were not opened. Nothing was pushed.

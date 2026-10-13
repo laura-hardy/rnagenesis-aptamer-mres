@@ -1,7 +1,9 @@
 {
   "package_id": "M9C-1",
-  "schema_version": "m9c-reference-upload-v2",
-  "status": "POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED",
+  "schema_version": "m9c-reference-upload-v3",
+  "previous_schema_version": "m9c-reference-upload-v2",
+  "previous_contract_sha256": "980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e",
+  "status": "POLICY_FROZEN_FOUR_COLUMN_REFERENCE_UPLOAD_ATTEMPT3_NOT_PUBLISHED",
   "stage": "M9C-1",
   "scientific_result": false,
   "production_inputs_opened": true,
@@ -145,7 +147,10 @@
     "representative": "first_identity_row",
     "replacement": false,
     "upload_fields_from_first_identity": {
-      "sequence": "sequence_core"
+      "id": "scientific_identity_id",
+      "sequence": "sequence_core",
+      "target_name": "canonical_target_name",
+      "target_pdb_id": "pdb_id"
     },
     "later_identity_rows": "duplicate_core_collapses",
     "later_rows_are_biological_or_quality_exclusions": false,
@@ -155,29 +160,90 @@
     "provenance_is_aptarank_input": false
   },
   "reference_upload_interface": {
-    "authority": "user_confirmed_live_interface",
+    "authority": "user_observed_live_ui_13_october_2026",
+    "header": "id,sequence,target_name,target_pdb_id",
     "columns": [
-      "sequence"
+      "id",
+      "sequence",
+      "target_name",
+      "target_pdb_id"
     ],
     "rejected_columns": [
-      "id",
-      "target_name",
-      "target_pdb_id",
-      "source_reference"
+      "source_reference",
+      "publication"
     ],
-    "target_configuration": "supplied_separately",
+    "additional_column_refused": true,
+    "nullable_blank_preserved": [
+      "target_pdb_id"
+    ],
+    "unique_nonempty_ids": true,
+    "unique_canonical_sequences": true,
+    "nonempty_target_names": true,
+    "invent_structural_provenance": false,
     "provenance_fields_in_upload": false,
     "header_exact": true,
     "sequence_pattern": "^[ACGU]+$",
-    "unique_sequences": true,
     "normalization": false,
     "sequence_rewriting": false,
+    "t_to_u": false,
+    "relies_on_ui_t_to_u": false,
     "private_ledger_is_aptarank_input": false,
     "supersedes_five_column_reference_upload": true,
+    "supersedes_one_column_reference_upload": true,
     "supersession_scope": "m9c_reference_upload_only",
     "historical_m9b_artifacts": "preserved",
+    "historical_m9b_label": "historical_evidence_superseded_by_live_ui_observation_13_october_2026",
     "historical_m9b_results_rewritten": false,
     "candidate_and_export_behavior_changed": false
+  },
+  "live_ui_observation": {
+    "observed_on": "13 October 2026",
+    "reference_library_header": "id,sequence,target_name,target_pdb_id",
+    "one_column_attempt": 2,
+    "one_column_attempt_rejected_before_run": true,
+    "one_column_rejection": "candidate_like",
+    "aptarank_accepted_library": false,
+    "aptarank_calibrated_library": false,
+    "aptarank_scored": false,
+    "observed_ui_accepted_count": null,
+    "observed_ui_dropped_count": null,
+    "control_bank_facts_recorded": false,
+    "candidate_input_accepts": [
+      "csv_with_sequence_and_optional_id",
+      "plain_text",
+      "fasta"
+    ],
+    "candidate_sequence_length_minimum_nt": 20,
+    "candidate_sequence_length_maximum_nt": 100,
+    "ui_accepts_t_as_u": true,
+    "mres_policy_alphabet": "^[ACGU]+$",
+    "mres_policy_relies_on_t_to_u_conversion": false
+  },
+  "superseded_ui_rejected_preparation": {
+    "attempt": 2,
+    "label": "superseded_ui_rejected_preparation",
+    "directory": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation",
+    "parent_commit": "43ee64464b69952b57250cf9ebfcb91eb860c648",
+    "evidence_commit": "5c1f8883042a2f26e5caf898f27a65685edff250",
+    "schema_version": "m9c-reference-upload-v2",
+    "interface_columns": [
+      "sequence"
+    ],
+    "reference_upload_bytes": 6281,
+    "reference_upload_sha256": "4959bccf1e8ef535857ea451ceb83795ce09c2e6ad79a6ae10411d976d760f08",
+    "duplicate_provenance_bytes": 29214,
+    "duplicate_provenance_sha256": "ff3d7986029aeaf52f1ebfdceceba3d94d7136ca7d457c93f62398d01235a841",
+    "preparation_manifest_bytes": 694,
+    "preparation_manifest_sha256": "00c9479f5609cbe6f4bcc9388d1a2d9af74d46860333b680f6466384126e3b63",
+    "manifest_status": "REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN",
+    "publication_attempt": 2,
+    "ui_rejected_before_run": true,
+    "rejection": "candidate_like",
+    "directory_preserved": true,
+    "overwrite_or_delete": false,
+    "aptarank_accepted_library": false,
+    "aptarank_calibrated_library": false,
+    "aptarank_scored": false
   },
   "expected_live_ui_result": {
     "label": "expectation_not_observed_ui_result",
@@ -196,7 +262,7 @@
     "relative_path": "data/processed/ref.csv",
     "sha256": "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23",
     "byte_size": 211993,
-    "locator": "opened_and_verified_in_attempt_1_corrected_retry_not_invoked",
+    "locator": "opened_and_verified_in_attempts_1_and_2_attempt3_not_invoked",
     "review_authorized": true
   },
   "frozen_target_mapping": {
@@ -208,7 +274,10 @@
   },
   "outputs": {
     "reference_upload_columns": [
-      "sequence"
+      "id",
+      "sequence",
+      "target_name",
+      "target_pdb_id"
     ],
     "duplicate_provenance": "private_project_audit_ledger",
     "duplicate_provenance_fields": [
@@ -219,9 +288,12 @@
     ],
     "duplicate_provenance_is_aptarank_input": false,
     "written_by_default": false,
-    "production_directory": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation",
+    "production_directory": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3",
+    "publication_attempt": 3,
+    "superseded_directory": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation",
     "publication_method": "atomic_rename_of_verified_temporary_sibling",
     "publication_invoked": false,
+    "attempt3_directory_created": false,
     "existing_destination_refused": true,
     "atomic_members": [
       "reference_upload.csv",
@@ -251,22 +323,28 @@
     "sealed_publication_requires_invocation": true
   },
   "prohibited": [
-    "Opening REF, EVAL, or a production candidate source before the sealed review",
-    "Writing results/ outside the exact M9C reference-preparation destination",
+    "Opening REF, EVAL, or a production candidate source for this correction",
+    "Creating the attempt-3 publication directory in this correction",
+    "Overwriting or deleting the attempt-2 preparation directory",
+    "Writing results/ outside the exact attempt-3 reference-preparation destination",
     "Publishing over an existing destination, including an empty directory",
     "Publishing through a symlink",
     "Excluding a row for a biological or quality reason",
     "Normalizing case, whitespace, or alphabet",
     "Converting T to U",
-    "Applying a length filter",
-    "Replacing a retained first-identity sequence with a later identity",
-    "Putting id, target_name, target_pdb_id, or source_reference on the reference upload",
+    "Relying on the UI conversion of T to U",
+    "Applying a length filter to the reference upload",
+    "Replacing a retained first-identity field with a later identity",
+    "Omitting id, sequence, target_name, or target_pdb_id",
+    "Putting source_reference, publication, or any additional column on the reference upload",
+    "Inventing a PDB identifier when pdb_id is blank",
     "Inventing provenance fields for the reference upload",
     "Sending the private duplicate-provenance ledger to AptaRank",
     "Putting sequence text in the private duplicate-provenance ledger",
     "Rewriting frozen M9B artifacts or historical M9B results",
     "Implementing or substituting local REF calibration",
     "Calling the AptaRank UI or API",
-    "Running an end-to-end production rehearsal"
+    "Running an end-to-end production rehearsal",
+    "Recording observed accepted counts, dropped counts, or control-bank facts before they exist"
   ]
 }

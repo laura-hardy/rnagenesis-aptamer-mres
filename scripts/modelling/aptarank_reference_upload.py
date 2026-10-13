@@ -2,11 +2,12 @@
 """M9C-1 reference-upload preparation.
 
 One upload row is retained for each distinct canonical REF sequence_core.
-The AptaRank upload is a one-column CSV named sequence. The private ledger
-is a project audit artifact and is not an AptaRank input. The no-argument
-command checks pins only. It does not locate REF, EVAL, or a production
-candidate source, and it does not calibrate AptaRank. The sealed publication
-entry point stays idle unless its invocation flag is passed.
+The AptaRank reference library is the four-column CSV
+id,sequence,target_name,target_pdb_id. The private ledger is a project audit
+artifact and is not an AptaRank input. The no-argument command checks pins
+only. It does not locate REF, EVAL, or a production candidate source, and it
+does not calibrate AptaRank. The sealed publication entry point stays idle
+unless its invocation flag is passed.
 """
 
 from __future__ import annotations
@@ -24,12 +25,15 @@ import sys
 import tempfile
 
 PACKAGE_ID = "M9C-1"
-SCHEMA_VERSION = "m9c-reference-upload-v2"
-STATUS = "POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED"
+SCHEMA_VERSION = "m9c-reference-upload-v3"
+PREVIOUS_SCHEMA_VERSION = "m9c-reference-upload-v2"
+PREVIOUS_CONTRACT_SHA256 = "980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e"
+STATUS = "POLICY_FROZEN_FOUR_COLUMN_REFERENCE_UPLOAD_ATTEMPT3_NOT_PUBLISHED"
 STAGE = "M9C-1"
 CONTRACT_RELATIVE = "config/modelling/aptarank_reference_upload_contract.json"
-CONTRACT_SHA256 = "980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e"
-PRODUCTION_DESTINATION = "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation"
+CONTRACT_SHA256 = "34912929e77a0a835a01e36ba0291160b49b60dcdfb12a2d2aeb57090c794d02"
+PRODUCTION_DESTINATION = "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3"
+SUPERSEDED_DIRECTORY = "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation"
 PRODUCTION_PUBLICATION_METHOD = "atomic_rename_of_verified_temporary_sibling"
 PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
 PLAN_SHA256 = "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
@@ -40,9 +44,9 @@ IO_MODULE_SHA256 = "eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c4
 REF_SHA256 = "531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23"
 REF_BYTE_SIZE = 211993
 EXTERNAL_REF_RELATIVE = "data/processed/ref.csv"
-EXTERNAL_REF_LOCATOR = "opened_and_verified_in_attempt_1_corrected_retry_not_invoked"
+EXTERNAL_REF_LOCATOR = "opened_and_verified_in_attempts_1_and_2_attempt3_not_invoked"
 MANIFEST_STATUS = "REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN"
-PUBLICATION_ATTEMPT = 2
+PUBLICATION_ATTEMPT = 3
 SEALED_REVIEW_AUTHORIZED = True
 SEALED_ENTRY_POINT_INVOKED = False
 OUTPUT_MEMBERS = (
@@ -59,8 +63,10 @@ EXPECTED_UI_DROPPED_COUNT = 0
 STRUCTURE_FILE_SHA256 = "2e185a205c9be0bf76484e8ffb96ae225880723ed68eaaf25dffbbccaf01ff51"
 SELECTION_RECORD_SHA256 = "08f0c96af349ce4909d40c3004804317661777f72828cd807823341e0e4f0d04"
 TARGET_UPLOAD_SHA256 = "46471bb0643125ce86300ec050d6f0d3a09faa1d06dc325141c67cd1acdd5922"
-UPLOAD_COLUMNS = ("sequence",)
-REJECTED_UPLOAD_COLUMNS = ("id", "target_name", "target_pdb_id", "source_reference")
+UPLOAD_HEADER = "id,sequence,target_name,target_pdb_id"
+UPLOAD_COLUMNS = ("id", "sequence", "target_name", "target_pdb_id")
+REJECTED_UPLOAD_COLUMNS = ("source_reference", "publication")
+NULLABLE_UPLOAD_COLUMNS = ("target_pdb_id",)
 HISTORICAL_FIVE_COLUMN_REFERENCE_UPLOAD = (
     "id",
     "sequence",
@@ -68,25 +74,83 @@ HISTORICAL_FIVE_COLUMN_REFERENCE_UPLOAD = (
     "target_pdb_id",
     "source_reference",
 )
-FIELD_MAP = {"sequence": "sequence_core"}
+HISTORICAL_ONE_COLUMN_REFERENCE_UPLOAD = ("sequence",)
+FIELD_MAP = {
+    "id": "scientific_identity_id",
+    "sequence": "sequence_core",
+    "target_name": "canonical_target_name",
+    "target_pdb_id": "pdb_id",
+}
 LEDGER_KEYS = ("upload_row_number", "retained_id", "source_identities", "collapsed_source_identities")
 INTERFACE_KEYS = (
     "authority",
+    "header",
     "columns",
     "rejected_columns",
-    "target_configuration",
+    "additional_column_refused",
+    "nullable_blank_preserved",
+    "unique_nonempty_ids",
+    "unique_canonical_sequences",
+    "nonempty_target_names",
+    "invent_structural_provenance",
     "provenance_fields_in_upload",
     "header_exact",
     "sequence_pattern",
-    "unique_sequences",
     "normalization",
     "sequence_rewriting",
+    "t_to_u",
+    "relies_on_ui_t_to_u",
     "private_ledger_is_aptarank_input",
     "supersedes_five_column_reference_upload",
+    "supersedes_one_column_reference_upload",
     "supersession_scope",
     "historical_m9b_artifacts",
+    "historical_m9b_label",
     "historical_m9b_results_rewritten",
     "candidate_and_export_behavior_changed",
+)
+LIVE_UI_KEYS = (
+    "observed_on",
+    "reference_library_header",
+    "one_column_attempt",
+    "one_column_attempt_rejected_before_run",
+    "one_column_rejection",
+    "aptarank_accepted_library",
+    "aptarank_calibrated_library",
+    "aptarank_scored",
+    "observed_ui_accepted_count",
+    "observed_ui_dropped_count",
+    "control_bank_facts_recorded",
+    "candidate_input_accepts",
+    "candidate_sequence_length_minimum_nt",
+    "candidate_sequence_length_maximum_nt",
+    "ui_accepts_t_as_u",
+    "mres_policy_alphabet",
+    "mres_policy_relies_on_t_to_u_conversion",
+)
+SUPERSEDED_KEYS = (
+    "attempt",
+    "label",
+    "directory",
+    "parent_commit",
+    "evidence_commit",
+    "schema_version",
+    "interface_columns",
+    "reference_upload_bytes",
+    "reference_upload_sha256",
+    "duplicate_provenance_bytes",
+    "duplicate_provenance_sha256",
+    "preparation_manifest_bytes",
+    "preparation_manifest_sha256",
+    "manifest_status",
+    "publication_attempt",
+    "ui_rejected_before_run",
+    "rejection",
+    "directory_preserved",
+    "overwrite_or_delete",
+    "aptarank_accepted_library",
+    "aptarank_calibrated_library",
+    "aptarank_scored",
 )
 ATTEMPT_KEYS = (
     "attempt",
@@ -125,6 +189,8 @@ MANIFEST_KEYS = (
 TOP_LEVEL_KEYS = (
     "package_id",
     "schema_version",
+    "previous_schema_version",
+    "previous_contract_sha256",
     "status",
     "stage",
     "scientific_result",
@@ -143,6 +209,8 @@ TOP_LEVEL_KEYS = (
     "source_schema",
     "retention",
     "reference_upload_interface",
+    "live_ui_observation",
+    "superseded_ui_rejected_preparation",
     "expected_live_ui_result",
     "external_ref",
     "frozen_target_mapping",
@@ -224,6 +292,8 @@ def validate_contract_document(document, blobs):
     _exact_keys(document, TOP_LEVEL_KEYS, "spec_invalid", "the reference-upload contract keys changed")
     _require(document["package_id"] == PACKAGE_ID, "spec_invalid", "the package id is not M9C-1")
     _require(document["schema_version"] == SCHEMA_VERSION, "spec_invalid", "the schema version changed")
+    _require(document["previous_schema_version"] == PREVIOUS_SCHEMA_VERSION, "spec_invalid", "the previous schema version changed")
+    _require(document["previous_contract_sha256"] == PREVIOUS_CONTRACT_SHA256, "spec_invalid", "the previous contract digest changed")
     _require(document["status"] == STATUS, "spec_invalid", "the status changed")
     _require(document["stage"] == STAGE, "spec_invalid", "the stage changed")
     for key in (
@@ -342,22 +412,85 @@ def validate_contract_document(document, blobs):
     _require(retention["provenance_is_aptarank_input"] is False, "spec_invalid", "the private ledger is not an AptaRank input")
     interface = document["reference_upload_interface"]
     _exact_keys(interface, INTERFACE_KEYS, "spec_invalid", "the reference-upload interface changed")
-    _require(interface["authority"] == "user_confirmed_live_interface", "spec_invalid", "the live interface authority changed")
-    _require(interface["columns"] == list(UPLOAD_COLUMNS), "spec_invalid", "the live reference upload is exactly the sequence column")
+    _require(interface["authority"] == "user_observed_live_ui_13_october_2026", "spec_invalid", "the live interface authority changed")
+    _require(interface["header"] == UPLOAD_HEADER, "spec_invalid", "the reference library header changed")
+    _require(interface["columns"] == list(UPLOAD_COLUMNS), "spec_invalid", "the reference library columns changed")
+    _require(",".join(interface["columns"]) == interface["header"], "spec_invalid", "the reference library header does not match the columns")
     _require(interface["rejected_columns"] == list(REJECTED_UPLOAD_COLUMNS), "spec_invalid", "a rejected reference-upload column changed")
-    _require(interface["target_configuration"] == "supplied_separately", "spec_invalid", "target configuration stays separate from the upload")
+    _require(interface["additional_column_refused"] is True, "spec_invalid", "an additional reference-upload column must stay refused")
+    _require(interface["nullable_blank_preserved"] == list(NULLABLE_UPLOAD_COLUMNS), "spec_invalid", "the nullable reference-upload column changed")
+    _require(interface["unique_nonempty_ids"] is True, "spec_invalid", "reference upload ids must be unique and nonempty")
+    _require(interface["unique_canonical_sequences"] is True, "spec_invalid", "reference upload sequences must be unique and canonical")
+    _require(interface["nonempty_target_names"] is True, "spec_invalid", "reference upload target names must be nonempty")
+    _require(interface["invent_structural_provenance"] is False, "spec_invalid", "a blank PDB must not be invented")
     _require(interface["provenance_fields_in_upload"] is False, "spec_invalid", "the upload must not carry provenance fields")
     _require(interface["header_exact"] is True, "spec_invalid", "the upload header must be exact")
     _require(interface["sequence_pattern"] == "^[ACGU]+$", "spec_invalid", "the upload sequence pattern changed")
-    _require(interface["unique_sequences"] is True, "spec_invalid", "upload sequences must be unique")
     _require(interface["normalization"] is False, "spec_invalid", "upload normalization is refused")
     _require(interface["sequence_rewriting"] is False, "spec_invalid", "sequence rewriting is refused")
+    _require(interface["t_to_u"] is False, "spec_invalid", "the reference upload must not convert T to U")
+    _require(interface["relies_on_ui_t_to_u"] is False, "spec_invalid", "the MRes policy must not rely on UI T-to-U conversion")
     _require(interface["private_ledger_is_aptarank_input"] is False, "spec_invalid", "the private ledger is not an AptaRank input")
     _require(interface["supersedes_five_column_reference_upload"] is True, "spec_invalid", "the five-column reference upload is superseded for M9C")
+    _require(interface["supersedes_one_column_reference_upload"] is True, "spec_invalid", "the one-column reference upload is superseded for M9C")
     _require(interface["supersession_scope"] == "m9c_reference_upload_only", "spec_invalid", "the supersession scope changed")
     _require(interface["historical_m9b_artifacts"] == "preserved", "spec_invalid", "frozen M9B artifacts stay preserved")
+    _require(
+        interface["historical_m9b_label"] == "historical_evidence_superseded_by_live_ui_observation_13_october_2026",
+        "spec_invalid",
+        "frozen M9B artifacts stay historical evidence superseded by the live UI observation",
+    )
     _require(interface["historical_m9b_results_rewritten"] is False, "spec_invalid", "historical M9B results stay unchanged")
     _require(interface["candidate_and_export_behavior_changed"] is False, "spec_invalid", "candidate and export behavior stays unchanged")
+    observed = document["live_ui_observation"]
+    _exact_keys(observed, LIVE_UI_KEYS, "spec_invalid", "the live UI observation changed")
+    _require(observed["observed_on"] == "13 October 2026", "spec_invalid", "the live UI observation date changed")
+    _require(observed["reference_library_header"] == UPLOAD_HEADER, "spec_invalid", "the observed reference library header changed")
+    _require(observed["one_column_attempt"] == 2, "spec_invalid", "the rejected one-column attempt number changed")
+    _require(observed["one_column_attempt_rejected_before_run"] is True, "spec_invalid", "attempt 2 was rejected before Run")
+    _require(observed["one_column_rejection"] == "candidate_like", "spec_invalid", "attempt 2 was rejected as candidate-like")
+    _require(observed["aptarank_accepted_library"] is False, "spec_invalid", "AptaRank did not accept the reference library")
+    _require(observed["aptarank_calibrated_library"] is False, "spec_invalid", "AptaRank did not calibrate the reference library")
+    _require(observed["aptarank_scored"] is False, "spec_invalid", "AptaRank did not score anything")
+    _require(observed["observed_ui_accepted_count"] is None, "spec_invalid", "no observed accepted count exists")
+    _require(observed["observed_ui_dropped_count"] is None, "spec_invalid", "no observed dropped count exists")
+    _require(observed["control_bank_facts_recorded"] is False, "spec_invalid", "no control-bank facts exist yet")
+    _require(
+        observed["candidate_input_accepts"] == ["csv_with_sequence_and_optional_id", "plain_text", "fasta"],
+        "spec_invalid",
+        "the observed candidate input forms changed",
+    )
+    _require(observed["candidate_sequence_length_minimum_nt"] == 20, "spec_invalid", "the observed candidate minimum length changed")
+    _require(observed["candidate_sequence_length_maximum_nt"] == 100, "spec_invalid", "the observed candidate maximum length changed")
+    _require(type(observed["candidate_sequence_length_minimum_nt"]) is int, "spec_invalid", "the observed candidate minimum length changed")
+    _require(type(observed["candidate_sequence_length_maximum_nt"]) is int, "spec_invalid", "the observed candidate maximum length changed")
+    _require(observed["ui_accepts_t_as_u"] is True, "spec_invalid", "the UI T-as-U observation changed")
+    _require(observed["mres_policy_alphabet"] == "^[ACGU]+$", "spec_invalid", "the MRes alphabet changed")
+    _require(observed["mres_policy_relies_on_t_to_u_conversion"] is False, "spec_invalid", "the MRes policy does not rely on T-to-U conversion")
+    superseded = document["superseded_ui_rejected_preparation"]
+    _exact_keys(superseded, SUPERSEDED_KEYS, "spec_invalid", "the superseded attempt-2 record changed")
+    _require(superseded["attempt"] == 2, "spec_invalid", "the superseded attempt number changed")
+    _require(superseded["label"] == "superseded_ui_rejected_preparation", "spec_invalid", "attempt 2 stays a superseded UI-rejected preparation")
+    _require(superseded["directory"] == SUPERSEDED_DIRECTORY, "spec_invalid", "the attempt-2 directory changed")
+    _require(superseded["parent_commit"] == "43ee64464b69952b57250cf9ebfcb91eb860c648", "spec_invalid", "the attempt-2 parent commit changed")
+    _require(superseded["evidence_commit"] == "5c1f8883042a2f26e5caf898f27a65685edff250", "spec_invalid", "the attempt-2 evidence commit changed")
+    _require(superseded["schema_version"] == PREVIOUS_SCHEMA_VERSION, "spec_invalid", "the attempt-2 schema changed")
+    _require(superseded["interface_columns"] == list(HISTORICAL_ONE_COLUMN_REFERENCE_UPLOAD), "spec_invalid", "the attempt-2 interface changed")
+    _require(superseded["reference_upload_bytes"] == 6281, "spec_invalid", "the attempt-2 upload size changed")
+    _require(superseded["reference_upload_sha256"] == "4959bccf1e8ef535857ea451ceb83795ce09c2e6ad79a6ae10411d976d760f08", "spec_invalid", "the attempt-2 upload digest changed")
+    _require(superseded["duplicate_provenance_bytes"] == 29214, "spec_invalid", "the attempt-2 provenance size changed")
+    _require(superseded["duplicate_provenance_sha256"] == "ff3d7986029aeaf52f1ebfdceceba3d94d7136ca7d457c93f62398d01235a841", "spec_invalid", "the attempt-2 provenance digest changed")
+    _require(superseded["preparation_manifest_bytes"] == 694, "spec_invalid", "the attempt-2 manifest size changed")
+    _require(superseded["preparation_manifest_sha256"] == "00c9479f5609cbe6f4bcc9388d1a2d9af74d46860333b680f6466384126e3b63", "spec_invalid", "the attempt-2 manifest digest changed")
+    _require(superseded["manifest_status"] == MANIFEST_STATUS, "spec_invalid", "the attempt-2 manifest status changed")
+    _require(superseded["publication_attempt"] == 2, "spec_invalid", "the attempt-2 publication number changed")
+    _require(superseded["ui_rejected_before_run"] is True, "spec_invalid", "attempt 2 was rejected before Run")
+    _require(superseded["rejection"] == "candidate_like", "spec_invalid", "attempt 2 was rejected as candidate-like")
+    _require(superseded["directory_preserved"] is True, "spec_invalid", "the attempt-2 directory stays preserved")
+    _require(superseded["overwrite_or_delete"] is False, "spec_invalid", "the attempt-2 directory must not be overwritten or deleted")
+    _require(superseded["aptarank_accepted_library"] is False, "spec_invalid", "AptaRank did not accept the attempt-2 library")
+    _require(superseded["aptarank_calibrated_library"] is False, "spec_invalid", "AptaRank did not calibrate the attempt-2 library")
+    _require(superseded["aptarank_scored"] is False, "spec_invalid", "AptaRank did not score the attempt-2 library")
     attempt = document["first_failed_publication_attempt"]
     _exact_keys(attempt, ATTEMPT_KEYS, "spec_invalid", "the first failed publication attempt record changed")
     _require(attempt["attempt"] == 1, "spec_invalid", "the first failed attempt number changed")
@@ -375,8 +508,9 @@ def validate_contract_document(document, blobs):
     _require(attempt["observed_error_field"] == "publication", "spec_invalid", "the first attempt required publication")
     _require(attempt["output_published"] is False, "spec_invalid", "the first attempt published no output")
     _require(attempt["aptarank_run"] is False, "spec_invalid", "the first attempt did not run AptaRank")
-    # retried stays false because this revision has not invoked the corrected publication.
-    _require(attempt["retried"] is False, "spec_invalid", "attempt 1 stays unretried in this pre-retry revision")
+    # retried stays false because the obsolete five-column publication was not retried.
+    # Attempt 2 is a separate one-column publication and is recorded as UI-rejected.
+    _require(attempt["retried"] is False, "spec_invalid", "the obsolete five-column publication was not retried")
     for source_name in FIELD_MAP.values():
         _require(source_name in columns, "schema_mismatch", "a retained source field is absent from the header")
     _require("partition" in columns and "sequence_core_sha256" in columns, "schema_mismatch", "the frozen REF header is incomplete")
@@ -425,7 +559,7 @@ def validate_contract_document(document, blobs):
     _require(
         external["locator"] == EXTERNAL_REF_LOCATOR,
         "spec_invalid",
-        "the external REF locator must record that attempt 1 opened and verified REF and that the corrected retry is not invoked",
+        "the external REF locator must record that attempts 1 and 2 opened REF and that attempt 3 is not invoked",
     )
     _require(external["review_authorized"] is True, "spec_invalid", "sealed review is not authorized")
     mapping = document["frozen_target_mapping"]
@@ -457,8 +591,11 @@ def validate_contract_document(document, blobs):
             "duplicate_provenance_is_aptarank_input",
             "written_by_default",
             "production_directory",
+            "publication_attempt",
+            "superseded_directory",
             "publication_method",
             "publication_invoked",
+            "attempt3_directory_created",
             "existing_destination_refused",
             "atomic_members",
             "sealed_entry_point_invoked",
@@ -467,21 +604,27 @@ def validate_contract_document(document, blobs):
         "the output record changed",
     )
     arp1 = _arp1()
-    _require(outputs["reference_upload_columns"] == list(UPLOAD_COLUMNS), "spec_invalid", "the upload columns are exactly sequence")
+    _require(outputs["reference_upload_columns"] == list(UPLOAD_COLUMNS), "spec_invalid", "the upload columns are exactly id,sequence,target_name,target_pdb_id")
     _require(outputs["reference_upload_columns"] != list(arp1.REFERENCE_COLUMNS), "spec_invalid", "M9C no longer uses the five-column reference upload")
     _require(
         list(arp1.REFERENCE_COLUMNS) == list(HISTORICAL_FIVE_COLUMN_REFERENCE_UPLOAD),
         "spec_invalid",
         "the historical five-column reference schema was rewritten",
     )
+    _require(list(UPLOAD_COLUMNS) == list(HISTORICAL_FIVE_COLUMN_REFERENCE_UPLOAD[:4]), "spec_invalid", "the four-column header drifted from the historical prefix")
+    _require(HISTORICAL_FIVE_COLUMN_REFERENCE_UPLOAD[4] == "source_reference", "spec_invalid", "source_reference stays refused")
     _require(outputs["duplicate_provenance"] == "private_project_audit_ledger", "spec_invalid", "the provenance ledger kind changed")
     _require(outputs["duplicate_provenance_fields"] == list(LEDGER_KEYS), "spec_invalid", "the private ledger fields changed")
     _require(outputs["duplicate_provenance_is_aptarank_input"] is False, "spec_invalid", "the private ledger is not an AptaRank input")
     _require(outputs["written_by_default"] is False, "spec_invalid", "preparation must not write by default")
     _require(outputs["production_directory"] == PRODUCTION_DESTINATION, "spec_invalid", "the production publication path changed")
+    _require(outputs["publication_attempt"] == PUBLICATION_ATTEMPT, "spec_invalid", "the publication attempt changed")
+    _require(outputs["superseded_directory"] == SUPERSEDED_DIRECTORY, "spec_invalid", "the superseded attempt-2 directory changed")
+    _require(outputs["production_directory"] != outputs["superseded_directory"], "spec_invalid", "attempt 3 must not reuse the attempt-2 directory")
     _require(outputs["publication_method"] == PRODUCTION_PUBLICATION_METHOD, "spec_invalid", "the publication method changed")
-    # False here is this corrected revision's pre-retry state. Attempt 1 already opened REF.
-    _require(outputs["publication_invoked"] is False, "spec_invalid", "corrected publication stays uninvoked before retry")
+    # False here means this v3 revision has not invoked attempt 3.
+    _require(outputs["publication_invoked"] is False, "spec_invalid", "attempt 3 stays uninvoked")
+    _require(outputs["attempt3_directory_created"] is False, "spec_invalid", "the attempt-3 directory has not been created")
     _require(outputs["existing_destination_refused"] is True, "spec_invalid", "an existing publication destination must stay refused")
     _require(outputs["atomic_members"] == list(OUTPUT_MEMBERS), "spec_invalid", "the atomic output members changed")
     _require(outputs["sealed_entry_point_invoked"] is False, "spec_invalid", "the sealed entry point stays uninvoked before retry")
@@ -542,11 +685,19 @@ def _parse_source(payload, document):
     return rows
 
 
+def _nonempty_target_name(value):
+    """True when a target name has a visible character. The cell is not rewritten."""
+    return type(value) is str and value.strip() != ""
+
+
 def _check_source_row(row, document):
     arp1 = _arp1()
     schema = document["source_schema"]
     mapping = document["retention"]["upload_fields_from_first_identity"]
+    _require(mapping["id"] == schema["identity_column"], "spec_invalid", "the upload id does not come from scientific_identity_id")
     _require(mapping["sequence"] == schema["core_column"], "spec_invalid", "the upload sequence does not come from sequence_core")
+    _require(mapping["target_name"] == "canonical_target_name", "spec_invalid", "the upload target name does not come from canonical_target_name")
+    _require(mapping["target_pdb_id"] == "pdb_id", "spec_invalid", "the upload PDB id does not come from pdb_id")
     identity = row[schema["identity_column"]]
     if type(identity) is not str or arp1.ID_TEXT.fullmatch(identity) is None:
         raise ReferenceUploadError("missing_required_field", "a required REF field is missing: scientific_identity_id")
@@ -565,6 +716,7 @@ def _retain_rows(rows, document):
     seen_identities = set()
     order = []
     groups = {}
+    mapping = document["retention"]["upload_fields_from_first_identity"]
     for row in rows:
         identity, core = _check_source_row(row, document)
         if identity in seen_identities:
@@ -572,8 +724,17 @@ def _retain_rows(rows, document):
         seen_identities.add(identity)
         group = groups.get(core)
         if group is None:
+            target_name = row[mapping["target_name"]]
+            pdb_id = row[mapping["target_pdb_id"]]
+            if not _nonempty_target_name(target_name):
+                raise ReferenceUploadError("missing_required_field", "a required REF field is missing: canonical_target_name")
+            if type(pdb_id) is not str:
+                raise ReferenceUploadError("missing_required_field", "a required REF field is missing: pdb_id")
             groups[core] = {
+                "id": identity,
                 "sequence": core,
+                "target_name": target_name,
+                "target_pdb_id": pdb_id,
                 "retained_id": identity,
                 "source_identities": [identity],
             }
@@ -592,19 +753,15 @@ def _upload_bytes(retained):
     writer = csv.writer(buffer, lineterminator="\n")
     writer.writerow(list(UPLOAD_COLUMNS))
     for item in retained:
-        writer.writerow([item["sequence"]])
+        writer.writerow([item["id"], item["sequence"], item["target_name"], item["target_pdb_id"]])
     return buffer.getvalue().encode("utf-8")
 
 
-def validate_reference_upload(payload):
-    """Accept a finished upload only when its header is exactly sequence.
-
-    Each data row is one canonical uppercase A, C, G and U sequence. Sequences
-    are unique. Metadata columns are refused. Nothing in the cell is rewritten.
-    """
+def _read_upload_table(payload):
+    """Return data rows only after the exact four-column header is accepted."""
     _require_bytes(payload)
     if payload.startswith(b"\xef\xbb\xbf") or payload == b"":
-        raise ReferenceUploadError("upload_header_invalid", "the reference upload header is not exactly sequence")
+        raise ReferenceUploadError("upload_header_invalid", "the reference upload header is not exactly " + UPLOAD_HEADER)
     try:
         text = payload.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -612,33 +769,76 @@ def validate_reference_upload(payload):
     try:
         rows = list(csv.reader(io.StringIO(text, newline="")))
     except csv.Error as exc:
-        raise ReferenceUploadError("upload_validation_failed", "the reference upload is not a one-column sequence CSV") from exc
-    if not rows or rows[0] != list(UPLOAD_COLUMNS):
-        raise ReferenceUploadError("upload_header_invalid", "the reference upload header is not exactly sequence")
-    if set(REJECTED_UPLOAD_COLUMNS) & set(rows[0]):
-        raise ReferenceUploadError("metadata_column_refused", "the reference upload accepts only the sequence column")
+        raise ReferenceUploadError("upload_validation_failed", "the reference upload is not a four-column CSV") from exc
+    if not rows:
+        raise ReferenceUploadError("upload_header_invalid", "the reference upload header is not exactly " + UPLOAD_HEADER)
+    header = rows[0]
+    if "source_reference" in header:
+        raise ReferenceUploadError("source_reference_refused", "the reference upload refuses source_reference")
+    if "publication" in header:
+        raise ReferenceUploadError("publication_column_refused", "the reference upload refuses publication")
+    if any(column not in UPLOAD_COLUMNS for column in header):
+        raise ReferenceUploadError("extra_column_refused", "the reference upload refuses an additional column")
+    if header != list(UPLOAD_COLUMNS):
+        raise ReferenceUploadError("upload_header_invalid", "the reference upload header is not exactly " + UPLOAD_HEADER)
+    parsed = []
+    for row in rows[1:]:
+        if len(row) > len(UPLOAD_COLUMNS):
+            raise ReferenceUploadError("extra_column_refused", "the reference upload refuses an additional column")
+        if len(row) != len(UPLOAD_COLUMNS):
+            raise ReferenceUploadError("missing_required_field", "the reference upload requires target_pdb_id even when it is blank")
+        parsed.append(dict(zip(UPLOAD_COLUMNS, row)))
+    return parsed
+
+
+def validate_reference_upload(payload):
+    """Accept a finished upload only when its header is exactly the four library columns.
+
+    IDs are unique and nonempty. Sequences are unique canonical uppercase A, C,
+    G and U. Target names are nonempty. target_pdb_id may be blank. source_reference,
+    publication, and any other column are refused. Nothing in a cell is rewritten.
+    """
+    rows = _read_upload_table(payload)
     arp1 = _arp1()
     sequences = []
-    seen = set()
-    for row in rows[1:]:
-        if len(row) != 1:
-            raise ReferenceUploadError("metadata_column_refused", "the reference upload accepts only the sequence column")
-        sequence = row[0]
+    seen_ids = set()
+    seen_sequences = set()
+    for row in rows:
+        identity = row["id"]
+        if type(identity) is not str or arp1.ID_TEXT.fullmatch(identity) is None:
+            raise ReferenceUploadError("missing_required_field", "a reference upload id is missing")
+        if identity in seen_ids:
+            raise ReferenceUploadError("duplicate_id", "a reference upload id is duplicated")
+        seen_ids.add(identity)
+        sequence = row["sequence"]
         if type(sequence) is not str or arp1.SEQUENCE_TEXT.fullmatch(sequence) is None:
             raise ReferenceUploadError("noncanonical_core", "a reference upload sequence is not canonical uppercase A, C, G and U")
-        if sequence in seen:
+        if sequence in seen_sequences:
             raise ReferenceUploadError("duplicate_sequence", "a reference upload sequence is duplicated")
-        seen.add(sequence)
+        seen_sequences.add(sequence)
+        if not _nonempty_target_name(row["target_name"]):
+            raise ReferenceUploadError("missing_required_field", "a reference upload target name is missing")
+        if type(row["target_pdb_id"]) is not str:
+            raise ReferenceUploadError("missing_required_field", "the reference upload requires target_pdb_id even when it is blank")
         sequences.append(sequence)
     return sequences
 
 
 def _validate_upload(payload, retained):
-    sequences = validate_reference_upload(payload)
-    expected = [item["sequence"] for item in retained]
-    if sequences != expected:
-        raise ReferenceUploadError("upload_validation_failed", "a reference upload sequence was not preserved")
-    return sequences
+    rows = _read_upload_table(payload)
+    validate_reference_upload(payload)
+    expected = [
+        {
+            "id": item["id"],
+            "sequence": item["sequence"],
+            "target_name": item["target_name"],
+            "target_pdb_id": item["target_pdb_id"],
+        }
+        for item in retained
+    ]
+    if rows != expected:
+        raise ReferenceUploadError("upload_validation_failed", "a reference upload field was not preserved")
+    return [item["sequence"] for item in retained]
 
 
 def _validate_private_ledger(payload, sequences):
@@ -698,10 +898,10 @@ def _validate_manifest_record(document):
     if document["status"] == STATUS or document["status"] != MANIFEST_STATUS:
         raise ReferenceUploadError(
             "manifest_invalid",
-            "a preparation manifest status is REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN and does not copy the pre-retry contract status",
+            "a preparation manifest status is REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN and does not copy the contract status",
         )
     if type(document["publication_attempt"]) is not int or document["publication_attempt"] != PUBLICATION_ATTEMPT:
-        raise ReferenceUploadError("manifest_invalid", "a preparation manifest records publication attempt 2")
+        raise ReferenceUploadError("manifest_invalid", "a preparation manifest records publication attempt 3")
 
 
 def _manifest_bytes(source_digest, source_rows, retained_count, collapses, upload_hash, ledger_hash):
@@ -988,15 +1188,24 @@ def _require_absent_regular_destination(path):
     raise ReferenceUploadError("output_exists", "an existing publication destination is refused, including an empty directory")
 
 
+def _refuse_superseded_directory(path):
+    if path == SUPERSEDED_DIRECTORY:
+        raise ReferenceUploadError(
+            "output_refused",
+            "the attempt-2 preparation directory is preserved and cannot be overwritten",
+        )
+
+
 def preflight_publication_destination(directory):
-    """Allow only the exact production destination, and only when it is absent."""
+    """Allow only the exact attempt-3 destination, and only when it is absent."""
     path = _absolute_publication_path(directory)
+    _refuse_superseded_directory(path)
     derived = os.path.join(
         repo_root(),
         "results",
         "fine_tuning",
         "m9_generator_evaluation",
-        "m9c_reference_preparation",
+        "m9c_reference_preparation_attempt3",
     )
     if path != PRODUCTION_DESTINATION or derived != PRODUCTION_DESTINATION:
         _refuse_non_production_destination(path)
@@ -1035,7 +1244,7 @@ def _prepared_members(prepared):
         raise ReferenceUploadError("publication_verify_failed", "the preparation manifest records local calibration")
     sequences = validate_reference_upload(prepared["reference_upload"])
     if manifest["prepared_upload_row_count"] != len(sequences):
-        raise ReferenceUploadError("publication_verify_failed", "the prepared upload row count does not match the one-column upload")
+        raise ReferenceUploadError("publication_verify_failed", "the prepared upload row count does not match the four-column upload")
     _validate_private_ledger(prepared["duplicate_provenance"], sequences)
     return members
 
@@ -1122,6 +1331,7 @@ def _remove_invocation_temp(directory):
 def _publish_prepared_directory(directory, prepared):
     """Write three members to a temporary sibling, reread them, then rename the directory once."""
     path = _absolute_publication_path(directory)
+    _refuse_superseded_directory(path)
     if path != PRODUCTION_DESTINATION:
         root = os.path.abspath(repo_root())
         if _is_within(path, os.path.join(root, "data")) or _is_within(path, os.path.join(root, "results")):
@@ -1174,7 +1384,9 @@ def publish_sealed_reference_preparation(*, invoke=False, **forbidden):
     if document["outputs"]["production_directory"] != PRODUCTION_DESTINATION:
         raise ReferenceUploadError("spec_invalid", "the production publication path changed")
     if document["outputs"]["publication_invoked"] is not False:
-        raise ReferenceUploadError("spec_invalid", "sealed publication stays uninvoked")
+        raise ReferenceUploadError("spec_invalid", "attempt 3 stays uninvoked")
+    if document["outputs"]["attempt3_directory_created"] is not False:
+        raise ReferenceUploadError("spec_invalid", "the attempt-3 directory has not been created")
     destination = preflight_publication_destination(PRODUCTION_DESTINATION)
     payload = _read_pinned_ref_bytes()
     if len(payload) != REF_BYTE_SIZE:

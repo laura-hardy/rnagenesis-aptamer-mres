@@ -1,14 +1,16 @@
 # M9C reference preparation
 
-M9C-1 published the sealed REF upload once. AptaRank was not run. M9C is not complete, and EVAL remains locked.
+This directory is attempt 2. It is preserved superseded evidence. On 13 October 2026 the live AptaRank UI rejected the one-column file before Run because it was candidate-like. AptaRank did not accept the library, did not calibrate it, and did not score anything. No accepted count, dropped count, or control-bank fact was observed. Do not overwrite or delete this directory.
 
-The manifest digest below was recomputed from the file bytes and is not embedded in the manifest. Preparation was not run again for this record.
+The corrected contract is schema `m9c-reference-upload-v3`. Publication attempt 3 is configured at `m9c_reference_preparation_attempt3` and has not been created. This record does not reopen REF. M9C is not complete, and EVAL remains locked.
+
+The manifest digest below was recomputed from the file bytes and is not embedded in the manifest. Preparation was not run again for this record. The three file digests are unchanged.
 
 ## Attempts
 
 Attempt 1 opened and verified REF, then failed before publication under the obsolete five-column assumption. That contract required `publication`. No output was published, and AptaRank was not run.
 
-Attempt 2 succeeded once. `publish_sealed_reference_preparation(invoke=True)` ran at HEAD `43ee64464b69952b57250cf9ebfcb91eb860c648` and was not retried.
+Attempt 2 published once. `publish_sealed_reference_preparation(invoke=True)` ran at HEAD `43ee64464b69952b57250cf9ebfcb91eb860c648`. The live UI later rejected that one-column file before Run. The directory remains the committed evidence of that superseded preparation.
 
 ## Source
 
@@ -24,7 +26,7 @@ The 18 later identity rows are duplicate-core collapses. They are not biological
 
 ## Interface
 
-The published upload is one CSV column, `sequence`. It does not carry `id`, `target_name`, `target_pdb_id`, or `source_reference`. Target configuration stays separate. The private provenance ledger is a project-only audit artifact and is not an AptaRank input.
+The published upload is the superseded one-column CSV, `sequence`. The live UI requires `id,sequence,target_name,target_pdb_id` instead. This file does not carry `id`, `target_name`, `target_pdb_id`, or `source_reference`. The private provenance ledger is a project-only audit artifact and is not an AptaRank input.
 
 ## Outputs
 
@@ -36,12 +38,12 @@ The published upload is one CSV column, `sequence`. It does not carry `id`, `tar
 
 ## Manifest
 
-Status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`. `publication_attempt` is 2. `production_ref_identity_verified` is true. `local_calibration` is false.
+This manifest is historical attempt-2 evidence. It is not an attempt-3 manifest. Status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`. `publication_attempt` is 2. `production_ref_identity_verified` is true. `local_calibration` is false.
 
-AptaRank was not run. `aptarank_ui_executed` is false. `observed_ui_accepted_count` and `observed_ui_dropped_count` remain null.
+AptaRank was not run. The file was rejected before Run. `aptarank_ui_executed` is false. `observed_ui_accepted_count` and `observed_ui_dropped_count` remain null. No control-bank fact was observed.
 
 ## Review
 
-Review archive SHA-256 `4da503a1b4b9162da19f1c0862b285ae1e972e4d8c2f8196f38b2563b1d7cf57`.
+The publication-evidence archive SHA-256 remains `4da503a1b4b9162da19f1c0862b285ae1e972e4d8c2f8196f38b2563b1d7cf57`. The upload, provenance ledger, and manifest bytes above are unchanged.
 
 The upload CSV and the provenance ledger stay ignored. This README and the manifest are the committed evidence. This record does not complete M9C and does not unlock EVAL.

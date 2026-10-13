@@ -29,7 +29,7 @@ if MODELLING not in sys.path:
 
 import aptarank_reference_upload as upload
 
-CONTRACT_SHA256 = "980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e"
+CONTRACT_SHA256 = "34912929e77a0a835a01e36ba0291160b49b60dcdfb12a2d2aeb57090c794d02"
 CORE_A = "ACGUACGUACGUACGUACGU"
 CORE_B = "GCAUGCAUGCAUGCAUGCAU"
 CORE_C = "ACGU"
@@ -105,26 +105,70 @@ class ReferenceUploadTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), CONTRACT_SHA256)
         self.assertEqual(upload.CONTRACT_SHA256, CONTRACT_SHA256)
         document = _document()
-        self.assertEqual(document["status"], "POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED")
-        self.assertEqual(document["schema_version"], "m9c-reference-upload-v2")
+        self.assertEqual(document["status"], "POLICY_FROZEN_FOUR_COLUMN_REFERENCE_UPLOAD_ATTEMPT3_NOT_PUBLISHED")
+        self.assertEqual(document["schema_version"], "m9c-reference-upload-v3")
+        self.assertEqual(document["previous_schema_version"], "m9c-reference-upload-v2")
+        self.assertEqual(document["previous_contract_sha256"], "980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e")
         interface = document["reference_upload_interface"]
-        self.assertEqual(interface["columns"], ["sequence"])
-        self.assertEqual(interface["rejected_columns"], ["id", "target_name", "target_pdb_id", "source_reference"])
-        self.assertEqual(interface["target_configuration"], "supplied_separately")
+        self.assertEqual(interface["header"], "id,sequence,target_name,target_pdb_id")
+        self.assertEqual(interface["columns"], ["id", "sequence", "target_name", "target_pdb_id"])
+        self.assertEqual(interface["rejected_columns"], ["source_reference", "publication"])
+        self.assertTrue(interface["additional_column_refused"])
+        self.assertEqual(interface["nullable_blank_preserved"], ["target_pdb_id"])
+        self.assertTrue(interface["unique_nonempty_ids"])
+        self.assertTrue(interface["unique_canonical_sequences"])
+        self.assertTrue(interface["nonempty_target_names"])
+        self.assertFalse(interface["invent_structural_provenance"])
         self.assertFalse(interface["provenance_fields_in_upload"])
-        self.assertTrue(interface["unique_sequences"])
         self.assertFalse(interface["normalization"])
         self.assertFalse(interface["sequence_rewriting"])
+        self.assertFalse(interface["t_to_u"])
+        self.assertFalse(interface["relies_on_ui_t_to_u"])
         self.assertFalse(interface["private_ledger_is_aptarank_input"])
         self.assertTrue(interface["supersedes_five_column_reference_upload"])
+        self.assertTrue(interface["supersedes_one_column_reference_upload"])
         self.assertEqual(interface["supersession_scope"], "m9c_reference_upload_only")
         self.assertEqual(interface["historical_m9b_artifacts"], "preserved")
+        self.assertEqual(
+            interface["historical_m9b_label"],
+            "historical_evidence_superseded_by_live_ui_observation_13_october_2026",
+        )
         self.assertFalse(interface["historical_m9b_results_rewritten"])
         self.assertFalse(interface["candidate_and_export_behavior_changed"])
-        self.assertEqual(document["outputs"]["reference_upload_columns"], ["sequence"])
+        observed = document["live_ui_observation"]
+        self.assertEqual(observed["observed_on"], "13 October 2026")
+        self.assertEqual(observed["reference_library_header"], "id,sequence,target_name,target_pdb_id")
+        self.assertTrue(observed["one_column_attempt_rejected_before_run"])
+        self.assertEqual(observed["one_column_rejection"], "candidate_like")
+        self.assertFalse(observed["aptarank_accepted_library"])
+        self.assertFalse(observed["aptarank_calibrated_library"])
+        self.assertFalse(observed["aptarank_scored"])
+        self.assertIsNone(observed["observed_ui_accepted_count"])
+        self.assertIsNone(observed["observed_ui_dropped_count"])
+        self.assertFalse(observed["control_bank_facts_recorded"])
+        self.assertEqual(
+            observed["candidate_input_accepts"],
+            ["csv_with_sequence_and_optional_id", "plain_text", "fasta"],
+        )
+        self.assertEqual(observed["candidate_sequence_length_minimum_nt"], 20)
+        self.assertEqual(observed["candidate_sequence_length_maximum_nt"], 100)
+        self.assertTrue(observed["ui_accepts_t_as_u"])
+        self.assertFalse(observed["mres_policy_relies_on_t_to_u_conversion"])
+        self.assertEqual(document["outputs"]["reference_upload_columns"], ["id", "sequence", "target_name", "target_pdb_id"])
         self.assertEqual(document["outputs"]["duplicate_provenance_fields"], list(upload.LEDGER_KEYS))
         self.assertFalse(document["outputs"]["duplicate_provenance_is_aptarank_input"])
-        self.assertEqual(document["retention"]["upload_fields_from_first_identity"], {"sequence": "sequence_core"})
+        self.assertEqual(document["outputs"]["publication_attempt"], 3)
+        self.assertFalse(document["outputs"]["attempt3_directory_created"])
+        self.assertEqual(document["outputs"]["superseded_directory"], upload.SUPERSEDED_DIRECTORY)
+        self.assertEqual(
+            document["retention"]["upload_fields_from_first_identity"],
+            {
+                "id": "scientific_identity_id",
+                "sequence": "sequence_core",
+                "target_name": "canonical_target_name",
+                "target_pdb_id": "pdb_id",
+            },
+        )
         self.assertEqual(document["retention"]["provenance_upload_row_number"], "deterministic_1_based")
         attempt = document["first_failed_publication_attempt"]
         self.assertEqual(attempt["attempt"], 1)
@@ -176,7 +220,7 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertEqual(document["external_ref"]["locator"], upload.EXTERNAL_REF_LOCATOR)
         self.assertEqual(
             document["external_ref"]["locator"],
-            "opened_and_verified_in_attempt_1_corrected_retry_not_invoked",
+            "opened_and_verified_in_attempts_1_and_2_attempt3_not_invoked",
         )
         self.assertTrue(document["external_ref"]["review_authorized"])
         self.assertEqual(document["outputs"]["atomic_members"], list(upload.OUTPUT_MEMBERS))
@@ -204,12 +248,18 @@ class ReferenceUploadTests(unittest.TestCase):
         )
         prepared = upload.prepare_reference_upload(payload)
         header, rows = _parsed_upload(prepared["reference_upload"])
-        self.assertEqual(header, ["sequence"])
-        self.assertEqual(list(rows[0]), ["sequence"])
-        self.assertEqual([row["sequence"] for row in rows], [CORE_B, CORE_A, CORE_C])
+        self.assertEqual(header, ["id", "sequence", "target_name", "target_pdb_id"])
+        self.assertEqual(
+            rows,
+            [
+                {"id": "S5I_synthetic_01", "sequence": CORE_B, "target_name": "Beta, target", "target_pdb_id": "1BBB"},
+                {"id": "S5I_synthetic_02", "sequence": CORE_A, "target_name": "Alpha target", "target_pdb_id": ""},
+                {"id": "S5I_synthetic_04", "sequence": CORE_C, "target_name": "Short target", "target_pdb_id": ""},
+            ],
+        )
         upload_text = prepared["reference_upload"].decode("utf-8")
-        self.assertEqual(upload_text.splitlines()[0], "sequence")
-        for forbidden in ("id", "target_name", "target_pdb_id", "source_reference", "S5I_synthetic_01", "Beta, target", "1BBB", "Doe et al. 2020", "Later beta", "9ZZZ"):
+        self.assertEqual(upload_text.splitlines()[0], "id,sequence,target_name,target_pdb_id")
+        for forbidden in ("source_reference", "publication", "Doe et al. 2020", "Later beta", "9ZZZ", "Later source", "Alpha source", "Short source"):
             self.assertNotIn(forbidden, upload_text)
         self.assertEqual(prepared["source_row_count"], 4)
         self.assertEqual(prepared["prepared_upload_row_count"], 3)
@@ -230,7 +280,7 @@ class ReferenceUploadTests(unittest.TestCase):
         manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
         self.assertEqual(manifest["status"], "REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN")
         self.assertNotEqual(manifest["status"], upload.STATUS)
-        self.assertEqual(manifest["publication_attempt"], 2)
+        self.assertEqual(manifest["publication_attempt"], 3)
         self.assertIs(type(manifest["publication_attempt"]), int)
         self.assertEqual(manifest["prepared_upload_row_count"], 3)
         self.assertNotIn("accepted_count", manifest)
@@ -243,7 +293,7 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertIsNone(manifest["observed_ui_dropped_count"])
         self.assertNotIn("sequence_core", manifest)
 
-    def test_one_column_header_and_113_style_collapse_preserve_order(self):
+    def test_four_column_header_and_113_style_collapse_preserve_order(self):
         def core_token(index):
             alphabet = "ACGU"
             chars = []
@@ -270,20 +320,28 @@ class ReferenceUploadTests(unittest.TestCase):
                 _identity(
                     row_number,
                     core_token(core_index),
-                    canonical_target_name="TARGET-NOT-UPLOADED-%02d" % row_number,
-                    pdb_id=" PDB-NOT-UPLOADED",
-                    publication="",
+                    canonical_target_name="Target %03d" % row_number,
+                    pdb_id="" if row_number % 3 == 0 else "P%03d" % row_number,
+                    publication="PUB-%03d" % row_number,
                 )
             )
         prepared = upload.prepare_reference_upload(_source_bytes(records))
         header, rows = _parsed_upload(prepared["reference_upload"])
-        self.assertEqual(header, ["sequence"])
+        self.assertEqual(header, ["id", "sequence", "target_name", "target_pdb_id"])
         self.assertEqual([row["sequence"] for row in rows], [core_token(index) for index in first_seen])
         self.assertNotEqual([row["sequence"] for row in rows], sorted(row["sequence"] for row in rows))
         upload_text = prepared["reference_upload"].decode("utf-8")
-        self.assertEqual(upload_text.splitlines()[0], "sequence")
-        for forbidden in ("id", "target_name", "target_pdb_id", "source_reference", "TARGET-NOT-UPLOADED", "PDB-NOT-UPLOADED"):
-            self.assertNotIn(forbidden, upload_text)
+        self.assertEqual(upload_text.splitlines()[0], "id,sequence,target_name,target_pdb_id")
+        self.assertNotIn("source_reference", upload_text)
+        self.assertNotIn("PUB-", upload_text)
+        first_row_for_core = {}
+        for row_number, core_index in enumerate(source_order, start=1):
+            first_row_for_core.setdefault(core_index, row_number)
+        for row, core_index in zip(rows, first_seen):
+            row_number = first_row_for_core[core_index]
+            self.assertEqual(row["id"], "S5I_synthetic_%02d" % row_number)
+            self.assertEqual(row["target_name"], "Target %03d" % row_number)
+            self.assertEqual(row["target_pdb_id"], "" if row_number % 3 == 0 else "P%03d" % row_number)
         self.assertEqual(prepared["source_row_count"], 131)
         self.assertEqual(prepared["prepared_upload_row_count"], 113)
         self.assertEqual(prepared["duplicate_core_collapses"], 18)
@@ -306,43 +364,30 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertEqual(upload.validate_reference_upload(prepared["reference_upload"]), [core_token(index) for index in first_seen])
 
     def test_finished_upload_refuses_duplicate_sequences_and_metadata_columns(self):
-        duplicate = ("sequence\n%s\n%s\n" % (CORE_A, CORE_A)).encode("utf-8")
+        duplicate = (
+            "id,sequence,target_name,target_pdb_id\n"
+            "S5I_a,%s,Alpha,\n"
+            "S5I_b,%s,Beta,\n" % (CORE_A, CORE_A)
+        ).encode("utf-8")
         with self.assertRaises(upload.ReferenceUploadError) as caught:
             upload.validate_reference_upload(duplicate)
         self.assertEqual(caught.exception.code, "duplicate_sequence")
-        five_column = b"id,sequence,target_name,target_pdb_id,source_reference\nS5I,ACGUACGUACGUACGUACGU,Target,1ABC,Paper\n"
-        with self.assertRaises(upload.ReferenceUploadError) as caught_header:
-            upload.validate_reference_upload(five_column)
-        self.assertEqual(caught_header.exception.code, "upload_header_invalid")
-        for payload in (
-            b"sequence,id\nACGUACGUACGUACGUACGU,S5I\n",
-            b"Sequence\nACGUACGUACGUACGUACGU\n",
-            b"id\nACGUACGUACGUACGUACGU\n",
-            b"target_name\nACGUACGUACGUACGUACGU\n",
-            b"target_pdb_id\nACGUACGUACGUACGUACGU\n",
-            b"source_reference\nACGUACGUACGUACGUACGU\n",
-            b"\xef\xbb\xbfsequence\nACGUACGUACGUACGUACGU\n",
-        ):
-            with self.assertRaises(upload.ReferenceUploadError) as caught_meta:
-                upload.validate_reference_upload(payload)
-            self.assertEqual(caught_meta.exception.code, "upload_header_invalid")
-        jagged = ("sequence\n%s,S5I_synthetic_01\n" % CORE_A).encode("utf-8")
-        with self.assertRaises(upload.ReferenceUploadError) as caught_jagged:
-            upload.validate_reference_upload(jagged)
-        self.assertEqual(caught_jagged.exception.code, "metadata_column_refused")
-        thymine = b"sequence\nACGTACGTACGTACGTACGT\n"
+        thymine = b"id,sequence,target_name,target_pdb_id\nS5I_a,ACGTACGTACGTACGTACGT,Alpha,\n"
         with self.assertRaises(upload.ReferenceUploadError) as caught_thymine:
             upload.validate_reference_upload(thymine)
         self.assertEqual(caught_thymine.exception.code, "noncanonical_core")
-        lowered = ("sequence\n%s\n" % CORE_A.lower()).encode("utf-8")
+        self.assertNotIn("ACGUACGUACGUACGUACGU", caught_thymine.exception.detail)
+        lowered = ("id,sequence,target_name,target_pdb_id\nS5I_a,%s,Alpha,\n" % CORE_A.lower()).encode("utf-8")
         with self.assertRaises(upload.ReferenceUploadError) as caught_lower:
             upload.validate_reference_upload(lowered)
         self.assertEqual(caught_lower.exception.code, "noncanonical_core")
-        spaced = ("sequence\n%s \n" % CORE_A).encode("utf-8")
+        spaced = ("id,sequence,target_name,target_pdb_id\nS5I_a,%s ,Alpha,\n" % CORE_A).encode("utf-8")
         with self.assertRaises(upload.ReferenceUploadError) as caught_space:
             upload.validate_reference_upload(spaced)
         self.assertEqual(caught_space.exception.code, "noncanonical_core")
-        accepted = upload.validate_reference_upload(("sequence\n%s\n%s\n" % (CORE_B, CORE_A)).encode("utf-8"))
+        accepted = upload.validate_reference_upload(
+            ("id,sequence,target_name,target_pdb_id\nS5I_b,%s,Beta,1BBB\nS5I_a,%s,Alpha,\n" % (CORE_B, CORE_A)).encode("utf-8")
+        )
         self.assertEqual(accepted, [CORE_B, CORE_A])
 
     def test_duplicate_identity_fails_closed(self):
@@ -369,28 +414,34 @@ class ReferenceUploadTests(unittest.TestCase):
             upload.prepare_reference_upload(lowered)
         self.assertEqual(caught_lower.exception.code, "noncanonical_core")
 
-    def test_missing_identity_fails_and_blank_provenance_is_not_an_exclusion(self):
+    def test_missing_identity_or_target_name_fails_and_blank_pdb_is_kept(self):
         missing = _source_bytes([_identity(1, CORE_A, scientific_identity_id="")])
         with self.assertRaises(upload.ReferenceUploadError) as caught:
             upload.prepare_reference_upload(missing)
         self.assertEqual(caught.exception.code, "missing_required_field")
+        for blank_name in ("", "  "):
+            blank = _source_bytes([_identity(1, CORE_A, canonical_target_name=blank_name)])
+            with self.assertRaises(upload.ReferenceUploadError) as caught_name:
+                upload.prepare_reference_upload(blank)
+            self.assertEqual(caught_name.exception.code, "missing_required_field")
         kept = upload.prepare_reference_upload(
             _source_bytes(
                 [
                     _identity(
                         1,
                         CORE_A,
-                        canonical_target_name="  ",
-                        pdb_id=" 1ABC",
-                        publication="",
+                        canonical_target_name="Alpha target",
+                        pdb_id="",
+                        publication="NOT-UPLOADED",
                     )
                 ]
             )
         )
         header, rows = _parsed_upload(kept["reference_upload"])
-        self.assertEqual(header, ["sequence"])
-        self.assertEqual(rows, [{"sequence": CORE_A}])
-        self.assertNotIn("1ABC", kept["reference_upload"].decode("utf-8"))
+        self.assertEqual(header, ["id", "sequence", "target_name", "target_pdb_id"])
+        self.assertEqual(rows, [{"id": "S5I_synthetic_01", "sequence": CORE_A, "target_name": "Alpha target", "target_pdb_id": ""}])
+        self.assertNotIn("NOT-UPLOADED", kept["reference_upload"].decode("utf-8"))
+        self.assertNotIn("source_reference", kept["reference_upload"].decode("utf-8"))
         self.assertEqual(kept["duplicate_core_collapses"], 0)
 
     def test_malformed_schema_and_wrong_partition_fail_closed(self):
@@ -468,7 +519,7 @@ class ReferenceUploadTests(unittest.TestCase):
         manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
         self.assertEqual(manifest["status"], upload.MANIFEST_STATUS)
         self.assertNotEqual(manifest["status"], upload.STATUS)
-        self.assertEqual(manifest["publication_attempt"], 2)
+        self.assertEqual(manifest["publication_attempt"], 3)
         self.assertTrue(prepared["production_ref_identity_verified"])
         self.assertTrue(manifest["production_ref_identity_verified"])
         self.assertEqual(manifest["prepared_upload_row_count"], 113)
@@ -672,9 +723,13 @@ class ReferenceUploadTests(unittest.TestCase):
     def test_only_the_exact_production_destination_is_allowed(self):
         self.assertEqual(
             upload.PRODUCTION_DESTINATION,
-            "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation",
+            "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3",
         )
         self.assertEqual(upload.preflight_publication_destination(upload.PRODUCTION_DESTINATION), upload.PRODUCTION_DESTINATION)
+        with self.assertRaises(upload.ReferenceUploadError) as caught_attempt2:
+            upload.preflight_publication_destination(upload.SUPERSEDED_DIRECTORY)
+        self.assertEqual(caught_attempt2.exception.code, "output_refused")
+        self.assertIn("attempt-2", caught_attempt2.exception.detail)
         repo = upload.repo_root()
         refused = (
             (os.path.join(repo, "results"), "another results path"),
@@ -692,9 +747,9 @@ class ReferenceUploadTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, "output_refused", path)
             self.assertIn(detail, caught.exception.detail)
         for path in (
-            "results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation",
+            "results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3",
             upload.PRODUCTION_DESTINATION + "/",
-            os.path.join(repo, "results", "..", "results", "fine_tuning", "m9_generator_evaluation", "m9c_reference_preparation"),
+            os.path.join(repo, "results", "..", "results", "fine_tuning", "m9_generator_evaluation", "m9c_reference_preparation_attempt3"),
         ):
             with self.assertRaises(upload.ReferenceUploadError) as caught_relative:
                 upload.preflight_publication_destination(path)
@@ -719,8 +774,8 @@ class ReferenceUploadTests(unittest.TestCase):
         prepared = _synthetic_prepared()
         manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
         self.assertEqual(manifest["status"], "REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN")
-        self.assertNotEqual(manifest["status"], "POLICY_FROZEN_ONE_COLUMN_REFERENCE_UPLOAD_PUBLICATION_NOT_RETRIED")
-        self.assertEqual(manifest["publication_attempt"], 2)
+        self.assertNotEqual(manifest["status"], "POLICY_FROZEN_FOUR_COLUMN_REFERENCE_UPLOAD_ATTEMPT3_NOT_PUBLISHED")
+        self.assertEqual(manifest["publication_attempt"], 3)
 
         def refuse(changed):
             blob = (json.dumps(changed, ensure_ascii=True, separators=(",", ":")) + "\n").encode("utf-8")
@@ -739,6 +794,9 @@ class ReferenceUploadTests(unittest.TestCase):
         refuse(copied)
         copied = dict(manifest)
         copied["publication_attempt"] = 1
+        refuse(copied)
+        copied = dict(manifest)
+        copied["publication_attempt"] = 2
         refuse(copied)
         copied = dict(manifest)
         copied["publication_attempt"] = True
@@ -959,31 +1017,185 @@ class ReferenceUploadTests(unittest.TestCase):
             self.assertFalse(os.path.lexists(path))
 
     def test_upload_and_provenance_stay_ignored_and_manifest_stays_untracked(self):
-        directory = "results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation"
-        ignored = {
-            directory + "/reference_upload.csv": "reference_upload.csv",
-            directory + "/duplicate_provenance.jsonl": "duplicate_provenance.jsonl",
-        }
-        for relative, name in ignored.items():
+        directories = (
+            "results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation",
+            "results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3",
+        )
+        for directory in directories:
+            ignored = {
+                directory + "/reference_upload.csv": "reference_upload.csv",
+                directory + "/duplicate_provenance.jsonl": "duplicate_provenance.jsonl",
+            }
+            for relative, name in ignored.items():
+                completed = subprocess.run(
+                    ["git", "check-ignore", "-v", "--no-index", relative],
+                    cwd=ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+                self.assertIn(name, completed.stdout)
+            manifest = directory + "/preparation_manifest.json"
             completed = subprocess.run(
-                ["git", "check-ignore", "-v", "--no-index", relative],
+                ["git", "check-ignore", "-q", "--no-index", manifest],
                 cwd=ROOT,
                 check=False,
                 capture_output=True,
                 text=True,
             )
-            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
-            self.assertIn(name, completed.stdout)
-        manifest = directory + "/preparation_manifest.json"
-        completed = subprocess.run(
-            ["git", "check-ignore", "-q", "--no-index", manifest],
-            cwd=ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
+            self.assertEqual(completed.returncode, 1)
+        self.assertTrue(os.path.isdir(os.path.join(ROOT, directories[0])))
+        self.assertFalse(os.path.lexists(os.path.join(ROOT, directories[1])))
+
+    def test_exact_four_column_header_maps_the_first_identity(self):
+        payload = _source_bytes(
+            [
+                _identity(1, CORE_B, canonical_target_name="Beta, target", pdb_id="1BBB", publication="Doe et al. 2020"),
+                _identity(2, CORE_A, canonical_target_name="Alpha target", pdb_id=""),
+                _identity(3, CORE_B, canonical_target_name="Later beta", pdb_id="9ZZZ", publication="Later source"),
+            ]
         )
-        self.assertEqual(completed.returncode, 1)
-        self.assertFalse(os.path.lexists(os.path.join(ROOT, directory)))
+        prepared = upload.prepare_reference_upload(payload)
+        header, rows = _parsed_upload(prepared["reference_upload"])
+        self.assertEqual(",".join(header), "id,sequence,target_name,target_pdb_id")
+        self.assertEqual(rows[0]["id"], "S5I_synthetic_01")
+        self.assertEqual(rows[0]["sequence"], CORE_B)
+        self.assertEqual(rows[0]["target_name"], "Beta, target")
+        self.assertEqual(rows[0]["target_pdb_id"], "1BBB")
+        self.assertEqual(rows[1]["id"], "S5I_synthetic_02")
+        self.assertEqual(rows[1]["target_name"], "Alpha target")
+        self.assertNotEqual(rows[0]["target_name"], "Later beta")
+        self.assertNotEqual(rows[0]["target_pdb_id"], "9ZZZ")
+        self.assertNotIn("source_reference", header)
+        self.assertNotIn("publication", header)
+
+    def test_unique_ids_and_sequences_are_required(self):
+        duplicate_id = (
+            "id,sequence,target_name,target_pdb_id\n"
+            "S5I_same,%s,Alpha,\n"
+            "S5I_same,%s,Beta,1BBB\n" % (CORE_A, CORE_B)
+        ).encode("utf-8")
+        with self.assertRaises(upload.ReferenceUploadError) as caught_id:
+            upload.validate_reference_upload(duplicate_id)
+        self.assertEqual(caught_id.exception.code, "duplicate_id")
+        blank_id = ("id,sequence,target_name,target_pdb_id\n,%s,Alpha,\n" % CORE_A).encode("utf-8")
+        with self.assertRaises(upload.ReferenceUploadError) as caught_blank:
+            upload.validate_reference_upload(blank_id)
+        self.assertEqual(caught_blank.exception.code, "missing_required_field")
+        blank_target = ("id,sequence,target_name,target_pdb_id\nS5I_a,%s,,\n" % CORE_A).encode("utf-8")
+        with self.assertRaises(upload.ReferenceUploadError) as caught_target:
+            upload.validate_reference_upload(blank_target)
+        self.assertEqual(caught_target.exception.code, "missing_required_field")
+        source_duplicate = _source_bytes([_identity(1, CORE_A), _identity(1, CORE_B)])
+        with self.assertRaises(upload.ReferenceUploadError) as caught_source:
+            upload.prepare_reference_upload(source_duplicate)
+        self.assertEqual(caught_source.exception.code, "duplicate_identity")
+
+    def test_blank_pdb_is_preserved_without_inventing_structure(self):
+        payload = _source_bytes(
+            [
+                _identity(1, CORE_A, canonical_target_name="Alpha target", pdb_id="", publication="Paper"),
+                _identity(2, CORE_A, canonical_target_name="Later alpha", pdb_id="9ZZZ"),
+                _identity(3, CORE_B, canonical_target_name="Beta target", pdb_id="1BBB"),
+            ]
+        )
+        prepared = upload.prepare_reference_upload(payload)
+        _header, rows = _parsed_upload(prepared["reference_upload"])
+        self.assertEqual(rows[0]["target_pdb_id"], "")
+        self.assertNotIn("9ZZZ", prepared["reference_upload"].decode("utf-8"))
+        self.assertEqual(rows[1]["target_pdb_id"], "1BBB")
+        self.assertNotIn("NONE", prepared["reference_upload"].decode("utf-8"))
+        self.assertNotIn("NA", rows[0]["target_pdb_id"])
+        finished = (
+            "id,sequence,target_name,target_pdb_id\n"
+            "S5I_a,%s,Alpha,\n" % CORE_A
+        ).encode("utf-8")
+        self.assertEqual(upload.validate_reference_upload(finished), [CORE_A])
+        missing_pdb_cell = ("id,sequence,target_name,target_pdb_id\nS5I_a,%s,Alpha\n" % CORE_A).encode("utf-8")
+        with self.assertRaises(upload.ReferenceUploadError) as caught_missing:
+            upload.validate_reference_upload(missing_pdb_cell)
+        self.assertEqual(caught_missing.exception.code, "missing_required_field")
+
+    def test_source_reference_publication_and_extra_columns_are_refused(self):
+        cases = (
+            (
+                b"id,sequence,target_name,target_pdb_id,source_reference\nS5I,ACGUACGUACGUACGUACGU,Target,1ABC,Paper\n",
+                "source_reference_refused",
+            ),
+            (
+                b"id,sequence,target_name,target_pdb_id,publication\nS5I,ACGUACGUACGUACGUACGU,Target,1ABC,Paper\n",
+                "publication_column_refused",
+            ),
+            (
+                b"id,sequence,target_name,target_pdb_id,notes\nS5I,ACGUACGUACGUACGUACGU,Target,1ABC,extra\n",
+                "extra_column_refused",
+            ),
+            (
+                b"sequence\nACGUACGUACGUACGUACGU\n",
+                "upload_header_invalid",
+            ),
+            (
+                b"id,sequence,target_name,target_pdb_id,source_reference\n",
+                "source_reference_refused",
+            ),
+        )
+        for payload, code in cases:
+            with self.assertRaises(upload.ReferenceUploadError) as caught:
+                upload.validate_reference_upload(payload)
+            self.assertEqual(caught.exception.code, code)
+        extra_cell = (
+            "id,sequence,target_name,target_pdb_id\nS5I_a,%s,Alpha,,extra\n" % CORE_A
+        ).encode("utf-8")
+        with self.assertRaises(upload.ReferenceUploadError) as caught_cell:
+            upload.validate_reference_upload(extra_cell)
+        self.assertEqual(caught_cell.exception.code, "extra_column_refused")
+
+    def test_attempt3_path_status_and_preserved_attempt2(self):
+        self.assertEqual(upload.PUBLICATION_ATTEMPT, 3)
+        self.assertTrue(upload.PRODUCTION_DESTINATION.endswith("m9c_reference_preparation_attempt3"))
+        self.assertFalse(os.path.lexists(upload.PRODUCTION_DESTINATION))
+        self.assertTrue(os.path.isdir(upload.SUPERSEDED_DIRECTORY))
+        self.assertNotEqual(upload.PRODUCTION_DESTINATION, upload.SUPERSEDED_DIRECTORY)
+        document = _document()
+        self.assertEqual(document["outputs"]["production_directory"], upload.PRODUCTION_DESTINATION)
+        self.assertEqual(document["outputs"]["publication_attempt"], 3)
+        self.assertFalse(document["outputs"]["publication_invoked"])
+        self.assertFalse(document["outputs"]["attempt3_directory_created"])
+        self.assertFalse(document["outputs"]["sealed_entry_point_invoked"])
+        prepared = _synthetic_prepared()
+        manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
+        self.assertEqual(manifest["schema_version"], "m9c-reference-upload-v3")
+        self.assertEqual(manifest["status"], "REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN")
+        self.assertNotEqual(manifest["status"], upload.STATUS)
+        self.assertEqual(manifest["publication_attempt"], 3)
+        self.assertFalse(manifest["aptarank_ui_executed"])
+        self.assertIsNone(manifest["observed_ui_accepted_count"])
+        self.assertIsNone(manifest["observed_ui_dropped_count"])
+        self.assertFalse(manifest["local_calibration"])
+        self.assertNotIn("control_bank", prepared["preparation_manifest"].decode("utf-8"))
+        superseded = document["superseded_ui_rejected_preparation"]
+        attempt2 = upload.SUPERSEDED_DIRECTORY
+        members = {
+            "reference_upload.csv": (superseded["reference_upload_bytes"], superseded["reference_upload_sha256"]),
+            "duplicate_provenance.jsonl": (superseded["duplicate_provenance_bytes"], superseded["duplicate_provenance_sha256"]),
+            "preparation_manifest.json": (superseded["preparation_manifest_bytes"], superseded["preparation_manifest_sha256"]),
+        }
+        for name, (size, digest) in members.items():
+            path = os.path.join(attempt2, name)
+            with open(path, "rb") as handle:
+                blob = handle.read()
+            self.assertEqual(len(blob), size)
+            self.assertEqual(hashlib.sha256(blob).hexdigest(), digest)
+        with open(os.path.join(attempt2, "preparation_manifest.json"), encoding="utf-8") as handle:
+            historical = json.loads(handle.read())
+        self.assertEqual(historical["schema_version"], "m9c-reference-upload-v2")
+        self.assertEqual(historical["publication_attempt"], 2)
+        self.assertEqual(historical["status"], "REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN")
+        with self.assertRaises(upload.ReferenceUploadError) as caught:
+            upload.preflight_publication_destination(attempt2)
+        self.assertEqual(caught.exception.code, "output_refused")
+        self.assertFalse(os.path.lexists(upload.PRODUCTION_DESTINATION))
 
 
 def _synthetic_prepared():

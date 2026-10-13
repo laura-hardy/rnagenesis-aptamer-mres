@@ -58,8 +58,11 @@ results/fine_tuning/m9_generator_evaluation/*.jsonl
 
 # M9C reference preparation. The upload and provenance ledger stay ignored.
 # The preparation manifest is not ignored, so a later publication remains reviewable while untracked.
+# Attempt 2 is the preserved UI-rejected one-column preparation. Attempt 3 is the corrected path.
 results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation/reference_upload.csv
 results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation/duplicate_provenance.jsonl
+results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3/reference_upload.csv
+results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3/duplicate_provenance.jsonl
 
 # Data is local-only — never committed
 # (replaces the narrower /data/raw/ rule; entire top-level data/ is ignored)
