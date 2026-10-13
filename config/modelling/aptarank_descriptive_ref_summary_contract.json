@@ -1,0 +1,172 @@
+{
+  "package_id": "M9C-2",
+  "schema_version": "m9c-descriptive-ref-summary-v1",
+  "status": "PREPARATION_FROZEN_SYNTHETIC_ONLY_PRODUCTION_REF_NOT_RUN",
+  "stage": "M9C-2",
+  "scientific_result": false,
+  "m9c_complete": false,
+  "eval_unlocked": false,
+  "eval_opened": false,
+  "production_candidates_opened": false,
+  "production_ref_opened_by_this_preparation": false,
+  "production_summary_executed": false,
+  "local_calibration": false,
+  "aptarank_execution": false,
+  "results_write": false,
+  "governing_plan_modified": false,
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md",
+    "version": "3.3",
+    "revision_date": "12 October 2026",
+    "sha256": "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
+  },
+  "attempt3_retention_authority": {
+    "path": "config/modelling/aptarank_reference_upload_contract.json",
+    "schema_version": "m9c-reference-upload-v3",
+    "sha256": "34912929e77a0a835a01e36ba0291160b49b60dcdfb12a2d2aeb57090c794d02",
+    "implementation": "scripts/modelling/aptarank_reference_upload.py",
+    "function": "_retain_rows"
+  },
+  "retention": {
+    "grain": "one_row_per_distinct_sequence_core",
+    "traversal": "existing_source_order",
+    "upload_order": "first_occurrence",
+    "representative": "first_identity_row",
+    "replacement": false,
+    "later_identity_rows": "duplicate_core_collapses",
+    "source_identity_rows": 131,
+    "distinct_sequence_cores": 113,
+    "duplicate_core_collapses": 18
+  },
+  "length_regime": {
+    "source": "frozen_s6_two_component_gmm",
+    "config_path": "config/global_s7d_final_build.json",
+    "assignment_method": "gmm_k2_maximum_posterior",
+    "grain": "distinct_sequence_core",
+    "refit": false,
+    "component_0": "short",
+    "tie_assignment": "short",
+    "means": [
+      38.959315119436454,
+      77.29072043239506
+    ],
+    "variances": [
+      63.1958166211836,
+      169.75577345871622
+    ],
+    "weights": [
+      0.5830380028129531,
+      0.416961997187046
+    ],
+    "required_unique_cores": {
+      "short": 65,
+      "long": 48
+    }
+  },
+  "components": {
+    "mfe_norm": {
+      "label": "normalized MFE",
+      "anchor": "src/aptarank/tier1/folding.py:_finish",
+      "definition": "ViennaRNA MFE divided by sequence length, after RNA.md() with uniq_ML = 1, MFE, exp_params_rescale, and pf()",
+      "direction_in_aptarank": "lower",
+      "used_as_calibration": false
+    },
+    "ensemble_defect": {
+      "label": "ensemble defect",
+      "anchor": "src/aptarank/tier1/folding.py:_finish",
+      "definition": "fc.ensemble_defect(mfe_struct) after pf()",
+      "direction_in_aptarank": "lower",
+      "used_as_calibration": false
+    },
+    "positional_entropy_mean": {
+      "label": "positional entropy",
+      "anchor": "src/aptarank/tier1/folding.py:_finish",
+      "definition": "mean of fc.positional_entropy()[1:n+1]; index 0 is unused",
+      "direction_in_aptarank": "lower",
+      "used_as_calibration": false
+    },
+    "stem_fraction": {
+      "label": "stem fraction",
+      "anchor": "src/aptarank/tier1/elements.py:parse_elements",
+      "definition": "paired positions in the MFE dot-bracket divided by length. The reviewed implementation sums 2 * forgi stem_length over stem elements. For a dot-bracket of parentheses and dots, every base pair belongs to one stem, so the numerator is that paired-position count.",
+      "forgi_imported": false,
+      "direction_in_aptarank": "two_sided",
+      "used_as_calibration": false
+    },
+    "gc_fraction": {
+      "label": "GC fraction",
+      "anchor": "src/aptarank/tier1/features.py:gc_fraction",
+      "definition": "(count of G plus count of C) divided by length",
+      "direction_in_aptarank": "two_sided",
+      "used_as_calibration": false
+    }
+  },
+  "fold_model": {
+    "constructor": "RNA.md()",
+    "uniq_ML": 1,
+    "other_model_details_set": false,
+    "settings_invented": false,
+    "temperature_dangles_and_salt": "unchanged defaults of the ViennaRNA interpreter used for a later production summary",
+    "production_summary_executed": false
+  },
+  "aggregate": {
+    "strata": ["all", "short", "long"],
+    "sequence_free": true,
+    "percentile_convention": "numpy_percentile_linear",
+    "percentile_quantiles": [25, 50, 75],
+    "population_standard_deviation_divisor": "n",
+    "statistics": [
+      "successful_count",
+      "error_or_missing_count",
+      "mean",
+      "population_standard_deviation",
+      "minimum",
+      "first_quartile",
+      "median",
+      "third_quartile",
+      "maximum"
+    ],
+    "reject_non_finite": true,
+    "reject_count_mismatch": true,
+    "successful_error_count": 0
+  },
+  "prohibited_calculations": [
+    "empirical_cdf",
+    "calibrated_score",
+    "composite",
+    "weight",
+    "shuffle_pass",
+    "candidate_ranking"
+  ],
+  "tier2_bank_decision": {
+    "quantities_are_distinct": true,
+    "tier1_candidate_shuffles": 20,
+    "tier2_realized_count": 5085,
+    "accepted_ref_upload_sha256": "5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6",
+    "sources": 113,
+    "aptarank_version": "0.1.0",
+    "aptarank_schema": "1.0.0",
+    "aptarank_git": "49a85609e352",
+    "viennarna": "2.7.2",
+    "forgi": "2.2.3",
+    "fpocket": "4.0",
+    "allocation": "equal 45-per-source dinucleotide-preserving",
+    "controls_per_source": 45,
+    "seed": 42,
+    "n_ensemble_samples": 100,
+    "explicit_bank_id_exposed": false,
+    "content_hash_exposed": false,
+    "ushuffle_version": "unknown",
+    "bank_id_claimed": false,
+    "content_hash_claimed": false,
+    "provenance_sufficient_for_deployed_percentile": true,
+    "limitations_reported": true,
+    "governing_plan_modified": false
+  },
+  "generator_viennarna_pin": {
+    "resolved_in_this_preparation": false,
+    "generator_metric_spec_modified": false,
+    "blocking_item_id": "viennarna_production_settings_not_pinned",
+    "related_metrics": ["mfe", "mfe_per_nt", "paired_fraction"]
+  }
+}
