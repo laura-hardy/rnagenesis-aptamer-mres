@@ -13,6 +13,7 @@ import io
 import json
 import os
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -28,7 +29,7 @@ if MODELLING not in sys.path:
 
 import aptarank_reference_upload as upload
 
-CONTRACT_SHA256 = "4bba54b5d8080b15287ce37f8645bbfc3e07a149c53bb0f647dfa3e34042d46b"
+CONTRACT_SHA256 = "eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591"
 CORE_A = "ACGUACGUACGUACGUACGU"
 CORE_B = "GCAUGCAUGCAUGCAUGCAU"
 CORE_C = "ACGU"
@@ -104,7 +105,13 @@ class ReferenceUploadTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256(handle.read()).hexdigest(), CONTRACT_SHA256)
         self.assertEqual(upload.CONTRACT_SHA256, CONTRACT_SHA256)
         document = _document()
-        self.assertEqual(document["status"], "POLICY_FROZEN_SEALED_PREPARATION_AUTHORIZED")
+        self.assertEqual(document["status"], "POLICY_FROZEN_SEALED_PUBLICATION_PATH_AUTHORIZED")
+        self.assertEqual(document["outputs"]["production_directory"], upload.PRODUCTION_DESTINATION)
+        self.assertEqual(document["outputs"]["publication_method"], upload.PRODUCTION_PUBLICATION_METHOD)
+        self.assertFalse(document["outputs"]["publication_invoked"])
+        self.assertTrue(document["outputs"]["existing_destination_refused"])
+        self.assertTrue(document["inputs"]["sealed_publication_requires_invocation"])
+        self.assertFalse(document["outputs"]["written_by_default"])
         self.assertFalse(document["ref_opened"])
         self.assertFalse(document["eval_opened"])
         self.assertFalse(document["production_candidates_opened"])
@@ -357,8 +364,12 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertNotIn("_read_external_ref", main_calls)
         reader_call = first_call(functions["_read_external_ref"])
         self.assertEqual(reader_call.func.id, "_require_sealed_invocation")
-        size_check = ast.dump(functions["_read_external_ref"])
+        size_check = ast.dump(functions["_read_pinned_ref_bytes"])
         self.assertLess(size_check.index("st_size"), size_check.index("id='open'"))
+        self.assertNotIn("prepare_sealed_reference", main_calls)
+        self.assertNotIn("publish_sealed_reference_preparation", main_calls)
+        self.assertNotIn("_publish_prepared_directory", main_calls)
+        self.assertNotIn("_read_pinned_ref_bytes", main_calls)
 
     def test_atomic_wrapper_writes_caller_bytes_without_the_sealed_entry_point(self):
         prepared = {
@@ -479,9 +490,325 @@ class ReferenceUploadTests(unittest.TestCase):
         self.assertFalse(defined & {"calibrate", "fit_reference_distribution", "empirical_cdf", "score_candidates"})
         self.assertEqual(
             sorted(opens),
-            ["_read_external_ref", "_read_pinned_file", "_write_atomic_bytes", "_write_atomic_bytes"],
+            [
+                "_fsync_directory",
+                "_read_pinned_file",
+                "_read_pinned_ref_bytes",
+                "_reread_verified_members",
+                "_write_atomic_bytes",
+                "_write_atomic_bytes",
+            ],
         )
         self.assertNotIn("eval.csv", source)
+
+    def setUp(self):
+        parent = os.path.dirname(upload.PRODUCTION_DESTINATION)
+        self._publication_partials = sorted(name for name in os.listdir(parent) if ".partial." in name)
+        self.assertFalse(os.path.lexists(upload.PRODUCTION_DESTINATION))
+
+    def tearDown(self):
+        self.assertFalse(os.path.lexists(upload.PRODUCTION_DESTINATION))
+        parent = os.path.dirname(upload.PRODUCTION_DESTINATION)
+        partials = sorted(name for name in os.listdir(parent) if ".partial." in name)
+        self.assertEqual(partials, self._publication_partials)
+
+    def test_only_the_exact_production_destination_is_allowed(self):
+        self.assertEqual(
+            upload.PRODUCTION_DESTINATION,
+            "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation",
+        )
+        self.assertEqual(upload.preflight_publication_destination(upload.PRODUCTION_DESTINATION), upload.PRODUCTION_DESTINATION)
+        repo = upload.repo_root()
+        refused = (
+            (os.path.join(repo, "results"), "another results path"),
+            (os.path.join(repo, "results", "other"), "another results path"),
+            (os.path.join(repo, "results", "fine_tuning", "m9_generator_evaluation"), "another results path"),
+            (os.path.join(repo, "results", "fine_tuning", "m9_generator_evaluation", "m9a_train_leakage"), "another results path"),
+            (upload.PRODUCTION_DESTINATION + "/child", "another results path"),
+            (os.path.join(repo, "data"), "under data"),
+            (os.path.join(repo, "data", "processed"), "under data"),
+            (os.path.join(repo, "data", "processed", "ref.csv"), "under data"),
+        )
+        for path, detail in refused:
+            with self.assertRaises(upload.ReferenceUploadError) as caught:
+                upload.preflight_publication_destination(path)
+            self.assertEqual(caught.exception.code, "output_refused", path)
+            self.assertIn(detail, caught.exception.detail)
+        for path in (
+            "results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation",
+            upload.PRODUCTION_DESTINATION + "/",
+            os.path.join(repo, "results", "..", "results", "fine_tuning", "m9_generator_evaluation", "m9c_reference_preparation"),
+        ):
+            with self.assertRaises(upload.ReferenceUploadError) as caught_relative:
+                upload.preflight_publication_destination(path)
+            self.assertEqual(caught_relative.exception.code, "output_refused")
+        prepared = {
+            "reference_upload": b"id,sequence\n",
+            "duplicate_provenance": b"{}\n",
+            "preparation_manifest": b"{}\n",
+        }
+        with self.assertRaises(upload.ReferenceUploadError) as caught_writer:
+            upload.write_sealed_preparation_outputs(upload.PRODUCTION_DESTINATION, prepared)
+        self.assertEqual(caught_writer.exception.code, "output_refused")
+        with tempfile.TemporaryDirectory() as parent:
+            linked_parent = os.path.join(parent, "linked")
+            os.symlink(parent, linked_parent)
+            with self.assertRaises(upload.ReferenceUploadError) as caught_link:
+                upload._publish_prepared_directory(os.path.join(linked_parent, "m9c_reference_preparation"), _synthetic_prepared())
+            self.assertEqual(caught_link.exception.code, "output_refused")
+            self.assertEqual(os.listdir(parent), ["linked"])
+
+    def test_publication_preflight_precedes_ref_and_stays_uninvoked(self):
+        source = _read_text(os.path.join(MODELLING, "aptarank_reference_upload.py"))
+        tree = ast.parse(source)
+        functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+
+        class Order(ast.NodeVisitor):
+            def __init__(self):
+                self.names = []
+
+            def visit_Call(self, node):
+                if isinstance(node.func, ast.Name):
+                    self.names.append(node.func.id)
+                self.generic_visit(node)
+
+        order = Order()
+        order.visit(functions["publish_sealed_reference_preparation"])
+        self.assertLess(order.names.index("load_pinned_contract"), order.names.index("preflight_publication_destination"))
+        self.assertLess(order.names.index("preflight_publication_destination"), order.names.index("_read_pinned_ref_bytes"))
+        self.assertLess(order.names.index("_read_pinned_ref_bytes"), order.names.index("prepare_reference_upload"))
+        self.assertLess(order.names.index("prepare_reference_upload"), order.names.index("_publish_prepared_directory"))
+        self.assertNotIn("prepare_sealed_reference", order.names)
+        self.assertNotIn("_read_external_ref", order.names)
+        self.assertFalse(upload.SEALED_ENTRY_POINT_INVOKED)
+        events = []
+        real_load = upload.load_pinned_contract
+        real_preflight = upload.preflight_publication_destination
+
+        def load():
+            events.append("contract")
+            return real_load()
+
+        def preflight(directory):
+            events.append("preflight")
+            self.assertEqual(directory, upload.PRODUCTION_DESTINATION)
+            return real_preflight(directory)
+
+        def read_ref():
+            events.append("ref")
+            raise upload.ReferenceUploadError("digest_mismatch", "synthetic stop before publication")
+
+        with patch.object(upload, "load_pinned_contract", side_effect=load):
+            with patch.object(upload, "preflight_publication_destination", side_effect=preflight):
+                with patch.object(upload, "_read_pinned_ref_bytes", side_effect=read_ref):
+                    with patch.object(upload, "prepare_sealed_reference", side_effect=AssertionError("sealed entry")):
+                        with patch.object(upload, "_publish_prepared_directory", side_effect=AssertionError("published")):
+                            with self.assertRaises(upload.ReferenceUploadError) as caught:
+                                upload.publish_sealed_reference_preparation(invoke=True)
+        self.assertEqual(caught.exception.code, "digest_mismatch")
+        self.assertEqual(events, ["contract", "preflight", "ref"])
+        with patch.object(upload, "_read_pinned_ref_bytes", side_effect=AssertionError("ref")):
+            with patch.object(upload, "load_pinned_contract", side_effect=AssertionError("contract")):
+                with patch("os.lstat", side_effect=AssertionError("lstat")):
+                    with self.assertRaises(upload.ReferenceUploadError) as caught_idle:
+                        upload.publish_sealed_reference_preparation()
+                    self.assertEqual(caught_idle.exception.code, "sealed_publication_not_invoked")
+                    with self.assertRaises(upload.ReferenceUploadError) as caught_false:
+                        upload.publish_sealed_reference_preparation(invoke=False)
+                    self.assertEqual(caught_false.exception.code, "sealed_publication_not_invoked")
+        with patch.object(upload, "_read_pinned_ref_bytes", side_effect=AssertionError("ref")):
+            with self.assertRaises(upload.ReferenceUploadError) as caught_ui:
+                upload.publish_sealed_reference_preparation(invoke=True, observed_ui_accepted_count=113)
+            self.assertEqual(caught_ui.exception.code, "ui_observation_refused")
+        real_lstat = os.lstat
+
+        def existing_directory(path):
+            if path == upload.PRODUCTION_DESTINATION:
+                return os.stat_result((stat.S_IFDIR, 0, 0, 1, 0, 0, 0, 0, 0, 0))
+            return real_lstat(path)
+
+        def existing_symlink(path):
+            if path == upload.PRODUCTION_DESTINATION:
+                return os.stat_result((stat.S_IFLNK, 0, 0, 1, 0, 0, 0, 0, 0, 0))
+            return real_lstat(path)
+
+        with patch("os.lstat", side_effect=existing_directory):
+            with patch.object(upload, "_read_pinned_ref_bytes", side_effect=AssertionError("ref")):
+                with self.assertRaises(upload.ReferenceUploadError) as caught_exists:
+                    upload.publish_sealed_reference_preparation(invoke=True)
+        self.assertEqual(caught_exists.exception.code, "output_exists")
+        self.assertIn("empty directory", caught_exists.exception.detail)
+        with patch("os.lstat", side_effect=existing_symlink):
+            with patch.object(upload, "_read_pinned_ref_bytes", side_effect=AssertionError("ref")):
+                with self.assertRaises(upload.ReferenceUploadError) as caught_symlink:
+                    upload.publish_sealed_reference_preparation(invoke=True)
+        self.assertEqual(caught_symlink.exception.code, "output_refused")
+        self.assertIn("symlink", caught_symlink.exception.detail)
+
+    def test_verified_temporary_sibling_publishes_with_one_rename(self):
+        prepared = _synthetic_prepared()
+        with tempfile.TemporaryDirectory() as parent:
+            destination = os.path.join(parent, "m9c_reference_preparation")
+            decoy = os.path.join(parent, ".m9c_reference_preparation.partial.keep")
+            os.mkdir(decoy)
+            with open(os.path.join(decoy, "keep.txt"), "wb") as handle:
+                handle.write(b"keep")
+            renamed = []
+            real_rename = upload._rename_noreplace
+
+            def spy(source, target):
+                renamed.append((os.path.basename(source), target))
+                self.assertEqual(os.path.dirname(source), parent)
+                self.assertIn(".partial.", os.path.basename(source))
+                self.assertEqual(sorted(os.listdir(source)), sorted(upload.OUTPUT_MEMBERS))
+                real_rename(source, target)
+                self.assertFalse(os.path.lexists(source))
+
+            with patch.object(upload, "_rename_noreplace", side_effect=spy):
+                published = upload._publish_prepared_directory(destination, prepared)
+            self.assertEqual(published, destination)
+            self.assertEqual(len(renamed), 1)
+            self.assertEqual(renamed[0][1], destination)
+            for name, key in (
+                ("reference_upload.csv", "reference_upload"),
+                ("duplicate_provenance.jsonl", "duplicate_provenance"),
+                ("preparation_manifest.json", "preparation_manifest"),
+            ):
+                path = os.path.join(destination, name)
+                info = os.lstat(path)
+                self.assertFalse(stat.S_ISLNK(info.st_mode))
+                self.assertTrue(stat.S_ISREG(info.st_mode))
+                with open(path, "rb") as handle:
+                    blob = handle.read()
+                self.assertEqual(blob, prepared[key])
+                self.assertEqual(hashlib.sha256(blob).hexdigest(), prepared[key + "_sha256"])
+            manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
+            self.assertFalse(manifest["aptarank_ui_executed"])
+            self.assertIsNone(manifest["observed_ui_accepted_count"])
+            self.assertIsNone(manifest["observed_ui_dropped_count"])
+            self.assertNotIn("accepted_count", manifest)
+            self.assertEqual(sorted(os.listdir(parent)), [".m9c_reference_preparation.partial.keep", "m9c_reference_preparation"])
+            with open(os.path.join(decoy, "keep.txt"), "rb") as handle:
+                self.assertEqual(handle.read(), b"keep")
+            with self.assertRaises(upload.ReferenceUploadError) as caught_again:
+                upload._publish_prepared_directory(destination, prepared)
+            self.assertEqual(caught_again.exception.code, "output_exists")
+            self.assertEqual(sorted(os.listdir(destination)), sorted(upload.OUTPUT_MEMBERS))
+
+    def test_publication_failure_removes_only_that_temporary_directory(self):
+        prepared = _synthetic_prepared()
+        with tempfile.TemporaryDirectory() as parent:
+            destination = os.path.join(parent, "m9c_reference_preparation")
+            decoy = os.path.join(parent, ".m9c_reference_preparation.partial.keep")
+            unrelated = os.path.join(parent, "unrelated")
+            os.mkdir(decoy)
+            os.mkdir(unrelated)
+            with open(os.path.join(decoy, "keep.txt"), "wb") as handle:
+                handle.write(b"keep")
+            with open(os.path.join(unrelated, "safe.txt"), "wb") as handle:
+                handle.write(b"safe")
+            os.mkdir(destination)
+            with self.assertRaises(upload.ReferenceUploadError) as caught_empty:
+                upload._publish_prepared_directory(destination, prepared)
+            self.assertEqual(caught_empty.exception.code, "output_exists")
+            self.assertIn("empty directory", caught_empty.exception.detail)
+            self.assertEqual(os.listdir(destination), [])
+            os.rmdir(destination)
+            elsewhere = os.path.join(parent, "elsewhere")
+            os.mkdir(elsewhere)
+            os.symlink(elsewhere, destination)
+            with self.assertRaises(upload.ReferenceUploadError) as caught_link:
+                upload._publish_prepared_directory(destination, prepared)
+            self.assertEqual(caught_link.exception.code, "output_refused")
+            self.assertIn("symlink", caught_link.exception.detail)
+            self.assertEqual(os.listdir(elsewhere), [])
+            os.unlink(destination)
+            os.rmdir(elsewhere)
+            real_read = os.read
+
+            def corrupt(descriptor, size):
+                data = real_read(descriptor, size)
+                if data == b"":
+                    return data
+                return b"\x00" + data[1:]
+
+            with patch("os.read", side_effect=corrupt):
+                with self.assertRaises(upload.ReferenceUploadError) as caught_verify:
+                    upload._publish_prepared_directory(destination, prepared)
+            self.assertEqual(caught_verify.exception.code, "publication_verify_failed")
+            self.assertFalse(os.path.lexists(destination))
+            with patch.object(upload, "_rename_noreplace", side_effect=OSError(16, "busy")):
+                with self.assertRaises(OSError):
+                    upload._publish_prepared_directory(destination, prepared)
+            self.assertFalse(os.path.lexists(destination))
+            with patch("os.write", side_effect=OSError("short write")):
+                with self.assertRaises(OSError):
+                    upload._publish_prepared_directory(destination, prepared)
+            self.assertFalse(os.path.lexists(destination))
+            bad = dict(prepared)
+            manifest = json.loads(bad["preparation_manifest"].decode("utf-8"))
+            manifest["observed_ui_accepted_count"] = 113
+            encoded = (json.dumps(manifest, ensure_ascii=True, separators=(",", ":")) + "\n").encode("utf-8")
+            bad["preparation_manifest"] = encoded
+            bad["preparation_manifest_sha256"] = hashlib.sha256(encoded).hexdigest()
+            with self.assertRaises(upload.ReferenceUploadError) as caught_ui:
+                upload._publish_prepared_directory(destination, bad)
+            self.assertEqual(caught_ui.exception.code, "ui_observation_refused")
+            self.assertFalse(os.path.lexists(destination))
+            self.assertEqual(sorted(os.listdir(parent)), [".m9c_reference_preparation.partial.keep", "unrelated"])
+            with open(os.path.join(decoy, "keep.txt"), "rb") as handle:
+                self.assertEqual(handle.read(), b"keep")
+            with open(os.path.join(unrelated, "safe.txt"), "rb") as handle:
+                self.assertEqual(handle.read(), b"safe")
+        repo = upload.repo_root()
+        for path, detail in (
+            (os.path.join(repo, "data", "m9c_reference_preparation"), "under data"),
+            (os.path.join(repo, "results", "m9c_reference_preparation"), "another results path"),
+        ):
+            self.assertFalse(os.path.lexists(path))
+            with self.assertRaises(upload.ReferenceUploadError) as caught_protected:
+                upload._publish_prepared_directory(path, prepared)
+            self.assertEqual(caught_protected.exception.code, "output_refused")
+            self.assertIn(detail, caught_protected.exception.detail)
+            self.assertFalse(os.path.lexists(path))
+
+    def test_upload_and_provenance_stay_ignored_and_manifest_stays_untracked(self):
+        directory = "results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation"
+        ignored = {
+            directory + "/reference_upload.csv": "reference_upload.csv",
+            directory + "/duplicate_provenance.jsonl": "duplicate_provenance.jsonl",
+        }
+        for relative, name in ignored.items():
+            completed = subprocess.run(
+                ["git", "check-ignore", "-v", "--no-index", relative],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            self.assertIn(name, completed.stdout)
+        manifest = directory + "/preparation_manifest.json"
+        completed = subprocess.run(
+            ["git", "check-ignore", "-q", "--no-index", manifest],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 1)
+        self.assertFalse(os.path.lexists(os.path.join(ROOT, directory)))
+
+
+def _synthetic_prepared():
+    payload = _source_bytes(
+        [
+            _identity(1, CORE_B, canonical_target_name="Beta target", publication="Synthetic publication 01"),
+            _identity(2, CORE_A, canonical_target_name="Alpha target", publication="Synthetic publication 02"),
+            _identity(3, CORE_B, canonical_target_name="Later beta", publication="Synthetic publication 03"),
+        ]
+    )
+    return upload.prepare_reference_upload(payload)
 
 
 if __name__ == "__main__":

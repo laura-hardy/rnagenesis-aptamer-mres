@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Status | `POLICY_FROZEN_SEALED_PREPARATION_AUTHORIZED` |
+| Status | `POLICY_FROZEN_SEALED_PUBLICATION_PATH_AUTHORIZED` |
 | Stage | M9C-1. The rest of M9C is not complete. |
-| Contract | `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `4bba54b5d8080b15287ce37f8645bbfc3e07a149c53bb0f647dfa3e34042d46b` |
+| Contract | `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591` |
 | Plan | `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md`, version 3.3, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe` |
 | Reused validator | `scripts/modelling/aptarank_io_preflight.py`, SHA-256 `eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01` |
 
@@ -48,6 +48,8 @@ The target-upload digest is stored separately from the structure-file digest and
 
 ## Boundary
 
-`prepare_reference_upload` accepts in-memory bytes. A filesystem path is refused. Sealed review is authorized for the verified REF file, 211,993 bytes, SHA-256 `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`. `prepare_sealed_reference` remains uninvoked and returns before any external path is opened. `write_sealed_preparation_outputs` atomically writes caller-supplied preparation bytes and does not call that entry point. The no-argument command checks the pins and prints the status. It does not write a production directory, and it does not run an end-to-end rehearsal.
+`prepare_reference_upload` accepts in-memory bytes. A filesystem path is refused. Sealed review is authorized for the verified REF file, 211,993 bytes, SHA-256 `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`. `prepare_sealed_reference` remains uninvoked and returns before any external path is opened. `write_sealed_preparation_outputs` atomically writes caller-supplied preparation bytes and does not call that entry point.
 
-Unit tests use synthetic fixtures only. TRAIN, VALIDATION, REF, EVAL, production candidate sources, target-mapping files, and `results/` were not opened.
+The only production publication destination is `/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation`. Any other `results/` path, every `data/` destination, a symlink, and any existing destination, including an empty directory, are refused. `publish_sealed_reference_preparation` runs only when its invocation flag is passed. It finishes the contract and destination preflight before opening REF, verifies the pinned REF bytes, prepares the upload, provenance ledger, and manifest, writes those three files into a temporary sibling, rereads and checks the bytes and digests, and publishes the directory with one `RENAME_NOREPLACE` rename. A failure removes only the temporary directory created by that invocation. The upload CSV and provenance JSONL stay ignored by Git. The manifest is not ignored, so it can be reviewed while untracked. This entry point has not been invoked. The no-argument command checks the pins and prints the status. It does not publish the directory, and it does not run an end-to-end rehearsal.
+
+Unit tests use synthetic fixtures and temporary directories only. TRAIN, VALIDATION, REF, EVAL, production candidate sources, target-mapping files, and the production destination were not opened.

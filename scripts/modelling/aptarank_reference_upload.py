@@ -3,12 +3,15 @@
 
 One upload row is retained for each distinct canonical REF sequence_core.
 The no-argument command checks pins only. It does not locate REF, EVAL, or a
-production candidate source, and it does not calibrate AptaRank.
+production candidate source, and it does not calibrate AptaRank. The sealed
+publication entry point stays idle unless its invocation flag is passed.
 """
 
 from __future__ import annotations
 
 import csv
+import ctypes
+import errno
 import hashlib
 import importlib.util
 import io
@@ -16,13 +19,16 @@ import json
 import os
 import stat
 import sys
+import tempfile
 
 PACKAGE_ID = "M9C-1"
 SCHEMA_VERSION = "m9c-reference-upload-v1"
-STATUS = "POLICY_FROZEN_SEALED_PREPARATION_AUTHORIZED"
+STATUS = "POLICY_FROZEN_SEALED_PUBLICATION_PATH_AUTHORIZED"
 STAGE = "M9C-1"
 CONTRACT_RELATIVE = "config/modelling/aptarank_reference_upload_contract.json"
-CONTRACT_SHA256 = "4bba54b5d8080b15287ce37f8645bbfc3e07a149c53bb0f647dfa3e34042d46b"
+CONTRACT_SHA256 = "eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591"
+PRODUCTION_DESTINATION = "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation"
+PRODUCTION_PUBLICATION_METHOD = "atomic_rename_of_verified_temporary_sibling"
 PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
 PLAN_SHA256 = "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe"
 IO_SPEC_RELATIVE = "config/modelling/aptarank_io_spec.json"
@@ -359,6 +365,9 @@ def validate_contract_document(document, blobs):
             "duplicate_provenance",
             "written_by_default",
             "production_directory",
+            "publication_method",
+            "publication_invoked",
+            "existing_destination_refused",
             "atomic_members",
             "sealed_entry_point_invoked",
         ),
@@ -369,14 +378,23 @@ def validate_contract_document(document, blobs):
     _require(outputs["reference_upload_columns"] == list(arp1.REFERENCE_COLUMNS), "spec_invalid", "the upload columns drifted from ARP-1")
     _require(outputs["duplicate_provenance"] == "restricted_identity_ledger", "spec_invalid", "the provenance ledger kind changed")
     _require(outputs["written_by_default"] is False, "spec_invalid", "preparation must not write by default")
-    _require(outputs["production_directory"] is False, "spec_invalid", "preparation has no production directory")
+    _require(outputs["production_directory"] == PRODUCTION_DESTINATION, "spec_invalid", "the production publication path changed")
+    _require(outputs["publication_method"] == PRODUCTION_PUBLICATION_METHOD, "spec_invalid", "the publication method changed")
+    _require(outputs["publication_invoked"] is False, "spec_invalid", "sealed publication stays uninvoked")
+    _require(outputs["existing_destination_refused"] is True, "spec_invalid", "an existing publication destination must stay refused")
     _require(outputs["atomic_members"] == list(OUTPUT_MEMBERS), "spec_invalid", "the atomic output members changed")
     _require(outputs["sealed_entry_point_invoked"] is False, "spec_invalid", "the sealed entry point stays uninvoked")
     inputs = document["inputs"]
-    _exact_keys(inputs, ("accepted_form", "filesystem_paths", "sealed_locator_requires_review"), "spec_invalid", "the input record changed")
+    _exact_keys(
+        inputs,
+        ("accepted_form", "filesystem_paths", "sealed_locator_requires_review", "sealed_publication_requires_invocation"),
+        "spec_invalid",
+        "the input record changed",
+    )
     _require(inputs["accepted_form"] == "caller_supplied_bytes", "spec_invalid", "the accepted input form changed")
     _require(inputs["filesystem_paths"] is False, "spec_invalid", "filesystem paths stay refused")
     _require(inputs["sealed_locator_requires_review"] is True, "spec_invalid", "the sealed locator requires review")
+    _require(inputs["sealed_publication_requires_invocation"] is True, "spec_invalid", "sealed publication requires an explicit invocation")
     _require(type(document["prohibited"]) is list and len(document["prohibited"]) >= 1, "spec_invalid", "the prohibited list is empty")
     try:
         spec, spec_bytes = arp1.load_spec()
@@ -724,9 +742,11 @@ def _require_sealed_invocation():
         raise ReferenceUploadError("sealed_entry_point_not_invoked", "sealed preparation is authorized and the entry point has not been invoked")
 
 
-def _read_external_ref():
-    """Read the frozen REF path after the sealed entry point is invoked. Symlinks are refused."""
-    _require_sealed_invocation()
+def _read_pinned_ref_bytes():
+    """Read the pinned REF file. The caller must already have passed its own gate.
+
+    The byte size is checked before the file is opened. Symlinks are refused.
+    """
     relative = EXTERNAL_REF_RELATIVE
     if type(relative) is not str or os.path.isabs(relative) or ".." in relative.split("/"):
         raise ReferenceUploadError("pin_invalid", "the external REF path is not repository-relative")
@@ -747,6 +767,12 @@ def _read_external_ref():
         return handle.read()
 
 
+def _read_external_ref():
+    """Read the frozen REF path after the sealed entry point is invoked. Symlinks are refused."""
+    _require_sealed_invocation()
+    return _read_pinned_ref_bytes()
+
+
 def prepare_sealed_reference():
     """Locate and verify external REF bytes only when the entry point is invoked.
 
@@ -758,6 +784,254 @@ def prepare_sealed_reference():
     if sha256_bytes(payload) != REF_SHA256:
         raise ReferenceUploadError("digest_mismatch", "the external REF bytes do not match the frozen digest")
     return prepare_reference_upload(payload, enforce_production_identity=True)
+
+
+def _absolute_publication_path(directory):
+    if type(directory) is not str or directory == "" or "\x00" in directory or directory.startswith("/") is False:
+        raise ReferenceUploadError("output_refused", "the output directory must be an absolute path")
+    if directory != os.path.normpath(directory):
+        raise ReferenceUploadError("output_refused", "the output directory must be an absolute path")
+    return directory
+
+
+def _is_within(path, root):
+    prefix = root.rstrip(os.sep) + os.sep
+    return path == root or path.startswith(prefix)
+
+
+def _refuse_non_production_destination(path):
+    root = os.path.abspath(repo_root())
+    if _is_within(path, os.path.abspath(os.path.join(root, "data"))):
+        raise ReferenceUploadError("output_refused", "preparation outputs cannot be written under data")
+    if _is_within(path, os.path.abspath(os.path.join(root, "results"))):
+        raise ReferenceUploadError("output_refused", "preparation outputs cannot be written under another results path")
+    raise ReferenceUploadError("output_refused", "the output directory is not the production publication path")
+
+
+def _require_absent_regular_destination(path):
+    """Refuse symlinks and any existing destination, including an empty directory."""
+    current = ""
+    for part in path.split("/")[1:-1]:
+        current = current + "/" + part
+        try:
+            info = os.lstat(current)
+        except OSError as exc:
+            raise ReferenceUploadError("output_refused", "the output directory is not a regular directory") from exc
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+            raise ReferenceUploadError("output_refused", "the output directory is not a regular directory")
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise ReferenceUploadError("output_refused", "the output directory is not a regular directory") from exc
+    if stat.S_ISLNK(info.st_mode):
+        raise ReferenceUploadError("output_refused", "the publication destination is a symlink")
+    raise ReferenceUploadError("output_exists", "an existing publication destination is refused, including an empty directory")
+
+
+def preflight_publication_destination(directory):
+    """Allow only the exact production destination, and only when it is absent."""
+    path = _absolute_publication_path(directory)
+    derived = os.path.join(
+        repo_root(),
+        "results",
+        "fine_tuning",
+        "m9_generator_evaluation",
+        "m9c_reference_preparation",
+    )
+    if path != PRODUCTION_DESTINATION or derived != PRODUCTION_DESTINATION:
+        _refuse_non_production_destination(path)
+    _require_absent_regular_destination(path)
+    return path
+
+
+def _prepared_members(prepared):
+    if type(prepared) is not dict:
+        raise ReferenceUploadError("input_type_invalid", "preparation outputs must be a mapping of byte strings")
+    for key in ("observed_ui_accepted_count", "observed_ui_dropped_count", "accepted_count", "dropped_count"):
+        if key in prepared:
+            raise ReferenceUploadError("ui_observation_refused", "preparation outputs cannot record an observed AptaRank UI count")
+    members = (
+        (OUTPUT_MEMBERS[0], prepared.get("reference_upload"), "reference_upload_sha256"),
+        (OUTPUT_MEMBERS[1], prepared.get("duplicate_provenance"), "duplicate_provenance_sha256"),
+        (OUTPUT_MEMBERS[2], prepared.get("preparation_manifest"), "preparation_manifest_sha256"),
+    )
+    for _name, blob, digest_key in members:
+        _require_bytes(blob)
+        recorded = prepared.get(digest_key)
+        if type(recorded) is not str or recorded != sha256_bytes(blob):
+            raise ReferenceUploadError("publication_verify_failed", "a prepared digest does not match the prepared bytes")
+    try:
+        manifest = json.loads(prepared["preparation_manifest"].decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ReferenceUploadError("manifest_invalid", "the preparation manifest is not readable JSON") from exc
+    _exact_keys(manifest, MANIFEST_KEYS, "manifest_invalid", "the preparation manifest schema drifted")
+    if manifest["reference_upload_sha256"] != sha256_bytes(prepared["reference_upload"]):
+        raise ReferenceUploadError("publication_verify_failed", "the manifest upload digest does not match the prepared bytes")
+    if manifest["duplicate_provenance_sha256"] != sha256_bytes(prepared["duplicate_provenance"]):
+        raise ReferenceUploadError("publication_verify_failed", "the manifest provenance digest does not match the prepared bytes")
+    if manifest["aptarank_ui_executed"] is not False or manifest["observed_ui_accepted_count"] is not None or manifest["observed_ui_dropped_count"] is not None:
+        raise ReferenceUploadError("ui_observation_refused", "preparation outputs cannot record an observed AptaRank UI count")
+    if manifest["local_calibration"] is not False:
+        raise ReferenceUploadError("publication_verify_failed", "the preparation manifest records local calibration")
+    return members
+
+
+def _fsync_directory(directory):
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | nofollow
+    if hasattr(os, "O_DIRECTORY"):
+        flags |= os.O_DIRECTORY
+    descriptor = os.open(directory, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _reread_verified_members(directory, prepared):
+    members = _prepared_members(prepared)
+    found = []
+    with os.scandir(directory) as entries:
+        for entry in entries:
+            found.append(entry.name)
+    if sorted(found) != sorted(OUTPUT_MEMBERS):
+        raise ReferenceUploadError("publication_verify_failed", "the publication directory does not contain exactly the three prepared members")
+    for name, blob, _digest_key in members:
+        path = os.path.join(directory, name)
+        info = os.lstat(path)
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+            raise ReferenceUploadError("publication_verify_failed", "a publication member is not a regular file")
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            chunks = []
+            while True:
+                piece = os.read(descriptor, 1024 * 1024)
+                if piece == b"":
+                    break
+                chunks.append(piece)
+        finally:
+            os.close(descriptor)
+        got = b"".join(chunks)
+        if got != blob or sha256_bytes(got) != sha256_bytes(blob):
+            raise ReferenceUploadError("publication_verify_failed", "a reread publication member does not match the prepared bytes")
+    return members
+
+
+def _rename_noreplace(source, destination):
+    """Move a directory with renameat2(RENAME_NOREPLACE). An existing destination stays in place."""
+    renameat2 = ctypes.CDLL(None, use_errno=True).renameat2
+    renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+    renameat2.restype = ctypes.c_int
+    ctypes.set_errno(0)
+    result = renameat2(-100, os.fsencode(source), -100, os.fsencode(destination), 1)
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise ReferenceUploadError("output_exists", "an existing publication destination is refused, including an empty directory")
+    raise OSError(error_number, os.strerror(error_number), destination)
+
+
+def _remove_invocation_temp(directory):
+    """Remove one invocation temporary directory. Do not follow symlinks or touch the destination."""
+    if type(directory) is not str or directory == "" or directory == PRODUCTION_DESTINATION:
+        raise ReferenceUploadError("output_refused", "cleanup refused the publication destination")
+    if ".partial." not in os.path.basename(directory):
+        raise ReferenceUploadError("output_refused", "cleanup refused a directory that is not an invocation temporary")
+    try:
+        info = os.lstat(directory)
+    except FileNotFoundError:
+        return
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        os.unlink(directory)
+        return
+    with os.scandir(directory) as entries:
+        children = list(entries)
+    for entry in children:
+        child_info = os.lstat(entry.path)
+        if stat.S_ISDIR(child_info.st_mode) and not stat.S_ISLNK(child_info.st_mode):
+            raise ReferenceUploadError("output_refused", "the publication temporary directory contains a nested directory")
+        os.unlink(entry.path)
+    os.rmdir(directory)
+
+
+def _publish_prepared_directory(directory, prepared):
+    """Write three members to a temporary sibling, reread them, then rename the directory once."""
+    path = _absolute_publication_path(directory)
+    if path != PRODUCTION_DESTINATION:
+        root = os.path.abspath(repo_root())
+        if _is_within(path, os.path.join(root, "data")) or _is_within(path, os.path.join(root, "results")):
+            _refuse_non_production_destination(path)
+    _require_absent_regular_destination(path)
+    members = _prepared_members(prepared)
+    parent = os.path.dirname(path)
+    temporary = None
+    try:
+        temporary = tempfile.mkdtemp(prefix="." + os.path.basename(path) + ".partial.", dir=parent)
+        for name, blob, _digest_key in members:
+            _write_atomic_bytes(temporary, name, blob)
+        _reread_verified_members(temporary, prepared)
+        _fsync_directory(temporary)
+        _rename_noreplace(temporary, path)
+        temporary = None
+        _fsync_directory(parent)
+    except BaseException as original:
+        if temporary is not None:
+            try:
+                _remove_invocation_temp(temporary)
+            except BaseException as cleanup_error:
+                raise ReferenceUploadError(
+                    "publication_cleanup_failed",
+                    "the publication temporary directory could not be removed",
+                ) from cleanup_error
+        raise original
+    return path
+
+
+def publish_sealed_reference_preparation(*, invoke=False, **forbidden):
+    """Publish the pinned REF preparation after an explicit invocation flag.
+
+    Contract and destination preflight finish before REF is opened. This
+    function does not call ``prepare_sealed_reference``. The no-argument
+    command does not call this function.
+    """
+    if forbidden:
+        raise ReferenceUploadError("ui_observation_refused", "preparation cannot populate an observed AptaRank UI count")
+    if invoke is not True:
+        raise ReferenceUploadError(
+            "sealed_publication_not_invoked",
+            "sealed publication is authorized and the entry point has not been invoked",
+        )
+    if SEALED_REVIEW_AUTHORIZED is not True:
+        raise ReferenceUploadError("review_required", "the sealed publication is not authorized")
+    if SEALED_ENTRY_POINT_INVOKED is not False:
+        raise ReferenceUploadError("spec_invalid", "the sealed entry point stays uninvoked")
+    document = load_pinned_contract()
+    if document["outputs"]["production_directory"] != PRODUCTION_DESTINATION:
+        raise ReferenceUploadError("spec_invalid", "the production publication path changed")
+    if document["outputs"]["publication_invoked"] is not False:
+        raise ReferenceUploadError("spec_invalid", "sealed publication stays uninvoked")
+    destination = preflight_publication_destination(PRODUCTION_DESTINATION)
+    payload = _read_pinned_ref_bytes()
+    if len(payload) != REF_BYTE_SIZE:
+        raise ReferenceUploadError("external_ref_unavailable", "the external REF byte size does not match the authorized size")
+    if sha256_bytes(payload) != REF_SHA256:
+        raise ReferenceUploadError("digest_mismatch", "the external REF bytes do not match the frozen digest")
+    prepared = prepare_reference_upload(payload, enforce_production_identity=True)
+    published = _publish_prepared_directory(destination, prepared)
+    return {
+        "published_directory": published,
+        "reference_upload_sha256": prepared["reference_upload_sha256"],
+        "duplicate_provenance_sha256": prepared["duplicate_provenance_sha256"],
+        "preparation_manifest_sha256": prepared["preparation_manifest_sha256"],
+        "source_sha256": prepared["source_sha256"],
+        "source_row_count": prepared["source_row_count"],
+        "prepared_upload_row_count": prepared["prepared_upload_row_count"],
+        "duplicate_core_collapses": prepared["duplicate_core_collapses"],
+        "production_ref_identity_verified": prepared["production_ref_identity_verified"],
+    }
 
 
 def verify_frozen_target_mapping(structure_bytes, selection_bytes, target_upload_bytes):

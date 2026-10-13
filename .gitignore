@@ -56,6 +56,11 @@ results/phase4_1_unadapted_rnagenesis_30k/.DS_Store
 # Regenerable M9 production JSONL ledgers. The summary and manifest stay eligible.
 results/fine_tuning/m9_generator_evaluation/*.jsonl
 
+# M9C reference preparation. The upload and provenance ledger stay ignored.
+# The preparation manifest is not ignored, so a later publication remains reviewable while untracked.
+results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation/reference_upload.csv
+results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation/duplicate_provenance.jsonl
+
 # Data is local-only — never committed
 # (replaces the narrower /data/raw/ rule; entire top-level data/ is ignored)
 /data/

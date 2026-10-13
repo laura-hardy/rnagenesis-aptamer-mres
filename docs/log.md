@@ -12062,3 +12062,15 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Contract:** `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `4bba54b5d8080b15287ce37f8645bbfc3e07a149c53bb0f647dfa3e34042d46b`. The previous digest was `b0387bc6d7c8d5328ccdbea05ad263b203b3405f80d7f359a6440751eb4e1b0f`.
 
 **Tests:** Synthetic fixtures and temporary directories only. `tests.modelling.test_aptarank_reference_upload` passed 15 tests. The sealed entry point was not called. REF, EVAL, production candidate sources, and AptaRank were not opened.
+
+## 2026-10-13 — M9C-1 sealed publication path
+
+**Stage:** Aim 2 / modelling / M9C-1 sealed REF publication path
+
+**Status:** `POLICY_FROZEN_SEALED_PUBLICATION_PATH_AUTHORIZED`. The only production destination is `/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation`. Other `results/` paths, every `data/` destination, symlinks, and any existing destination, including an empty directory, stay refused. `publish_sealed_reference_preparation` runs only after an explicit invocation flag. It completes contract and destination preflight before opening REF, verifies the pinned REF bytes, prepares the upload, provenance ledger, and manifest, writes them to a temporary sibling, rereads those bytes and digests, and publishes the directory with one atomic rename. A failure removes only that invocation's temporary directory. The entry point was not invoked. `prepare_sealed_reference` stays uninvoked. The 131 / 113 / 18 policy is unchanged. Observed UI counts stay unwritable. EVAL stays closed.
+
+**Contract:** `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `eb082923fbd79ccc05a9833e0f18e40094e8384bd2104392eee6cd46bc55f591`. The previous digest was `4bba54b5d8080b15287ce37f8645bbfc3e07a149c53bb0f647dfa3e34042d46b`.
+
+**Git:** `reference_upload.csv` and `duplicate_provenance.jsonl` stay ignored. `preparation_manifest.json` is not ignored, so a later publication can be reviewed while it is untracked. The manifest was not created.
+
+**Tests:** Synthetic fixtures and temporary directories only. `tests.modelling.test_aptarank_reference_upload` passed 20 tests. The sealed publication entry point and the sealed REF entry point were not invoked. REF, EVAL, production candidate sources, AptaRank, and the production destination were not opened.

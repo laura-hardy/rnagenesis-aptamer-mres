@@ -1,7 +1,7 @@
 {
   "package_id": "M9C-1",
   "schema_version": "m9c-reference-upload-v1",
-  "status": "POLICY_FROZEN_SEALED_PREPARATION_AUTHORIZED",
+  "status": "POLICY_FROZEN_SEALED_PUBLICATION_PATH_AUTHORIZED",
   "stage": "M9C-1",
   "scientific_result": false,
   "production_inputs_opened": false,
@@ -193,7 +193,10 @@
     ],
     "duplicate_provenance": "restricted_identity_ledger",
     "written_by_default": false,
-    "production_directory": false,
+    "production_directory": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation",
+    "publication_method": "atomic_rename_of_verified_temporary_sibling",
+    "publication_invoked": false,
+    "existing_destination_refused": true,
     "atomic_members": [
       "reference_upload.csv",
       "duplicate_provenance.jsonl",
@@ -204,11 +207,14 @@
   "inputs": {
     "accepted_form": "caller_supplied_bytes",
     "filesystem_paths": false,
-    "sealed_locator_requires_review": true
+    "sealed_locator_requires_review": true,
+    "sealed_publication_requires_invocation": true
   },
   "prohibited": [
     "Opening REF, EVAL, or a production candidate source before the sealed review",
-    "Reading or writing results/",
+    "Writing results/ outside the exact M9C reference-preparation destination",
+    "Publishing over an existing destination, including an empty directory",
+    "Publishing through a symlink",
     "Excluding a row for a biological or quality reason",
     "Normalizing case, whitespace, or alphabet",
     "Converting T to U",
