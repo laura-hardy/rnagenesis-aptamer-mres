@@ -12112,3 +12112,29 @@ M0 reproducibility/data-contract/code-integration implementation.
 **Tests:** Synthetic fixtures and temporary directories only. `tests.modelling.test_aptarank_reference_upload` passed 23 tests, including the manifest status, publication attempt 2, and refusal of the pre-retry contract status.
 
 **Boundary:** REF was not reopened. Production publication was not retried. EVAL, production candidates, and AptaRank were not opened. Nothing was pushed.
+
+## 2026-10-13 — M9C-1 reviewed REF preparation
+
+**Stage:** Aim 2 / modelling / M9C-1 sealed REF publication evidence
+
+**Status:** `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`. Publication attempt 2 succeeded once. M9C is not complete. EVAL remains locked. No scientific result is claimed.
+
+**Attempts:** Attempt 1, on commit `3d5a4beafc723ab154a2ff7d3a6d6835841b3b48`, opened and verified REF, then failed before publication under the obsolete five-column assumption (`missing_required_field` for `publication`). No output was published. AptaRank was not run. Attempt 2 invoked `publish_sealed_reference_preparation(invoke=True)` once at HEAD `43ee64464b69952b57250cf9ebfcb91eb860c648` and succeeded. It was not retried.
+
+**Source:** REF SHA-256 `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`. Accounting is 131 source identity rows, 113 distinct canonical sequence cores, and 18 duplicate-core collapses. The collapses are not biological or quality exclusions.
+
+**Interface:** The published upload is one CSV column, `sequence`. It does not carry `id`, `target_name`, `target_pdb_id`, or `source_reference`.
+
+**Outputs:** `results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation/`.
+
+- `reference_upload.csv` — 6281 bytes, SHA-256 `4959bccf1e8ef535857ea451ceb83795ce09c2e6ad79a6ae10411d976d760f08`
+- `duplicate_provenance.jsonl` — 29214 bytes, SHA-256 `ff3d7986029aeaf52f1ebfdceceba3d94d7136ca7d457c93f62398d01235a841`
+- `preparation_manifest.json` — 694 bytes, SHA-256 `00c9479f5609cbe6f4bcc9388d1a2d9af74d46860333b680f6466384126e3b63`
+
+The manifest status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN` and `publication_attempt` is 2. The manifest digest was recomputed from the file bytes and is not embedded in the manifest.
+
+**AptaRank:** AptaRank was not run. `aptarank_ui_executed` is false. `observed_ui_accepted_count` and `observed_ui_dropped_count` remain null.
+
+**Review:** Review archive SHA-256 `4da503a1b4b9162da19f1c0862b285ae1e972e4d8c2f8196f38b2563b1d7cf57`.
+
+**Boundary:** This record does not complete M9C and does not unlock EVAL. The upload CSV and the provenance ledger stay uncommitted. Preparation was not run again. Nothing was pushed.
