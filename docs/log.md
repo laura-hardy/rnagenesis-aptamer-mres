@@ -12164,3 +12164,19 @@ The manifest status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN` and `publica
 **Tests:** Synthetic fixtures and temporary directories only. `tests.modelling.test_aptarank_reference_upload` passed 28 tests, including the exact four-column header, first-identity mappings, unique IDs and sequences, nullable PDB values, refusal of `source_reference` and extra columns, and the attempt-3 path and prepared-not-run status.
 
 **Boundary:** REF was not reopened. The attempt-3 directory was not created. EVAL, production candidates, and AptaRank were not opened. Nothing was pushed.
+
+## 2026-10-13 — M9C development-run validation recorded
+
+**Stage:** Aim 2 / modelling / M9C live deployment validation
+
+**Status:** `M9C_LIVE_VALIDATION_RECORDED_REVIEW_PENDING`. Development run only. `scientific_result` is false. M9C is not complete. EVAL remains locked. No scientific result is claimed.
+
+**Attempt 3:** The published directory is `results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3`. Its manifest is unchanged: schema `m9c-reference-upload-v3`, status `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`, `publication_attempt` 3. `reference_upload.csv` is 17302 bytes, SHA-256 `5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6`. `duplicate_provenance.jsonl` is 29214 bytes, SHA-256 `ff3d7986029aeaf52f1ebfdceceba3d94d7136ca7d457c93f62398d01235a841`. `preparation_manifest.json` is 694 bytes, SHA-256 `abaf33fa7dcebb853a8d3ce5c95f83139201fbbeed5c1a1269a1b8bbb1e382b7`. The live UI accepted 113 reference aptamers and dropped 0.
+
+**Development evidence:** `/home/laura/rnagenesis-mres-runs/m9c_aptarank_development_validation_20261013/`, job `job_20261013T032514_0a356a`. Example candidates only. Candidate SHA-256 `6db3dae7b68afb4c171301a9a53b53e24df04940cdb82a375c6d23bbffba1b02`. Shortlist SHA-256 `e51141a97bc0df0150b7d2801031c7227681177e07358f69bb7b401f5d8f4b71`. PDF SHA-256 `7d798dbb67c6c9e11862209b8215b1591f83da1a9fc3c147a596170ae5e175f5`. Accounting is 199 submitted, 199 returned, and 0 omitted. The seven-column export returned every example candidate once. Scores, the compatibility distribution, the top candidate, the correlation, and the biological narrative are not copied.
+
+**Run facts:** Composite method `corpus_weighted_mean`. Scoring signature `6dec9dc463a8fde1`, which is not a control-bank hash. AptaRank 0.1.0, schema 1.0.0, git `49a85609e352`. ViennaRNA 2.7.2, forgi 2.2.3, fpocket 4.0. The ushuffle version is unknown. Standard analysis, 20 shuffled controls, seed 42. The reported ranking runtime is 6 seconds and is not total wall-clock runtime. Target 5ZGX chain A, pocket/groove recognition, prepared-target identifier `0fde4d5e4370`. Fifteen cavities were detected and cavity 1 was selected. Characteristic width 23.0 Å, volume 744 Å³. The compatibility control-bank realized count is 5,085. Moderate threshold at least 0.75 and strong threshold at least 0.95. The UI did not expose a control-bank hash or an explicit bank ID. Electrostatics were skipped. The chosen cavity is unusually shaped, and its robust extent and equivalent-sphere diameter differ by more than twofold. `publication_eligible` is false because no AptaRank provenance sidecar accompanied the REF upload. Laura decided that this flag does not block M9C. No sidecar was added.
+
+**Record:** `results/fine_tuning/m9_generator_evaluation/m9c_live_deployment_validation/`.
+
+**Boundary:** The pre-run v3 contract, preparation module, tests, governing plan, historical M9B artifacts, and attempt 2 are unchanged. EVAL and production candidates were not opened. REF preparation and AptaRank were not rerun. Nothing was committed or pushed.
