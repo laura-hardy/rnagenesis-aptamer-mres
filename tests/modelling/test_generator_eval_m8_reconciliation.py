@@ -735,8 +735,9 @@ class BoundaryTests(unittest.TestCase):
         with self.assertRaises(analysis.AnalysisContractError):
             analysis.analyse({"fixture_role": "SYNTHETIC", "eval_path": "eval.csv"})
         item = next(entry for entry in gep1.load_metric_spec()["blocking_items"] if entry["id"] == "viennarna_production_settings_not_pinned")
-        self.assertEqual(item["status"], "unresolved")
-        self.assertIn("temperature", item["statement"])
+        self.assertEqual(item["status"], "resolved")
+        self.assertIn("RNA.fold(sequence)", item["statement"])
+        self.assertIn("ViennaRNA 2.7.0", item["statement"])
         self.assertNotIn("37C", item["statement"])
         report = analysis.analyse(helpers.default_document())
         self.assertFalse(report["viennarna_called"])

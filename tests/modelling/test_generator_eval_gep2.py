@@ -771,7 +771,7 @@ class BlockScheduleAndPanelTests(unittest.TestCase):
         self.assertIn("only synthetic TRAIN/reference fixtures used", text)
         self.assertIn("no EVAL, REF or VALIDATION data loaded", text)
         self.assertIn("metric_count: 35", text)
-        self.assertIn("unresolved_item_count: 7", text)
+        self.assertIn("unresolved_item_count: 6", text)
         for sequence in sequences:
             self.assertNotIn(sequence, text)
         formula_hashes = {

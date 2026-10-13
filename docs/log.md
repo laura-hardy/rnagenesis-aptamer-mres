@@ -12180,3 +12180,23 @@ The manifest status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN` and `publica
 **Record:** `results/fine_tuning/m9_generator_evaluation/m9c_live_deployment_validation/`.
 
 **Boundary:** The pre-run v3 contract, preparation module, tests, governing plan, historical M9B artifacts, and attempt 2 are unchanged. EVAL and production candidates were not opened. REF preparation and AptaRank were not rerun. Nothing was committed or pushed.
+
+## 2026-10-13 — M9C closure
+
+**Stage:** Aim 2 / modelling / M9C closure
+
+**Status:** `M9C_COMPLETE_EVAL_UNLOCKED`. The independent review passed. M9 and M9C are complete. EVAL is unlocked. `scientific_result` is false. `eval_opened` is false. `m10_started` is false. `m10_execution_authorized` is false. No scientific result is claimed.
+
+**Scope decision:** External REF component-distribution calculations are not required for the M9C gate. AptaRank performs its own internal REF calibration. The sufficient descriptive accounting is 131 source identities, 113 distinct cores, 18 duplicate-core collapses, and 65 short / 48 long. Commit `2dd04204e0888263f18b3e6431e69b9b0de5113b` remains unexecuted preparatory code and is non-gating. It was not run. No production REF summary was created. v3.3 was not modified. Its SHA-256 remains `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`.
+
+**Frozen input:** Attempt 3 upload SHA-256 `5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6`, 113 accepted and 0 dropped. Source REF SHA-256 `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`.
+
+**Bank:** The 20 Standard-preset candidate shuffles are distinct from the 5,085-member REF-derived compatibility bank. The bank is identified by the accepted construction record and realized count: the attempt-3 upload, 113 sources, AptaRank 0.1.0, schema 1.0.0, git `49a85609e352`, ViennaRNA 2.7.2, forgi 2.2.3, fpocket 4.0, equal 45-per-source dinucleotide-preserving allocation, seed 42, 100 ensemble samples, and realized count 5,085. No bank ID or content hash was exposed or claimed. The ushuffle version is unknown.
+
+**Generator ViennaRNA pin:** The existing `_default_fold` call is `RNA.fold(sequence)` in `/home/laura/miniconda3/envs/rnagenesis-h200/bin/python`. The installed package is viennarna 2.7.0, build `py38pl5321hd78456e_0`. The code sets no model detail. Observed `RNA.md()` defaults include temperature 37.0 centigrade, dangles 2, `uniq_ML` 0, and salt 1.021 molar monovalent. This pin is distinct from AptaRank ViennaRNA 2.7.2. The fold method was not changed.
+
+**Record:** `results/fine_tuning/m9_generator_evaluation/m9c_closure/`.
+
+**Unlock:** M9C is complete and EVAL is unlocked for a separately authorized M10 execution. This record does not itself authorize or begin M10 and did not open EVAL. The independent review archive SHA-256 is `4c2e174f53aaa4da388debb1362c3d0b8f180c4791a1d96305c20d1a53d592c5`.
+
+**Boundary:** REF, EVAL, production candidates, TRAIN, VALIDATION, models, and checkpoints were not opened. AptaRank was not run. M10 execution is not authorized. Nothing was pushed.

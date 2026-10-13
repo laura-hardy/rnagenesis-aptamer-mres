@@ -348,6 +348,7 @@ RESOLVED_BLOCKING_IDS = (
     "nucleotide_total_variation_membership_unresolved",
     "dinucleotide_total_variation_membership_unresolved",
     "b2_generic_seed_field_disambiguated",
+    "viennarna_production_settings_not_pinned",
 )
 RESOLVED_REQUIRED_PHRASES = {
     "parsed_outputs_predicate_versus_successful_parse": "successfully_parsed_outputs counts nonempty extracted sequences before A/C/G/U filtering",
@@ -360,6 +361,7 @@ RESOLVED_REQUIRED_PHRASES = {
     "nucleotide_total_variation_membership_unresolved": "nested descriptive output",
     "dinucleotide_total_variation_membership_unresolved": "nested descriptive output",
     "b2_generic_seed_field_disambiguated": "does not assume that a production run used seed 42",
+    "viennarna_production_settings_not_pinned": "The existing generator fold is RNA.fold(sequence) in ViennaRNA 2.7.0 and sets no model detail.",
 }
 BLOCKING_IDS = (
     "parsed_outputs_predicate_versus_successful_parse",
@@ -1809,11 +1811,40 @@ def _validate_m8_contract_blocks(spec, problems):
         problems.append(_problem("b0_adapter_contract_invalid", "the B0 adapter contract drifted"))
     viennarna = spec.get("viennarna_production_settings")
     if viennarna != {
-        "pinned": False,
-        "blocking_item_id": "viennarna_production_settings_not_pinned",
+        "pinned": True,
         "settings_invented": False,
+        "method_changed": False,
+        "blocking_item_id": "viennarna_production_settings_not_pinned",
+        "implementation_path": "scripts/modelling/m6_diagnostic_generation.py",
+        "implementation_symbol": "_default_fold",
+        "call": "RNA.fold(sequence)",
+        "model_details_set_by_code": False,
+        "interpreter": "/home/laura/miniconda3/envs/rnagenesis-h200/bin/python",
+        "package_name": "viennarna",
+        "package_version": "2.7.0",
+        "package_build": "py38pl5321hd78456e_0",
+        "package_channel": "bioconda",
+        "distinct_from_aptarank_viennarna": "2.7.2",
+        "observed_rna_md_defaults": {
+            "temperature_centigrade": 37.0,
+            "dangles": 2,
+            "salt_monovalent_molar": 1.021,
+            "uniq_ML": 0,
+            "noLP": 0,
+            "noGU": 0,
+            "noGUclosure": 0,
+            "gquad": 0,
+            "special_hp": 1,
+            "energy_set": 0,
+            "min_loop_size": 3,
+            "circ": 0,
+            "logML": 0,
+            "betaScale": 1.0,
+            "max_bp_span": -1,
+        },
+        "unlisted_model_fields": "remaining RNA.md() fields stay at the ViennaRNA 2.7.0 constructor defaults and are not overridden",
     }:
-        problems.append(_problem("viennarna_settings_invalid", "production ViennaRNA settings must stay unpinned"))
+        problems.append(_problem("viennarna_settings_invalid", "production ViennaRNA settings do not match the pinned RNA.fold defaults"))
 
 
 def biological_validity(text):

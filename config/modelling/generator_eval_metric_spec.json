@@ -775,7 +775,7 @@
       "data_source": "caller-supplied fold of each distinct valid sequence, repeated on valid rows",
       "reference_role": "none",
       "scientific_role": "descriptor",
-      "calculation_summary": "Quantiles of the fold-returned MFE float. The code stores float(mfe) and does not rescale it. More negative MFE is not inherently better. thresholds_defined is false. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production ViennaRNA settings are not yet fully pinned. This package does not invent temperature, dangle, salt, or other folding settings.",
+      "calculation_summary": "Quantiles of the fold-returned MFE float. The code stores float(mfe) and does not rescale it. More negative MFE is not inherently better. thresholds_defined is false. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production folding is the existing RNA.fold(sequence) call in ViennaRNA 2.7.0. The code sets no model detail. The observed defaults are pinned in viennarna_production_settings. This package does not change temperature, dangles, salt, or any other folding setting.",
       "numerator": "fold-returned MFE",
       "denominator_and_filters": "Not a ratio. Quantiles are over valid rows. Invalid rows are excluded. A structure length that differs from the sequence raises fold_invalid.",
       "units": "fold-returned MFE float (ViennaRNA convention is kcal/mol; this code does not convert the value)",
@@ -802,7 +802,7 @@
       "data_source": "caller-supplied fold of each distinct valid sequence, repeated on valid rows",
       "reference_role": "none",
       "scientific_role": "descriptor",
-      "calculation_summary": "Quantiles of float(mfe) divided by the sequence length. mfe_per_nt remains the generator metric. It is not the AptaRank normalized-MFE component. mfe_per_nucleotide is not a second metric. More negative MFE per nucleotide is not a selection score. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production ViennaRNA settings are not yet fully pinned. This package does not invent temperature, dangle, salt, or other folding settings.",
+      "calculation_summary": "Quantiles of float(mfe) divided by the sequence length. mfe_per_nt remains the generator metric. It is not the AptaRank normalized-MFE component. mfe_per_nucleotide is not a second metric. More negative MFE per nucleotide is not a selection score. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production folding is the existing RNA.fold(sequence) call in ViennaRNA 2.7.0. The code sets no model detail. The observed defaults are pinned in viennarna_production_settings. This package does not change temperature, dangles, salt, or any other folding setting.",
       "numerator": "fold-returned MFE",
       "denominator_and_filters": "Sequence length in nucleotides. Quantiles are over valid rows. Division by zero is not reached because valid sequences are nonempty.",
       "units": "fold-returned MFE float per nucleotide",
@@ -829,7 +829,7 @@
       "data_source": "dot-bracket string returned by the caller-supplied fold",
       "reference_role": "none",
       "scientific_role": "descriptor",
-      "calculation_summary": "Quantiles of (count of '(' plus count of ')') divided by the sequence length. Unpaired positions are not added to the numerator. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production ViennaRNA settings are not yet fully pinned. This package does not invent temperature, dangle, salt, or other folding settings.",
+      "calculation_summary": "Quantiles of (count of '(' plus count of ')') divided by the sequence length. Unpaired positions are not added to the numerator. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production folding is the existing RNA.fold(sequence) call in ViennaRNA 2.7.0. The code sets no model detail. The observed defaults are pinned in viennarna_production_settings. This package does not change temperature, dangles, salt, or any other folding setting.",
       "numerator": "paired parentheses in the fold structure",
       "denominator_and_filters": "Sequence length. The structure length must equal the sequence length. Quantiles are over valid rows.",
       "units": "fraction",
@@ -1142,14 +1142,14 @@
     },
     {
       "id": "viennarna_production_settings_not_pinned",
-      "status": "unresolved",
+      "status": "resolved",
       "related_names": [
         "mfe",
         "mfe_per_nt",
         "paired_fraction",
         "viennarna_settings"
       ],
-      "statement": "Production ViennaRNA settings are not yet fully pinned. This is a blocking pre-M9C item and requires an explicit pin or a scope decision. This package does not invent temperature, dangle, salt, or other folding settings. Structure metrics remain synthetic-injection-only."
+      "statement": "The existing generator fold is RNA.fold(sequence) in ViennaRNA 2.7.0 and sets no model detail. The inspected interpreter is /home/laura/miniconda3/envs/rnagenesis-h200/bin/python, package viennarna 2.7.0 build py38pl5321hd78456e_0. Observed RNA.md() defaults include temperature 37.0 centigrade, dangles 2, uniq_ML 0, and salt 1.021 molar monovalent. Remaining model fields stay at those constructor defaults. This pin is distinct from AptaRank ViennaRNA 2.7.2. No folding setting was invented or changed."
     },
     {
       "id": "production_matched_chunk_schedule_not_wired",
@@ -1262,9 +1262,38 @@
     "included_in_b1_d1_controlled_comparison": false
   },
   "viennarna_production_settings": {
-    "pinned": false,
+    "pinned": true,
+    "settings_invented": false,
+    "method_changed": false,
     "blocking_item_id": "viennarna_production_settings_not_pinned",
-    "settings_invented": false
+    "implementation_path": "scripts/modelling/m6_diagnostic_generation.py",
+    "implementation_symbol": "_default_fold",
+    "call": "RNA.fold(sequence)",
+    "model_details_set_by_code": false,
+    "interpreter": "/home/laura/miniconda3/envs/rnagenesis-h200/bin/python",
+    "package_name": "viennarna",
+    "package_version": "2.7.0",
+    "package_build": "py38pl5321hd78456e_0",
+    "package_channel": "bioconda",
+    "distinct_from_aptarank_viennarna": "2.7.2",
+    "observed_rna_md_defaults": {
+      "temperature_centigrade": 37.0,
+      "dangles": 2,
+      "salt_monovalent_molar": 1.021,
+      "uniq_ML": 0,
+      "noLP": 0,
+      "noGU": 0,
+      "noGUclosure": 0,
+      "gquad": 0,
+      "special_hp": 1,
+      "energy_set": 0,
+      "min_loop_size": 3,
+      "circ": 0,
+      "logML": 0,
+      "betaScale": 1.0,
+      "max_bp_span": -1
+    },
+    "unlisted_model_fields": "remaining RNA.md() fields stay at the ViennaRNA 2.7.0 constructor defaults and are not overridden"
   },
   "novelty_direction_statement": "Directions on nearest_train_normalized_edit_distance and maximum_edit_similarity_to_train describe novelty only and are not extra votes for overall generator quality.",
   "revision_schema": {
