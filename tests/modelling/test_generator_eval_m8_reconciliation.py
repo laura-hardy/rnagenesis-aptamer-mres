@@ -724,7 +724,7 @@ class BoundaryTests(unittest.TestCase):
         alias["metrics"].append(copy.deepcopy(alias["metrics"][-1]))
         alias["metrics"][-1]["metric_id"] = "combined_quality_score"
         with self.assertRaises(gep1.GeneratorEvalContractError) as combined:
-            gep1.validate_metric_spec(alias, require_draft=True)
+            gep1.validate_metric_spec(alias, require_draft=False)
         self.assertEqual(combined.exception.code, "unknown_metric_alias")
         for role in ("REF", "VALIDATION", "TRAIN", "EVAL"):
             with self.assertRaises(gep1.GeneratorEvalContractError):

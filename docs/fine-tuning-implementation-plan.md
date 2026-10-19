@@ -209,7 +209,7 @@ eval.csv SHA256 =
 ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015
 ```
 
-**Role:** final held-out assessment only, after generator and downstream pipeline decisions are frozen.
+**Role:** final held-out assessment only, after generator and downstream pipeline decisions are frozen. M9C unlocked EVAL. The published M10 Section 5 run opened EVAL once on 19 October 2026. The reviewed result is [M10 generator evaluation results](m10_generator_evaluation_results.md).
 
 EVAL must not influence:
 
@@ -220,6 +220,8 @@ EVAL must not influence:
 - AptaRank calibration;
 - metric choice;
 - model/pipeline configuration selection.
+
+M10 is the one opening of EVAL. It is only the frozen four-condition generator-level evaluation in Section 5 of `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md`, run on server CPU after explicit authorization. That opening occurred once, in the published 19 October 2026 Section 5 run. Later AptaRank analysis uses that already-opened held-out set. It is not a second fresh opening. AptaRank Tier 1, illustrative Tier 2, generated-candidate scoring, the NDM-1 review, and the final decision record remain required and are outside M10. The active plan for that remaining AptaRank evaluation is `docs/aptarank_full_mres_thesis_evaluation_plan_v3_5.md`. v3.4 remains the governing plan for completed M10. AptaRank is the next stage and remains unauthorized for manual production.
 
 ### 3.5 Frozen role invariant
 
@@ -864,9 +866,10 @@ At prespecified checkpoints, generate a modest fixed-seed diagnostic sample and 
 
 - exact overlap with TRAIN;
 - nearest-TRAIN normalized edit distance;
-- maximum sequence identity to TRAIN;
-- distribution of nearest-TRAIN similarity;
-- generated sequence-cluster concentration.
+- maximum edit similarity to TRAIN;
+- distribution of nearest-TRAIN similarity.
+
+Generated-sequence clustering, structural diversity, ensemble metrics, and representation metrics are outside M10. They are not development-selection metrics for the completed M6–M8 path, and they are not M10 outputs.
 
 #### Aptamer-domain distribution diagnostics
 
@@ -876,9 +879,7 @@ At prespecified checkpoints, generate a modest fixed-seed diagnostic sample and 
 - mono-/dinucleotide distribution distance;
 - ViennaRNA MFE;
 - normalized MFE (MFE/nt);
-- base-pair/paired fraction;
-- structural diversity;
-- frozen-encoder embedding distribution distance such as MMD to VALIDATION.
+- base-pair/paired fraction.
 
 ### 9.5 Secondary metrics do not replace the primary selection criterion
 
@@ -1782,7 +1783,7 @@ Review seed consistency and freeze D1 training.
 **Status: M8 raw generation and assembly are complete. The checked-in configuration is inactive, `M8_RAW_GENERATION_READY_FOR_REVIEW_NOT_AUTHORISED`, and non-consumable.** Later four-condition evaluation is required and is not authorised by this closure. The record is section 8 of [M8 raw generation](fine_tuning/m8_raw_generation.md). The checked-in configuration has no active generation entry and no active assembly entry. The unused GPU 1 seed-44 block-B authorisation remains recorded as unconsumed and superseded before dispatch. It is not executable. The consumed D1 seed-44 block-B arm used `shared_allowed` on physical GPU 0; that authorisation is not in the inactive configuration. Exclusive remains the default for a new entry that names it. Shared execution was an operational deviation for that one arm: it can change wall-clock runtime and contention risk, and it does not change sampling, checkpoint selection, or evaluation criteria.
 
 **Objective**  
-Produce and seal raw B1 and D1 pools only. Parsing, filtering, clustering, representation analysis, and the four-condition comparison occur later under a common frozen evaluation protocol. They are not part of M8.
+Produce and seal raw B1 and D1 pools only. Parsing and the four-condition comparison occur later under the common frozen evaluation protocol. They are not part of M8. Clustering and representation analysis are outside M10.
 
 **Approved generation**
 
@@ -1797,13 +1798,13 @@ Produce and seal raw B1 and D1 pools only. Parsing, filtering, clustering, repre
 
 **Later comparison, outside M8**
 
-The four conditions remain B1, B2, D1, and B0. B1 versus D1 is the primary controlled comparison. B2 is the non-neural null. B0 remains the external comparator and keeps its existing 30,080 attempts. TRAIN copying and novelty checks, VALIDATION distribution comparison, clustering, and representation analysis belong to that later protocol. REF and EVAL stay prohibited.
+The four conditions remain B1, B2, D1, and B0. B1 versus D1 is the primary controlled comparison. B2 is the non-neural null. B0 remains the external comparator and keeps its existing 30,080 attempts. TRAIN copying and novelty checks belong to the later protocol and are satisfied for M10 by the frozen M9A outputs. Clustering and representation analysis are outside M10. REF stays prohibited. Completed M9C unlocked EVAL, and the published M10 Section 5 run opened it once.
 
 **Launch binding, still inactive.** A future authorization commit is live HEAD. `repository_identity.mres_commit` records that commit. `proposal_base_commit` keeps `d0f9a397b536c64ca1b22662cc9ae36aea0101f6` separately. Every commit after the executing implementation commit must be linear, must contain no merge, and may change only `config/experiments/M8_raw_generation.yaml`. The controller observation reads the running process, including `/proc/self/exe` where available. A child interpreter probe runs before consumption and does not import the model stack or query CUDA. Production path preflight refuses a symlinked run root, a symlinked checkpoint or source directory, and a raw file that does not resolve inside its arm. Assembly stores `active_configuration_raw_sha256` from the exact YAML bytes and validates the nested arm manifest, including D1 `selected_set_evidence`. After consumption and before the first generation subprocess, isolated `HOME`, `TMPDIR`, cache, and pycache directories are created inside the output. `TMPDIR` must exist. This paragraph describes validators that remain unauthorised.
 
 **Closure — 10 October 2026.** The four generation arms and both CPU assemblies are complete. B1 and D1 each have 30,000 raw attempts, master indexes 0 through 29999 exactly once, and 30,000 unique record ids. B1 block A pairs with D1 training seed 43 and generation seeds 800000–800162. B1 block B pairs with D1 training seed 44 and generation seeds 900000–900163. Training seeds are 43 and 44 only. They are not generation seeds and they are not record ids. The B1 combined ledger is `/home/laura/rnagenesis-mres-runs/m8_b1_combined_1069b63_cpu_attempt1/m8_combined_raw_attempt_ledger.jsonl`, SHA-256 `37ba0e1b852a6b8492a816a4adc0c6bfee15a554ba28a8ba5dd91d9e32a255d9`, 26,427,607 bytes. The D1 combined ledger is `/home/laura/rnagenesis-mres-runs/m8_d1_combined_1069b63_cpu_attempt1/m8_combined_raw_attempt_ledger.jsonl`, SHA-256 `cedcc36133f5dfb3678e1560c6d6bab703136fe89e512e939b9f93a9a6361de9`, 28,971,289 bytes. Filtering, replacement, and replenishment stayed false. Parsing and deduplication stayed false on the assembly manifests. Sealed manifests were not rewritten. Evidence is retained through at least 1 November 2026.
 
-Only two fine-tuning seeds were used, because of time and GPU constraints. Evaluation completeness was prioritized over a third training replicate. The training seed is coupled to the D1 technical block and generation-seed range, so the pooled D1 condition supports condition-level evaluation and does not support clean replicate-level causal inference. Raw attempts are not yet established to be valid nucleotide sequences. No duplicate removal, exact training-set-match analysis, leakage analysis, biological-quality assessment, structure analysis, clustering, representation-space analysis, or functional evaluation was performed. M7 guardrail samples were not included. Seed 43 attempt 1 remains the consumed `runtime_identity` environment failure, not a model failure. Guardrails establish generation and runtime sanity only. Shared GPU use on the seed-44 block-B arm may affect runtime and resource contention; its generated bytes and provenance remain sealed.
+Only two fine-tuning seeds were used, because of time and GPU constraints. Evaluation completeness was prioritized over a third training replicate. The training seed is coupled to the D1 technical block and generation-seed range, so the pooled D1 condition supports condition-level evaluation and does not support clean replicate-level causal inference. At M8 closure, raw attempts were not yet established to be valid nucleotide sequences. M9A later recorded that accounting. No duplicate removal, exact training-set-match analysis, leakage analysis, biological-quality assessment, structure analysis, clustering, representation-space analysis, or functional evaluation was performed in M8. M7 guardrail samples were not included. Seed 43 attempt 1 remains the consumed `runtime_identity` environment failure, not a model failure. Guardrails establish generation and runtime sanity only. Shared GPU use on the seed-44 block-B arm may affect runtime and resource contention; its generated bytes and provenance remain sealed.
 
 **Current status: COMPLETE for raw generation and assembly. Four-condition evaluation is required and is not authorised by this closure.**
 
@@ -1819,7 +1820,7 @@ Only two fine-tuning seeds were used, because of time and GPU constraints. Evalu
 
 ---
 
-The unversioned file `docs/aptarank_full_mres_thesis_evaluation_plan.md` remains the immutable v3.2 governing artifact for completed M9A. Its SHA-256 is `fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` is the active plan for M9B onward.
+The unversioned file `docs/aptarank_full_mres_thesis_evaluation_plan.md` remains the immutable v3.2 governing artifact for completed M9A. Its SHA-256 is `fc6963f01f7d4ab311774865bda15626facdb753ffa0db06b01b338d88162b51`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` remains the M9C-frozen plan, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md` remains the governing plan under which M10 ran. Its SHA-256 is `1f3a73bc294a75c527e11f074c6d3265786c8e7e70d41eacf3ea83d3cf512941`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_5.md` is the active plan for the remaining AptaRank evaluation.
 
 ### M9A — RNAGenesis generator freeze
 
@@ -1867,7 +1868,7 @@ Prepare the full thesis evaluation workflow without overlap, leakage, REF, EVAL,
 - manual-run checklists and provenance records;
 - synthetic examples of the full thesis evaluation workflow.
 
-Laura will later operate AptaRank manually through its UI. That execution is M10, after the M9C unlock. The expected workflow is:
+Laura will later operate AptaRank manually through its UI. That execution is the later thesis-evaluation workflow, after M10, and it is not M10. M9B remains completed frozen groundwork for that later workflow. Manual AptaRank production approval belongs to that later workflow. The expected workflow is:
 
 1. upload the frozen reference file;
 2. upload the sequence file;
@@ -1898,7 +1899,7 @@ M9B is complete when the synthetic preparation above is frozen. M9B completion d
 
 ### M9C — Controlled calibration and end-to-end preflight
 
-**Status: `M9C_COMPLETE_EVAL_UNLOCKED`.** The independent review passed. M9 and M9C are complete. EVAL is unlocked. The closure is `results/fine_tuning/m9_generator_evaluation/m9c_closure/`. `scientific_result` is false. `eval_opened` is false and `m10_started` is false. `m10_execution_authorized` is false. M10 execution still requires separate user authorization. This record did not open EVAL.
+**Status: `M9C_COMPLETE_EVAL_UNLOCKED`.** The independent review passed. M9 and M9C are complete. EVAL is unlocked. The closure is `results/fine_tuning/m9_generator_evaluation/m9c_closure/`. `scientific_result` is false. `eval_opened` is false and `m10_started` is false. `m10_execution_authorized` is false. M10 execution still requires separate user authorization. This record did not open EVAL. Those flags are historical properties of this M9C record, not the current project status.
 
 M9C begins with separately authorized REF-only work, before EVAL is opened:
 
@@ -1911,39 +1912,33 @@ M9C begins with separately authorized REF-only work, before EVAL is opened:
 
 AptaRank performs its own empirical REF calibration internally. Independent REF calculations stay descriptive. The actual Tier-2 bank identity and realized count are recorded only after the deployed M9C verification.
 
-**Reference-upload policy — corrected 13 October 2026, schema `m9c-reference-upload-v3`.** Contract `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `34912929e77a0a835a01e36ba0291160b49b60dcdfb12a2d2aeb57090c794d02`. The previous contract is SHA-256 `980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e`, schema `m9c-reference-upload-v2`. The user-observed live UI on 13 October 2026 requires the reference-library header `id,sequence,target_name,target_pdb_id`. The retained first identity maps `id` from `scientific_identity_id`, `sequence` from `sequence_core`, `target_name` from `canonical_target_name`, and `target_pdb_id` from `pdb_id`. IDs are unique and nonempty, sequences are unique and canonical, and target names are nonempty. The PDB column is required, and a blank value is preserved when the source has no PDB. `source_reference`, `publication`, and any additional column are refused. The one-column attempt-2 file was rejected before Run as candidate-like. AptaRank did not accept or calibrate the library and did not score anything. At the time of this policy correction, no accepted count, dropped count, or control-bank fact had been observed. Candidate input accepts a CSV with `sequence` and an optional `id`, plain text, or FASTA, and candidate sequences must be 20–100 nt. The UI accepts `T` as `U`. The MRes policy still provides canonical uppercase A/C/G/U and does not rely on that conversion. Walk the frozen 131-row REF CSV in its existing order and upload one row per distinct canonical `sequence_core`, in first-occurrence order, copying the four mapped fields from the first identity without normalization or rewriting. A private project-only ledger records a deterministic 1-based `upload_row_number` and every contributing source identity, without sequence text, and is not an AptaRank input. Frozen M9B artifacts stay historical evidence, superseded for this reference upload by the live UI observation. Those M9B results are not rewritten, and candidate/export behavior is unchanged. The first publication attempt opened and verified REF, then stopped because the obsolete five-column contract required `publication`. No output was published and AptaRank was not run. The 18 later identity rows are duplicate-core collapses, not biological or quality exclusions. The expected AptaRank UI result is 113 accepted and zero dropped. That expectation was not yet an observed UI count when this policy was frozen. Sealed REF preparation that does not match the frozen identity stops M9C. A malformed schema, noncanonical core, conflicting row count, duplicate identity, missing scientific identity, missing target name, or digest mismatch fails closed. No other exclusion, normalization, T-to-U conversion, length filter, or replacement is permitted. AptaRank performs the single pooled empirical REF calibration. Local calibration is not implemented. The sealed locator remains authorized for the verified 211,993-byte REF file. `prepare_sealed_reference` has not been invoked. The corrected publication destination is `/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3`. A generated manifest records `publication_attempt` 3 and status `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`. The attempt-2 directory, other `results/` paths, every `data/` destination, symlinks, and any existing destination, including an empty directory, stay refused. `publish_sealed_reference_preparation` preflights the contract and that destination before opening REF, writes the upload, provenance ledger, and manifest to a temporary sibling, rereads those bytes, and publishes the directory with one atomic rename. This correction itself did not invoke publication and did not create the attempt-3 directory. The frozen target mapping records structure-file digest `2e185a205c9be0bf76484e8ffb96ae225880723ed68eaaf25dffbbccaf01ff51`, selection-record digest `08f0c96af349ce4909d40c3004804317661777f72828cd807823341e0e4f0d04`, and, separately, AptaRank target-upload digest `46471bb0643125ce86300ec050d6f0d3a09faa1d06dc325141c67cd1acdd5922`. This policy correction does not complete M9C and does not unlock EVAL.
+**Reference-upload policy — corrected 13 October 2026, schema `m9c-reference-upload-v3`.** Contract `config/modelling/aptarank_reference_upload_contract.json`, SHA-256 `34912929e77a0a835a01e36ba0291160b49b60dcdfb12a2d2aeb57090c794d02`. The previous contract is SHA-256 `980e7d1b9ce8a8c4c86a88dc99df280f05485b7c4fb2fdfd600fdea7a0665f9e`, schema `m9c-reference-upload-v2`. The user-observed live UI on 13 October 2026 requires the reference-library header `id,sequence,target_name,target_pdb_id`. The retained first identity maps `id` from `scientific_identity_id`, `sequence` from `sequence_core`, `target_name` from `canonical_target_name`, and `target_pdb_id` from `pdb_id`. IDs are unique and nonempty, sequences are unique and canonical, and target names are nonempty. The PDB column is required, and a blank value is preserved when the source has no PDB. `source_reference`, `publication`, and any additional column are refused. The one-column attempt-2 file was rejected before Run as candidate-like. AptaRank did not accept or calibrate the library and did not score anything. At the time of this policy correction, no accepted count, dropped count, or control-bank fact had been observed. Candidate input accepts a CSV with `sequence` and an optional `id`, plain text, or FASTA, and candidate sequences must be 20–100 nt. The UI accepts `T` as `U`. The MRes policy still provides canonical uppercase A/C/G/U and does not rely on that conversion. Walk the frozen 131-row REF CSV in its existing order and upload one row per distinct canonical `sequence_core`, in first-occurrence order, copying the four mapped fields from the first identity without normalization or rewriting. A private project-only ledger records a deterministic 1-based `upload_row_number` and every contributing source identity, without sequence text, and is not an AptaRank input. Frozen M9B artifacts stay historical evidence, superseded for this reference upload by the live UI observation. Those M9B results are not rewritten, and candidate/export behavior is unchanged. The first publication attempt opened and verified REF, then stopped because the obsolete five-column contract required `publication`. No output was published and AptaRank was not run. The 18 later identity rows are duplicate-core collapses, not biological or quality exclusions. The expected AptaRank UI result is 113 accepted and zero dropped. That expectation was not yet an observed UI count when this policy was frozen. Sealed REF preparation that does not match the frozen identity stops M9C. A malformed schema, noncanonical core, conflicting row count, duplicate identity, missing scientific identity, missing target name, or digest mismatch fails closed. No other exclusion, normalization, T-to-U conversion, length filter, or replacement is permitted. AptaRank performs the single pooled empirical REF calibration. Local calibration is not implemented. The sealed locator remains authorized for the verified 211,993-byte REF file. `prepare_sealed_reference` has not been invoked. The corrected publication destination is `/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3`. A generated manifest records `publication_attempt` 3 and status `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`. The attempt-2 directory, other `results/` paths, every `data/` destination, symlinks, and any existing destination, including an empty directory, stay refused. `publish_sealed_reference_preparation` preflights the contract and that destination before opening REF, writes the upload, provenance ledger, and manifest to a temporary sibling, rereads those bytes, and publishes the directory with one atomic rename. This correction itself did not invoke publication and did not create the attempt-3 directory. The frozen target mapping records structure-file digest `2e185a205c9be0bf76484e8ffb96ae225880723ed68eaaf25dffbbccaf01ff51`, selection-record digest `08f0c96af349ce4909d40c3004804317661777f72828cd807823341e0e4f0d04`, and, separately, AptaRank target-upload digest `46471bb0643125ce86300ec050d6f0d3a09faa1d06dc325141c67cd1acdd5922`. This policy correction, by itself, did not complete M9C and did not unlock EVAL. The later 13 October 2026 closure did complete M9C and did unlock EVAL without opening it.
 
-**Preserved attempt 2 — 13 October 2026.** Attempt 1 failed before publication under the obsolete five-column assumption. Attempt 2 published the one-column upload once, and the live UI then rejected that file before Run as candidate-like. The directory `/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation` is preserved superseded evidence and is not overwritten. The source REF SHA-256 is `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`, with 131 source identity rows, 113 distinct sequence cores, and 18 duplicate-core collapses. `reference_upload.csv` is 6281 bytes, SHA-256 `4959bccf1e8ef535857ea451ceb83795ce09c2e6ad79a6ae10411d976d760f08`. `duplicate_provenance.jsonl` is 29214 bytes, SHA-256 `ff3d7986029aeaf52f1ebfdceceba3d94d7136ca7d457c93f62398d01235a841`. `preparation_manifest.json` is 694 bytes, SHA-256 `00c9479f5609cbe6f4bcc9388d1a2d9af74d46860333b680f6466384126e3b63`. Its status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN` and `publication_attempt` is 2. AptaRank did not accept, calibrate, or score that library. For that rejected file, the observed UI accepted and dropped counts remain null, and it produced no control-bank fact. The earlier review archive SHA-256 is `4da503a1b4b9162da19f1c0862b285ae1e972e4d8c2f8196f38b2563b1d7cf57`. The evidence note is `results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation/README.md`. M9C is not complete. EVAL remains locked.
+**Preserved attempt 2 — 13 October 2026.** Attempt 1 failed before publication under the obsolete five-column assumption. Attempt 2 published the one-column upload once, and the live UI then rejected that file before Run as candidate-like. The directory `/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation` is preserved superseded evidence and is not overwritten. The source REF SHA-256 is `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`, with 131 source identity rows, 113 distinct sequence cores, and 18 duplicate-core collapses. `reference_upload.csv` is 6281 bytes, SHA-256 `4959bccf1e8ef535857ea451ceb83795ce09c2e6ad79a6ae10411d976d760f08`. `duplicate_provenance.jsonl` is 29214 bytes, SHA-256 `ff3d7986029aeaf52f1ebfdceceba3d94d7136ca7d457c93f62398d01235a841`. `preparation_manifest.json` is 694 bytes, SHA-256 `00c9479f5609cbe6f4bcc9388d1a2d9af74d46860333b680f6466384126e3b63`. Its status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN` and `publication_attempt` is 2. AptaRank did not accept, calibrate, or score that library. For that rejected file, the observed UI accepted and dropped counts remain null, and it produced no control-bank fact. The earlier review archive SHA-256 is `4da503a1b4b9162da19f1c0862b285ae1e972e4d8c2f8196f38b2563b1d7cf57`. The evidence note is `results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation/README.md`. At the time attempt 2 was preserved, M9C was not yet complete and EVAL was still locked. The 13 October 2026 closure superseded that state: M9B and M9C are complete, EVAL is unlocked and unopened, and the generator-evaluation ViennaRNA pin is the recorded `RNA.fold(sequence)` call in ViennaRNA 2.7.0, distinct from AptaRank ViennaRNA 2.7.2.
 
 **Published attempt 3 — 13 October 2026.** The directory `results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3` is the published four-column preparation. Its manifest is unchanged: schema `m9c-reference-upload-v3`, status `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN`, `publication_attempt` 3. `reference_upload.csv` is 17302 bytes, SHA-256 `5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6`. `duplicate_provenance.jsonl` is 29214 bytes, SHA-256 `ff3d7986029aeaf52f1ebfdceceba3d94d7136ca7d457c93f62398d01235a841`. `preparation_manifest.json` is 694 bytes, SHA-256 `abaf33fa7dcebb853a8d3ce5c95f83139201fbbeed5c1a1269a1b8bbb1e382b7`. The live UI accepted 113 reference aptamers and dropped 0. The note is `results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3/README.md`.
 
 **Development-run validation — 13 October 2026.** Job `job_20261013T032514_0a356a` used only AptaRank's downloaded example candidates. Candidate input SHA-256 `6db3dae7b68afb4c171301a9a53b53e24df04940cdb82a375c6d23bbffba1b02`, with accounting 199 submitted, 199 returned, and 0 omitted. The seven-column export returned every example candidate once. Example-candidate scores, the compatibility distribution, the top candidate, the correlation, and any biological narrative are not scientific MRes results and are not copied here. The sequence-free record is `results/fine_tuning/m9_generator_evaluation/m9c_live_deployment_validation/`. `publication_eligible` is false because no AptaRank provenance sidecar accompanied the REF upload. That implementation flag does not block M9C, because REF provenance is independently frozen in the project. No sidecar was added. EVAL and production candidates remained unopened. This development-run record did not itself complete M9C.
 
-**Closure — 13 October 2026.** The independent review passed. External REF component-distribution calculations are not required for the M9C gate. AptaRank performs its own internal REF calibration. The recorded accounting, 131 source identities, 113 distinct cores, 18 duplicate-core collapses, and 65 short / 48 long, is sufficient. Commit `2dd04204e0888263f18b3e6431e69b9b0de5113b` stays unexecuted and non-gating. Attempt 3 is the frozen evaluation input: upload SHA-256 `5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6`, 113 accepted and 0 dropped, source REF SHA-256 `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`. The 20 candidate shuffles stay distinct from the 5,085-member REF-derived compatibility bank, which is identified by its construction record and realized count. No bank ID or content hash is exposed or claimed. The ushuffle version remains unknown. The generator pin is the existing `RNA.fold(sequence)` call in ViennaRNA 2.7.0, with no model detail set by the code. That pin is distinct from AptaRank ViennaRNA 2.7.2. v3.3 is unchanged. The sequence-free record is `results/fine_tuning/m9_generator_evaluation/m9c_closure/`. The independent review archive SHA-256 is `4c2e174f53aaa4da388debb1362c3d0b8f180c4791a1d96305c20d1a53d592c5`. M9 and M9C are complete. EVAL is unlocked. `eval_opened` is false and `m10_started` is false. `m10_execution_authorized` is false. M10 execution still requires separate user authorization. This record did not open EVAL.
+**Closure — 13 October 2026.** The independent review passed. External REF component-distribution calculations are not required for the M9C gate. AptaRank performs its own internal REF calibration. The recorded accounting, 131 source identities, 113 distinct cores, 18 duplicate-core collapses, and 65 short / 48 long, is sufficient. Commit `2dd04204e0888263f18b3e6431e69b9b0de5113b` stays unexecuted and non-gating. Attempt 3 is the frozen evaluation input: upload SHA-256 `5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6`, 113 accepted and 0 dropped, source REF SHA-256 `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`. The 20 candidate shuffles stay distinct from the 5,085-member REF-derived compatibility bank, which is identified by its construction record and realized count. No bank ID or content hash is exposed or claimed. The ushuffle version remains unknown. The generator pin is the existing `RNA.fold(sequence)` call in ViennaRNA 2.7.0, with no model detail set by the code. That pin is distinct from AptaRank ViennaRNA 2.7.2. v3.3 is unchanged. The sequence-free record is `results/fine_tuning/m9_generator_evaluation/m9c_closure/`. The independent review archive SHA-256 is `4c2e174f53aaa4da388debb1362c3d0b8f180c4791a1d96305c20d1a53d592c5`. M9 and M9C are complete. EVAL is unlocked. `eval_opened` is false and `m10_started` is false. `m10_execution_authorized` is false. M10 execution still requires separate user authorization. This record did not open EVAL. Those flags are historical properties of this M9C record, not the current project status.
 
 M9C is complete and EVAL is unlocked for a separately authorized M10 execution. This record does not itself authorize or begin M10.
 
 ---
 
-### M10 — Final EVAL assessment
+### M10 — Frozen four-condition generator-level EVAL
 
-**Objective**  
-Perform the final held-out assessment once.
+**Status: scientifically complete and reviewed — 19 October 2026.** The published production state remains `M10_SECTION5_PUBLISHED`. The corrected authorized production invocation published `results/fine_tuning/m10_generator_evaluation/m10_section5_production_v1/`. The sequence-free report status is `section5_calculation_complete`. EVAL was opened once, `eval_read_count` is 1, and the frozen EVAL SHA-256 matched. The reviewed interpretation is [M10 generator evaluation results](m10_generator_evaluation_results.md). The 17 October 2026 documentation revision remains the milestone boundary and the Section 5 scientific contract in `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md`. The failed production attempt and the protected EVAL adapter correction remain historical records in `docs/log.md`. The executable metric specification remains frozen and production-ready. The specification's six former blockers remain resolved dispositions: clustering, representation analysis, and confidence intervals, bootstrap, hypothesis tests, and EVAL-cluster resampling are outside M10; TRAIN loading is resolved through the frozen M9A summaries, and this run did not reopen TRAIN; structure execution and matched-block wiring ran in the published production. The three closeness metrics used production reference role `authorized_eval_unique_cores`. The specification remains frozen at the top level, on every metric row, and on the contract, with no unresolved blocking item. The frozen S6 parameter-record hash and the S7B, S7C, and S7D configuration hashes were checked before EVAL access. Absent `bimodality.json` stays a provenance limitation. The broad code inventory is captured, and metric-calculation revisions stay validated through the specification. AptaRank was not run. v3.4 remains the governing plan for this completed M10 run. v3.5 is the active plan for the remaining AptaRank evaluation. M10 is scientifically complete and reviewed. AptaRank is the next stage and remains unauthorized for manual production.
 
-**Input**
+**Scope.** M10 consists only of Section 5 of v3.4: the four-condition B0/B1/B2/D1 generator-level EVAL. B1 versus D1 remains the primary comparison. B2 remains the secondary non-neural data-scale comparator. B0 remains the external, length-aware comparator. M10 uses server CPU execution after explicit EVAL authorization. It is not a GPU job and it does not run AptaRank.
 
-```text
-EVAL
-```
+**Scientific contract.** The three separate headline closeness metrics are nearest-EVAL longer-length-normalized edit distance, nucleotide total variation to EVAL, and dinucleotide total variation to EVAL. M10 forms no aggregate generator-quality score. Diversity is exact-duplicate diversity only. Clustering, representation analysis, generator confidence intervals, bootstrap, hypothesis tests, and EVAL-cluster resampling are outside M10. Report D1 seeds 43 and 44 and matched blocks A and B separately, plus observed ranges only. The 154 unique EVAL cores are weighted once each. The 79 clusters are a design fact and a limitation and do not weight formulas. TRAIN-overlap and nearest-TRAIN results are the frozen M9A outputs, and M10 does not reopen TRAIN. The thesis-facing parsed count is `successfully_parsed_outputs`. Legacy `parsed_outputs` is an internal/schema-valid-record audit field. The same pinned generator-evaluation fold, ViennaRNA 2.7.0 as recorded in the frozen generator pin and distinct from AptaRank's ViennaRNA 2.7.2, folds each distinct valid generated sequence once. Generated condition, seed, and block quantiles use valid attempt rows with duplicate-attempt weighting. The 154 unique EVAL cores are folded once each. The reported structure descriptors are MFE per nucleotide and paired fraction, including length strata and per-D1-seed results. M10 creates no structure-distance metric.
 
-Use EVAL to assess the already frozen:
+**Outside M10.** AptaRank Tier 1 EVAL, illustrative Tier 2 EVAL, generated-candidate Tier 1 and Tier 2, the NDM-1 review, and the final decision record remain required work in v3.5, the active plan for the remaining AptaRank evaluation. v3.4 remains the M10 governing plan. They are explicitly outside M10. M9B and M9C remain completed groundwork for that later AptaRank workflow. M10 authorization and M10 closure belong to the generator evaluation. Manual AptaRank production approval belongs to the later thesis-evaluation workflow. AptaRank production is not yet authorized.
 
-- D1 generator;
-- B1/B0/B2 comparisons where appropriate;
-- AptaRank;
-- final ranking pipeline.
+**EVAL opening.** EVAL was opened once, at authorized M10 execution. Subsequent AptaRank analysis is analysis of that already-opened held-out set. It is not a second fresh held-out opening.
 
-After seeing EVAL:
+After EVAL has been opened:
 
 - do not retrain RNAGenesis;
 - do not recalibrate AptaRank;
@@ -1952,16 +1947,21 @@ After seeing EVAL:
 
 If final results are weaker than expected, report them.
 
+**Completion.** The frozen Section 5 generator outputs, the metric specification, the design-aware interpretation, and the provenance are published. The reviewed sequence-free interpretation is `docs/m10_generator_evaluation_results.md`. The protected derived evidence remains mode `0600`, SHA-256 `9ba39df6e9c24196d35958613f373f92bac6bf720acde6a07e3880d9d6dc42ee`, and this documentation stage did not reopen it. AptaRank production results remain outside M10 and were not produced.
+
 ---
 
 ## 17. Generator evaluation metrics
+
+M10 uses Section 5 of `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md`. The catalogue below is that M10 contract. Clustering, structural diversity, ensemble metrics, and representation metrics are outside M10. M10 forms no aggregate generator-quality score and reports no generator confidence interval.
 
 ### 17.1 Output accounting
 
 For every condition report separately:
 
 - raw attempted sequences;
-- successfully parsed outputs;
+- `successfully_parsed_outputs`, the thesis-facing parsed count;
+- legacy `parsed_outputs`, only as the labelled internal/schema-valid-record audit field;
 - valid A/C/G/U outputs;
 - unique valid outputs;
 - duplicate outputs;
@@ -1976,53 +1976,36 @@ Never silently discard invalid or duplicate generations before calculating their
 - A/U/C/G fractions;
 - GC fraction;
 - mono-/dinucleotide frequencies;
-- exact TRAIN overlap;
-- normalized edit distance to nearest TRAIN sequence;
-- maximum identity to nearest TRAIN sequence;
-- sequence clustering at the frozen/project-specified identity threshold;
-- cluster count;
-- singleton fraction;
-- largest-cluster share;
-- Shannon diversity;
-- effective cluster count.
+- exact TRAIN overlap, cited from the frozen M9A output;
+- nearest-TRAIN normalized edit distance, cited from the frozen M9A output;
+- maximum edit similarity to TRAIN, cited from that same frozen output.
 
-### 17.3 Structure/thermodynamic metrics
+### 17.3 Structure descriptors
 
-Use pinned ViennaRNA.
+Use the pinned generator-evaluation fold, `RNA.fold(sequence)` in ViennaRNA 2.7.0, distinct from AptaRank's ViennaRNA 2.7.2. The pin is the frozen generator record. Fold each distinct valid generated sequence once. Generated condition, seed, and block quantiles use valid attempt rows with duplicate-attempt weighting. Fold each of the 154 unique EVAL cores once.
 
-Include:
+Report descriptively:
 
-- MFE;
-- MFE/nt;
+- MFE per nucleotide;
 - paired fraction;
-- selected length-aware secondary-structure descriptors;
-- structural diversity;
-- optional ensemble/conformational metrics only where their interpretation is scientifically valid.
+- length strata;
+- per-D1-seed results.
 
-A more negative MFE is not inherently better.
+M10 creates no structure-distance metric. A more negative MFE is not inherently better. Interpret these descriptors as distributional properties, not as evidence of protein binding.
 
-Interpret structural metrics as distributional/plausibility properties, not direct evidence of protein binding.
+### 17.4 Headline EVAL closeness
 
-### 17.4 Representation-space metrics
+Report these three metrics separately:
 
-Using a frozen representation model only:
+- nearest-EVAL longer-length-normalized edit distance;
+- nucleotide total variation to EVAL;
+- dinucleotide total variation to EVAL.
 
-- embedding MMD between generated conditions and VALIDATION/EVAL as permitted by stage;
-- optional nearest-neighbour/coverage diagnostics.
+Weight each of the 154 unique EVAL cores once. Report the 79 clusters as a design fact and a limitation. They do not weight the formulas.
 
-Do not train a representation model on EVAL.
+### 17.5 Reporting
 
-### 17.5 Statistical reporting
-
-Prefer:
-
-- full distributions;
-- effect sizes;
-- seed-level summaries;
-- confidence intervals respecting generation/training seed structure;
-- length stratification where relevant.
-
-Avoid relying on tiny p-values produced only by having tens of thousands of generated sequences.
+Report D1 seed 43, D1 seed 44, matched block A, and matched block B separately, plus observed ranges only. Include length stratification where the metric requires it. M10 reports no generator confidence interval, bootstrap, hypothesis test, or EVAL-cluster resampling. Do not treat tens of thousands of generated rows as independent training replicates.
 
 ---
 
@@ -2056,10 +2039,10 @@ REF enters only at M9C, after the M9A generator freeze, for AptaRank's internal 
 Uses:
 
 ```text
-EVAL only after M9C freeze
+EVAL, unlocked by completed M9C and opened only at authorized M10
 ```
 
-This yields the final held-out estimate of the generator/ranking pipeline selected without EVAL access.
+M9C unlocked EVAL. The published M10 Section 5 run opened that held-out set once on 19 October 2026. It is the Section 5 generator-level evaluation on server CPU. The reviewed result is [M10 generator evaluation results](m10_generator_evaluation_results.md). Later AptaRank analysis uses the already-opened set and is outside M10. This is the held-out generator estimate. It is not a second claim of fresh EVAL.
 
 ---
 
@@ -2099,14 +2082,16 @@ This yields the final held-out estimate of the generator/ranking pipeline select
 - memorisation/diversity analysis;
 - final generator freeze;
 - M9C REF-only AptaRank internal calibration;
-- EVAL-only final assessment.
+- M10 generator-level EVAL on the four frozen conditions.
+
+The remaining AptaRank Tier 1, illustrative Tier 2, generated-candidate Tier 1 and Tier 2, NDM-1 review, and final decision record stay required thesis-evaluation work. v3.5 is the active plan for that remaining AptaRank evaluation, and v3.4 remains the governing plan for completed M10. They are outside M10. AptaRank is the next stage and remains unauthorized for manual production.
 
 ### 20.2 Useful only if time remains and already supported by the core analysis
 
 - limited legacy reproduction of RNAGenesis aptamer metrics;
-- dinucleotide-preserving shuffled structural-control baseline;
-- additional representation-space visualisation;
-- richer uncertainty/bootstrap analysis.
+- dinucleotide-preserving shuffled structural-control baseline.
+
+Additional representation-space visualisation and generator bootstrap or confidence-interval analysis are outside M10.
 
 These must not delay the essential experiment.
 
@@ -2146,10 +2131,12 @@ The MRes RNAGenesis modelling implementation is complete when:
 13. selected D1 checkpoints are chosen using VALIDATION only;14. B1/B2/D1 development comparisons use VALIDATION rather than REF;
 15. RNAGenesis is frozen in completed M9A before REF is used for AptaRank;
 16. AptaRank's internal calibration uses REF only, and that use begins at M9C;
-17. EVAL is unlocked only after the complete pipeline freeze;
+17. M9C unlocked EVAL, and the authorized M10 Section 5 run opened it once on 19 October 2026 and published the reviewed result;
 18. every thesis result is reproducible from committed code/configuration plus recorded input/model hashes;
 19. terminology in Section 4 is used consistently in methods, results and discussion;
 20. claims remain limited to unconditional aptamer-domain adaptation and downstream computational prioritisation rather than target-specific binding.
+
+M10 completion is separate from that modelling-implementation list. M10 is complete only when the frozen Section 5 generator outputs, metric specification, design-aware interpretation, provenance, and reviewed derived results exist. Those Section 5 artifacts are published as of 19 October 2026, and M10 is scientifically complete and reviewed. The reviewed sequence-free interpretation is `docs/m10_generator_evaluation_results.md`. AptaRank production results are not M10 completion criteria. AptaRank is the next stage under v3.5 and remains unauthorized for manual production.
 
 ---
 
@@ -2161,7 +2148,10 @@ Proceed in this order:
 
 1. The M7 human gate is closed by the 8 October 2026 record. No further M7 execution is authorised. M7 completion is that human closure. Sealed M7 manifest bytes remain unchanged, including `m8_generation_performed: false`. The candidate-guardrail and final-selection documents are inactive. `D1_final_replicates.yaml` remains historical M7 state, including the live seed-44 authorisation, and is not M8 authority.
 2. M8 generation and assembly are complete. The inactive configuration has empty authorisation lists and every execution flag false. The B1 and D1 combined ledgers are the handoff inputs named in section 8 of [M8 raw generation](fine_tuning/m8_raw_generation.md). Sealed M8 manifests are not rewritten.
-3. M9A is complete. M9B is complete at `f7aba126170fce7c6da8cf7653ee282402b2f0e4`. The unversioned v3.2 evaluation plan remains the immutable governing artifact for M9A. v3.3 remains the byte-stable active plan for M9B onward and is not rewritten by this M9C closure. The independent review passed. M9 and M9C are complete, and EVAL is unlocked. The closure is `results/fine_tuning/m9_generator_evaluation/m9c_closure/`. Attempt 3 is the frozen evaluation input: upload SHA-256 `5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6`, 113 accepted and 0 dropped, source REF SHA-256 `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`. External REF component-distribution calculations are not required for the gate. `eval_opened` is false and `m10_started` is false. `m10_execution_authorized` is false. M10 execution still requires separate user authorization. This record did not open EVAL.
+3. M9A is complete. M9B is complete at `f7aba126170fce7c6da8cf7653ee282402b2f0e4`. The unversioned v3.2 evaluation plan remains the immutable governing artifact for M9A. v3.3 remains the byte-stable M9C-frozen plan, SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`, and this revision does not rewrite it. The independent review passed. M9 and M9C are complete, and EVAL is unlocked. The closure is `results/fine_tuning/m9_generator_evaluation/m9c_closure/`. Attempt 3 is the frozen evaluation input: upload SHA-256 `5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6`, 113 accepted and 0 dropped, source REF SHA-256 `531dd98ff5887e349b2f0e16db463c3b60b51f5f02f912cf099a1a5eb2debf23`. External REF component-distribution calculations are not required for the gate. The generator-evaluation ViennaRNA pin is complete: `RNA.fold(sequence)` in ViennaRNA 2.7.0, distinct from AptaRank ViennaRNA 2.7.2. At M9C closure, `eval_opened` was false, `m10_started` was false, and `m10_execution_authorized` was false. That M9C record did not open EVAL. The later published M10 run is item 5.
+4. On 17 October 2026 the active plan became `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md`. The historical 17 October 2026 v3.4 SHA-256 is `33a3ff4dfd4d0107903320a0176d94dc029ff1f39fec73533b1d4d074d78a020`. M10 is only the Section 5 four-condition generator-level EVAL on server CPU after explicit EVAL authorization. AptaRank Tier 1, illustrative Tier 2, generated-candidate Tier 1 and Tier 2, the NDM-1 review, and the final decision record remained required in v3.4 and outside M10. M9B and M9C remain completed groundwork for that later workflow. The ledger adapter, single-read EVAL adapter, matched schedule, structure wrapper and distinct-sequence cache, and production writer were implemented and synthetically verified. At that pre-production stage they had not yet run biologically. On 19 October 2026 the executable metric specification `config/modelling/generator_eval_metric_spec.json` was frozen with `freeze_status` `frozen` and is production-ready. The historical metric-specification SHA-256 at that freeze, before this documentation-consistency correction, is `c999f0a4352b7fde7dfa0431583020b054b02da8803aeb7839479584de256066`. The historical finalized v3.4 SHA-256 immediately before this correction is `bc782488568b936d5c2facb278cb9be6b1fcc92087fd1adfd69b9dfc7acf9949`. The current finalized v3.4 SHA-256 is `1f3a73bc294a75c527e11f074c6d3265786c8e7e70d41eacf3ea83d3cf512941`. The current metric-specification SHA-256 is `2b0679b999235cc838298563448b01ef73f5fdd5132c5ddd3d9944f301f5c824`. As of that documentation correction, M10 execution remained unauthorized and that correction did not open EVAL.
+5. On 19 October 2026 the corrected Section 5 production invocation published `results/fine_tuning/m10_generator_evaluation/m10_section5_production_v1/`. Report status is `section5_calculation_complete`. EVAL was opened once. The reviewed interpretation is [M10 generator evaluation results](m10_generator_evaluation_results.md). The failed attempt and the adapter correction in `docs/log.md` remain historical records. AptaRank remains outside M10 and was not run.
+6. On 19 October 2026, after that reviewed Section 5 result, `docs/aptarank_full_mres_thesis_evaluation_plan_v3_5.md` became the active plan for the remaining AptaRank evaluation. v3.4 remains the governing plan under which M10 ran, SHA-256 `1f3a73bc294a75c527e11f074c6d3265786c8e7e70d41eacf3ea83d3cf512941`. M10 is scientifically complete and reviewed. AptaRank, beginning with REF-calibrated Tier 1 EVAL, is the next stage and remains unauthorized for manual production.
 
 ---
 

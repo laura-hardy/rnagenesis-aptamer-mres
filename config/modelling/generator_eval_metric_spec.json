@@ -1,13 +1,20 @@
 {
   "schema_version": "generator-eval-metric-spec-gep2-draft-r4",
   "package_id": "GEP-2",
-  "freeze_status": "draft",
+  "freeze_status": "frozen",
   "aggregate_generator_quality_score": false,
   "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md",
+    "sha256": "1f3a73bc294a75c527e11f074c6d3265786c8e7e70d41eacf3ea83d3cf512941",
+    "version": "3.4",
+    "revision_date": "17 October 2026"
+  },
+  "historical_m9c_plan": {
     "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md",
     "sha256": "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe",
     "version": "3.3",
-    "revision_date": "12 October 2026"
+    "revision_date": "12 October 2026",
+    "role": "m9c_frozen_historical"
   },
   "field_schema": [
     "metric_id",
@@ -67,18 +74,18 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
     {
       "metric_id": "parsed_outputs",
-      "display_name": "Parsed outputs",
+      "display_name": "Parsed outputs (internal audit field)",
       "implementation_symbol": "m4_diagnostic_metrics.validate_attempt_record",
       "data_source": "generation attempt ledger",
       "reference_role": "none",
       "scientific_role": "accounting",
-      "calculation_summary": "Count of attempts for which raw_decoded_text is nonempty, or cleaned_sequence is nonempty, or raw_length is 0. A schema-valid ledger has raw_length equal to the length of raw_decoded_text, so this predicate is true for every accepted row, including empty unparseable text. It is not a successful-parse count.",
+      "calculation_summary": "Count of attempts for which raw_decoded_text is nonempty, or cleaned_sequence is nonempty, or raw_length is 0. A schema-valid ledger has raw_length equal to the length of raw_decoded_text, so this predicate is true for every accepted row, including empty unparseable text. It is not a successful-parse count. It is retained only as an explicitly labelled internal/schema-valid-record audit field. successfully_parsed_outputs is the thesis-facing parsed count.",
       "numerator": "ledger rows meeting that predicate",
       "denominator_and_filters": "Not a ratio. Schema-invalid rows are rejected rather than counted as unparsed.",
       "units": "count",
@@ -94,7 +101,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -121,7 +128,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -148,7 +155,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -175,7 +182,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -202,7 +209,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -230,7 +237,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit."
     },
     {
@@ -256,7 +263,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -283,7 +290,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -310,7 +317,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -337,7 +344,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -364,7 +371,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -391,7 +398,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -418,7 +425,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -445,7 +452,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -472,7 +479,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -503,7 +510,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -534,7 +541,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -565,7 +572,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -596,7 +603,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -627,7 +634,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -654,7 +661,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -681,7 +688,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast.",
       "novelty_direction_only": true
@@ -709,7 +716,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast.",
       "novelty_direction_only": true
@@ -737,7 +744,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -764,7 +771,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -791,7 +798,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -802,7 +809,7 @@
       "data_source": "caller-supplied fold of each distinct valid sequence, repeated on valid rows",
       "reference_role": "none",
       "scientific_role": "descriptor",
-      "calculation_summary": "Quantiles of float(mfe) divided by the sequence length. mfe_per_nt remains the generator metric. It is not the AptaRank normalized-MFE component. mfe_per_nucleotide is not a second metric. More negative MFE per nucleotide is not a selection score. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production folding is the existing RNA.fold(sequence) call in ViennaRNA 2.7.0. The code sets no model detail. The observed defaults are pinned in viennarna_production_settings. This package does not change temperature, dangles, salt, or any other folding setting.",
+      "calculation_summary": "Quantiles of float(mfe) divided by the sequence length. mfe_per_nt remains the generator metric. It is not the AptaRank normalized-MFE component. mfe_per_nucleotide is not a second metric. More negative MFE per nucleotide is not a selection score. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production folding is the existing RNA.fold(sequence) call in ViennaRNA 2.7.0. The code sets no model detail. The observed defaults are pinned in viennarna_production_settings. This package does not change temperature, dangles, salt, or any other folding setting. Each distinct valid sequence is folded once. Generated condition, seed, and block quantiles use valid attempt rows with duplicate-attempt weighting. EVAL uses its 154 unique cores once each, including length strata and per-D1-seed results. No structure-distance metric is created. The structure wrapper and distinct-sequence cache are implemented and synthetically verified. Biological folding awaits authorization and is not an active implementation blocker.",
       "numerator": "fold-returned MFE",
       "denominator_and_filters": "Sequence length in nucleotides. Quantiles are over valid rows. Division by zero is not reached because valid sequences are nonempty.",
       "units": "fold-returned MFE float per nucleotide",
@@ -818,7 +825,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -829,7 +836,7 @@
       "data_source": "dot-bracket string returned by the caller-supplied fold",
       "reference_role": "none",
       "scientific_role": "descriptor",
-      "calculation_summary": "Quantiles of (count of '(' plus count of ')') divided by the sequence length. Unpaired positions are not added to the numerator. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production folding is the existing RNA.fold(sequence) call in ViennaRNA 2.7.0. The code sets no model detail. The observed defaults are pinned in viennarna_production_settings. This package does not change temperature, dangles, salt, or any other folding setting.",
+      "calculation_summary": "Quantiles of (count of '(' plus count of ')') divided by the sequence length. Unpaired positions are not added to the numerator. Quantiles use the implemented nearest-rank index int(round(p * (n - 1))) on values sorted ascending. No confidence interval is defined. Production folding is the existing RNA.fold(sequence) call in ViennaRNA 2.7.0. The code sets no model detail. The observed defaults are pinned in viennarna_production_settings. This package does not change temperature, dangles, salt, or any other folding setting. Each distinct valid sequence is folded once. Generated condition, seed, and block quantiles use valid attempt rows with duplicate-attempt weighting. EVAL uses its 154 unique cores once each, including length strata and per-D1-seed results. No structure-distance metric is created. The structure wrapper and distinct-sequence cache are implemented and synthetically verified. Biological folding awaits authorization and is not an active implementation blocker.",
       "numerator": "paired parentheses in the fold structure",
       "denominator_and_filters": "Sequence length. The structure length must equal the sequence length. Quantiles are over valid rows.",
       "units": "fraction",
@@ -845,7 +852,7 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
@@ -872,18 +879,18 @@
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast."
     },
     {
       "metric_id": "successfully_parsed_outputs",
-      "display_name": "Successfully parsed outputs",
+      "display_name": "Successfully parsed outputs (thesis-facing parsed count)",
       "implementation_symbol": "generator_eval_analysis.successfully_parsed_outputs",
       "data_source": "generated attempt records",
       "reference_role": "none",
       "scientific_role": "accounting",
-      "calculation_summary": "Count of nonempty extracted sequences before A/C/G/U filtering. An alphabet-invalid nonempty output is parsed and is not valid. An empty or unparseable output is not successfully parsed. This count is not derived from the legacy M4 parsed predicate, and parsed_outputs is not renamed.",
+      "calculation_summary": "Count of nonempty extracted sequences before A/C/G/U filtering. An alphabet-invalid nonempty output is parsed and is not valid. An empty or unparseable output is not successfully parsed. This count is not derived from the legacy M4 parsed predicate, and parsed_outputs is not renamed. This is the thesis-facing parsed count.",
       "numerator": "generated rows whose extracted sequence is a nonempty string",
       "denominator_and_filters": "Not a ratio. No A/C/G/U filter is applied. Empty and unparseable rows are excluded from this count and remain in raw_attempts.",
       "units": "count",
@@ -893,13 +900,13 @@
       "missing_failure_handling": "Empty or unparseable output counts as not successfully parsed. The count is not derived from the legacy M4 parsed predicate. A missing sequence is not imputed.",
       "code_revision": {
         "path": "scripts/modelling/generator_eval_analysis.py",
-        "sha256": "91b8db184e3999f664e81f6fea845a4fc278f207f8d96fd7f488cdc55de245d2"
+        "sha256": "7063abfeb09aaebf248b415c5e64df61dc4bdfdcafedb18db8658298510b88e5"
       },
       "config_revision": {
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit. GEP-2 reports each actual D1 training seed separately, with counts and denominators per seed. With one D1 training seed the observed range is omitted and uncertainty excludes training-run variability. With two or more D1 training seeds the observed minimum and maximum of the explicit headline allowlist is an observed range, never a confidence interval. Rows, candidates, chunks, invocation indexes, length seeds, and generation seeds are not training replicates. Matched B1/D1 blocks are descriptive controlled blocks, not training replicates and not significance-test units.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast. B0 requested-length exact-hit metrics stay not_applicable. Directional consistency uses only B1 and D1 and is not applied to B0 or B2."
     },
@@ -916,17 +923,17 @@
       "units": "fraction",
       "expected_range": "[0, 1] when defined",
       "direction": "not_applicable",
-      "length_treatment": "Each canonical base contributes equally. When stratification is requested, a stratum uses the same population restricted to an explicit frozen S6 label of short or long. The label is not inferred from sequence length.",
+      "length_treatment": "Each canonical base contributes equally. When stratification is requested, a stratum uses the same population restricted to a frozen S6 label of short or long. Valid generated sequences and authorized EVAL cores are assigned by applying the frozen S6 `gmm_k2_maximum_posterior` rule to S6 `length_of(sequence_core)`, with component 0 short, component 1 long, ties short, no refitting, no requested-generation-length input, and no invented fixed cutoff.",
       "missing_failure_handling": "No canonical bases yields null. Null is not replaced with zero. No GC acceptance window is applied.",
       "code_revision": {
         "path": "scripts/modelling/generator_eval_analysis.py",
-        "sha256": "91b8db184e3999f664e81f6fea845a4fc278f207f8d96fd7f488cdc55de245d2"
+        "sha256": "7063abfeb09aaebf248b415c5e64df61dc4bdfdcafedb18db8658298510b88e5"
       },
       "config_revision": {
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit. GEP-2 reports each actual D1 training seed separately, with counts and denominators per seed. With one D1 training seed the observed range is omitted and uncertainty excludes training-run variability. With two or more D1 training seeds the observed minimum and maximum of the explicit headline allowlist is an observed range, never a confidence interval. Rows, candidates, chunks, invocation indexes, length seeds, and generation seeds are not training replicates. Matched B1/D1 blocks are descriptive controlled blocks, not training replicates and not significance-test units.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast. B0 requested-length exact-hit metrics stay not_applicable. Directional consistency uses only B1 and D1 and is not applied to B0 or B2."
     },
@@ -934,26 +941,26 @@
       "metric_id": "nearest_reference_normalized_edit_distance",
       "display_name": "Nearest-reference normalized edit distance",
       "implementation_symbol": "generator_eval_analysis.nearest_reference_normalized_edit_distance",
-      "data_source": "valid generated rows compared with unique synthetic reference sequences",
-      "reference_role": "synthetic_eval_stand_in",
+      "data_source": "valid generated rows compared with authorized_eval_unique_cores, the 154 frozen unique EVAL cores",
+      "reference_role": "authorized_eval_unique_cores",
       "scientific_role": "closeness",
-      "calculation_summary": "For each valid generated row, the minimum Levenshtein distance to a unique synthetic reference sequence divided by the length of the longer sequence. Duplicates are retained. The existing quantile block is reported and its median is the predeclared headline scalar. Lower means closer. The metric is not combined with the two total-variation metrics. Synthetic-reference-only in this package. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores.",
+      "calculation_summary": "For each valid generated row, the minimum Levenshtein distance to a unique synthetic reference sequence divided by the length of the longer sequence. Duplicates are retained. The existing quantile block is reported and its median is the predeclared headline scalar. Lower means closer. The metric is not combined with the two total-variation metrics. The production reference role is authorized_eval_unique_cores: the 154 frozen unique EVAL cores, each weighted once, available only after authorization and hash verification. The 79 clusters do not weight this formula. Synthetic fixtures may exercise this formula without changing that production reference declaration. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. The single-read EVAL adapter is implemented and synthetically verified and has not run biologically. Runtime EVAL access stays refused until explicit authorization. The M9C unlock does not open EVAL.",
       "numerator": "median of the per-row nearest-reference normalized edit distances",
-      "denominator_and_filters": "Generated side: valid generated rows with duplicates retained, the same population as nucleotide_fractions. Reference side: unique synthetic reference sequences. Reported denominators are the generated valid-row count, the generated unique-valid count, and the reference unique-core count. Invalid generated rows are excluded from the generated side.",
+      "denominator_and_filters": "Generated side: valid generated rows with duplicates retained, the same population as nucleotide_fractions. Reference side: authorized_eval_unique_cores, the 154 unique EVAL cores weighted once. A synthetic fixture may exercise the formula without changing that production reference declaration. Reported denominators are the generated valid-row count, the generated unique-valid count, and the reference unique-core count. Invalid generated rows are excluded from the generated side.",
       "units": "fraction",
       "expected_range": "[0, 1] when defined",
       "direction": "lower",
-      "length_treatment": "Longer-sequence normalization applies to this metric only: Levenshtein distance divided by the length of the longer sequence. Overall values use every valid generated row. When stratification is requested, short and long values use an explicit frozen S6 label of exactly short or long. The stratum is never inferred from sequence length, and no nucleotide cutoff is invented.",
-      "missing_failure_handling": "The caller rejects a malformed, noncanonical, duplicate, or empty synthetic reference before metric calculation. An empty generated population is a metric-level result: the value is null with an explicit undefined reason and is not replaced with zero. These metrics are synthetic-reference-only in this package. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. Runtime role EVAL is refused. The three metrics are never combined or weighted.",
+      "length_treatment": "Longer-sequence normalization applies to this metric only: Levenshtein distance divided by the length of the longer sequence. Overall values use every valid generated row. When stratification is requested, short and long values use a frozen S6 label of exactly short or long. Valid generated sequences and authorized EVAL cores are assigned by applying the frozen S6 `gmm_k2_maximum_posterior` rule to S6 `length_of(sequence_core)`, with component 0 short, component 1 long, ties short, no refitting, no requested-generation-length input, and no invented fixed cutoff.",
+      "missing_failure_handling": "The caller rejects a malformed, noncanonical, duplicate, or empty synthetic reference before metric calculation. An empty generated population is a metric-level result: the value is null with an explicit undefined reason and is not replaced with zero. The production reference role remains authorized_eval_unique_cores. Synthetic fixtures may exercise this formula without changing that production reference declaration. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. Runtime EVAL access is refused until explicit authorization. The three metrics are never combined or weighted.",
       "code_revision": {
         "path": "scripts/modelling/generator_eval_analysis.py",
-        "sha256": "91b8db184e3999f664e81f6fea845a4fc278f207f8d96fd7f488cdc55de245d2"
+        "sha256": "7063abfeb09aaebf248b415c5e64df61dc4bdfdcafedb18db8658298510b88e5"
       },
       "config_revision": {
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit. GEP-2 reports each actual D1 training seed separately, with counts and denominators per seed. With one D1 training seed the observed range is omitted and uncertainty excludes training-run variability. With two or more D1 training seeds the observed minimum and maximum of the explicit headline allowlist is an observed range, never a confidence interval. Rows, candidates, chunks, invocation indexes, length seeds, and generation seeds are not training replicates. Matched B1/D1 blocks are descriptive controlled blocks, not training replicates and not significance-test units.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast. B0 requested-length exact-hit metrics stay not_applicable. Directional consistency uses only B1 and D1 and is not applied to B0 or B2."
     },
@@ -961,26 +968,26 @@
       "metric_id": "nucleotide_total_variation_to_reference",
       "display_name": "Nucleotide total variation to reference",
       "implementation_symbol": "generator_eval_analysis.nucleotide_total_variation_to_reference",
-      "data_source": "valid generated rows compared with unique synthetic reference sequences",
-      "reference_role": "synthetic_eval_stand_in",
+      "data_source": "valid generated rows compared with authorized_eval_unique_cores, the 154 frozen unique EVAL cores",
+      "reference_role": "authorized_eval_unique_cores",
       "scientific_role": "closeness",
-      "calculation_summary": "0.5 * L1 distance between pooled nucleotide fractions of valid generated rows and unique synthetic reference sequences. Duplicate valid rows are retained. Lower means closer. This is not the nested TRAIN total variation and it is not combined with the other closeness metrics. Synthetic-reference-only in this package. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores.",
+      "calculation_summary": "0.5 * L1 distance between pooled nucleotide fractions of valid generated rows and unique synthetic reference sequences. Duplicate valid rows are retained. Lower means closer. This is not the nested TRAIN total variation and it is not combined with the other closeness metrics. The production reference role is authorized_eval_unique_cores: the 154 frozen unique EVAL cores, each weighted once, available only after authorization and hash verification. The 79 clusters do not weight this formula. Synthetic fixtures may exercise this formula without changing that production reference declaration. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. The single-read EVAL adapter is implemented and synthetically verified and has not run biologically. Runtime EVAL access stays refused until explicit authorization. The M9C unlock does not open EVAL.",
       "numerator": "0.5 * L1 nucleotide-fraction distance",
-      "denominator_and_filters": "Generated side: valid generated rows with duplicates retained, the same population as nucleotide_fractions. Reference side: unique synthetic reference sequences. Reported denominators are the generated valid-row count, the generated unique-valid count, and the reference unique-core count. Invalid generated rows are excluded from the generated side.",
+      "denominator_and_filters": "Generated side: valid generated rows with duplicates retained, the same population as nucleotide_fractions. Reference side: authorized_eval_unique_cores, the 154 unique EVAL cores weighted once. A synthetic fixture may exercise the formula without changing that production reference declaration. Reported denominators are the generated valid-row count, the generated unique-valid count, and the reference unique-core count. Invalid generated rows are excluded from the generated side.",
       "units": "fraction",
       "expected_range": "[0, 1] when defined",
       "direction": "lower",
-      "length_treatment": "Pooled base-composition length treatment. Every canonical base in every valid generated row is pooled, and duplicate valid rows are retained. The reference side pools every base of the unique synthetic reference sequences. This total variation is not divided by sequence length. When stratification is requested, short and long values use an explicit frozen S6 label of exactly short or long. The stratum is never inferred from sequence length, and no nucleotide cutoff is invented.",
-      "missing_failure_handling": "The caller rejects a malformed, noncanonical, duplicate, or empty synthetic reference before metric calculation. An empty generated population is a metric-level result: the value is null with an explicit undefined reason and is not replaced with zero. These metrics are synthetic-reference-only in this package. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. Runtime role EVAL is refused. The three metrics are never combined or weighted.",
+      "length_treatment": "Pooled base-composition length treatment. Every canonical base in every valid generated row is pooled, and duplicate valid rows are retained. The reference side pools every base of the unique reference sequences. In production those sequences are the 154 authorized EVAL cores, each once. This total variation is not divided by sequence length. When stratification is requested, short and long values use a frozen S6 label of exactly short or long. Valid generated sequences and authorized EVAL cores are assigned by applying the frozen S6 `gmm_k2_maximum_posterior` rule to S6 `length_of(sequence_core)`, with component 0 short, component 1 long, ties short, no refitting, no requested-generation-length input, and no invented fixed cutoff.",
+      "missing_failure_handling": "The caller rejects a malformed, noncanonical, duplicate, or empty synthetic reference before metric calculation. An empty generated population is a metric-level result: the value is null with an explicit undefined reason and is not replaced with zero. The production reference role remains authorized_eval_unique_cores. Synthetic fixtures may exercise this formula without changing that production reference declaration. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. Runtime EVAL access is refused until explicit authorization. The three metrics are never combined or weighted.",
       "code_revision": {
         "path": "scripts/modelling/generator_eval_analysis.py",
-        "sha256": "91b8db184e3999f664e81f6fea845a4fc278f207f8d96fd7f488cdc55de245d2"
+        "sha256": "7063abfeb09aaebf248b415c5e64df61dc4bdfdcafedb18db8658298510b88e5"
       },
       "config_revision": {
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit. GEP-2 reports each actual D1 training seed separately, with counts and denominators per seed. With one D1 training seed the observed range is omitted and uncertainty excludes training-run variability. With two or more D1 training seeds the observed minimum and maximum of the explicit headline allowlist is an observed range, never a confidence interval. Rows, candidates, chunks, invocation indexes, length seeds, and generation seeds are not training replicates. Matched B1/D1 blocks are descriptive controlled blocks, not training replicates and not significance-test units.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast. B0 requested-length exact-hit metrics stay not_applicable. Directional consistency uses only B1 and D1 and is not applied to B0 or B2."
     },
@@ -988,26 +995,26 @@
       "metric_id": "dinucleotide_total_variation_to_reference",
       "display_name": "Dinucleotide total variation to reference",
       "implementation_symbol": "generator_eval_analysis.dinucleotide_total_variation_to_reference",
-      "data_source": "valid generated rows compared with unique synthetic reference sequences",
-      "reference_role": "synthetic_eval_stand_in",
+      "data_source": "valid generated rows compared with authorized_eval_unique_cores, the 154 frozen unique EVAL cores",
+      "reference_role": "authorized_eval_unique_cores",
       "scientific_role": "closeness",
-      "calculation_summary": "0.5 * L1 distance between pooled overlapping-dinucleotide fractions of valid generated rows and unique synthetic reference sequences. Duplicate valid rows are retained. A sequence shorter than 2 contributes nucleotide counts and no dinucleotide pairs. Lower means closer. This is not the nested TRAIN total variation and it is not combined with the other closeness metrics. Synthetic-reference-only in this package. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores.",
+      "calculation_summary": "0.5 * L1 distance between pooled overlapping-dinucleotide fractions of valid generated rows and unique synthetic reference sequences. Duplicate valid rows are retained. A sequence shorter than 2 contributes nucleotide counts and no dinucleotide pairs. Lower means closer. This is not the nested TRAIN total variation and it is not combined with the other closeness metrics. The production reference role is authorized_eval_unique_cores: the 154 frozen unique EVAL cores, each weighted once, available only after authorization and hash verification. The 79 clusters do not weight this formula. Synthetic fixtures may exercise this formula without changing that production reference declaration. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. The single-read EVAL adapter is implemented and synthetically verified and has not run biologically. Runtime EVAL access stays refused until explicit authorization. The M9C unlock does not open EVAL.",
       "numerator": "0.5 * L1 dinucleotide-fraction distance",
-      "denominator_and_filters": "Generated side: valid generated rows with duplicates retained, the same population as nucleotide_fractions. Reference side: unique synthetic reference sequences. Reported denominators are the generated valid-row count, the generated unique-valid count, and the reference unique-core count. Invalid generated rows are excluded from the generated side.",
+      "denominator_and_filters": "Generated side: valid generated rows with duplicates retained, the same population as nucleotide_fractions. Reference side: authorized_eval_unique_cores, the 154 unique EVAL cores weighted once. A synthetic fixture may exercise the formula without changing that production reference declaration. Reported denominators are the generated valid-row count, the generated unique-valid count, and the reference unique-core count. Invalid generated rows are excluded from the generated side.",
       "units": "fraction",
       "expected_range": "[0, 1] when defined",
       "direction": "lower",
-      "length_treatment": "Pooled overlapping-pair length treatment. Each valid generated row contributes its overlapping dinucleotides, and duplicate valid rows are retained. A sequence shorter than 2 contributes no pairs. When the pooled overlapping-pair count is zero, the dinucleotide fractions are undefined and this metric is null. The reference side uses the same overlapping-pair treatment. This total variation is not divided by sequence length. When stratification is requested, short and long values use an explicit frozen S6 label of exactly short or long. The stratum is never inferred from sequence length, and no nucleotide cutoff is invented.",
-      "missing_failure_handling": "The caller rejects a malformed, noncanonical, duplicate, or empty synthetic reference before metric calculation. An empty generated population is a metric-level result: the value is null with an explicit undefined reason and is not replaced with zero. These metrics are synthetic-reference-only in this package. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. Runtime role EVAL is refused. The three metrics are never combined or weighted. A generated or reference population with no overlapping pairs, including when every sequence is shorter than 2, is null with an explicit undefined reason.",
+      "length_treatment": "Pooled overlapping-pair length treatment. Each valid generated row contributes its overlapping dinucleotides, and duplicate valid rows are retained. A sequence shorter than 2 contributes no pairs. When the pooled overlapping-pair count is zero, the dinucleotide fractions are undefined and this metric is null. The reference side uses the same overlapping-pair treatment. This total variation is not divided by sequence length. When stratification is requested, short and long values use a frozen S6 label of exactly short or long. Valid generated sequences and authorized EVAL cores are assigned by applying the frozen S6 `gmm_k2_maximum_posterior` rule to S6 `length_of(sequence_core)`, with component 0 short, component 1 long, ties short, no refitting, no requested-generation-length input, and no invented fixed cutoff.",
+      "missing_failure_handling": "The caller rejects a malformed, noncanonical, duplicate, or empty synthetic reference before metric calculation. An empty generated population is a metric-level result: the value is null with an explicit undefined reason and is not replaced with zero. The production reference role remains authorized_eval_unique_cores. Synthetic fixtures may exercise this formula without changing that production reference declaration. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. Runtime EVAL access is refused until explicit authorization. The three metrics are never combined or weighted. A generated or reference population with no overlapping pairs, including when every sequence is shorter than 2, is null with an explicit undefined reason.",
       "code_revision": {
         "path": "scripts/modelling/generator_eval_analysis.py",
-        "sha256": "91b8db184e3999f664e81f6fea845a4fc278f207f8d96fd7f488cdc55de245d2"
+        "sha256": "7063abfeb09aaebf248b415c5e64df61dc4bdfdcafedb18db8658298510b88e5"
       },
       "config_revision": {
         "path": "config/modelling/validation_metrics_v1.yaml",
         "sha256": "d30006c6f2b94be89ee2c7721b701e76e6835142a1af9f49997ba0d5baadf4bb"
       },
-      "freeze_status": "draft",
+      "freeze_status": "frozen",
       "seed_or_block_treatment": "The implemented functions summarise the supplied attempt ledger. They do not treat candidate rows, generation chunks, B1 length-control seeds, length-sampling seeds, or the single B2 empirical-null seed as independent training replicates. D1 training seeds are the training-replicate unit when more than one exists; these functions do not aggregate across that unit. GEP-2 reports each actual D1 training seed separately, with counts and denominators per seed. With one D1 training seed the observed range is omitted and uncertainty excludes training-run variability. With two or more D1 training seeds the observed minimum and maximum of the explicit headline allowlist is an observed range, never a confidence interval. Rows, candidates, chunks, invocation indexes, length seeds, and generation seeds are not training replicates. Matched B1/D1 blocks are descriptive controlled blocks, not training replicates and not significance-test units.",
       "condition_scope": "Report B0, B1, B2, and D1 separately. Do not pool B0's historical 37-nt regime into a matched-length B1/D1 contrast. B0 requested-length exact-hit metrics stay not_applicable. Directional consistency uses only B1 and D1 and is not applied to B0 or B2."
     }
@@ -1019,7 +1026,7 @@
       "related_names": [
         "parsed_outputs"
       ],
-      "statement": "parsed_outputs remains the legacy M4 predicate and is not renamed. successfully_parsed_outputs counts nonempty extracted sequences before A/C/G/U filtering. An alphabet-invalid nonempty output is parsed and is not valid. An empty or unparseable output is not successfully parsed."
+      "statement": "parsed_outputs remains the legacy M4 predicate and is not renamed. successfully_parsed_outputs counts nonempty extracted sequences before A/C/G/U filtering. An alphabet-invalid nonempty output is parsed and is not valid. An empty or unparseable output is not successfully parsed. successfully_parsed_outputs is the thesis-facing parsed count. parsed_outputs is retained only as an explicitly labelled internal/schema-valid-record audit field."
     },
     {
       "id": "alias_requested_length_exact_hit_rate",
@@ -1065,7 +1072,7 @@
     },
     {
       "id": "clustering_diversity_deferred",
-      "status": "unresolved",
+      "status": "resolved",
       "related_names": [
         "clustering_identity_threshold",
         "generated_cluster_concentration",
@@ -1075,17 +1082,19 @@
         "shannon_diversity",
         "effective_cluster_count"
       ],
-      "statement": "Generated-sequence clustering, structure clustering, singleton fraction, largest-cluster share, Shannon diversity, effective-cluster count, and threshold sensitivity stay deferred. They are not required generator output. No threshold, including a corpus 90% threshold, is imported. They are not closeness votes. largest_duplicate_share remains the exact-string guardrail."
+      "statement": "Generated-sequence clustering, structure clustering, singleton fraction, largest-cluster share, Shannon diversity, effective-cluster count, and threshold sensitivity are explicitly outside M10. No threshold, including a corpus 90% threshold, is imported. Exact-duplicate diversity is the M10 diversity report. largest_duplicate_share remains the exact-string guardrail.",
+      "m10_disposition": "outside_m10"
     },
     {
       "id": "representation_metrics_deferred",
-      "status": "unresolved",
+      "status": "resolved",
       "related_names": [
         "frozen_representation_metrics",
         "frozen_representation_or_embedding_metrics",
         "representation_aggregation_rules"
       ],
-      "statement": "Representation-space analysis stays deferred. No representation model, encoder, distance, or kernel is added during this evaluation."
+      "statement": "Representation-space analysis is explicitly outside M10. No representation model, encoder, distance, or kernel is added for M10.",
+      "m10_disposition": "outside_m10"
     },
     {
       "id": "eval_closeness_not_implemented",
@@ -1094,7 +1103,7 @@
         "eval_distance",
         "eval_closeness"
       ],
-      "statement": "Three closeness metrics are implemented only for runtime role synthetic_eval_stand_in. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. Runtime role EVAL is refused. The metrics are reported separately and are never combined. A distributional similarity does not demonstrate binding, affinity, selectivity, inhibition, or NDM-1-specific learning."
+      "statement": "Three closeness metrics declare the production reference role authorized_eval_unique_cores, the 154 frozen unique EVAL cores available only after authorization and hash verification. Synthetic fixtures may exercise the formulas without changing that production reference declaration. They become EVAL metrics only after the formal M9C unlock supplies unique EVAL cores. Runtime EVAL access is refused until explicit authorization. The metrics are reported separately and are never combined. A distributional similarity does not demonstrate binding, affinity, selectivity, inhibition, or NDM-1-specific learning. The M9C unlock has been written and does not authorize opening EVAL. The 79 clusters do not weight the formulas. The single-read EVAL adapter is implemented and synthetically verified. Biological execution awaits authorization and is not an active implementation blocker."
     },
     {
       "id": "nucleotide_total_variation_membership_unresolved",
@@ -1114,31 +1123,36 @@
     },
     {
       "id": "confidence_intervals_not_specified_in_gep1",
-      "status": "unresolved",
+      "status": "resolved",
       "related_names": [
         "confidence_interval",
         "bootstrap"
       ],
-      "statement": "No generator confidence interval, hypothesis test, or bootstrap is specified. An observed range across D1 training seeds is not a confidence interval."
+      "statement": "Generator confidence intervals, bootstrap, hypothesis tests, and EVAL-cluster resampling are explicitly outside M10. D1 seeds 43 and 44 and matched blocks A and B are reported separately, plus observed ranges only. An observed range is not a confidence interval.",
+      "m10_disposition": "outside_m10"
     },
     {
       "id": "train_reference_not_loaded_in_gep1",
-      "status": "unresolved",
+      "status": "resolved",
       "related_names": [
         "exact_train_match_rate",
         "nearest_train_normalized_edit_distance"
       ],
-      "statement": "Production TRAIN is not loaded. Only a synthetic TRAIN collection inside a GEP-2 fixture is accepted, and that collection is not production TRAIN."
+      "statement": "Production TRAIN loading for M10 is satisfied by the frozen M9A outputs, and TRAIN is not reopened. The cited files are results/fine_tuning/m9_generator_evaluation/m9a_train_leakage/m9_exact_train_leakage_summary.json SHA-256 f7d10f7f41777a091cc2b2bf3dfeec555d5e8d84b3b89850328be7cdcf15e0d3 and results/fine_tuning/m9_generator_evaluation/m9a_train_leakage/m9_nearest_train_distance_summary.json SHA-256 c68fa997207a657a7049e53dd074e8d593333f84152008d631cae0d6565c1d66. The synthetic GEP package still does not load production TRAIN.",
+      "m10_disposition": "satisfied_by_frozen_m9a_outputs"
     },
     {
       "id": "structure_metrics_not_executed_in_gep1",
-      "status": "unresolved",
+      "status": "resolved",
       "related_names": [
         "mfe",
         "mfe_per_nt",
         "paired_fraction"
       ],
-      "statement": "ViennaRNA is not called. Structure metrics run only when a deterministic synthetic fold is injected. No new MFE formula is defined, and mfe_per_nt is not the AptaRank normalized-MFE component."
+      "statement": "The formulas for mfe, mfe_per_nt, and paired_fraction stay unchanged. The production wrapper is implemented and synthetically verified: it calls RNA.fold(sequence) in ViennaRNA 2.7.0, folds each distinct valid sequence once, and weights generated condition, seed, and block quantiles by valid attempt rows, including duplicate attempts. EVAL uses its 154 unique cores once each. Biological folding is not yet authorized and is not an active implementation blocker. No structure-distance metric is defined. mfe_per_nt is not the AptaRank normalized-MFE component.",
+      "m10_disposition": "required_implementation_work",
+      "implementation_readiness": "implemented_and_synthetically_verified",
+      "biological_production_execution": "not_yet_authorized"
     },
     {
       "id": "viennarna_production_settings_not_pinned",
@@ -1153,7 +1167,7 @@
     },
     {
       "id": "production_matched_chunk_schedule_not_wired",
-      "status": "unresolved",
+      "status": "resolved",
       "related_names": [
         "invocation_index",
         "batch_position",
@@ -1162,7 +1176,10 @@
         "invocation_seed",
         "generation_chunk_id"
       ],
-      "statement": "A pure synthetic schedule mapper normalizes producer keys and verifies arithmetic. Production schedules are not loaded. A 1,000-attempt diagnostic schedule is not the 30,000-attempt final D1 budget, and this package does not declare that budget satisfied."
+      "statement": "Matched-block binding is implemented and synthetically verified. The production B1/D1 schedule is wired into the reviewed block binder: block A with D1 seed 43, block B with D1 seed 44, and 15,000 attempts on each side. Biological M10 execution is not yet authorized and is not an active implementation blocker. A 1,000-attempt diagnostic schedule is not the 30,000-attempt final D1 budget.",
+      "m10_disposition": "required_implementation_work",
+      "implementation_readiness": "implemented_and_synthetically_verified",
+      "biological_production_execution": "not_yet_authorized"
     },
     {
       "id": "b2_generic_seed_field_disambiguated",
@@ -1427,35 +1444,35 @@
     },
     {
       "metric_id": "mfe",
-      "aggregation_basis": "unavailable pending a defined aggregation"
+      "aggregation_basis": "per-condition and per-seed valid-row quantiles with duplicate-attempt weighting"
     },
     {
       "metric_id": "mfe_per_nt",
-      "aggregation_basis": "unavailable pending a defined aggregation"
+      "aggregation_basis": "per-condition and per-seed valid-row quantiles with duplicate-attempt weighting"
     },
     {
       "metric_id": "paired_fraction",
-      "aggregation_basis": "unavailable pending a defined aggregation"
+      "aggregation_basis": "per-condition and per-seed valid-row quantiles with duplicate-attempt weighting"
     },
     {
       "metric_id": "exact_train_match_rate",
-      "aggregation_basis": "unavailable pending a defined aggregation"
+      "aggregation_basis": "inherited frozen M9A exact-match summary"
     },
     {
       "metric_id": "exact_hit_rate_valid_outputs_diagnostic",
-      "aggregation_basis": "unavailable pending a defined aggregation"
+      "aggregation_basis": "actual attempt accounting diagnostic"
     },
     {
       "metric_id": "nearest_train_normalized_edit_distance",
-      "aggregation_basis": "unavailable pending a defined aggregation"
+      "aggregation_basis": "inherited frozen M9A nearest-distance summary"
     },
     {
       "metric_id": "maximum_edit_similarity_to_train",
-      "aggregation_basis": "unavailable pending a defined aggregation"
+      "aggregation_basis": "inherited frozen M9A nearest-distance summary"
     },
     {
       "metric_id": "full_length_stratified_results",
-      "aggregation_basis": "unavailable pending a defined aggregation"
+      "aggregation_basis": "per requested length where a requested length is recorded; B0 not applicable"
     },
     {
       "metric_id": "d1_by_training_seed",
@@ -1469,5 +1486,477 @@
       "metric_id": "observed_range_across_training_seeds",
       "aggregation_basis": "per-seed only"
     }
-  ]
+  ],
+  "m10_production_metric_coverage": [
+    {
+      "metric_id": "raw_attempts",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "raw_attempts"
+    },
+    {
+      "metric_id": "parsed_outputs",
+      "disposition": "audit_only",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "parsed_outputs"
+    },
+    {
+      "metric_id": "valid_outputs",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "valid_outputs"
+    },
+    {
+      "metric_id": "invalid_outputs",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "invalid_outputs"
+    },
+    {
+      "metric_id": "empty_or_unparseable_outputs",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "empty_or_unparseable_outputs"
+    },
+    {
+      "metric_id": "exact_length_hits",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "exact_length_hits",
+      "b0_requested_length": "not_applicable"
+    },
+    {
+      "metric_id": "exact_hit_rate",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "exact_hit_rate",
+      "b0_requested_length": "not_applicable"
+    },
+    {
+      "metric_id": "exact_hit_rate_valid_outputs_diagnostic",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting diagnostic",
+      "output_location": "metrics.by_condition",
+      "field": "exact_hit_rate_valid_outputs_diagnostic",
+      "b0_requested_length": "not_applicable"
+    },
+    {
+      "metric_id": "eos_marker_observations",
+      "disposition": "audit_only",
+      "aggregation_basis": "not recorded on the frozen M9 derived ledger and not imputed",
+      "output_location": "audit_only.eos_marker_observations"
+    },
+    {
+      "metric_id": "early_eos_observations",
+      "disposition": "audit_only",
+      "aggregation_basis": "not recorded on the frozen M9 derived ledger and not imputed",
+      "output_location": "audit_only.early_eos_observations"
+    },
+    {
+      "metric_id": "cleaned_length_distribution",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "cleaned_length_distribution"
+    },
+    {
+      "metric_id": "length_shortfall_distribution",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "length_shortfall_distribution",
+      "b0_requested_length": "not_applicable"
+    },
+    {
+      "metric_id": "length_excess_distribution",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "length_excess_distribution",
+      "b0_requested_length": "not_applicable"
+    },
+    {
+      "metric_id": "unique_valid_outputs",
+      "disposition": "production_output",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome",
+      "output_location": "metrics.by_condition",
+      "field": "unique_valid_outputs"
+    },
+    {
+      "metric_id": "duplicates",
+      "disposition": "production_output",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome",
+      "output_location": "metrics.by_condition",
+      "field": "duplicates"
+    },
+    {
+      "metric_id": "largest_duplicate_multiplicity",
+      "disposition": "production_output",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome",
+      "output_location": "exact_duplicate_diversity.by_condition",
+      "field": "largest_duplicate_multiplicity"
+    },
+    {
+      "metric_id": "largest_duplicate_share",
+      "disposition": "production_output",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome",
+      "output_location": "exact_duplicate_diversity.by_condition",
+      "field": "largest_duplicate_share"
+    },
+    {
+      "metric_id": "valid_nonempty_acgu_fraction",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "valid_nonempty_acgu_fraction"
+    },
+    {
+      "metric_id": "empty_or_unparseable_fraction",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "empty_or_unparseable_fraction"
+    },
+    {
+      "metric_id": "unique_fraction",
+      "disposition": "production_output",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome",
+      "output_location": "exact_duplicate_diversity.by_condition",
+      "field": "unique_fraction"
+    },
+    {
+      "metric_id": "exact_train_match_rate",
+      "disposition": "inherited_frozen_m9a",
+      "aggregation_basis": "inherited frozen M9A exact-match summary",
+      "output_location": "frozen_m9a_train.exact"
+    },
+    {
+      "metric_id": "per_requested_length_exact_hit_rate",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "by_requested_length",
+      "b0_requested_length": "not_applicable"
+    },
+    {
+      "metric_id": "nearest_train_normalized_edit_distance",
+      "disposition": "inherited_frozen_m9a",
+      "aggregation_basis": "inherited frozen M9A nearest-distance summary",
+      "output_location": "frozen_m9a_train.nearest"
+    },
+    {
+      "metric_id": "maximum_edit_similarity_to_train",
+      "disposition": "inherited_frozen_m9a",
+      "aggregation_basis": "inherited frozen M9A nearest-distance summary",
+      "output_location": "frozen_m9a_train.nearest.by_condition",
+      "field": "maximum_edit_similarity_to_train"
+    },
+    {
+      "metric_id": "nucleotide_distribution",
+      "disposition": "production_output",
+      "aggregation_basis": "valid rows with duplicates retained",
+      "output_location": "composition.by_condition",
+      "field": "nucleotide_fractions"
+    },
+    {
+      "metric_id": "dinucleotide_distribution",
+      "disposition": "production_output",
+      "aggregation_basis": "valid rows with duplicates retained",
+      "output_location": "composition.by_condition",
+      "field": "dinucleotide_fractions"
+    },
+    {
+      "metric_id": "mfe",
+      "disposition": "production_output",
+      "aggregation_basis": "per-condition and per-seed valid-row quantiles with duplicate-attempt weighting",
+      "output_location": "structure.by_condition",
+      "field": "mfe"
+    },
+    {
+      "metric_id": "mfe_per_nt",
+      "disposition": "production_output",
+      "aggregation_basis": "per-condition and per-seed valid-row quantiles with duplicate-attempt weighting",
+      "output_location": "structure.by_condition",
+      "field": "mfe_per_nt"
+    },
+    {
+      "metric_id": "paired_fraction",
+      "disposition": "production_output",
+      "aggregation_basis": "per-condition and per-seed valid-row quantiles with duplicate-attempt weighting",
+      "output_location": "structure.by_condition",
+      "field": "paired_fraction"
+    },
+    {
+      "metric_id": "full_length_stratified_results",
+      "disposition": "production_output",
+      "aggregation_basis": "per requested length where a requested length is recorded; B0 not applicable",
+      "output_location": "by_requested_length",
+      "b0_requested_length": "not_applicable"
+    },
+    {
+      "metric_id": "successfully_parsed_outputs",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "successfully_parsed_outputs"
+    },
+    {
+      "metric_id": "pooled_gc_fraction",
+      "disposition": "production_output",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture",
+      "output_location": "d1_equal_seed",
+      "field": "pooled_gc_fraction"
+    },
+    {
+      "metric_id": "nearest_reference_normalized_edit_distance",
+      "disposition": "production_output",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture",
+      "output_location": "closeness.by_condition",
+      "field": "nearest_reference_normalized_edit_distance"
+    },
+    {
+      "metric_id": "nucleotide_total_variation_to_reference",
+      "disposition": "production_output",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture",
+      "output_location": "closeness.by_condition",
+      "field": "nucleotide_total_variation_to_reference"
+    },
+    {
+      "metric_id": "dinucleotide_total_variation_to_reference",
+      "disposition": "production_output",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture",
+      "output_location": "closeness.by_condition",
+      "field": "dinucleotide_total_variation_to_reference"
+    },
+    {
+      "metric_id": "failure_reason_counts",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "failure_reason_counts"
+    },
+    {
+      "metric_id": "actual_attempt_level_validity_rate",
+      "disposition": "production_output",
+      "aggregation_basis": "actual attempt accounting",
+      "output_location": "metrics.by_condition",
+      "field": "actual_attempt_level_validity_rate"
+    },
+    {
+      "metric_id": "duplicate_excess",
+      "disposition": "production_output",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome",
+      "output_location": "exact_duplicate_diversity.by_condition",
+      "field": "duplicate_excess"
+    },
+    {
+      "metric_id": "multiplicity_histogram",
+      "disposition": "production_output",
+      "aggregation_basis": "global condition-level duplicate/multiplicity outcome",
+      "output_location": "exact_duplicate_diversity.by_condition",
+      "field": "multiplicity_histogram"
+    },
+    {
+      "metric_id": "equal_seed_mean_validity_rate",
+      "disposition": "production_output",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture",
+      "output_location": "d1_equal_seed.mean_validity_rate"
+    },
+    {
+      "metric_id": "nucleotide_total_variation_to_train",
+      "disposition": "inherited_frozen_m9a",
+      "aggregation_basis": "nested descriptive TRAIN output is not recomputed and is not a closeness metric",
+      "output_location": "inherited_dispositions.nucleotide_total_variation_to_train"
+    },
+    {
+      "metric_id": "dinucleotide_total_variation_to_train",
+      "disposition": "inherited_frozen_m9a",
+      "aggregation_basis": "nested descriptive TRAIN output is not recomputed and is not a closeness metric",
+      "output_location": "inherited_dispositions.dinucleotide_total_variation_to_train"
+    },
+    {
+      "metric_id": "b1_d1_directional_consistency",
+      "disposition": "production_output",
+      "aggregation_basis": "equal-training-seed valid-conditional mixture",
+      "output_location": "directional_consistency.b1_versus_d1"
+    },
+    {
+      "metric_id": "d1_by_training_seed",
+      "disposition": "production_output",
+      "aggregation_basis": "per-seed only",
+      "output_location": "d1_by_training_seed"
+    },
+    {
+      "metric_id": "matched_b1_d1_block_directional_consistency",
+      "disposition": "production_output",
+      "aggregation_basis": "per-seed only",
+      "output_location": "directional_consistency.by_matched_block"
+    },
+    {
+      "metric_id": "observed_range_across_training_seeds",
+      "disposition": "production_output",
+      "aggregation_basis": "per-seed only",
+      "output_location": "observed_range_across_training_seeds"
+    }
+  ],
+  "m10_draft_contract": {
+    "document_status": "frozen",
+    "labelled_frozen": true,
+    "labelled_production_ready": true,
+    "inactive_pathway_supersession": {
+      "date": "19 October 2026",
+      "statement": "The executable metric specification is frozen and production-ready. Production execution remains unauthorized. M10 execution remains unauthorized. EVAL access remains unauthorized. The ledger adapter, single-read EVAL adapter, matched schedule, structure wrapper and distinct-sequence cache, and production writer are implemented and synthetically verified. They have not run biologically. Awaiting authorization is not an active implementation blocker. The production publication pathway stays uninvoked. Every retained metric has an explicit production output location or an explicit audit-only or inherited disposition."
+    },
+    "implementation_readiness": {
+      "generated_input_preflight": "implemented_and_synthetically_verified",
+      "authorized_production_execution": "implemented_not_invoked",
+      "biological_production_execution": "not_yet_authorized",
+      "biological_sequence_folding": "not_yet_authorized",
+      "eval_opening": "not_yet_authorized",
+      "metric_specification": "frozen_and_production_ready"
+    },
+    "m10_scope": "Section 5 only",
+    "governing_plan_version": "3.4",
+    "headline_closeness_metrics": [
+      {
+        "metric_id": "nearest_reference_normalized_edit_distance",
+        "thesis_name": "nearest-EVAL longer-length-normalized edit distance",
+        "direction": "lower",
+        "formula_unchanged": true
+      },
+      {
+        "metric_id": "nucleotide_total_variation_to_reference",
+        "thesis_name": "nucleotide total variation to EVAL",
+        "direction": "lower",
+        "formula_unchanged": true
+      },
+      {
+        "metric_id": "dinucleotide_total_variation_to_reference",
+        "thesis_name": "dinucleotide total variation to EVAL",
+        "direction": "lower",
+        "formula_unchanged": true
+      }
+    ],
+    "aggregate_generator_quality_score": false,
+    "diversity": "exact-duplicate diversity only",
+    "outside_m10": [
+      "generated-sequence clustering",
+      "representation analysis",
+      "generator confidence intervals",
+      "bootstrap",
+      "hypothesis tests",
+      "EVAL-cluster resampling",
+      "AptaRank Tier 1",
+      "illustrative Tier 2",
+      "generated-candidate Tier 1 and Tier 2",
+      "NDM-1 review",
+      "final decision record"
+    ],
+    "reporting": {
+      "d1_seeds_reported_separately": [
+        43,
+        44
+      ],
+      "matched_blocks_reported_separately": [
+        "A",
+        "B"
+      ],
+      "uncertainty": "observed ranges only"
+    },
+    "eval_weighting": {
+      "unique_eval_cores": 154,
+      "weight": "once each",
+      "clusters_reported": 79,
+      "clusters_weight_formulas": false,
+      "clusters_role": "design fact and limitation"
+    },
+    "parsed_count": {
+      "thesis_facing": "successfully_parsed_outputs",
+      "legacy_audit_field": "parsed_outputs",
+      "legacy_label": "internal/schema-valid-record audit field"
+    },
+    "production_train_loading": {
+      "m10_disposition": "satisfied_by_frozen_m9a_outputs",
+      "reopen_train": false,
+      "outputs": [
+        {
+          "path": "results/fine_tuning/m9_generator_evaluation/m9a_train_leakage/m9_exact_train_leakage_summary.json",
+          "sha256": "f7d10f7f41777a091cc2b2bf3dfeec555d5e8d84b3b89850328be7cdcf15e0d3"
+        },
+        {
+          "path": "results/fine_tuning/m9_generator_evaluation/m9a_train_leakage/m9_nearest_train_distance_summary.json",
+          "sha256": "c68fa997207a657a7049e53dd074e8d593333f84152008d631cae0d6565c1d66"
+        },
+        {
+          "path": "results/fine_tuning/m9_generator_evaluation/m9a_train_leakage/m9_train_leakage_manifest.json",
+          "sha256": "e2b97da3b1f39859c1d4fc3a652dd4abb6e4da5836e2a5e9c067ce1b87491d88"
+        }
+      ]
+    },
+    "structure": {
+      "fold": "RNA.fold(sequence)",
+      "generator_viennarna": "2.7.0",
+      "aptarank_viennarna": "2.7.2",
+      "verified_from": [
+        "config/modelling/generator_eval_metric_spec.json#viennarna_production_settings",
+        "results/fine_tuning/m9_generator_evaluation/m9c_closure/m9c_closure_manifest.json#generator_viennarna_pin"
+      ],
+      "populations": {
+        "fold": "each distinct valid generated sequence once, and each of the 154 unique EVAL cores once",
+        "generated_quantiles": "valid attempt rows with duplicate-attempt weighting by condition, seed, and block"
+      },
+      "reported_descriptors": [
+        "mfe_per_nt",
+        "paired_fraction"
+      ],
+      "include_length_strata": true,
+      "include_per_d1_seed_results": true,
+      "structure_distance_metric": false
+    },
+    "production_report_writer_exists": true,
+    "generated_input_preflight_writer_exists": true,
+    "required_implementation_work": [
+      {
+        "id": "ledger_adapter",
+        "status": "required",
+        "implementation_readiness": "implemented_and_synthetically_verified",
+        "biological_production_execution": "not_yet_authorized",
+        "statement": "The frozen M9 ledger adapter is implemented and synthetically verified. It reads only the allowlisted generated ledgers and retains every attempt. Biological M10 execution is not yet authorized and is not an active implementation blocker."
+      },
+      {
+        "id": "authorized_eval_adapter",
+        "status": "required",
+        "implementation_readiness": "implemented_and_synthetically_verified",
+        "biological_production_execution": "not_yet_authorized",
+        "statement": "The authorized EVAL adapter is implemented. It refuses to open EVAL unless the explicit M10/EVAL authorization object is present, and production mode completes the non-EVAL checks before that single read. EVAL remains unopened. Biological M10 execution is not yet authorized and is not an active implementation blocker."
+      },
+      {
+        "id": "matched_block_binding",
+        "status": "required",
+        "implementation_readiness": "implemented_and_synthetically_verified",
+        "biological_production_execution": "not_yet_authorized",
+        "statement": "Matched-block binding for blocks A and B is implemented and wired to the production B1/D1 schedule. Biological M10 execution is not yet authorized and is not an active implementation blocker."
+      },
+      {
+        "id": "structure_execution",
+        "status": "required",
+        "implementation_readiness": "implemented_and_synthetically_verified",
+        "biological_production_execution": "not_yet_authorized",
+        "statement": "The pinned RNA.fold(sequence) wrapper and distinct-sequence cache are implemented and covered by a synthetic smoke test. Each distinct valid sequence is folded once, generated quantiles keep duplicate-attempt weighting, and EVAL uses its 154 unique cores once each. Biological folding is not yet authorized and is not an active implementation blocker."
+      },
+      {
+        "id": "sequence_free_report_writer",
+        "status": "required",
+        "implementation_readiness": "implemented_and_synthetically_verified",
+        "biological_production_execution": "not_yet_authorized",
+        "statement": "The sequence-free generated-input preflight writer is implemented. The scientific production report writer is implemented and publishes only after the frozen metric-specification gate and one authorized EVAL read. It has not run on repository EVAL. Biological M10 execution is not yet authorized and is not an active implementation blocker."
+      }
+    ]
+  }
 }

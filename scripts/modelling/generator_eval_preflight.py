@@ -20,8 +20,10 @@ import sys
 
 PACKAGE_ID = "GEP-1"
 SCHEMA_VERSION = "generator-eval-preflight-gep1-r3"
-GOVERNING_PLAN_VERSION = "3.3"
-GOVERNING_PLAN_REVISION_DATE = "12 October 2026"
+GOVERNING_PLAN_VERSION = "3.4"
+GOVERNING_PLAN_REVISION_DATE = "17 October 2026"
+HISTORICAL_M9C_PLAN_VERSION = "3.3"
+HISTORICAL_M9C_PLAN_REVISION_DATE = "12 October 2026"
 SYNTHETIC_RAW_CONTRACT = "synthetic-m8-raw-attempt-bundle-v1"
 SYNTHETIC_PARSER_ADAPTER_VERSION = "synthetic-m8-parser-adapter-v2"
 SOURCE_MANIFEST_SCHEMA = "synthetic-m8-source-manifest-v2"
@@ -193,13 +195,15 @@ M4_METRICS_RELATIVE = "scripts/modelling/m4_diagnostic_metrics.py"
 M6_DIAGNOSTIC_RELATIVE = "scripts/modelling/m6_diagnostic_generation.py"
 ANALYSIS_RELATIVE = "scripts/modelling/generator_eval_analysis.py"
 METRICS_CONFIG_RELATIVE = "config/modelling/validation_metrics_v1.yaml"
-GOVERNING_PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
+GOVERNING_PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md"
+HISTORICAL_M9C_PLAN_RELATIVE = "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md"
 ALLOWED_REVISION_PATHS = (
     M4_METRICS_RELATIVE,
     M6_DIAGNOSTIC_RELATIVE,
     ANALYSIS_RELATIVE,
     METRICS_CONFIG_RELATIVE,
     GOVERNING_PLAN_RELATIVE,
+    HISTORICAL_M9C_PLAN_RELATIVE,
 )
 CODE_PATH_BY_MODULE = {
     "m4_diagnostic_metrics": M4_METRICS_RELATIVE,
@@ -310,6 +314,7 @@ GEP2_CLOSENESS_METRIC_IDS = (
     "dinucleotide_total_variation_to_reference",
 )
 SYNTHETIC_REFERENCE_ROLE = "synthetic_eval_stand_in"
+PRODUCTION_REFERENCE_ROLE = "authorized_eval_unique_cores"
 FORBIDDEN_REFERENCE_ROLES = ("EVAL", "REF", "VALIDATION", "TRAIN")
 FORBIDDEN_METRIC_ALIASES = (
     "requested_length_exact_hit_rate",
@@ -344,11 +349,17 @@ RESOLVED_BLOCKING_IDS = (
     "alias_mfe_per_nucleotide",
     "per_length_exact_hit_floor_not_a_decision",
     "gc_fraction_not_implemented",
+    "clustering_diversity_deferred",
+    "representation_metrics_deferred",
     "eval_closeness_not_implemented",
     "nucleotide_total_variation_membership_unresolved",
     "dinucleotide_total_variation_membership_unresolved",
-    "b2_generic_seed_field_disambiguated",
+    "confidence_intervals_not_specified_in_gep1",
+    "train_reference_not_loaded_in_gep1",
+    "structure_metrics_not_executed_in_gep1",
     "viennarna_production_settings_not_pinned",
+    "production_matched_chunk_schedule_not_wired",
+    "b2_generic_seed_field_disambiguated",
 )
 RESOLVED_REQUIRED_PHRASES = {
     "parsed_outputs_predicate_versus_successful_parse": "successfully_parsed_outputs counts nonempty extracted sequences before A/C/G/U filtering",
@@ -360,6 +371,12 @@ RESOLVED_REQUIRED_PHRASES = {
     "eval_closeness_not_implemented": "formal M9C unlock supplies unique EVAL cores",
     "nucleotide_total_variation_membership_unresolved": "nested descriptive output",
     "dinucleotide_total_variation_membership_unresolved": "nested descriptive output",
+    "clustering_diversity_deferred": "explicitly outside M10",
+    "representation_metrics_deferred": "explicitly outside M10",
+    "confidence_intervals_not_specified_in_gep1": "explicitly outside M10",
+    "train_reference_not_loaded_in_gep1": "satisfied by the frozen M9A outputs",
+    "structure_metrics_not_executed_in_gep1": "implemented and synthetically verified",
+    "production_matched_chunk_schedule_not_wired": "implemented and synthetically verified",
     "b2_generic_seed_field_disambiguated": "does not assume that a production run used seed 42",
     "viennarna_production_settings_not_pinned": "The existing generator fold is RNA.fold(sequence) in ViennaRNA 2.7.0 and sets no model detail.",
 }
@@ -381,6 +398,71 @@ BLOCKING_IDS = (
     "viennarna_production_settings_not_pinned",
     "production_matched_chunk_schedule_not_wired",
     "b2_generic_seed_field_disambiguated",
+)
+# The six former blockers are resolved dispositions. Their status is resolved.
+M10_BLOCKING_DISPOSITIONS = {
+    "clustering_diversity_deferred": "outside_m10",
+    "representation_metrics_deferred": "outside_m10",
+    "confidence_intervals_not_specified_in_gep1": "outside_m10",
+    "train_reference_not_loaded_in_gep1": "satisfied_by_frozen_m9a_outputs",
+    "structure_metrics_not_executed_in_gep1": "required_implementation_work",
+    "production_matched_chunk_schedule_not_wired": "required_implementation_work",
+}
+S6_ASSIGNMENT_STATEMENT = (
+    "Valid generated sequences and authorized EVAL cores are assigned by applying the frozen S6 "
+    "`gmm_k2_maximum_posterior` rule to S6 `length_of(sequence_core)`, with component 0 short, "
+    "component 1 long, ties short, no refitting, no requested-generation-length input, and no invented fixed cutoff."
+)
+S6_ASSIGNMENT_METRIC_IDS = (
+    "pooled_gc_fraction",
+    "nearest_reference_normalized_edit_distance",
+    "nucleotide_total_variation_to_reference",
+    "dinucleotide_total_variation_to_reference",
+)
+FORBIDDEN_S6_LABEL_CLAIMS = (
+    "not inferred from sequence length",
+    "never inferred from sequence length",
+)
+CLOSED_BY_M10_SCOPE = (
+    {"id": "clustering_diversity_deferred", "subject": "clustering"},
+    {"id": "representation_metrics_deferred", "subject": "representation analysis"},
+    {
+        "id": "confidence_intervals_not_specified_in_gep1",
+        "subject": "confidence intervals, bootstrap, hypothesis tests, and EVAL-cluster resampling",
+    },
+)
+SATISFIED_BY_FROZEN_EVIDENCE = (
+    {
+        "id": "train_reference_not_loaded_in_gep1",
+        "subject": "production TRAIN loading through the frozen M9A summaries",
+    },
+)
+IMPLEMENTED_AWAITING_AUTHORIZATION = (
+    {
+        "id": "structure_metrics_not_executed_in_gep1",
+        "subject": "ViennaRNA structure wrapper and distinct-sequence cache, implemented and synthetically verified; biological execution is not authorized",
+    },
+    {
+        "id": "production_matched_chunk_schedule_not_wired",
+        "subject": "matched B1/D1 production schedule, implemented and synthetically verified; biological execution is not authorized",
+    },
+)
+BLOCKER_CLASSIFICATION_DISPOSITIONS = {
+    "closed_by_m10_scope": "outside_m10",
+    "satisfied_by_frozen_evidence": "satisfied_by_frozen_m9a_outputs",
+    "implemented_awaiting_authorization": "required_implementation_work",
+}
+BLOCKER_CLASSIFICATION_GROUPS = (
+    ("closed_by_m10_scope", CLOSED_BY_M10_SCOPE),
+    ("satisfied_by_frozen_evidence", SATISFIED_BY_FROZEN_EVIDENCE),
+    ("implemented_awaiting_authorization", IMPLEMENTED_AWAITING_AUTHORIZATION),
+)
+REQUIRED_IMPLEMENTATION_IDS = (
+    "ledger_adapter",
+    "authorized_eval_adapter",
+    "matched_block_binding",
+    "structure_execution",
+    "sequence_free_report_writer",
 )
 UNLOCK_KEYS = (
     "timestamp",
@@ -527,7 +609,7 @@ def load_metric_spec(path=None):
     document_path = spec_path() if path is None else path
     with open(document_path, encoding="utf-8") as handle:
         spec = json.load(handle)
-    validate_metric_spec(spec, require_draft=True)
+    validate_metric_spec(spec, require_draft=spec.get("freeze_status") != "frozen")
     return spec
 
 
@@ -557,22 +639,40 @@ def _validate_path_sha256(value, label, expected_path, problems):
         problems.append(_problem("source_hash_mismatch", label + " sha256 does not match " + path))
 
 
-def _validate_governing_plan(spec, problems):
-    plan = spec.get("governing_plan")
+def _validate_plan_identity(plan, label, relative, version, revision_date, problems):
     if not isinstance(plan, dict) or set(plan) != {"path", "sha256", "version", "revision_date"}:
-        problems.append(_problem("revision_invalid", "the governing plan must record path, sha256, version, and revision date"))
+        problems.append(_problem("revision_invalid", label + " must record path, sha256, version, and revision date"))
         return
-    if (
-        plan.get("path") != GOVERNING_PLAN_RELATIVE
-        or plan.get("version") != GOVERNING_PLAN_VERSION
-        or plan.get("revision_date") != GOVERNING_PLAN_REVISION_DATE
-    ):
-        problems.append(_problem("revision_invalid", "the governing plan is not v3.3 dated 12 October 2026"))
+    if plan.get("path") != relative or plan.get("version") != version or plan.get("revision_date") != revision_date:
+        problems.append(_problem("revision_invalid", label + " is not " + version + " dated " + revision_date))
         return
     _validate_path_sha256(
         {"path": plan["path"], "sha256": plan.get("sha256")},
-        "governing plan",
+        label,
+        relative,
+        problems,
+    )
+
+
+def _validate_governing_plan(spec, problems):
+    _validate_plan_identity(
+        spec.get("governing_plan"),
+        "the active governing plan",
         GOVERNING_PLAN_RELATIVE,
+        GOVERNING_PLAN_VERSION,
+        GOVERNING_PLAN_REVISION_DATE,
+        problems,
+    )
+    historical = spec.get("historical_m9c_plan")
+    if not isinstance(historical, dict) or historical.get("role") != "m9c_frozen_historical":
+        problems.append(_problem("revision_invalid", "v3.3 must remain recorded as the historical M9C plan"))
+        return
+    _validate_plan_identity(
+        {key: historical.get(key) for key in ("path", "sha256", "version", "revision_date")},
+        "the historical M9C plan",
+        HISTORICAL_M9C_PLAN_RELATIVE,
+        HISTORICAL_M9C_PLAN_VERSION,
+        HISTORICAL_M9C_PLAN_REVISION_DATE,
         problems,
     )
 
@@ -600,12 +700,111 @@ def _analysis_implements(symbol):
     return callable(function)
 
 
+def blocker_classification():
+    """Partition the six explicit M10 dispositions into reporting classes.
+
+    The disposition strings stay on each entry. Closed-by-scope items,
+    frozen-evidence items, and work that is implemented but not yet
+    biologically executed are not active implementation blockers.
+    """
+    classified = {}
+    for group_name, entries in BLOCKER_CLASSIFICATION_GROUPS:
+        disposition = BLOCKER_CLASSIFICATION_DISPOSITIONS[group_name]
+        classified[group_name] = [
+            {"id": entry["id"], "m10_disposition": disposition, "subject": entry["subject"]} for entry in entries
+        ]
+    return classified
+
+
+def _reject_forbidden_s6_claims(value, problems, where):
+    if isinstance(value, str):
+        lowered = value.lower()
+        for claim in FORBIDDEN_S6_LABEL_CLAIMS:
+            if claim in lowered:
+                problems.append(
+                    _problem(
+                        "s6_label_claim_invalid",
+                        where + " still says the S6 label is not inferred from sequence length",
+                    )
+                )
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _reject_forbidden_s6_claims(item, problems, where + "." + str(key))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _reject_forbidden_s6_claims(item, problems, "%s[%d]" % (where, index))
+
+
+FROZEN_METRIC_SPECIFICATION_READINESS = "frozen_and_production_ready"
+ACTIVE_DRAFT_PHRASES = ("remains draft", "not production-ready")
+
+
+def _require_frozen_specification_language(draft, problems):
+    """Require frozen production-ready wording and reject an active draft claim.
+
+    The readiness value and the supersession statement are part of the freeze.
+    Stale draft wording fails before any EVAL access.
+    """
+    readiness = draft.get("implementation_readiness")
+    value = readiness.get("metric_specification") if isinstance(readiness, dict) else None
+    if value != FROZEN_METRIC_SPECIFICATION_READINESS:
+        problems.append(
+            _problem(
+                "metric_spec_readiness_unfrozen",
+                "a frozen specification requires metric_specification readiness frozen_and_production_ready",
+            )
+        )
+    note = draft.get("inactive_pathway_supersession")
+    statement = note.get("statement") if isinstance(note, dict) else None
+    if not isinstance(statement, str):
+        problems.append(
+            _problem(
+                "metric_spec_freeze_statement_invalid",
+                "a frozen specification requires a supersession statement",
+            )
+        )
+        return
+    lowered = statement.lower()
+    for phrase in ACTIVE_DRAFT_PHRASES:
+        if phrase in lowered:
+            problems.append(
+                _problem(
+                    "metric_spec_draft_wording",
+                    "a frozen specification still says " + phrase,
+                )
+            )
+    if "frozen" not in lowered or "production-ready" not in lowered:
+        problems.append(
+            _problem(
+                "metric_spec_freeze_statement_invalid",
+                "the freeze statement must say the specification is frozen and production-ready",
+            )
+        )
+    if "production execution remains unauthorized" not in lowered and "production remains unauthorized" not in lowered:
+        problems.append(
+            _problem(
+                "metric_spec_freeze_statement_invalid",
+                "the freeze statement must say production remains unauthorized",
+            )
+        )
+
+
 def validate_metric_spec(spec, require_draft=True):
-    """Return the spec when it matches the implemented metric ids.
+    """Return the spec when its membership, formulas, revisions, and dispositions match.
 
     A closeness row is accepted only for an implemented GEP-2 metric whose
-    reference role is exactly synthetic_eval_stand_in. Runtime role EVAL is
-    refused. The spec stays draft and has no aggregate score.
+    production reference role is exactly ``authorized_eval_unique_cores``.
+    Runtime role EVAL is refused. Synthetic fixtures exercise the formulas
+    without changing that declaration. ``require_draft=True`` keeps a draft
+    package draft. A candidate frozen specification is checked with
+    ``require_draft=False`` and must be frozen at the top level, on every
+    metric row, and on the contract, with both production labels true, no
+    blocking item left unresolved, ``metric_specification`` readiness
+    ``frozen_and_production_ready``, and a supersession statement that says
+    the specification is frozen and production-ready while production remains
+    unauthorized. Active wording such as "remains draft" or "not
+    production-ready" fails that check.
     """
     metrics_module = _load_module("m4_diagnostic_metrics.py", "gep1_m4_metrics")
     report_module = _load_module("m6_diagnostic_generation.py", "gep1_m6_report")
@@ -646,8 +845,13 @@ def validate_metric_spec(spec, require_draft=True):
         if metric["scientific_role"] == "closeness":
             if metric_id not in GEP2_CLOSENESS_METRIC_IDS or not _analysis_implements(metric.get("implementation_symbol")):
                 problems.append(_problem("closeness_metric_not_implemented", metric_id + " claims closeness without the synthetic implementation"))
-            elif metric["reference_role"] != SYNTHETIC_REFERENCE_ROLE:
-                problems.append(_problem("closeness_runtime_role_refused", metric_id + " closeness role is not synthetic_eval_stand_in"))
+            elif metric["reference_role"] != PRODUCTION_REFERENCE_ROLE:
+                problems.append(
+                    _problem(
+                        "production_reference_role_refused",
+                        metric_id + " production reference role is not authorized_eval_unique_cores",
+                    )
+                )
             elif metric["direction"] != "lower":
                 problems.append(_problem("metric_spec_invalid", metric_id + " closeness direction must be lower"))
         elif metric_id in GEP2_IMPLEMENTED_METRIC_IDS and not _analysis_implements(metric.get("implementation_symbol")):
@@ -658,6 +862,10 @@ def validate_metric_spec(spec, require_draft=True):
             problems.append(_problem("metric_spec_invalid", metric_id + " has an unknown freeze status"))
         if require_draft and metric["freeze_status"] != "draft":
             problems.append(_problem("metric_spec_frozen_in_gep1", metric_id + " is frozen"))
+        elif not require_draft and metric["freeze_status"] != "frozen":
+            problems.append(_problem("metric_row_unfrozen", metric_id + " remains draft"))
+        if metric_id in S6_ASSIGNMENT_METRIC_IDS and S6_ASSIGNMENT_STATEMENT not in metric["length_treatment"]:
+            problems.append(_problem("s6_assignment_statement_missing", metric_id + " does not state the frozen S6 length assignment"))
         if metric_id in NOVELTY_DIRECTIONS:
             if metric["scientific_role"] != "outcome":
                 problems.append(_problem("novelty_role_invalid", metric_id + " is a novelty outcome, not EVAL closeness"))
@@ -706,10 +914,72 @@ def validate_metric_spec(spec, require_draft=True):
             resolved_ids.append(item["id"])
         else:
             unresolved_ids.append(item["id"])
-    if set(resolved_ids) != set(RESOLVED_BLOCKING_IDS) or set(unresolved_ids) != set(BLOCKING_IDS) - set(RESOLVED_BLOCKING_IDS):
-        problems.append(_problem("blocking_item_drift", "blocking items do not match the reviewed resolved and unresolved sets"))
+            if not require_draft:
+                problems.append(_problem("blocking_item_unresolved", item["id"] + " remains unresolved"))
+    if set(resolved_ids) != set(RESOLVED_BLOCKING_IDS):
+        problems.append(_problem("blocking_item_drift", "resolved blocking items do not match the reviewed set"))
     if len(resolved_ids) != len(set(resolved_ids)) or len(unresolved_ids) != len(set(unresolved_ids)):
         problems.append(_problem("blocking_item_drift", "a blocking item id is duplicated"))
+    dispositions = {}
+    for item in blocking:
+        if not isinstance(item, dict):
+            continue
+        item_id = item.get("id")
+        if item_id not in M10_BLOCKING_DISPOSITIONS:
+            continue
+        if item.get("m10_disposition") != M10_BLOCKING_DISPOSITIONS[item_id]:
+            problems.append(_problem("blocking_disposition_invalid", item_id + " does not carry its M10 disposition"))
+        dispositions[item_id] = item.get("m10_disposition")
+    if set(dispositions) != set(M10_BLOCKING_DISPOSITIONS) or set(M10_BLOCKING_DISPOSITIONS) - set(resolved_ids):
+        problems.append(_problem("blocking_disposition_invalid", "the six M10 dispositions are not resolved"))
+    classified_ids = []
+    for group_name, entries in BLOCKER_CLASSIFICATION_GROUPS:
+        expected_disposition = BLOCKER_CLASSIFICATION_DISPOSITIONS[group_name]
+        for entry in entries:
+            classified_ids.append(entry["id"])
+            if M10_BLOCKING_DISPOSITIONS.get(entry["id"]) != expected_disposition:
+                problems.append(_problem("blocking_disposition_invalid", entry["id"] + " is not in its reporting class"))
+            if dispositions.get(entry["id"]) != expected_disposition:
+                problems.append(_problem("blocking_disposition_invalid", entry["id"] + " disposition is not preserved"))
+    if classified_ids != list(dict.fromkeys(classified_ids)) or set(classified_ids) != set(M10_BLOCKING_DISPOSITIONS):
+        problems.append(_problem("blocking_disposition_invalid", "the blocker classification does not partition the six M10 dispositions"))
+    draft = spec.get("m10_draft_contract")
+    if not isinstance(draft, dict):
+        problems.append(_problem("metric_spec_not_draft", "the metric specification contract is missing"))
+        draft = {}
+    elif require_draft and (
+        draft.get("document_status") != "draft" or draft.get("labelled_production_ready") is not False
+    ):
+        problems.append(_problem("metric_spec_not_draft", "the metric specification must stay draft and not production-ready"))
+    elif require_draft:
+        note = draft.get("inactive_pathway_supersession")
+        if not isinstance(note, dict) or "remains draft" not in str(note.get("statement")):
+            problems.append(_problem("metric_spec_not_draft", "the draft supersession note is missing"))
+    if not require_draft:
+        if spec.get("freeze_status") != "frozen":
+            problems.append(_problem("metric_spec_unfrozen", "a frozen specification requires top-level freeze_status frozen"))
+        if (
+            draft.get("document_status") != "frozen"
+            or draft.get("labelled_frozen") is not True
+            or draft.get("labelled_production_ready") is not True
+        ):
+            problems.append(
+                _problem(
+                    "metric_spec_contract_unfrozen",
+                    "a frozen specification requires a frozen contract that is labelled frozen and production-ready",
+                )
+            )
+        _require_frozen_specification_language(draft, problems)
+    required_items = draft.get("required_implementation_work")
+    required = {}
+    if isinstance(required_items, list):
+        for entry in required_items:
+            if isinstance(entry, dict) and _nonempty_text(entry.get("id")):
+                required[entry["id"]] = entry
+    for item_id in REQUIRED_IMPLEMENTATION_IDS:
+        entry = required.get(item_id)
+        if not isinstance(entry, dict) or entry.get("status") != "required":
+            problems.append(_problem("required_implementation_missing", item_id + " is not recorded as required implementation work"))
     covered = set(seen)
     for name in report_module.REPORT_ONLY_ITEMS:
         if name in covered:
@@ -721,6 +991,7 @@ def validate_metric_spec(spec, require_draft=True):
         if not named:
             problems.append(_problem("metric_silently_dropped", name + " is neither specified nor blocked"))
     _validate_m8_contract_blocks(spec, problems)
+    _reject_forbidden_s6_claims(spec, problems, "metric_spec")
     _raise_problems(problems)
     return spec
 
@@ -1561,7 +1832,8 @@ def run_preflight(records, metadata=None, mode=None):
     reconciliation = m4_reconciliation(rows)
     unresolved_items = [item for item in spec["blocking_items"] if item.get("status") == "unresolved"]
     resolved_items = [item for item in spec["blocking_items"] if item.get("status") == "resolved"]
-    warnings = ["unresolved: %s: %s" % (item["id"], item["statement"]) for item in unresolved_items]
+    classification = blocker_classification()
+    warnings = []
     if namespace is None:
         warnings.append("chunk_id_namespace_unspecified: matched ids are not a loaded production schedule")
     if not rows:
@@ -1604,12 +1876,36 @@ def run_preflight(records, metadata=None, mode=None):
             "preflight_module_sha256": _sha256_file(os.path.abspath(__file__)),
             "metric_spec_sha256": _sha256_file(spec_path()),
             "metric_spec_schema_version": spec["schema_version"],
-            "governing_plan": {"path": GOVERNING_PLAN_RELATIVE, "sha256": _hash_revision_path(GOVERNING_PLAN_RELATIVE)},
+            "governing_plan": {"path": GOVERNING_PLAN_RELATIVE, "sha256": _hash_revision_path(GOVERNING_PLAN_RELATIVE), "version": GOVERNING_PLAN_VERSION, "revision_date": GOVERNING_PLAN_REVISION_DATE},
+            "historical_m9c_plan": {
+                "path": HISTORICAL_M9C_PLAN_RELATIVE,
+                "sha256": _hash_revision_path(HISTORICAL_M9C_PLAN_RELATIVE),
+                "version": HISTORICAL_M9C_PLAN_VERSION,
+                "revision_date": HISTORICAL_M9C_PLAN_REVISION_DATE,
+                "role": "m9c_frozen_historical",
+            },
             "m4_diagnostic_metrics": {"path": M4_METRICS_RELATIVE, "sha256": _hash_revision_path(M4_METRICS_RELATIVE)},
             "m6_diagnostic_generation": {"path": M6_DIAGNOSTIC_RELATIVE, "sha256": _hash_revision_path(M6_DIAGNOSTIC_RELATIVE)},
             "validation_metrics_config": {"path": METRICS_CONFIG_RELATIVE, "sha256": _hash_revision_path(METRICS_CONFIG_RELATIVE)},
         },
-        "metric_spec_validation_status": "valid_draft_with_unresolved_items",
+        "metric_spec_validation_status": (
+            "valid_frozen"
+            if spec.get("freeze_status") == "frozen" and not unresolved_items
+            else "valid_draft"
+            if not unresolved_items
+            else "valid_draft_with_unresolved_items"
+        ),
+        "metric_spec_freeze_status": spec.get("freeze_status"),
+        "metric_spec_production_ready": spec.get("m10_draft_contract", {}).get("labelled_production_ready") is True,
+        "m10_blocking_dispositions": dict(M10_BLOCKING_DISPOSITIONS),
+        "blocker_classification": classification,
+        "active_implementation_blockers": [],
+        "implemented_awaiting_authorization": [
+            entry["id"] for entry in classification["implemented_awaiting_authorization"]
+        ],
+        "required_implementation_work": [
+            {"id": item_id, "status": "required"} for item_id in REQUIRED_IMPLEMENTATION_IDS
+        ],
         "metric_count": len(spec["metrics"]),
         "metric_ids": [metric["metric_id"] for metric in spec["metrics"]],
         "unresolved_item_count": len(unresolved_items),
@@ -1727,6 +2023,15 @@ def render_preflight_text(report):
     lines.append("resolved_items:")
     for item_id in report["resolved_item_ids"]:
         lines.append("  resolved: " + item_id)
+    lines.append("blocker_classification:")
+    for group_name, _entries in BLOCKER_CLASSIFICATION_GROUPS:
+        lines.append("  " + group_name + ":")
+        for entry in report["blocker_classification"][group_name]:
+            lines.append("    %s [%s]: %s" % (entry["id"], entry["m10_disposition"], entry["subject"]))
+    lines.append("active_implementation_blockers: " + json.dumps(report["active_implementation_blockers"]))
+    lines.append(
+        "implemented_awaiting_authorization: " + json.dumps(report["implemented_awaiting_authorization"])
+    )
     lines.append("warnings: %d" % len(report["warnings"]))
     for warning in report["warnings"]:
         lines.append("  warning: " + warning)

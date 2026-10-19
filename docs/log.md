@@ -12200,3 +12200,151 @@ The manifest status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN` and `publica
 **Unlock:** M9C is complete and EVAL is unlocked for a separately authorized M10 execution. This record does not itself authorize or begin M10 and did not open EVAL. The independent review archive SHA-256 is `4c2e174f53aaa4da388debb1362c3d0b8f180c4791a1d96305c20d1a53d592c5`.
 
 **Boundary:** REF, EVAL, production candidates, TRAIN, VALIDATION, models, and checkpoints were not opened. AptaRank was not run. M10 execution is not authorized. Nothing was pushed.
+
+## 2026-10-17 — M10 scientific contract in v3.4
+
+**Stage:** Aim 2 / modelling / M10 documentation
+
+**Status:** `M10_NOT_STARTED`. Documentation and draft-configuration only. No scientific result is claimed. M10 execution is not authorized. EVAL was not opened.
+
+**Active plan:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md` is the active plan, revision date 17 October 2026, SHA-256 `33a3ff4dfd4d0107903320a0176d94dc029ff1f39fec73533b1d4d074d78a020`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` remains the M9C-frozen plan at SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe` and was not rewritten. M10 is Section 5 only. M9C has unlocked EVAL. EVAL remains unopened, and M10 execution remains unauthorized. Sections 6–10 and the NDM-1 decision record remain required and are outside M10.
+
+**Scientific contract:** The three separate headline closeness metrics are nearest-EVAL longer-length-normalized edit distance, nucleotide total variation to EVAL, and dinucleotide total variation to EVAL. There is no aggregate generator-quality score. Diversity is exact-duplicate diversity only. Clustering, representation analysis, generator confidence intervals, bootstrap, hypothesis tests, and EVAL-cluster resampling are outside M10. D1 seeds 43 and 44 and matched blocks A and B are reported separately, plus observed ranges only. The 154 unique EVAL cores are weighted once each. The 79 clusters are a design fact and a limitation and do not weight formulas. TRAIN-overlap and nearest-TRAIN results are the frozen M9A outputs, and TRAIN was not reopened. The thesis-facing parsed count is `successfully_parsed_outputs`. Legacy `parsed_outputs` is an internal/schema-valid-record audit field. The generator-evaluation fold recorded by the frozen generator pin is `RNA.fold(sequence)` in ViennaRNA 2.7.0, distinct from AptaRank's ViennaRNA 2.7.2.
+
+**Draft metric specification:** `config/modelling/generator_eval_metric_spec.json` remains `freeze_status` `draft`, SHA-256 `aa13cd3844f4b42a705970d394a268b458d244f1863406628c3bed2bae397489`. It is not frozen and it is not production-ready. Clustering, representation analysis, and generator confidence intervals are recorded as outside M10. Production TRAIN loading is recorded as satisfied by the frozen M9A outputs. The ledger adapter, authorized EVAL adapter, matched-block binding, structure execution, and sequence-free report writer are recorded as required implementation work. The production report writer does not yet exist.
+
+**Documents:** `docs/fine-tuning-implementation-plan.md` SHA-256 `f834e658f4e7dfc025c8b7904281740a22b30ac882360b7ad3729f2067ce9c80`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md` SHA-256 `33a3ff4dfd4d0107903320a0176d94dc029ff1f39fec73533b1d4d074d78a020`. `config/modelling/generator_eval_metric_spec.json` SHA-256 `aa13cd3844f4b42a705970d394a268b458d244f1863406628c3bed2bae397489`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` remains SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`.
+
+**Boundary:** EVAL sequence data was not opened, hashed, previewed, parsed, or copied. TRAIN was not reopened. AptaRank was not run. The production runner was not implemented. Production analysis was not run. No GPU was used. Nothing was committed or pushed.
+
+## 2026-10-19 — M10 freeze-readiness correction, still unauthorized
+
+**Stage:** Aim 2 / modelling / M10 inactive pathway
+
+**Status:** `M10_NOT_STARTED`. No scientific result is claimed. M10 execution is not authorized. EVAL was not opened. The metric specification was not frozen and `FROZEN_METRIC_SPEC_SHA256` remains unset.
+
+**Correction:** Authorized production now finishes the frozen M9A summary path, hash, and schema checks, the full candidate-spec validation, the code and configuration inventory, and S6 provenance before the single EVAL read. A draft specification and an unpinned hash still fail closed. Protected generated records keep `record_id` and carry the adapted checkpoint, D1 training seed, block, generation seed, attempt position, B0 chunk and seed, B2 attempt and empirical-null seed, lengths, cleaning status and version, and source-artifact hash. The public report adds a sequence-free provenance summary by condition. Per-row folding is `computed_on_this_row`, `reused_from_earlier_row`, or `not_folded`. The protected derived file is mode `0600`. The sequence-free report, manifest, and checksum file are mode `0644`. Publication stays atomic and still refuses an existing directory.
+
+**Structure population:** Each distinct valid sequence is folded once. Generated condition, seed, and block quantiles use valid attempt rows with duplicate-attempt weighting. EVAL uses its 154 unique cores once each.
+
+**Implementation status:** The ledger adapter, single-read EVAL adapter, matched schedule, structure wrapper and distinct-sequence cache, and production writer are implemented and synthetically verified. They have not run biologically. Awaiting authorization is not an active implementation blocker. `config/modelling/generator_eval_metric_spec.json` remains `freeze_status` `draft` and is not production-ready.
+
+**Draft metric specification:** SHA-256 `cfd822da40489a677464b18e01dadd37ce0331033ec24f1656fef7f113e274e8`.
+
+**Documents:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md` SHA-256 `8b51f870d894715e5e4cf3906914856a8d96802f5ce65e49bf07faee2eb70dc0`. `docs/fine-tuning-implementation-plan.md` SHA-256 `e028c18aff23c69ce22ff55dad5d8c888b285c1634875b40c62c91d46d36af86`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` remains SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe` and was not rewritten. `scripts/modelling/generator_eval_m10.py` SHA-256 `61d044cc437968caf213c786622f32acb58d4317388ae4de766bafb57565794b`. `scripts/modelling/generator_eval_preflight.py` SHA-256 `eb66bd9c2f7061b2cac1231a1cb45dfb7ad970fdacf743c387ea3464e9980873`.
+
+**Tests:** The pinned interpreter `/home/laura/miniconda3/envs/rnagenesis-h200/bin/python` ran `python -m unittest discover -s tests/modelling -p 'test_generator_eval*.py' -v`. 193 tests passed.
+
+**Boundary:** EVAL sequence data was not opened, hashed, previewed, parsed, or copied. TRAIN sequence data was not reopened. Production was not run. AptaRank was not run. No GPU was used. Nothing was committed or pushed.
+
+## 2026-10-19 — M10 frozen-candidate gate, still unauthorized
+
+**Stage:** Aim 2 / modelling / M10 freeze-readiness correction
+
+**Status:** `M10_NOT_STARTED`. No scientific result is claimed. M10 execution is not authorized. EVAL was not opened. Production was not run. The on-disk metric specification remains `freeze_status` `draft`, every metric row remains `draft`, and the contract remains `document_status` `draft` with `labelled_frozen` false and `labelled_production_ready` false. `FROZEN_METRIC_SPEC_SHA256` remains unset.
+
+**Frozen-candidate gate:** An in-memory candidate must have top-level `freeze_status` `frozen`, every metric row `frozen`, contract `document_status` `frozen`, `labelled_frozen` true, `labelled_production_ready` true, and no blocking item left `unresolved`. Partial top-level flag changes fail before EVAL access. The six former blockers are resolved dispositions on the draft specification: clustering, representation analysis, and confidence intervals, bootstrap, hypothesis tests, and EVAL-cluster resampling are outside M10; TRAIN loading is resolved through the frozen M9A summaries; structure execution and matched-block wiring are implemented and synthetically verified, awaiting authorization only.
+
+**Reference role:** The three closeness metrics declare production reference role `authorized_eval_unique_cores`, the 154 frozen unique EVAL cores available only after authorization and hash verification. Synthetic fixtures may exercise the formulas without changing that declaration.
+
+**Hashes required before EVAL access:** The frozen S6 parameter-record SHA-256 is `8e2e20cfe1fa68ba53beec8df9aa9a64a9a2144dc9006fbbf5f8eb064f01df0f`. The supplied 63-character token was not a SHA-256; the parameter record computed from the frozen S7 configurations has this 64-character digest. S7B is `c62553344748fc8c322869d68a46f69e653dee5641bf5f208dcb776e597c9550`. S7C is `e07f5af0de56beff4cefe75854493eaa3f696b9bc20c554ce2261033165f0873`, matching `config/global_s7c_ft_train_validation.json`; the duplicated-looking alternate was not used. S7D is `abd3e1b29f422848aabd309ab0bb985731b9fb3941ddfbd2ec0f43d31a98b475`. `data/interim/deduplicated/s6_profile/bimodality.json` is absent. That absence remains the recorded provenance limitation. The parameter-record hash is not an artefact hash.
+
+**Code inventory:** The broad code inventory is captured. Metric-calculation revisions remain validated through the specification. The production-runner hash is the captured SHA-256 of `scripts/modelling/generator_eval_m10.py`, `5b3f608baf8de1c5393e7ac65b2b9f594c56b9111234c37db5d24429d194d58b`. It is not embedded in the source.
+
+**Draft metric specification:** SHA-256 `1e4059ffb704fa3915feaaa6ed53f240d78d758f4a86b101497b5be9bba1b7e8`.
+
+**Documents:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md` SHA-256 `da64358018285d1fdd99c7d72f8e1b3fc735feac5dca6998a1b32eafc6b07e00`. `docs/fine-tuning-implementation-plan.md` SHA-256 `7e2136abf345a8f57f790748bf872b6bf2cb400893c0bd0356d051d11a856aae`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` remains SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe` and was not rewritten. `scripts/modelling/generator_eval_preflight.py` SHA-256 `74b413bf86d5dda33fdf0aa71ebb56270a3fdd0352122f68b3a3ef725e8f9e82`.
+
+**Tests:** The pinned interpreter `/home/laura/miniconda3/envs/rnagenesis-h200/bin/python` ran `python -m unittest discover -s tests/modelling -p 'test_generator_eval*.py' -v`. 196 tests passed.
+
+**Boundary:** EVAL sequence data was not opened, hashed, previewed, parsed, or copied. TRAIN sequence data was not reopened. Production was not run. AptaRank was not run. No GPU was used. Nothing was committed or pushed.
+
+## 2026-10-19 — M10 metric specification frozen, execution still unauthorized
+
+**Stage:** Aim 2 / modelling / M10 pre-EVAL metric-specification freeze
+
+**Status:** `M10_NOT_STARTED`. No scientific result is claimed. The executable metric specification is frozen and production-ready. M10 execution is not authorized. EVAL access remains unauthorized. EVAL was not opened. Production was not run. `run_authorized_production` was not called.
+
+**Frozen specification:** `config/modelling/generator_eval_metric_spec.json` has top-level `freeze_status` `frozen`, all 35 metric rows `freeze_status` `frozen`, contract `document_status` `frozen`, `labelled_frozen` true, and `labelled_production_ready` true. `implementation_readiness.metric_specification` is `frozen_and_production_ready`. The supersession statement says the specification is frozen and production-ready while production execution remains unauthorized. Unresolved blocking items are zero. Formulas, denominators, directions, metric membership, scientific roles, the production reference role `authorized_eval_unique_cores`, exclusions, the S6 rule, and code and configuration revisions were not changed. `FROZEN_METRIC_SPEC_SHA256` is `c999f0a4352b7fde7dfa0431583020b054b02da8803aeb7839479584de256066`.
+
+**Frozen pre-EVAL gate:** The generated-input preflight now validates the pinned frozen specification, generated ledgers, matched schedule, frozen M9A summaries, ViennaRNA 2.7.0, the S6 parameter hash, and the three S7 hashes. The only fold is the existing synthetic ViennaRNA smoke test. The published record reports `metric_spec_freeze_status` `frozen`, `production_ready` true, `m10_execution_authorized` false, `production_execution_invoked` false, and `eval_opened` false. Its SHA-256 is `c9514ce04bab30f35274bc5f6c9819cdae14a1885c67a105b2350562e4f90a67`. The record has no EVAL route and records no EVAL outcome.
+
+**Documents:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md` SHA-256 `bc782488568b936d5c2facb278cb9be6b1fcc92087fd1adfd69b9dfc7acf9949`. `docs/fine-tuning-implementation-plan.md` SHA-256 `a0b14ba47f2407847f1565081885c9bb223d5c489f6cd4adeeb44d4e9210074c`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` remains SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe` and was not rewritten. `scripts/modelling/generator_eval_m10.py` SHA-256 `45387aa07d304f19ca4ba9b725bc81b7c1be4bb5a81807997054fe9e6526b450`. `scripts/modelling/generator_eval_preflight.py` SHA-256 `e9cb9b65b3d804a1f2f5c7678aac6e950875c884bb414c93d016a0421cfcb144`.
+
+**Tests:** The pinned interpreter `/home/laura/miniconda3/envs/rnagenesis-h200/bin/python` ran `python -m unittest discover -s tests/modelling -p 'test_generator_eval*.py' -v`. 197 tests passed.
+
+**Boundary:** EVAL sequence data was not opened, hashed, previewed, parsed, or copied. TRAIN sequence data was not reopened. Biological generated sequences were not folded. Production was not run. AptaRank was not run. No GPU was used. Nothing was committed or pushed.
+
+## 2026-10-19 — M10 Section 9.1 documentation-consistency correction, still unauthorized
+
+**Stage:** Aim 2 / modelling / M10 pre-authorization documentation consistency
+
+**Status:** `M10_NOT_STARTED`. No scientific result is claimed. The executable metric specification remains frozen and production-ready. M10 execution is not authorized. EVAL access remains unauthorized. EVAL was not opened. Production was not run. `run_authorized_production` was not called.
+
+**Correction:** Section 9.1 of `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md` no longer says Laura uploads the generated-candidate Tier 1 files in M10. She uploads and runs them in the later AptaRank thesis-evaluation workflow, after M10 and under its separate manual-production approval. No other sentence in v3.4 or `docs/fine-tuning-implementation-plan.md` placed an AptaRank upload, UI run, Tier 1, Tier 2, the NDM-1 review, or the final decision record inside M10. M10 remains Section 5 only. AptaRank remains required later full-thesis work outside M10. EVAL is still opened once, during authorized M10. Frozen metrics, formulas, denominators, directions, exclusions, and scientific interpretations were not changed. v3.3 was not rewritten.
+
+**Current hashes:** The current finalized v3.4 SHA-256 is `1f3a73bc294a75c527e11f074c6d3265786c8e7e70d41eacf3ea83d3cf512941`. The current metric-specification SHA-256 is `2b0679b999235cc838298563448b01ef73f5fdd5132c5ddd3d9944f301f5c824`, and `FROZEN_METRIC_SPEC_SHA256` matches it. The historical 17 October 2026 v3.4 SHA-256 is `33a3ff4dfd4d0107903320a0176d94dc029ff1f39fec73533b1d4d074d78a020`. The historical finalized v3.4 SHA-256 immediately before this correction is `bc782488568b936d5c2facb278cb9be6b1fcc92087fd1adfd69b9dfc7acf9949`. The historical metric-specification SHA-256 at the prior freeze is `c999f0a4352b7fde7dfa0431583020b054b02da8803aeb7839479584de256066`.
+
+**Specification:** Top-level `freeze_status` remains `frozen`. All 35 metric rows remain `frozen`. Contract `document_status` remains `frozen`, with `labelled_frozen` true and `labelled_production_ready` true. `implementation_readiness.metric_specification` remains `frozen_and_production_ready`. Unresolved blocking items remain zero. The three closeness metrics still declare production reference role `authorized_eval_unique_cores`.
+
+**Pre-EVAL gate:** A new sequence-free record was written at `/home/laura/m10_review_archives/m10_doc_consistency_20261019T003846Z/gate/m10_doc_consistency_pre_eval_gate.json`, SHA-256 `6d4e10d1eb877566811d3efcaf6ac76dde182e8e96dee7a923c3c1adeae53182`. The synthetic smoke record SHA-256 is `80c3322c58c5ad182c36bb582ef298ff89a98a92eb6c1bf2706051cd93187edb`. The gate reports `metric_spec_freeze_status` `frozen`, `production_ready` true, `m10_execution_authorized` false, `production_execution_invoked` false, and `eval_opened` false. The earlier gate SHA-256 `c9514ce04bab30f35274bc5f6c9819cdae14a1885c67a105b2350562e4f90a67` was not overwritten. EVAL was not opened. Production was not invoked. The only fold was the synthetic smoke fixture, one call.
+
+**Documents:** `docs/fine-tuning-implementation-plan.md` SHA-256 `aea4f213ea62248949b317524c6b299781866b3a74023ea989c5bafef6062fbd`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` remains SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. `scripts/modelling/generator_eval_m10.py` SHA-256 `4c43b389d16c6477c17e993d2eb668784bf3a1a18a78166b69cfc0484f842019`. `scripts/modelling/generator_eval_preflight.py` remains SHA-256 `e9cb9b65b3d804a1f2f5c7678aac6e950875c884bb414c93d016a0421cfcb144`.
+
+**Tests:** The pinned interpreter `/home/laura/miniconda3/envs/rnagenesis-h200/bin/python` ran `python -m unittest discover -s tests/modelling -p 'test_generator_eval*.py' -v`. 197 tests passed.
+
+**Boundary:** EVAL sequence data was not opened, hashed, previewed, parsed, or copied. TRAIN sequence data was not reopened. Biological generated sequences were not folded. Production was not run. AptaRank was not run. No GPU was used. Nothing was committed or pushed.
+
+## 2026-10-19 — M10 protected EVAL adapter identity-key correction
+
+**Stage:** Aim 2 / modelling / M10 protected-input adapter correction
+
+**Status:** M10 was authorized and started. EVAL was opened once and its frozen SHA-256 passed. The run stopped before folding, calculation, or publication. No scientific result is claimed. The protected adapter was corrected and independently reviewed. One additional EVAL read and one corrected invocation are now explicitly authorized. No other method, metric, or input change is authorized.
+
+**Failure:** The single authorized production attempt matched `FROZEN_EVAL_SHA256` inside `adapt_authorized_eval`, then `_parse_eval_csv` failed closed with `duplicate_sequence_id` because a sequence-level `sequence_id` was repeated. Nothing was published. The prior invocation log remains outside the repository.
+
+**Contract:** `sequence_id` is `S5SEQ_<sha256(sequence_core)>`, a sequence-level core key, not a scientific identity key. `scientific_identity_id` is the unique identity-row key. EVAL has 181 scientific identities and 154 unique cores, so a repeated `sequence_id` is expected when identities share a core.
+
+**Correction:** `scripts/modelling/generator_eval_m10.py` now requires a populated unique `scientific_identity_id` on every identity row. `sequence_id` is required separately and may repeat only when every repeat maps to the same `sequence_core`. Identity rows stay in the 181-identity denominator. Collapse is still by `sequence_core`, with one core record per distinct core, the sequence-level `sequence_id` on that record, `identity_count` for the identities that share it, and weight 1 per unique core. The adapter fails closed when a scientific identity id is missing or duplicated, a `sequence_id` maps to more than one core, one core maps to more than one `sequence_id`, a repeated core conflicts on cluster, stored/core length, or frozen S6 assignment, or a required core or cluster field is missing or invalid. The synthetic core-level stand-in remains one row per unique core and still rejects a repeated `sequence_id`. Frozen formulas, downstream report schemas, the metric specification, v3.4, and the frozen counts 181 / 154 / 79 / 89 / 65 were not changed.
+
+**Hashes:** Corrected runner `scripts/modelling/generator_eval_m10.py` SHA-256 `02735f84f264b3b0cfe7f9b5d2ab704846bb5840f9235707197e2999f9152c77`. The metric specification remains SHA-256 `2b0679b999235cc838298563448b01ef73f5fdd5132c5ddd3d9944f301f5c824`. v3.4 remains SHA-256 `1f3a73bc294a75c527e11f074c6d3265786c8e7e70d41eacf3ea83d3cf512941`. `scripts/modelling/generator_eval_preflight.py` remains SHA-256 `e9cb9b65b3d804a1f2f5c7678aac6e950875c884bb414c93d016a0421cfcb144`.
+
+**Pre-EVAL gate:** A new sequence-free record was written at `/home/laura/m10_review_archives/m10_eval_identity_adapter_20261019T013121Z/gate/m10_eval_identity_adapter_pre_eval_gate.json`, SHA-256 `4a04218c3f3302b032426b47201e3f4647692344bf246c9c8bfe2b64764d08d2`. The synthetic smoke record SHA-256 is `80c3322c58c5ad182c36bb582ef298ff89a98a92eb6c1bf2706051cd93187edb`. The gate reports `metric_spec_freeze_status` `frozen`, `production_ready` true, `m10_execution_authorized` false, `production_execution_invoked` false, and `eval_opened` false. An EVAL path argument was rejected before the function body and did not open a file. The earlier gate records were not overwritten. The only fold was the synthetic smoke fixture, one call. No EVAL metric was calculated and nothing was published.
+
+**Tests:** The pinned interpreter `/home/laura/miniconda3/envs/rnagenesis-h200/bin/python` ran `python -m unittest discover -s tests/modelling -p 'test_generator_eval*.py' -v`. 206 tests passed. Nine of those tests cover the identity-row adapter with in-memory bytes. They do not open repository EVAL.
+
+**Boundary:** This correction did not open, hash, preview, parse, or copy EVAL sequence data. The earlier authorized attempt opened EVAL once; its frozen SHA-256 passed, and that run stopped before folding, calculation, or publication. TRAIN sequence data was not reopened. Biological generated sequences were not folded. AptaRank was not run. No GPU was used. Nothing was committed or pushed. The corrected invocation is authorized and has not been executed by this record.
+
+## 2026-10-19 — M10 Section 5 production published
+
+**Stage:** Aim 2 / modelling / M10 post-production documentation
+
+**Status:** `M10_SECTION5_PUBLISHED`. The corrected authorized invocation succeeded. EVAL was opened once. The sequence-free report status is `section5_calculation_complete`. This documentation stage records the reviewed interpretation. It did not rerun production or recompute metrics. The 19 October 2026 failed-attempt entry and the protected EVAL adapter-correction entry above remain historical records.
+
+**Production:** `results/fine_tuning/m10_generator_evaluation/m10_section5_production_v1/`. Invocation `2026-10-19T02:02:55Z` to `2026-10-19T02:58:06Z`, function elapsed 3310.761914 seconds, pipeline exit status 0, `eval_read_count` 1. The four published files are unchanged by this stage: `m10_derived_evidence.json` mode `0600`, 186484548 bytes, SHA-256 `9ba39df6e9c24196d35958613f373f92bac6bf720acde6a07e3880d9d6dc42ee`; `m10_sequence_free_report.json` SHA-256 `20e8daf7b2decb92299a9c0274273fd764db94c63c46e603c204cc7b0f09547f`; `m10_run_manifest.json` SHA-256 `5d828d918ff8d79e66d65181584175c87d125f69f59b76b2e3a48e78395803d0`; `SHA256SUMS` SHA-256 `95f096762d76026f643f245eefae8cbb540c0f36f8b7df50fefa4e1fe09576ee`. The existing sequence-free validation record reports `VALIDATION_OVERALL pass`. Its SHA-256 is `e9fff42849f027456c02bdc70e7659dd04531b8cb57ca742797b484dd4abc3c4`. The invocation log SHA-256 is `fe6fd9f617d89552159d56781fce6ce218316a0c0411c41d8ea602374a87d44c`.
+
+**EVAL:** Frozen SHA-256 `ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015` matched. Counts are 181 identities, 154 unique cores, and 79 clusters, with 89 short cores and 65 long cores. Each unique core is weighted once.
+
+**Interpretation:** D1 is closer than B1 on all three frozen EVAL closeness metrics overall, on the equal-training-seed mixture, and in both matched blocks. The nearest-edit improvement is small. The composition shifts are larger. B2 is numerically closer than D1 on all three closeness metrics and descriptively closer on the folding summaries, which limits any claim of higher-order learned aptamer behaviour. D1 moves toward EVAL for MFE and normalized MFE and slightly away for paired fraction, so the structural result is mixed. All four conditions are 100% valid. D1 has no exact duplicates. B1 has 17 duplicate-excess attempts. Exact TRAIN overlap is zero for every condition. D1 is slightly closer to TRAIN than B1 by median nearest-TRAIN distance, 0.44 versus 0.4444444444444444. The full tables, denominators, B0 panel, and limitations are in `docs/m10_generator_evaluation_results.md`.
+
+**Limitations recorded:** two D1 seeds, seed/block coupling, B2 single seed, unweighted EVAL clusters, no confidence interval or test, no aggregate quality score, and no binding or target-specific claim.
+
+**Documents:** `docs/m10_generator_evaluation_results.md` SHA-256 `a76b1d36b2f4a492b96395e64dbb3d8c099478ad6fd3243bd062fd45a17e6d10`. `docs/fine-tuning-implementation-plan.md` SHA-256 `19a2a50ec15fc9a369b1c47e9eb5e3403b75cd709890ce0a5805230c65e11b25`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` remains SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md` remains SHA-256 `1f3a73bc294a75c527e11f074c6d3265786c8e7e70d41eacf3ea83d3cf512941`. `config/modelling/generator_eval_metric_spec.json` remains SHA-256 `2b0679b999235cc838298563448b01ef73f5fdd5132c5ddd3d9944f301f5c824`. `scripts/modelling/generator_eval_m10.py` remains SHA-256 `02735f84f264b3b0cfe7f9b5d2ab704846bb5840f9235707197e2999f9152c77`.
+
+**Checks:** Focused sequence-free document consistency checks passed. They compared the figures in `docs/m10_generator_evaluation_results.md` with the published sequence-free report and manifest, confirmed the failed-attempt and adapter-correction entries remain, and re-hashed the frozen plans, metric specification, runner, and public production files. The protected derived file was not parsed.
+
+**Boundary:** This stage did not open `eval.csv`, `m10_derived_evidence.json`, the generated ledgers, or TRAIN sequences. It did not rerun production, recompute metrics, modify the four production outputs, change code or metric definitions, commit, or push. AptaRank was not run. No GPU was used.
+
+## 2026-10-19 — v3.5 succession after reviewed M10
+
+**Stage:** Aim 2 / modelling / post-M10 evaluation-plan succession
+
+**Status:** Documentation only. M10 Section 5 is scientifically complete and reviewed. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md` remains the governing plan for that run, SHA-256 `1f3a73bc294a75c527e11f074c6d3265786c8e7e70d41eacf3ea83d3cf512941`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_5.md` is the active plan for the remaining AptaRank evaluation. AptaRank, beginning with Section 6, is the next stage and remains unauthorized for manual production. Nothing was committed or pushed.
+
+**Succession:** v3.5 keeps the approved scope and the frozen Section 5 scientific contract. It records the completed Section 5 execution and result handoff. Sections 6–10 stay the remaining required workflow, and their frozen AptaRank methods are unchanged. Later AptaRank work uses the already-opened held-out EVAL set and is not a fresh EVAL opening. Manual AptaRank production approval remains a separate gate after upload preparation and validation.
+
+**Wording correction:** `docs/m10_generator_evaluation_results.md` now states that the three metric-level difference relations are `d1_closer` and the overall directional-consistency label is `d1_closer_or_tied`. The numerical interpretation is unchanged.
+
+**Documents:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_5.md` SHA-256 `ebb0e66dd35c7ed20abecacf710ea7a90dd0e2737ba1973af66e8f0753e22c9d`. `docs/m10_generator_evaluation_results.md` SHA-256 `595a3be7e74c4b1f2c653cbaf7b8e848c9c825ab66d8a99ae31124d34a16eecc`. `docs/fine-tuning-implementation-plan.md` SHA-256 `13a44e78d4044e34a37271caedd583cbd976f52964327f8f8bb61139e7e6c24a`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` remains SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. `config/modelling/generator_eval_metric_spec.json` remains SHA-256 `2b0679b999235cc838298563448b01ef73f5fdd5132c5ddd3d9944f301f5c824`. `scripts/modelling/generator_eval_m10.py` remains SHA-256 `02735f84f264b3b0cfe7f9b5d2ab704846bb5840f9235707197e2999f9152c77`.
+
+**Boundary:** This stage did not parse `eval.csv`, `m10_derived_evidence.json`, the generated ledgers, or TRAIN sequences. It did not rerun production, recompute metrics, modify the four production outputs, change code or metric definitions, commit, or push. AptaRank was not run. No GPU was used.

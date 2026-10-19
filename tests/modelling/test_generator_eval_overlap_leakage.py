@@ -159,7 +159,17 @@ class OverlapLeakageContractTests(unittest.TestCase):
         # Completed M9A artifacts remain pinned to immutable v3.2. Future-facing
         # evaluation specifications may advance to a separately versioned plan.
         metric_spec = load_json(PINNED_SPECS[0])
-        self.assertEqual(metric_spec["freeze_status"], "draft")
+        self.assertEqual(metric_spec["freeze_status"], "frozen")
+        self.assertTrue(metric_spec["m10_draft_contract"]["labelled_frozen"])
+        self.assertTrue(metric_spec["m10_draft_contract"]["labelled_production_ready"])
+        self.assertEqual(
+            metric_spec["m10_draft_contract"]["implementation_readiness"]["metric_specification"],
+            "frozen_and_production_ready",
+        )
+        self.assertEqual(
+            metric_spec["m10_draft_contract"]["implementation_readiness"]["eval_opening"],
+            "not_yet_authorized",
+        )
         with open(DOC_PATH, "r", encoding="utf-8") as handle:
             document = handle.read()
         self.assertIn(overlap.STATUS, document)

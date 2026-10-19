@@ -289,10 +289,16 @@ class SpecContractTests(unittest.TestCase):
         ids = [metric["metric_id"] for metric in spec["metrics"]]
         self.assertEqual(len(ids), 35)
         self.assertEqual(len(ids), len(set(ids)))
-        self.assertEqual(spec["freeze_status"], "draft")
+        self.assertEqual(spec["freeze_status"], "frozen")
+        self.assertTrue(all(metric["freeze_status"] == "frozen" for metric in spec["metrics"]))
+        self.assertTrue(spec["m10_draft_contract"]["labelled_frozen"])
+        self.assertTrue(spec["m10_draft_contract"]["labelled_production_ready"])
+        self.assertFalse(any(item["status"] == "unresolved" for item in spec["blocking_items"]))
         self.assertFalse(spec["aggregate_generator_quality_score"])
-        self.assertEqual(spec["governing_plan"]["version"], "3.3")
-        self.assertEqual(spec["governing_plan"]["revision_date"], "12 October 2026")
+        self.assertEqual(spec["governing_plan"]["version"], "3.4")
+        self.assertEqual(spec["governing_plan"]["revision_date"], "17 October 2026")
+        self.assertEqual(spec["historical_m9c_plan"]["path"], "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md")
+        self.assertEqual(spec["historical_m9c_plan"]["version"], "3.3")
         self.assertEqual(spec["governing_plan"]["sha256"], preflight._hash_revision_path(spec["governing_plan"]["path"]))
         analysis_path = os.path.join(ROOT, "scripts/modelling/generator_eval_analysis.py")
         with open(analysis_path, "rb") as handle:
@@ -311,8 +317,9 @@ class SpecContractTests(unittest.TestCase):
             metric = next(item for item in spec["metrics"] if item["metric_id"] == metric_id)
             self.assertEqual(metric["scientific_role"], "closeness")
             self.assertEqual(metric["direction"], "lower")
-            self.assertEqual(metric["reference_role"], "synthetic_eval_stand_in")
+            self.assertEqual(metric["reference_role"], "authorized_eval_unique_cores")
             self.assertIn("formal M9C unlock supplies unique EVAL cores", metric["calculation_summary"])
+            self.assertIn("without changing that production reference declaration", metric["calculation_summary"])
         self.assertNotIn("combined_quality_score", ids)
         self.assertNotIn("combined_closeness_score", ids)
         self.assertNotIn("confidence_interval", ids)
@@ -329,24 +336,24 @@ class SpecContractTests(unittest.TestCase):
         missing = copy.deepcopy(preflight.load_metric_spec())
         missing["metrics"][-1]["code_revision"] = {"path": "scripts/modelling/generator_eval_analysis.py"}
         with self.assertRaises(preflight.GeneratorEvalContractError) as caught:
-            preflight.validate_metric_spec(missing, require_draft=True)
+            preflight.validate_metric_spec(missing, require_draft=False)
         self.assertEqual(caught.exception.code, "revision_invalid")
         aggregate = copy.deepcopy(preflight.load_metric_spec())
         aggregate["aggregate_generator_quality_score"] = True
         with self.assertRaises(preflight.GeneratorEvalContractError) as caught:
-            preflight.validate_metric_spec(aggregate, require_draft=True)
+            preflight.validate_metric_spec(aggregate, require_draft=False)
         self.assertEqual(caught.exception.code, "aggregate_score_forbidden")
         alias = copy.deepcopy(preflight.load_metric_spec())
         alias["metrics"].append(copy.deepcopy(alias["metrics"][-1]))
         alias["metrics"][-1]["metric_id"] = "maximum_identity_to_TRAIN"
         with self.assertRaises(preflight.GeneratorEvalContractError) as caught:
-            preflight.validate_metric_spec(alias, require_draft=True)
+            preflight.validate_metric_spec(alias, require_draft=False)
         self.assertEqual(caught.exception.code, "unknown_metric_alias")
         role = copy.deepcopy(preflight.load_metric_spec())
         closeness = next(metric for metric in role["metrics"] if metric["metric_id"] == "nearest_reference_normalized_edit_distance")
         closeness["reference_role"] = "EVAL"
         with self.assertRaises(preflight.GeneratorEvalContractError) as caught:
-            preflight.validate_metric_spec(role, require_draft=True)
+            preflight.validate_metric_spec(role, require_draft=False)
         self.assertIn(caught.exception.code, ("closeness_runtime_role_refused", "reference_role_refused"))
 
 
@@ -771,7 +778,7 @@ class BlockScheduleAndPanelTests(unittest.TestCase):
         self.assertIn("only synthetic TRAIN/reference fixtures used", text)
         self.assertIn("no EVAL, REF or VALIDATION data loaded", text)
         self.assertIn("metric_count: 35", text)
-        self.assertIn("unresolved_item_count: 6", text)
+        self.assertIn("unresolved_item_count: 0", text)
         for sequence in sequences:
             self.assertNotIn(sequence, text)
         formula_hashes = {
@@ -1050,7 +1057,7 @@ class ReviewedCoverageTests(unittest.TestCase):
         self.assertIn("overlapping", dinucleotide["length_treatment"].lower())
         self.assertIn("shorter than 2", dinucleotide["length_treatment"].lower())
         self.assertNotIn("longer sequence", dinucleotide["length_treatment"].lower())
-        self.assertEqual(spec["freeze_status"], "draft")
+        self.assertEqual(spec["freeze_status"], "frozen")
         for metric in (nearest, nucleotide, dinucleotide):
             handling = metric["missing_failure_handling"].lower()
             self.assertNotIn("paired fraction", handling)
@@ -1058,14 +1065,15 @@ class ReviewedCoverageTests(unittest.TestCase):
             self.assertIn("caller", handling)
             self.assertIn("empty generated", handling)
             self.assertEqual(metric["direction"], "lower")
-            self.assertEqual(metric["freeze_status"], "draft")
-            self.assertEqual(metric["reference_role"], "synthetic_eval_stand_in")
+            self.assertEqual(metric["freeze_status"], "frozen")
+            self.assertEqual(metric["reference_role"], "authorized_eval_unique_cores")
             self.assertIn("B0", metric["condition_scope"])
             self.assertIn("B1", metric["condition_scope"])
             self.assertIn("B2", metric["condition_scope"])
             self.assertIn("D1", metric["condition_scope"])
             self.assertIn("not_applicable", metric["condition_scope"])
-            self.assertIn("Synthetic-reference-only", metric["calculation_summary"])
+            self.assertIn("authorized_eval_unique_cores", metric["calculation_summary"])
+            self.assertIn("without changing that production reference declaration", metric["calculation_summary"])
 
 
 def length_schedule(ordered, sampled):

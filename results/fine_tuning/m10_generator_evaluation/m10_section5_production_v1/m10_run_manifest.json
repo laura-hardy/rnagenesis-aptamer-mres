@@ -1,0 +1,207 @@
+{
+  "code": {
+    "config/global_s7b_partition.json": "c62553344748fc8c322869d68a46f69e653dee5641bf5f208dcb776e597c9550",
+    "config/global_s7c_ft_train_validation.json": "e07f5af0de56beff4cefe75854493eaa3f696b9bc20c554ce2261033165f0873",
+    "config/global_s7d_final_build.json": "abd3e1b29f422848aabd309ab0bb985731b9fb3941ddfbd2ec0f43d31a98b475",
+    "config/modelling/generator_eval_metric_spec.json": "2b0679b999235cc838298563448b01ef73f5fdd5132c5ddd3d9944f301f5c824",
+    "docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md": "b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe",
+    "docs/aptarank_full_mres_thesis_evaluation_plan_v3_4.md": "1f3a73bc294a75c527e11f074c6d3265786c8e7e70d41eacf3ea83d3cf512941",
+    "scripts/modelling/generator_eval_analysis.py": "7063abfeb09aaebf248b415c5e64df61dc4bdfdcafedb18db8658298510b88e5",
+    "scripts/modelling/generator_eval_m10.py": "02735f84f264b3b0cfe7f9b5d2ab704846bb5840f9235707197e2999f9152c77",
+    "scripts/modelling/generator_eval_preflight.py": "e9cb9b65b3d804a1f2f5c7678aac6e950875c884bb414c93d016a0421cfcb144",
+    "scripts/modelling/generator_eval_s6_assignment.py": "5c834c0dea01961f44b0974208f77fa52fedfb35f699ef5363a7aadbfdab9b7d"
+  },
+  "configuration": {
+    "config/modelling/generator_eval_parser_contract.json": "a8cda86af2cd6aff52ed7929c1a8cdfe134394f9087c768a731e8597339fe872",
+    "config/modelling/generator_eval_source_manifest.json": "89be54f49b020027d58686ececfc1d743c16e58c0ed12d0b6bae269d36c4aa6c",
+    "metric_spec_freeze_status": "frozen",
+    "metric_spec_production_ready": true,
+    "metric_spec_relative_path": "config/modelling/generator_eval_metric_spec.json",
+    "metric_spec_sha256": "2b0679b999235cc838298563448b01ef73f5fdd5132c5ddd3d9944f301f5c824",
+    "results/fine_tuning/m9_generator_evaluation/m9_b0_derived_attempt_ledger.jsonl": "4d35ea9e4980fa42e4dbefa08f80f49df39ca7517784ea1851ea20c3742fe6ef",
+    "results/fine_tuning/m9_generator_evaluation/m9_b1_derived_attempt_ledger.jsonl": "18d76af08e931dc46d59cba5c303a1824fced966337bb5cef06abcbb6bbaf935",
+    "results/fine_tuning/m9_generator_evaluation/m9_b2_derived_attempt_ledger.jsonl": "49ae765eef2aacb7ecc16a922cc663465a91f0e26f1abe8aff01eed7c6d86c06",
+    "results/fine_tuning/m9_generator_evaluation/m9_d1_derived_attempt_ledger.jsonl": "58cc3acb0e22d497521480d949ccb55237212bd8aec617f939471951c02deecd",
+    "results/fine_tuning/m9_generator_evaluation/m9_parsing_accounting_summary.json": "b06aaf5cf9d2938cf555c496990ba6d04ed4d385fc5c7a6d7071eb504df148d4"
+  },
+  "contains_sequences": false,
+  "environment": {
+    "call": "RNA.fold(sequence)",
+    "distinct_from_aptarank_viennarna": "2.7.2",
+    "interpreter": "/home/laura/miniconda3/envs/rnagenesis-h200/bin/python",
+    "metadata_path": "/home/laura/miniconda3/envs/rnagenesis-h200/conda-meta/viennarna-2.7.0-py38pl5321hd78456e_0.json",
+    "metadata_version": "2.7.0",
+    "model_details_altered": false,
+    "model_details_set_by_code": false,
+    "package_build": "py38pl5321hd78456e_0",
+    "package_name": "viennarna",
+    "package_version": "2.7.0",
+    "python_version": "3.8.13"
+  },
+  "eval_read_count": 1,
+  "inputs": {
+    "denominators": {
+      "B0": {
+        "attempts": 30080,
+        "duplicate_excess": 0,
+        "failure_reason_counts": {},
+        "invalid_retained": 0,
+        "rows_dropped": false,
+        "unique_valid": 30080,
+        "valid_canonical": 30080
+      },
+      "B1": {
+        "attempts": 30000,
+        "duplicate_excess": 17,
+        "failure_reason_counts": {},
+        "invalid_retained": 0,
+        "rows_dropped": false,
+        "unique_valid": 29983,
+        "valid_canonical": 30000
+      },
+      "B2": {
+        "attempts": 30000,
+        "duplicate_excess": 0,
+        "failure_reason_counts": {},
+        "invalid_retained": 0,
+        "rows_dropped": false,
+        "unique_valid": 30000,
+        "valid_canonical": 30000
+      },
+      "D1": {
+        "attempts": 30000,
+        "duplicate_excess": 0,
+        "failure_reason_counts": {},
+        "invalid_retained": 0,
+        "rows_dropped": false,
+        "unique_valid": 30000,
+        "valid_canonical": 30000
+      }
+    },
+    "eval": {
+      "identity_count": 181,
+      "read_count": 1,
+      "relative_path": "data/interim/s7b_partition/eval.csv",
+      "sha256": "ff4b36535052981c240dfa0571acd9cf00a386c80d9487a5994d1597f3386015",
+      "unique_core_count": 154
+    },
+    "generated_ledgers": {
+      "accounting_summary": {
+        "path": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9_parsing_accounting_summary.json",
+        "relative_path": "results/fine_tuning/m9_generator_evaluation/m9_parsing_accounting_summary.json",
+        "sequence_strings_emitted": false,
+        "sha256": "b06aaf5cf9d2938cf555c496990ba6d04ed4d385fc5c7a6d7071eb504df148d4"
+      },
+      "b2_empirical_null_seed": 42,
+      "excluded_sources": {
+        "lineages": [
+          {
+            "included_in_evaluation_sources": false,
+            "kind": "m6_diagnostic_sample",
+            "logical_id": "m6_d1_update21_diagnostic_6953687e2e9_gpu0_attempt1"
+          },
+          {
+            "included_in_evaluation_sources": false,
+            "kind": "m7_guardrail_sample",
+            "logical_id": "m7_candidate_guardrail_seed_43"
+          },
+          {
+            "included_in_evaluation_sources": false,
+            "kind": "m7_guardrail_sample",
+            "logical_id": "m7_candidate_guardrail_seed_44"
+          },
+          {
+            "included_in_evaluation_sources": false,
+            "kind": "diagnostic_pool",
+            "logical_id": "m4_and_m7_1000_attempt_pools"
+          }
+        ],
+        "method": "declared_source_lineage_and_directory_identity",
+        "sequence_comparison": false
+      },
+      "ledgers": {
+        "B0": {
+          "attempts": 30080,
+          "byte_count": 41103236,
+          "path": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9_b0_derived_attempt_ledger.jsonl",
+          "relative_path": "results/fine_tuning/m9_generator_evaluation/m9_b0_derived_attempt_ledger.jsonl",
+          "sha256": "4d35ea9e4980fa42e4dbefa08f80f49df39ca7517784ea1851ea20c3742fe6ef"
+        },
+        "B1": {
+          "attempts": 30000,
+          "byte_count": 50998055,
+          "path": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9_b1_derived_attempt_ledger.jsonl",
+          "relative_path": "results/fine_tuning/m9_generator_evaluation/m9_b1_derived_attempt_ledger.jsonl",
+          "sha256": "18d76af08e931dc46d59cba5c303a1824fced966337bb5cef06abcbb6bbaf935"
+        },
+        "B2": {
+          "attempts": 30000,
+          "byte_count": 42878534,
+          "path": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9_b2_derived_attempt_ledger.jsonl",
+          "relative_path": "results/fine_tuning/m9_generator_evaluation/m9_b2_derived_attempt_ledger.jsonl",
+          "sha256": "49ae765eef2aacb7ecc16a922cc663465a91f0e26f1abe8aff01eed7c6d86c06"
+        },
+        "D1": {
+          "attempts": 30000,
+          "byte_count": 53541744,
+          "path": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/results/fine_tuning/m9_generator_evaluation/m9_d1_derived_attempt_ledger.jsonl",
+          "relative_path": "results/fine_tuning/m9_generator_evaluation/m9_d1_derived_attempt_ledger.jsonl",
+          "sha256": "58cc3acb0e22d497521480d949ccb55237212bd8aec617f939471951c02deecd"
+        }
+      },
+      "source_manifest": {
+        "path": "/home/laura/rnagenesis-mres-worktrees/generator-eval-prep/config/modelling/generator_eval_source_manifest.json",
+        "relative_path": "config/modelling/generator_eval_source_manifest.json",
+        "sha256": "89be54f49b020027d58686ececfc1d743c16e58c0ed12d0b6bae269d36c4aa6c"
+      }
+    },
+    "schedule": {
+      "b0_attempts_outside_blocks": 30080,
+      "b0_included_in_matched_blocks": false,
+      "b2_attempts_outside_blocks": 30000,
+      "b2_included_in_matched_blocks": false,
+      "blocks": [
+        {
+          "b1_attempts": 15000,
+          "block": "A",
+          "d1_attempts": 15000,
+          "d1_training_seed": 43,
+          "generation_seed_count": 163,
+          "is_significance_test_unit": false,
+          "is_training_replicate": false,
+          "one_to_one": true,
+          "paired_row_count": 15000,
+          "technical_block": "A"
+        },
+        {
+          "b1_attempts": 15000,
+          "block": "B",
+          "d1_attempts": 15000,
+          "d1_training_seed": 44,
+          "generation_seed_count": 164,
+          "is_significance_test_unit": false,
+          "is_training_replicate": false,
+          "one_to_one": true,
+          "paired_row_count": 15000,
+          "technical_block": "B"
+        }
+      ],
+      "cross_family_rows": 0,
+      "duplicated_pairing_rows": 0,
+      "extra_pairing_rows": 0,
+      "missing_pairing_rows": 0,
+      "status": "passed",
+      "validation": "one_to_one_frozen_pairing_keys"
+    },
+    "train_summaries": {
+      "exact": "f7d10f7f41777a091cc2b2bf3dfeec555d5e8d84b3b89850328be7cdcf15e0d3",
+      "manifest": "e2b97da3b1f39859c1d4fc3a652dd4abb6e4da5836e2a5e9c067ce1b87491d88",
+      "nearest": "c68fa997207a657a7049e53dd074e8d593333f84152008d631cae0d6565c1d66"
+    }
+  },
+  "outputs": {
+    "m10_derived_evidence.json": "9ba39df6e9c24196d35958613f373f92bac6bf720acde6a07e3880d9d6dc42ee",
+    "m10_sequence_free_report.json": "20e8daf7b2decb92299a9c0274273fd764db94c63c46e603c204cc7b0f09547f"
+  },
+  "schema": "generator-eval-m10-production-manifest-v1"
+}

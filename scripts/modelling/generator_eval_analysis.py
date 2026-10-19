@@ -104,6 +104,11 @@ AGGREGATION_GLOBAL_MULTIPLICITY = "global condition-level duplicate/multiplicity
 AGGREGATION_EQUAL_SEED = "equal-training-seed valid-conditional mixture"
 AGGREGATION_PER_SEED = "per-seed only"
 AGGREGATION_UNAVAILABLE = "unavailable pending a defined aggregation"
+AGGREGATION_VALID_ROW_QUANTILES = "per-condition and per-seed valid-row quantiles with duplicate-attempt weighting"
+AGGREGATION_INHERITED_EXACT = "inherited frozen M9A exact-match summary"
+AGGREGATION_DIAGNOSTIC_ATTEMPT = "actual attempt accounting diagnostic"
+AGGREGATION_INHERITED_NEAREST = "inherited frozen M9A nearest-distance summary"
+AGGREGATION_REQUESTED_LENGTH = "per requested length where a requested length is recorded; B0 not applicable"
 WEIGHTED_QUANTILE_RULE = "inclusive_cumulative_weight_exact_v2"
 ANALYSIS_SCHEMA_VERSION = "generator-eval-analysis-gep2-r5"
 EXACT_QUANTILE_PROBABILITIES = (
@@ -143,14 +148,14 @@ D1_METRIC_AGGREGATION = (
     {"metric_id": "nucleotide_total_variation_to_train", "aggregation_basis": AGGREGATION_EQUAL_SEED},
     {"metric_id": "dinucleotide_total_variation_to_train", "aggregation_basis": AGGREGATION_EQUAL_SEED},
     {"metric_id": "b1_d1_directional_consistency", "aggregation_basis": AGGREGATION_EQUAL_SEED},
-    {"metric_id": "mfe", "aggregation_basis": AGGREGATION_UNAVAILABLE},
-    {"metric_id": "mfe_per_nt", "aggregation_basis": AGGREGATION_UNAVAILABLE},
-    {"metric_id": "paired_fraction", "aggregation_basis": AGGREGATION_UNAVAILABLE},
-    {"metric_id": "exact_train_match_rate", "aggregation_basis": AGGREGATION_UNAVAILABLE},
-    {"metric_id": "exact_hit_rate_valid_outputs_diagnostic", "aggregation_basis": AGGREGATION_UNAVAILABLE},
-    {"metric_id": "nearest_train_normalized_edit_distance", "aggregation_basis": AGGREGATION_UNAVAILABLE},
-    {"metric_id": "maximum_edit_similarity_to_train", "aggregation_basis": AGGREGATION_UNAVAILABLE},
-    {"metric_id": "full_length_stratified_results", "aggregation_basis": AGGREGATION_UNAVAILABLE},
+    {"metric_id": "mfe", "aggregation_basis": AGGREGATION_VALID_ROW_QUANTILES},
+    {"metric_id": "mfe_per_nt", "aggregation_basis": AGGREGATION_VALID_ROW_QUANTILES},
+    {"metric_id": "paired_fraction", "aggregation_basis": AGGREGATION_VALID_ROW_QUANTILES},
+    {"metric_id": "exact_train_match_rate", "aggregation_basis": AGGREGATION_INHERITED_EXACT},
+    {"metric_id": "exact_hit_rate_valid_outputs_diagnostic", "aggregation_basis": AGGREGATION_DIAGNOSTIC_ATTEMPT},
+    {"metric_id": "nearest_train_normalized_edit_distance", "aggregation_basis": AGGREGATION_INHERITED_NEAREST},
+    {"metric_id": "maximum_edit_similarity_to_train", "aggregation_basis": AGGREGATION_INHERITED_NEAREST},
+    {"metric_id": "full_length_stratified_results", "aggregation_basis": AGGREGATION_REQUESTED_LENGTH},
     {"metric_id": "d1_by_training_seed", "aggregation_basis": AGGREGATION_PER_SEED},
     {"metric_id": "matched_b1_d1_block_directional_consistency", "aggregation_basis": AGGREGATION_PER_SEED},
     {"metric_id": "observed_range_across_training_seeds", "aggregation_basis": AGGREGATION_PER_SEED},

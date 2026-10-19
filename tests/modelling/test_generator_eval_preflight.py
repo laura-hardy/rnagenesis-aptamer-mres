@@ -85,12 +85,19 @@ class MetricSpecTests(unittest.TestCase):
         self.assertEqual(spec["novelty_direction_statement"], gep1.NOVELTY_DIRECTION_STATEMENT)
         self.assertNotIn("closeness", spec["novelty_direction_statement"])
         self.assertIn("not extra votes for overall generator quality", spec["novelty_direction_statement"])
-        self.assertTrue(all(metric["freeze_status"] == "draft" for metric in spec["metrics"]))
-        self.assertEqual(spec["freeze_status"], "draft")
+        self.assertTrue(all(metric["freeze_status"] == "frozen" for metric in spec["metrics"]))
+        self.assertEqual(spec["freeze_status"], "frozen")
+        self.assertEqual(spec["m10_draft_contract"]["document_status"], "frozen")
+        self.assertTrue(spec["m10_draft_contract"]["labelled_frozen"])
+        self.assertTrue(spec["m10_draft_contract"]["labelled_production_ready"])
+        self.assertEqual(
+            spec["m10_draft_contract"]["implementation_readiness"]["metric_specification"],
+            gep1.FROZEN_METRIC_SPECIFICATION_READINESS,
+        )
         closeness = [metric for metric in spec["metrics"] if metric["scientific_role"] == "closeness"]
         self.assertEqual([metric["metric_id"] for metric in closeness], list(gep1.GEP2_CLOSENESS_METRIC_IDS))
         for metric in closeness:
-            self.assertEqual(metric["reference_role"], "synthetic_eval_stand_in")
+            self.assertEqual(metric["reference_role"], "authorized_eval_unique_cores")
             self.assertEqual(metric["direction"], "lower")
             self.assertIn("formal M9C unlock supplies unique EVAL cores", metric["calculation_summary"])
         self.assertEqual(by_id["successfully_parsed_outputs"]["scientific_role"], "accounting")
@@ -103,7 +110,11 @@ class MetricSpecTests(unittest.TestCase):
             self.assertEqual(gep1._hash_revision_path(metric["code_revision"]["path"]), metric["code_revision"]["sha256"])
             self.assertEqual(gep1._hash_revision_path(metric["config_revision"]["path"]), metric["config_revision"]["sha256"])
         self.assertEqual(spec["governing_plan"]["path"], gep1.GOVERNING_PLAN_RELATIVE)
-        self.assertEqual(spec["governing_plan"]["version"], "3.3")
+        self.assertEqual(spec["governing_plan"]["version"], "3.4")
+        self.assertEqual(spec["governing_plan"]["revision_date"], "17 October 2026")
+        self.assertEqual(spec["historical_m9c_plan"]["version"], "3.3")
+        self.assertEqual(spec["historical_m9c_plan"]["revision_date"], "12 October 2026")
+        self.assertEqual(spec["historical_m9c_plan"]["role"], "m9c_frozen_historical")
         self.assertEqual(gep1._hash_revision_path(spec["governing_plan"]["path"]), spec["governing_plan"]["sha256"])
         for deferred in metrics.DEFERRED_BEYOND_M4:
             self.assertNotIn(deferred, found)
@@ -112,15 +123,17 @@ class MetricSpecTests(unittest.TestCase):
             if name not in covered:
                 self.assertTrue(any(name in item["related_names"] for item in spec["blocking_items"]))
 
-    def test_frozen_status_is_recognised_and_refused_for_this_package(self):
+    def test_frozen_status_is_recognised_and_draft_mode_still_refuses_it(self):
         spec = gep1.load_metric_spec()
-        mutated = copy.deepcopy(spec)
-        mutated["metrics"][0]["freeze_status"] = "frozen"
-        mutated["freeze_status"] = "frozen"
-        gep1.validate_metric_spec(mutated, require_draft=False)
+        gep1.validate_metric_spec(spec, require_draft=False)
         with self.assertRaises(gep1.GeneratorEvalContractError) as caught:
-            gep1.validate_metric_spec(mutated, require_draft=True)
+            gep1.validate_metric_spec(spec, require_draft=True)
         self.assertEqual(caught.exception.code, "metric_spec_frozen_in_gep1")
+        mutated = copy.deepcopy(spec)
+        mutated["metrics"][0]["freeze_status"] = "draft"
+        with self.assertRaises(gep1.GeneratorEvalContractError) as caught:
+            gep1.validate_metric_spec(mutated, require_draft=False)
+        self.assertEqual(caught.exception.code, "metric_row_unfrozen")
 
     def test_closeness_role_is_refused(self):
         spec = copy.deepcopy(gep1.load_metric_spec())
@@ -133,17 +146,17 @@ class MetricSpecTests(unittest.TestCase):
         spec = copy.deepcopy(gep1.load_metric_spec())
         spec["governing_plan"]["sha256"] = "ab" * 32
         with self.assertRaises(gep1.GeneratorEvalContractError) as caught:
-            gep1.validate_metric_spec(spec, require_draft=True)
+            gep1.validate_metric_spec(spec, require_draft=False)
         self.assertEqual(caught.exception.code, "source_hash_mismatch")
         spec = copy.deepcopy(gep1.load_metric_spec())
         spec["metrics"][0]["code_revision"]["sha256"] = "cd" * 32
         with self.assertRaises(gep1.GeneratorEvalContractError) as caught:
-            gep1.validate_metric_spec(spec, require_draft=True)
+            gep1.validate_metric_spec(spec, require_draft=False)
         self.assertEqual(caught.exception.code, "source_hash_mismatch")
         spec = copy.deepcopy(gep1.load_metric_spec())
         spec["metrics"][0]["code_revision"] = {"path": "eval.csv", "sha256": "ab" * 32}
         with self.assertRaises(gep1.GeneratorEvalContractError) as caught:
-            gep1.validate_metric_spec(spec, require_draft=True)
+            gep1.validate_metric_spec(spec, require_draft=False)
         self.assertEqual(caught.exception.code, "revision_path_refused")
 
 
@@ -590,6 +603,65 @@ class PreflightReportTests(unittest.TestCase):
         self.assertFalse(report["aggregate_generator_quality_score"])
         self.assertTrue(report["package_revision"]["git_head"])
         self.assertIn("eval_closeness_not_implemented", text)
+        self.assertEqual(report["m10_blocking_dispositions"], gep1.M10_BLOCKING_DISPOSITIONS)
+        classification = report["blocker_classification"]
+        self.assertEqual(
+            [(item["id"], item["m10_disposition"], item["subject"]) for item in classification["closed_by_m10_scope"]],
+            [
+                ("clustering_diversity_deferred", "outside_m10", "clustering"),
+                ("representation_metrics_deferred", "outside_m10", "representation analysis"),
+                (
+                    "confidence_intervals_not_specified_in_gep1",
+                    "outside_m10",
+                    "confidence intervals, bootstrap, hypothesis tests, and EVAL-cluster resampling",
+                ),
+            ],
+        )
+        self.assertEqual(
+            [(item["id"], item["m10_disposition"], item["subject"]) for item in classification["satisfied_by_frozen_evidence"]],
+            [
+                (
+                    "train_reference_not_loaded_in_gep1",
+                    "satisfied_by_frozen_m9a_outputs",
+                    "production TRAIN loading through the frozen M9A summaries",
+                )
+            ],
+        )
+        self.assertEqual(
+            [
+                (item["id"], item["m10_disposition"], item["subject"])
+                for item in classification["implemented_awaiting_authorization"]
+            ],
+            [
+                (
+                    "structure_metrics_not_executed_in_gep1",
+                    "required_implementation_work",
+                    "ViennaRNA structure wrapper and distinct-sequence cache, implemented and synthetically verified; biological execution is not authorized",
+                ),
+                (
+                    "production_matched_chunk_schedule_not_wired",
+                    "required_implementation_work",
+                    "matched B1/D1 production schedule, implemented and synthetically verified; biological execution is not authorized",
+                ),
+            ],
+        )
+        self.assertEqual(report["active_implementation_blockers"], [])
+        self.assertEqual(
+            report["implemented_awaiting_authorization"],
+            ["structure_metrics_not_executed_in_gep1", "production_matched_chunk_schedule_not_wired"],
+        )
+        self.assertEqual(report["unresolved_item_count"], 0)
+        self.assertEqual(report["metric_spec_validation_status"], "valid_frozen")
+        self.assertEqual(report["metric_spec_freeze_status"], "frozen")
+        self.assertTrue(report["metric_spec_production_ready"])
+        self.assertEqual(report["warnings"], [])
+        self.assertIn("closed_by_m10_scope:", text)
+        self.assertIn("satisfied_by_frozen_evidence:", text)
+        self.assertIn("implemented_awaiting_authorization:", text)
+        self.assertNotIn("remaining_implementation_blockers:", text)
+        self.assertIn("active_implementation_blockers: []", text)
+        self.assertNotIn("unresolved: clustering_diversity_deferred", text)
+        self.assertNotIn("unresolved: train_reference_not_loaded_in_gep1", text)
 
     def test_empty_and_all_invalid_subsets_do_not_crash(self):
         empty_meta, empty_records = fixture("synthetic_empty.json")
