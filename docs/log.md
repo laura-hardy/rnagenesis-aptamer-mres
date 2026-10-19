@@ -12348,3 +12348,57 @@ The manifest status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN` and `publica
 **Documents:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_5.md` SHA-256 `ebb0e66dd35c7ed20abecacf710ea7a90dd0e2737ba1973af66e8f0753e22c9d`. `docs/m10_generator_evaluation_results.md` SHA-256 `595a3be7e74c4b1f2c653cbaf7b8e848c9c825ab66d8a99ae31124d34a16eecc`. `docs/fine-tuning-implementation-plan.md` SHA-256 `13a44e78d4044e34a37271caedd583cbd976f52964327f8f8bb61139e7e6c24a`. `docs/aptarank_full_mres_thesis_evaluation_plan_v3_3.md` remains SHA-256 `b23094cf976de49fc8efb987ee5cbd6584b37c750e1e6eb4351d11f9d65f23fe`. `config/modelling/generator_eval_metric_spec.json` remains SHA-256 `2b0679b999235cc838298563448b01ef73f5fdd5132c5ddd3d9944f301f5c824`. `scripts/modelling/generator_eval_m10.py` remains SHA-256 `02735f84f264b3b0cfe7f9b5d2ab704846bb5840f9235707197e2999f9152c77`.
 
 **Boundary:** This stage did not parse `eval.csv`, `m10_derived_evidence.json`, the generated ledgers, or TRAIN sequences. It did not rerun production, recompute metrics, modify the four production outputs, change code or metric definitions, commit, or push. AptaRank was not run. No GPU was used.
+
+## 2026-10-19 — Section 6 synthetic method freeze
+
+**Stage:** Aim 2 / modelling / Section 6 REF-calibrated AptaRank Tier 1 method freeze
+
+**Status:** `SECTION6_METHOD_FROZEN_SYNTHETIC_ONLY_PRODUCTION_UNAUTHORIZED`. Synthetic fixtures only. Manual AptaRank production remains unauthorized. No scientific result is claimed. v3.5 remains the active plan, SHA-256 `ebb0e66dd35c7ed20abecacf710ea7a90dd0e2737ba1973af66e8f0753e22c9d`. The historical ARP-2B Tier 1 draft was not edited and is not treated as production-ready.
+
+**Contract:** `config/modelling/aptarank_section6_method_contract.json`, SHA-256 `a68156babc09a8eaddff010b7a0dcae0fd6a20a50edc17d98a10076f9de40d11`. The note is `docs/fine_tuning/section6_method_freeze.md`, SHA-256 `b394bc41801335ad99cf22b5ea1f4913b6c0d6250c1f2479d0bc0353704c2f20`.
+
+**Method:** One exact-length uniform A/C/G/U control per parent, master seed 42, SHA-256 domain `aptarank-section6-uniform-v1`, unbiased bytes below 252, attempts 0–9999, and fail-closed rejection against a caller-supplied known-core inventory. Blinding is caller-supplied HMAC-SHA-256, domain `aptarank-section6-id-v1`, with a separate ordering domain. The production count gate, exercised only on a synthetic fixture, is 154/154/154/308/79. The target-free run sheet cites the frozen attempt-3 reference digest, the Standard preset, seed 42, 20 shuffles, 100 ensemble samples, and compatibility `not evaluated`. Statistics use type-7 quantiles, the median paired difference, tie-aware AUROC, and a two-sided Wilcoxon signed-rank test. The cluster bootstrap uses 10,000 replicates and does not impute undefined replicates. The deployed AptaRank UI remains the scorer.
+
+**M9C facts cited, not re-observed:** Deployment identity AptaRank 0.1.0 / schema 1.0.0 / git `49a85609e352`; ViennaRNA 2.7.2, forgi 2.2.3, and fpocket 4.0; attempt 3 accepted 113 and dropped 0; Standard preset settings; bank realized count 5,085. The ushuffle version, bank content hash, and quick-preset discrepancy remain unresolved. Local scorer recomputation remains refused.
+
+**Tests:** `tests.modelling.test_aptarank_section6_method` passed 11 tests. They cover stream determinism, unbiased byte rejection, collision rejection, blinding, the synthetic 308-row gate, id joins, AUROC ties, Wilcoxon zeros and ties, cluster multiplicity, bootstrap accounting, and target-free token rejection.
+
+**Modules:** `scripts/modelling/aptarank_section6_uniform.py` SHA-256 `a8d05f956eeb8c2aad2eba5a72cd7e070098c7acd0867ae4878825bbda958670`. `scripts/modelling/aptarank_section6_blinding.py` SHA-256 `b90a202675f74d7e76f622023cbdecf8f30646d110eb722e843071442479b83d`. `scripts/modelling/aptarank_section6_analysis.py` SHA-256 `a30ba550aedd0da02655bf102ee959865302ce1ac443beb8d16f0143b50442c7`. `tests/modelling/test_aptarank_section6_method.py` SHA-256 `63efbab833e9119b8f7e7b5833154efea527606005cc8338d7dc4321f4d36600`.
+
+**Boundary:** TRAIN, VALIDATION, REF, and EVAL sequence data were not opened. The missing REF upload was not recovered. No production secret or upload was generated. Nothing was written under `results/`. AptaRank was not run. M10 protected evidence was not inspected. Historical M9B and M9C contracts and results were not modified. Nothing was committed or pushed.
+
+## 2026-10-19 — Section 6 method-package repair
+
+**Stage:** Aim 2 / modelling / Section 6 REF-calibrated AptaRank Tier 1 method repair
+
+**Status:** `SECTION6_METHOD_FROZEN_SYNTHETIC_ONLY_PRODUCTION_UNAUTHORIZED`. Synthetic fixtures only. Manual AptaRank production remains unauthorized. No scientific result is claimed. v3.5 remains the active plan, SHA-256 `ebb0e66dd35c7ed20abecacf710ea7a90dd0e2737ba1973af66e8f0753e22c9d`. The historical ARP-2B Tier 1 draft was not edited.
+
+**Correction:** This entry corrects the Section 6 synthetic method freeze above. The tie-aware Wilcoxon variance is `n(n+1)(2n+1)/24 - sum(t^3-t)/48`. That equals `sum(r_i^2)/4` for the average ranks of the nonzero absolute differences. The previous `/24` placement of the whole tie term is withdrawn. Ordering is a domain-separated HMAC under the same caller-supplied 32-byte secret and domain `aptarank-section6-order-v1`. The implementation does not accept a second ordering key. The 5,085-member compatibility bank and the Tier 2 band thresholds remain provenance only and are unused by Section 6 Tier 1.
+
+**Contract:** `config/modelling/aptarank_section6_method_contract.json`, SHA-256 `6ebe7c6c47b7d13ded47c305b7faad9919a67e98ac600504b3856e39cfd07f44`. The note is `docs/fine_tuning/section6_method_freeze.md`, SHA-256 `e4a63b2c9ac04ebcdd1743b2fa9daf800fa0eea28c41bf3b8e2e01be14ef8149`.
+
+**Checks added:** Exported aptamer-likeness must be finite and inside the closed interval [0, 1], including both endpoints. The caller-supplied known-core inventory must contain every input parent source digest before a uniform control is drawn. Private-key ingestion checks the package, schema, and restricted markers, candidate-id and SHA-256 formats, candidate-id and source-digest uniqueness, and pair consistency. Each pair contains exactly one `eval_core` and one `paired_uniform_shuffle` sharing `parent_core_id`, `cluster_id`, and `length`. Export ranks are validated from the rank values, not from physical CSV order. A complete export must use ranks 1 through N. When technical failures leave retained gaps, increasing rank must correspond to non-increasing score and ascending candidate id on score ties. Every available raw run artifact is hashed. The five-component descriptive table is populated only from a verified AptaRank artifact that exposes those fields; otherwise its unavailability is recorded and no local recomputation is attempted. SciPy was not added.
+
+**Tests:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/modelling -p 'test_aptarank_section6_method.py' -v` passed 17 tests. `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/modelling -p 'test_aptarank_io_preflight.py' -v` passed 19 tests. `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/modelling -p 'test_aptarank_export_validation.py' -v` passed 14 tests.
+
+**Modules:** `scripts/modelling/aptarank_section6_uniform.py` SHA-256 `02b158fc372ca2c50d80f44fe7afce1c85a5f3ae035afb42e181863bece02ee2`. `scripts/modelling/aptarank_section6_blinding.py` SHA-256 `14f64ab3cc57942b21fd9086cac53b4062d6df1d625745a00fdaf17b2df10b2e`. `scripts/modelling/aptarank_section6_analysis.py` SHA-256 `423f5e23a2355887eadcffce250755c1b484f7433d6e1453f368c34a2ebc4817`. `tests/modelling/test_aptarank_section6_method.py` SHA-256 `c96cce3800c670f0cae7a212cc291817ad2c4fc01ad762c0e5887add09acd9b5`.
+
+**Boundary:** TRAIN, VALIDATION, REF, and EVAL sequence data were not opened. No production upload was prepared. AptaRank was not run. Nothing was written under `results/`. The ARP-2B draft was not edited. Nothing was committed or pushed.
+
+## 2026-10-19 — Section 6 method-package correction
+
+**Stage:** Aim 2 / modelling / Section 6 REF-calibrated AptaRank Tier 1 method correction
+
+**Status:** `SECTION6_METHOD_FROZEN_SYNTHETIC_ONLY_PRODUCTION_UNAUTHORIZED`. Synthetic fixtures only. Manual AptaRank production remains unauthorized. No scientific result is claimed. v3.5 remains the active plan, SHA-256 `ebb0e66dd35c7ed20abecacf710ea7a90dd0e2737ba1973af66e8f0753e22c9d`. The historical ARP-2B Tier 1 draft was not edited.
+
+**Correction:** This entry corrects the Section 6 method-package repair above. Every summary records the SHA-256 and byte count of the exact candidate-upload bytes and the exact downloaded-export bytes, including when the optional raw-artifact list is empty. Optional run artifacts stay separate, with available and unavailable accounting. A component JSON document is not verified because it declares the expected scorer and role strings. No deployed AptaRank component-artifact schema has been observed or frozen, so the production five-component table stays unavailable. No production schema was invented. Duplicate, unexpected, incomplete, and merely self-declared component rows do not receive `populated_from_verified_artifact`.
+
+**Future acceptance gate:** If the deployed UI exposes components, first capture and hash the untouched artifact, review and freeze its real schema, enforce unique candidate ids and reconciliation against the analyzed export and private key, then compute a compact class-level descriptive table from the exported component values. Summarizing exported values is allowed. Recomputing component values is not.
+
+**Contract:** `config/modelling/aptarank_section6_method_contract.json`, SHA-256 `50652795985ddec6d93925715c7a6a50462a215ed830c54ccd7faf9a7c84e555`. The note is `docs/fine_tuning/section6_method_freeze.md`, SHA-256 `3c4deca8e5cca30134ac273168129dac35754bb3716b1b274f6eab9c1ada06f1`.
+
+**Tests:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/modelling -p 'test_aptarank_section6_method.py' -v` passed 19 tests. `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/modelling -p 'test_aptarank_io_preflight.py' -v` passed 19 tests. `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/modelling -p 'test_aptarank_export_validation.py' -v` passed 14 tests. `git diff --check` found no whitespace errors.
+
+**Modules:** `scripts/modelling/aptarank_section6_uniform.py` SHA-256 `02b158fc372ca2c50d80f44fe7afce1c85a5f3ae035afb42e181863bece02ee2`. `scripts/modelling/aptarank_section6_blinding.py` SHA-256 `be644bfa62d37cc93a5a4b0714fcbd351e71e7fd5775b6bd254030e757b524ff`. `scripts/modelling/aptarank_section6_analysis.py` SHA-256 `f4051c232d1a5be0c12fc959006957c439973e67baf32e4e3fdd31544f0ae3bf`. `tests/modelling/test_aptarank_section6_method.py` SHA-256 `cabf6e33e4e6dbe4a6963359319fc7569c2aa52f8a31fb554b103d6011e06216`.
+
+**Boundary:** TRAIN, VALIDATION, REF, and EVAL sequence data were not opened. No production upload was prepared. AptaRank was not run. Nothing was written under `results/`. The ARP-2B draft was not edited. Nothing was committed or pushed.

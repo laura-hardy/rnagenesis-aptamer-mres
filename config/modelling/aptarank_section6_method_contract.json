@@ -1,0 +1,271 @@
+{
+  "package_id": "SECTION6-METHOD",
+  "schema_version": "aptarank-section6-method-v1",
+  "status": "SECTION6_METHOD_FROZEN_SYNTHETIC_ONLY_PRODUCTION_UNAUTHORIZED",
+  "stage": "Section 6 method freeze, synthetic fixtures only",
+  "scientific_result": false,
+  "production_authorized": false,
+  "production_secret_embedded": false,
+  "production_upload_instantiated": false,
+  "aptarank_execution": false,
+  "results_written": false,
+  "scores_recomputed": false,
+  "scorer_owner": "deployed AptaRank UI",
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_5.md",
+    "version": "3.5",
+    "revision_date": "19 October 2026",
+    "section": "6",
+    "sha256": "ebb0e66dd35c7ed20abecacf710ea7a90dd0e2737ba1973af66e8f0753e22c9d"
+  },
+  "historical_m9b_tier1_draft": {
+    "specification": "config/modelling/aptarank_tier1_analysis_spec.json",
+    "specification_sha256": "5065112af2de0668f3ed240242dacbdd73ccadfccc15d288769353bafadda03e",
+    "module": "scripts/modelling/aptarank_tier1_analysis.py",
+    "module_sha256": "127d20a1e14d8f72dca1913a596be0a812cba1be25c310d5ca7c1c86c32a7f6c",
+    "modified_by_section6": false,
+    "production_ready": false,
+    "note": "ARP-2B remains the historical synthetic draft. Its blocked register is not rewritten, and this contract does not treat that draft as production-ready."
+  },
+  "reused_validators": [
+    {
+      "role": "aptarank_io_specification",
+      "path": "config/modelling/aptarank_io_spec.json",
+      "sha256": "46ba6c8be873dad4c086e9f6b889b51702ba31212fa502d00f26e267a22da732",
+      "behavior": "Candidate columns stay id,sequence. The target-free profile still accepts only compatibility 'not evaluated' and shuffle pass or fail."
+    },
+    {
+      "role": "aptarank_io_module",
+      "path": "scripts/modelling/aptarank_io_preflight.py",
+      "sha256": "eb71cb67447142f0b8ea1ac87575adfd067824b96fb552c8ace016ad00c43c01",
+      "behavior": "CSV parsing, opaque-id checks, canonical A/C/G/U checks, finite aptamer-likeness checks, and target-free token checks are reused. ARP-1 is not modified."
+    }
+  ],
+  "not_reused": {
+    "m9b3_export_validator": "M9B-3 accepts strong, moderate, weak, and U+2014 in addition to the target-free tokens. Section 6 keeps the narrower ARP-1 target-free profile.",
+    "m9b2_candidate_ids": "M9B-2 blinds generator-condition memberships under domain m9b2-candidate-id-v1. Section 6 uses a separate domain and does not import that preparer."
+  },
+  "m9c_deployment_resolution": {
+    "source": "Recorded 13 October 2026 M9C deployment validation and closure. This package does not re-operate AptaRank and does not reopen REF.",
+    "resolved": [
+      {
+        "id": "deployment_identity",
+        "status": "resolved",
+        "value": "AptaRank 0.1.0, schema 1.0.0, git 49a85609e352"
+      },
+      {
+        "id": "dependency_versions",
+        "status": "resolved",
+        "value": "ViennaRNA 2.7.2, forgi 2.2.3, fpocket 4.0"
+      },
+      {
+        "id": "reference_attempt3",
+        "status": "resolved",
+        "value": "upload SHA-256 5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6, 113 accepted, 0 dropped"
+      },
+      {
+        "id": "standard_preset",
+        "status": "resolved",
+        "value": "Standard preset, seed 42, 20 candidate shuffles, 100 ensemble samples"
+      },
+      {
+        "id": "tier2_bank_realized_count",
+        "status": "provenance_only_unused_by_section6_tier1",
+        "used_by_section6_tier1": false,
+        "value": "5085 members, distinct from the 20 candidate shuffles"
+      },
+      {
+        "id": "band_thresholds",
+        "status": "provenance_only_unused_by_section6_tier1",
+        "used_by_section6_tier1": false,
+        "value": "moderate at least 0.75 and strong at least 0.95"
+      },
+      {
+        "id": "composite_method_name",
+        "status": "recorded_not_recomputed",
+        "value": "corpus_weighted_mean; scoring signature 6dec9dc463a8fde1 is not a control-bank hash"
+      }
+    ],
+    "unresolved": [
+      {
+        "id": "ushuffle_version",
+        "status": "unresolved",
+        "note": "M9C recorded the ushuffle version as unknown. This package does not invent one."
+      },
+      {
+        "id": "bank_id_and_content_hash",
+        "status": "unresolved",
+        "note": "The deployment exposed neither an explicit bank id nor a content hash."
+      },
+      {
+        "id": "quick_preset_30_versus_0",
+        "status": "unresolved_not_used",
+        "note": "The paper-versus-fast-mode discrepancy remains unresolved. Section 6 uses the recorded Standard preset and does not use the quick preset."
+      },
+      {
+        "id": "local_scorer_recomputation",
+        "status": "unresolved_and_refused",
+        "note": "M9C did not authorize local recomputation of the pooled calibration, the five components, the composite, the shuffles, or the shuffle p-values."
+      },
+      {
+        "id": "target_free_export_observation",
+        "status": "not_an_m9c_observation",
+        "note": "The recorded development run used a protein target. The target-free token 'not evaluated' is the Section 6 expectation from ARP-1 and v3.5. A discrepancy fails closed and requires reviewed rerun lineage."
+      }
+    ]
+  },
+  "uniform_controls": {
+    "parents": "one exact-length i.i.d. A/C/G/U control per parent",
+    "master_seed": 42,
+    "algorithm": "sha256_counter_stream",
+    "domain": "aptarank-section6-uniform-v1",
+    "length_delimited_components": ["domain", "seed", "parent_sequence_core_sha256", "attempt", "block"],
+    "integer_rendering": "canonical decimal text with no sign and no leading zeros",
+    "byte_rule": "consume digest bytes below 252 and map byte % 4 with nucleotide order A,C,G,U; discard bytes 252-255",
+    "attempts": "0 through 9999 inclusive",
+    "attempt_cap": 10000,
+    "attempt_cap_disposition": "fail_closed",
+    "rejection": "a draw matching the caller-supplied known-core inventory or a previously accepted control is discarded",
+    "inventory_contains_input_parents": "the caller-supplied known-core inventory must contain every input parent source digest before a control is drawn",
+    "inventory_roles_for_later_production": ["TRAIN", "VALIDATION", "REF", "EVAL"],
+    "inventory_built_here": false,
+    "overlap_results_emitted": false,
+    "parent_order": "ascending sequence_core_sha256 so input order does not change the accepted controls",
+    "scientific_role": "synthetic floor"
+  },
+  "blinding": {
+    "secret": "caller-supplied 32 bytes; not embedded in code, configuration, manifests, tests, or Git",
+    "id_algorithm": "hmac_sha256",
+    "id_domain": "aptarank-section6-id-v1",
+    "id_preimage": "length-delimited domain and canonical sequence; the secret is the HMAC key",
+    "truncation_bytes": 16,
+    "id_format": "cand_ plus 32 lowercase hexadecimal characters",
+    "id_collision": "fail_closed",
+    "order_domain": "aptarank-section6-order-v1",
+    "order_algorithm": "domain-separated HMAC-SHA-256 of the canonical sequence under the same caller-supplied 32-byte secret, full digest, ascending",
+    "order_secret": "the same caller-supplied 32-byte secret; the implementation does not accept a second ordering key",
+    "order_collision": "fail_closed",
+    "private_key_markers": ["package_id", "schema_version", "restricted"],
+    "private_key_fields": ["candidate_id", "class_label", "pair_id", "parent_core_id", "cluster_id", "length", "source_digest"],
+    "class_labels": ["eval_core", "paired_uniform_shuffle"],
+    "pair_rule": "each pair contains exactly one eval_core and one paired_uniform_shuffle sharing parent_core_id, cluster_id, and length",
+    "candidate_id_format": "cand_ plus 32 lowercase hexadecimal characters",
+    "source_digest_format": "lowercase SHA-256",
+    "identifier_uniqueness": "candidate_id",
+    "source_digest_uniqueness": true,
+    "class_label_counts": "eval_core populates real_memberships; paired_uniform_shuffle populates controls",
+    "private_key_omits": ["sequence", "secret", "target", "class-bearing upload columns"],
+    "upload_columns": ["id", "sequence"]
+  },
+  "production_gates": {
+    "enforced_on_synthetic_fixtures_only": true,
+    "real_memberships": 154,
+    "controls": 154,
+    "complete_pairs": 154,
+    "unique_upload_sequences": 308,
+    "pre_rejection_clusters": 79,
+    "upload_header": "id,sequence",
+    "forbidden_upload_fields": ["class", "pair", "cluster", "target"],
+    "run_sheet": {
+      "reference_upload_sha256": "5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6",
+      "reference_publication_attempt": 3,
+      "preset": "Standard",
+      "seed": 42,
+      "candidate_shuffles": 20,
+      "ensemble_samples": 100,
+      "protein_target": null,
+      "expected_compatibility_token": "not evaluated"
+    },
+    "schema_or_token_discrepancy": "fail_closed_reviewed_rerun_lineage_required"
+  },
+  "statistics": {
+    "favourable_direction": "higher_aptamer_likeness",
+    "aptamer_likeness": "finite decimal in the closed interval [0, 1], endpoints included",
+    "export_ranks": {
+      "physical_order": "not a key",
+      "complete_export": "ranks are exactly 1 through N",
+      "retained_gaps": "when technical failures omit rows, increasing rank must correspond to non-increasing score and ascending candidate id on score ties"
+    },
+    "quantiles": "hyndman_fan_type_7",
+    "class_summaries": ["mean", "median", "q1", "q3", "iqr"],
+    "primary_paired_effect": "median of eval_core minus paired_uniform_shuffle score differences",
+    "mean_paired_difference": "descriptive",
+    "auroc": "complete pairs, positive class eval_core, tie credit 0.5, values below 0.5 preserved",
+    "shuffle_pass_rate_denominator": "rows with a valid exported pass or fail value",
+    "paired_shuffle_difference": "pairs with valid values for both members, eval_core minus paired_uniform_shuffle",
+    "secondary_test": {
+      "name": "wilcoxon_signed_rank",
+      "alternative": "two-sided",
+      "zero_method": "wilcox",
+      "ties": "average ranks of tied absolute differences",
+      "approximation": "normal",
+      "continuity_correction": false,
+      "variance_formula": "n(n+1)(2n+1)/24 - sum(t^3-t)/48",
+      "variance_identity": "sum(r_i^2)/4 for the average ranks of the nonzero absolute differences",
+      "statistic": "sum of the ranks of strictly positive differences",
+      "all_zero_differences": "statistic 0, p-value 1, disposition all_zero_differences"
+    },
+    "bootstrap": {
+      "replicates": 10000,
+      "seed": 42,
+      "domain": "aptarank-section6-bootstrap-v1",
+      "unit": "observed unique cluster ids, drawn with replacement, same count as observed",
+      "multiplicity": "every eligible complete pair in a selected cluster is included once per draw of that cluster",
+      "interval": "95 percent type-7 quantiles at 0.025 and 0.975 of defined replicates",
+      "undefined_replicates": "counted and excluded; never imputed",
+      "minimum_defined_replicates": 9500,
+      "minimum_for_paired_auroc_and_bootstrap": "at least two complete pairs from at least two clusters",
+      "below_minimum": "null with a technical-incompleteness reason"
+    },
+    "denominators_preserved": ["input", "evaluable", "complete_pair", "cluster", "shuffle", "failure", "undefined_replicate"]
+  },
+  "analyzed_bytes": {
+    "candidate_upload": "every summary records the SHA-256 and byte count of the exact candidate-upload bytes",
+    "downloaded_export": "every summary records the SHA-256 and byte count of the exact downloaded-export bytes",
+    "when_optional_artifacts_empty": "both records remain present when the optional raw-artifact list is empty",
+    "separate_from_optional_run_artifacts": true
+  },
+  "raw_run_artifacts": {
+    "capture": "optional run artifacts stay separate from the analyzed upload and export bytes; every available optional artifact is hashed; unavailable roles are recorded and are not replaced",
+    "five_component_fields": ["normalized_mfe", "ensemble_defect", "positional_entropy", "stem_fraction", "gc_fraction"],
+    "five_component_fields_note": "These are the v3.5 Tier 1 checklist names. They are not an observed or frozen deployed artifact schema.",
+    "production_schema_observed": false,
+    "production_schema_frozen": false,
+    "self_declared_scorer_and_role": "unverified",
+    "five_component_table": "unavailable. A JSON document that declares the expected scorer and role strings is not verified. Duplicate, unexpected, incomplete, or merely self-declared rows do not receive populated_from_verified_artifact. No production schema is invented.",
+    "component_acceptance_gate": {
+      "status": "future",
+      "schema_observed": false,
+      "schema_frozen": false,
+      "when": "the deployed AptaRank UI exposes component values",
+      "steps": [
+        "capture and hash the untouched artifact",
+        "review and freeze its real schema",
+        "enforce unique candidate ids and reconciliation against the analyzed export and private key",
+        "compute a compact class-level descriptive table from the exported component values"
+      ],
+      "summarizing_exported_values": "allowed",
+      "recomputing_component_values": "refused"
+    }
+  },
+  "closed_register_from_historical_draft": {
+    "note": "These ARP-2B blockers are closed by this Section 6 contract. The historical draft file still lists them as unresolved and is not edited.",
+    "ids": {
+      "U22": "SHA-256 counter stream, master seed 42, nucleotide order A,C,G,U",
+      "U23": "caller-supplied SHA-256 inventory of corrected primary-corpus unique cores; later production uses TRAIN, VALIDATION, REF, and EVAL",
+      "U24": "attempt index and block counter, attempts 0-9999, fail closed",
+      "U25": "cand_ plus 32 lowercase hex characters",
+      "U26": "caller-supplied 32-byte HMAC secret; ordering is a domain-separated HMAC under that same secret",
+      "U29": "higher aptamer-likeness is favourable for these summaries",
+      "U30": "Hyndman-Fan type 7",
+      "U31": "primary effect is the median paired difference; the mean is descriptive",
+      "U32": "AUROC tie credit 0.5",
+      "U33": "pass/fail rows for class rates; both-valid pairs for the paired difference",
+      "U34": "two-sided Wilcoxon signed-rank, zero_method wilcox, average ranks, normal approximation, no continuity correction",
+      "U35": "cluster resampling with replacement and multiplicity",
+      "U36": "type-7 endpoints at 0.025 and 0.975",
+      "U37": "undefined replicates are counted and excluded",
+      "U38": "two complete pairs from two clusters, and 9500 defined replicates for an interval"
+    }
+  }
+}
