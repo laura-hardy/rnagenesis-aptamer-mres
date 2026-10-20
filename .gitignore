@@ -74,3 +74,6 @@ results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3/d
 
 #thesis writing doc
 target/THESIS_METHODS_DRAFT.tex
+/docs/fine_tuning/generator_evaluation_report_supervisor.md
+/docs/fine_tuning/generator_evaluation_supervisor_tables.md
+/docs/fine_tuning/generator_evaluation_supervisor_assets/
