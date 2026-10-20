@@ -12402,3 +12402,35 @@ The manifest status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN` and `publica
 **Modules:** `scripts/modelling/aptarank_section6_uniform.py` SHA-256 `02b158fc372ca2c50d80f44fe7afce1c85a5f3ae035afb42e181863bece02ee2`. `scripts/modelling/aptarank_section6_blinding.py` SHA-256 `be644bfa62d37cc93a5a4b0714fcbd351e71e7fd5775b6bd254030e757b524ff`. `scripts/modelling/aptarank_section6_analysis.py` SHA-256 `f4051c232d1a5be0c12fc959006957c439973e67baf32e4e3fdd31544f0ae3bf`. `tests/modelling/test_aptarank_section6_method.py` SHA-256 `cabf6e33e4e6dbe4a6963359319fc7569c2aa52f8a31fb554b103d6011e06216`.
 
 **Boundary:** TRAIN, VALIDATION, REF, and EVAL sequence data were not opened. No production upload was prepared. AptaRank was not run. Nothing was written under `results/`. The ARP-2B draft was not edited. Nothing was committed or pushed.
+
+## 2026-10-20 — Section 6 result closure and v3.6 succession
+
+**Stage:** Aim 2 / AptaRank evaluation / Section 6 closure and prospective remaining-scope revision
+
+**Status:** `SECTION6_SCIENTIFIC_RESULT_COMMITTED_AND_CLOSED`. Independent review found no material defect, reproduced the frozen Section 6 statistics including all 10,000 cluster-bootstrap replicates, and found no blocker or in-scope optional change. Laura explicitly approved and closed the result. The reviewed raw and derived analysis files were not edited. This is a scientific result commitment, not a claim that the work has been Git-committed or pushed.
+
+**Final Section 6 accounting:** 308 uploaded candidates, 306 scored, and two recorded length-121 exclusions forming one complete excluded pair. The retained analysis contains 153 complete EVAL/control pairs across all 79 pre-rejection clusters. No candidate was replaced. Median paired EVAL-minus-control score difference is 0.108, cluster-bootstrap 95% CI 0.064 to 0.164. Descriptive AUROC is 0.638, 95% CI 0.555 to 0.717. Wilcoxon W+ is 7,959 with two-sided p = 0.000164702. Shuffle pass is 9/153 for EVAL and 7/153 for controls; paired difference 1.3 percentage points, 95% CI -4.1 to 6.6. The five-component table remains unavailable and no component was recomputed.
+
+**Closure record:** `results/aptarank/evaluation/section6_tier1_eval_v1/closure/section6_closure_record.json`, SHA-256 `02fe7666add2ffb4008ab2351c7bf535e895e359d7805af58e35ec631d500fa9`. The reviewed analysis files remain at their pinned hashes: summary `b3dec6026badbdfb38cce10cd5d7ad04838d6a0f20069a1b7dab0878b6bf8422`, manifest `1908f34a9dfa2987920bd9c077810783875b915db8c5cce677764a7c9e078161`, and results note `b96c5b323f6ad0a8a31ff8d5feefe3720e55217237966ba77aa608272c7a84fc`.
+
+**Plan succession:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_6.md`, SHA-256 `77fcefc24787faa464c3206a1571127e6042cb9db3089a745a2a5d681bf10120`, now governs the remaining evaluation. v3.5 remains unchanged at SHA-256 `ebb0e66dd35c7ed20abecacf710ea7a90dd0e2737ba1973af66e8f0753e22c9d` and governs completed Section 6. v3.4 continues to govern completed M10.
+
+**Prospective remaining workflow:** Section 8 remains the prespecified illustrative Tier 2 EVAL. Section 9 becomes one target-enabled run of a frozen, score-blind sample with exactly 200 memberships per B0/B1/B2/D1 condition; Tier 1 and NDM-1 Tier 2 outputs are reported separately and no candidate from this run enters supervisor shortlisting. Section 10 becomes one target-enabled run of the complete frozen 30,000-member D1 unique-valid pool. Its supervisor-review pool requires a valid score, shuffle `pass`, and `strong` or `moderate` NDM-1 compatibility; `strong` candidates precede `moderate`, and Tier 1 rank then opaque ID orders candidates within each band. The pool is capped at 100. If fewer than 50 qualify, all qualifying candidates are reviewed and the shortfall is reported without weakening criteria or replenishing failures. This is a filter and lexicographic ordering, not a combined score.
+
+**Authorization:** Manual production is authorized for the remaining prespecified Sections 8–10 runs after their frozen input and preflight gates. Final result commitment and closure remain subject to later explicit approval. No AptaRank run occurred during this documentation and closure stage.
+
+**Documents:** `docs/fine-tuning-implementation-plan.md` SHA-256 `2d86c255904b3215df84abd1c2a37b5cf2b0d27abe13c8aabcd7fedf2bf60ff5`; Section 6 run README SHA-256 `482e7746f820e40fbe2e860aa6470f348c0a09fde60173fdbfad15927cce8541`; evaluation README SHA-256 `9e4114f8107a199361ed68ff5d539963561653a78eee8a27ea8a8841fcabcad8`.
+
+**Boundary:** No protected sequence-bearing evidence was opened or exposed. No AptaRank score was recomputed outside the frozen reviewed analysis. No target, score, threshold, candidate membership or observed result was used to choose the prospective v3.6 design. Nothing was committed or pushed.
+
+## 2026-10-20 — Section 6 repository finalization
+
+**Stage:** Aim 2 / AptaRank evaluation / Section 6 repository closure
+
+**Status:** Section 6 is complete, scientifically committed, independently reviewed and ready for repository closure. The commit containing this entry establishes the public closure boundary. Raw AptaRank browser exports and all files under `data/` remain local; they are preserved unchanged and represented publicly only by sequence-free accounting and hashes. The active restricted private key and blinding secret remain outside the repository.
+
+**Public repository artifacts:** Frozen preparation and production-analysis adapters; their focused tests; the v3.6 successor plan; sequence-free analysis summary, manifest and results note; Section 6 closure record and checksum manifest; run and evaluation READMEs; and the implementation-plan/log updates. `.gitignore` now explicitly excludes `results/aptarank/evaluation/**/raw/` and any `restricted/` directory under that tree.
+
+**Checks:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.modelling.test_aptarank_section6_method tests.modelling.test_aptarank_io_preflight tests.modelling.test_aptarank_export_validation tests.modelling.test_aptarank_section6_prepare_upload tests.modelling.test_aptarank_section6_production_analysis` passed 63 tests. `git diff --check` passed. The closure `SHA256SUMS` manifest passed. The frozen v3.5 plan and the three reviewed Section 6 analysis artifacts retained their pinned hashes.
+
+**Boundary:** No raw sequence-bearing AptaRank export, candidate upload, reference upload, private key, blinding secret or protected M10 evidence is included in the public closure commit. No AptaRank run or score recomputation occurred. This finalization does not push the branch.

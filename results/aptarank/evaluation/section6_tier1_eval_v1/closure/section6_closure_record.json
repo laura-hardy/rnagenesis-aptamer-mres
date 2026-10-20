@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0.0",
+  "status": "SECTION6_SCIENTIFIC_RESULT_COMMITTED_AND_CLOSED",
+  "closed_at_date": "2026-10-20",
+  "scientific_result_committed": true,
+  "git_commit_claimed": false,
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_5.md",
+    "sha256": "ebb0e66dd35c7ed20abecacf710ea7a90dd0e2737ba1973af66e8f0753e22c9d"
+  },
+  "approval": {
+    "source": "explicit_user_instruction",
+    "decision": "approve_and_close_section6"
+  },
+  "independent_review": {
+    "outcome": "no_material_defect",
+    "blocking_issue": false,
+    "optional_change_required": false,
+    "fresh_in_memory_recalculation_matched": true,
+    "cluster_bootstrap_replicates": 10000
+  },
+  "accounting": {
+    "input_candidates": 308,
+    "scored_candidates": 306,
+    "technical_exclusions": 2,
+    "complete_pairs": 153,
+    "incomplete_pairs": 1,
+    "clusters_before_rejection": 79,
+    "clusters_represented": 79
+  },
+  "results": {
+    "median_paired_difference_eval_minus_control": 0.108,
+    "median_paired_difference_cluster_bootstrap_95_ci": [0.064, 0.164],
+    "mean_paired_difference_eval_minus_control": 0.083,
+    "tie_aware_auroc": 0.638,
+    "auroc_cluster_bootstrap_95_ci": [0.555, 0.717],
+    "wilcoxon_w_plus": 7959,
+    "wilcoxon_two_sided_p": 0.000164702,
+    "eval_shuffle_pass": "9/153",
+    "control_shuffle_pass": "7/153",
+    "paired_shuffle_pass_difference_percentage_points": 1.3,
+    "paired_shuffle_pass_difference_cluster_bootstrap_95_ci_percentage_points": [-4.1, 6.6]
+  },
+  "artifact_sha256": {
+    "candidate_upload": "5554f68fd94d1754ff9bcc87fba81be7dc8391af7e45703400796f4a5a336ad2",
+    "private_key": "be1a40990875a3d02bcdf3ebed6a6a5fb57104fa93f78df41c2ca544b7dc8408",
+    "run_sheet": "069e68885436432ab8fa5a71b72aaab7c67dedacfec70a4917c2f8a4df71c057",
+    "shortlist": "3fddbf7b13746c08595e2f3cf68be70dc8c1a76a9b7dc05045af131462a7b015",
+    "exclusion_register": "91ff501e648389b2c8234c0bd2460ea8a8c2d63ccf56a37c8079abc2b82d3d3e",
+    "result_pdf": "6bca5c8c317112902a8f1637bcd8647e37ede46aed8edd3d3ac0b420f97ced9a",
+    "analysis_summary": "b3dec6026badbdfb38cce10cd5d7ad04838d6a0f20069a1b7dab0878b6bf8422",
+    "analysis_manifest": "1908f34a9dfa2987920bd9c077810783875b915db8c5cce677764a7c9e078161",
+    "results_markdown": "b96c5b323f6ad0a8a31ff8d5feefe3720e55217237966ba77aa608272c7a84fc"
+  },
+  "component_table": {
+    "status": "unavailable",
+    "reason": "component_artifact_unavailable",
+    "recomputed": false
+  },
+  "interpretation": "Moderate Tier 1 score separation from the paired uniform null; low shuffle-pass sensitivity and an uncertain shuffle-pass difference.",
+  "claim_boundary": "This result is not evidence of universal aptamer classification, binding, affinity, specificity, inhibition or target-specific function.",
+  "reviewed_artifacts_modified_during_closure": false,
+  "aptarank_rerun_during_closure": false
+}

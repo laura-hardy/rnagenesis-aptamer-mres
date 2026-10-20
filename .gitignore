@@ -68,6 +68,11 @@ results/fine_tuning/m9_generator_evaluation/m9c_reference_preparation_attempt3/d
 # (replaces the narrower /data/raw/ rule; entire top-level data/ is ignored)
 /data/
 
+# AptaRank evaluation raw browser exports are sequence-bearing local evidence.
+# Commit only reviewed sequence-free derived summaries, closure records and READMEs.
+/results/aptarank/evaluation/**/raw/
+/results/aptarank/evaluation/**/restricted/
+
 # OS and editor noise (Excel lock files, temp files)
 ~$*
 *.tmp

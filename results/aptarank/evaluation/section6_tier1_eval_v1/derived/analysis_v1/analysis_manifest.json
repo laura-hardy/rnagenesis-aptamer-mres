@@ -1,0 +1,44 @@
+{
+  "generated_at_utc": "2026-10-20T06:42:49Z",
+  "inputs": {
+    "candidate_upload": {
+      "byte_count": 29048,
+      "sha256": "5554f68fd94d1754ff9bcc87fba81be7dc8391af7e45703400796f4a5a336ad2"
+    },
+    "downloaded_export": {
+      "byte_count": 42480,
+      "sha256": "3fddbf7b13746c08595e2f3cf68be70dc8c1a76a9b7dc05045af131462a7b015"
+    },
+    "exclusion_register": {
+      "byte_count": 289,
+      "sha256": "91ff501e648389b2c8234c0bd2460ea8a8c2d63ccf56a37c8079abc2b82d3d3e"
+    },
+    "private_key": {
+      "byte_count": 135789,
+      "sha256": "be1a40990875a3d02bcdf3ebed6a6a5fb57104fa93f78df41c2ca544b7dc8408"
+    },
+    "result_page_pdf": {
+      "byte_count": 487234,
+      "sha256": "6bca5c8c317112902a8f1637bcd8647e37ede46aed8edd3d3ac0b420f97ced9a"
+    },
+    "run_sheet": {
+      "byte_count": 275,
+      "sha256": "069e68885436432ab8fa5a71b72aaab7c67dedacfec70a4917c2f8a4df71c057"
+    }
+  },
+  "method": {
+    "analysis_module_sha256": "f4051c232d1a5be0c12fc959006957c439973e67baf32e4e3fdd31544f0ae3bf",
+    "scores_recomputed": false
+  },
+  "outputs": {
+    "analysis_summary.json": {
+      "byte_count": 8103,
+      "sha256": "b3dec6026badbdfb38cce10cd5d7ad04838d6a0f20069a1b7dab0878b6bf8422"
+    },
+    "section6_tier1_results.md": {
+      "byte_count": 2396,
+      "sha256": "b96c5b323f6ad0a8a31ff8d5feefe3720e55217237966ba77aa608272c7a84fc"
+    }
+  },
+  "status": "PROVISIONAL_SECTION6_ANALYSIS_AWAITING_EXPLICIT_RESULT_COMMITMENT"
+}
