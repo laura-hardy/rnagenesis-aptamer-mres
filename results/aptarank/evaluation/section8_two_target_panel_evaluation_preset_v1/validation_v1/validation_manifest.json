@@ -1,0 +1,99 @@
+{
+  "generated_at_utc": "2026-10-20T12:29:14Z",
+  "governing_plan_sha256": "24ae601f4c9bf64325ec8aa509ef7a5eafefd5b77a7610fbd014554e16553db9",
+  "inputs_by_case": {
+    "grk2_pocket": {
+      "candidate_upload": {
+        "byte_count": 79,
+        "sha256": "e7589866fb3322eb3d9ea90a8276d613720ff9d64e59bfed6f7cb47433b9572f"
+      },
+      "downloaded_shortlist": {
+        "byte_count": 168,
+        "sha256": "d9ecbb4b3745b496832575bba7b9ccbcba5850dd838e178810fa8eea6fd644c7"
+      },
+      "expected_cell_manifest": {
+        "byte_count": 967,
+        "sha256": "c001e821ec44e8e25dd9228824039646027b80d0759ca87ce17ae927a870951c"
+      },
+      "pdf_visual_review": {
+        "byte_count": 2497,
+        "sha256": "8339fd8294aaea9b3760018cff41e5636777df4ec7f8447d3d547b0ee6eba43e"
+      },
+      "raw_artifact_manifest": {
+        "byte_count": 1443,
+        "sha256": "826649e6200818f8a665eb40e60dff12b89d474f3d7971204dde36bf9d150389"
+      },
+      "restricted_private_key": {
+        "byte_count": 1299,
+        "sha256": "d596a7465f633904039177db6f638d080b234f7d00959b04ee4609e1d1e0418f"
+      },
+      "result_pdf": {
+        "byte_count": 463121,
+        "sha256": "cec6ad469ccab822818f92aeee6addc15368ed54d6f99cfb07cf45754ac782fb"
+      },
+      "run_sheet": {
+        "byte_count": 3390,
+        "sha256": "78c196b54d9a1d021820c8c6b2f1b0fafacd48e6ff220a2e15c2fe03c258ec83"
+      }
+    },
+    "hewl_surface": {
+      "candidate_upload": {
+        "byte_count": 194,
+        "sha256": "ade52448da9a6b8630f082df446745f28c649031df460c7b8eb13c4c9b47ab9d"
+      },
+      "downloaded_shortlist": {
+        "byte_count": 320,
+        "sha256": "1cea5620a0a1a938b454c6c4b612c105fa2423fe8eeb7e66e9cd9b706dc70a6a"
+      },
+      "expected_cell_manifest": {
+        "byte_count": 1017,
+        "sha256": "c722d636c419170929ad404800ec7ffb9e1f17add9602bb5bf7db418ee8e6120"
+      },
+      "pdf_visual_review": {
+        "byte_count": 2574,
+        "sha256": "27448cd316fe03a09b5b3018bac1209fefc57c3b7e3c2a10709f3bea167f2171"
+      },
+      "raw_artifact_manifest": {
+        "byte_count": 1427,
+        "sha256": "590f6df0f5b436ffdc0b3a4cd6ee72de8451fdc966c9ff9460a219dd7daf88b3"
+      },
+      "restricted_private_key": {
+        "byte_count": 2219,
+        "sha256": "b9b9c2abb19dd388bb2135d0fb4b1e2f80f6b8afda8a84e1ffa6f5df74589153"
+      },
+      "result_pdf": {
+        "byte_count": 504709,
+        "sha256": "114efec24fd3e25e92cc7b15d71b1abec7835b0201806d85ef918843a39d994c"
+      },
+      "run_sheet": {
+        "byte_count": 3244,
+        "sha256": "25a65d353eda5fb4b3e1973a329a5b8667c8ce2651d3c4447810cba2f345949d"
+      }
+    }
+  },
+  "outputs": {
+    "section8_validation_report.md": {
+      "byte_count": 2490,
+      "sha256": "0548d191df77354f893e1ed7fea2636c25bb11da470ec68d848ca79d1c2e7b69"
+    },
+    "section8_validation_summary.json": {
+      "byte_count": 8902,
+      "sha256": "163f1f1b0b994015ee9f6827064142ae3ead4905743eba04a1b61fdfa8db1218"
+    }
+  },
+  "preparation_adapter_sha256": "952d201b81bfd6c1939577f20530dc52d13d7eec86b032ddece4c77863558e78",
+  "reference_upload": {
+    "byte_count": 17302,
+    "sha256": "5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6"
+  },
+  "restricted_package_manifest": {
+    "byte_count": 277,
+    "sha256": "192d1973a718d049135b0be54d24891fdf5ccec3a8315b54a238eabfe4341f0a"
+  },
+  "schema_version": "mres-aptarank-section8-validation-manifest-v1",
+  "status": "SECTION8_TECHNICAL_VALIDATION_PASS_INTERPRETATION_AND_COMMITMENT_PENDING",
+  "validation_adapter": {
+    "byte_count": 43339,
+    "sha256": "d3c9d6d5cef19f21daa35df037b208fc07923c02826aa7817ac87c2a9e8c10e0"
+  }
+}

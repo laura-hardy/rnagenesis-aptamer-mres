@@ -1,0 +1,87 @@
+{
+  "cases": [
+    {
+      "case_id": "grk2_pocket",
+      "case_label": "GRK2/3UZS pocket-mode descriptive case",
+      "denominators": {
+        "clusters": 1,
+        "scientific_identities": 1,
+        "scored": 1,
+        "technical_exclusions": 0,
+        "unique_cores": 1,
+        "uploaded": 1
+      },
+      "interpretation": "clearly weak target-compatibility annotation for the single configured GRK2 core",
+      "rows_in_rank_order": [
+        {
+          "candidate_shuffle": "fail",
+          "compatibility_band": "weak",
+          "length": 28,
+          "rank": 1,
+          "tier1_aptamer_likeness": "0.3415929203539823",
+          "tier2_control_percentile": "0.10619469026548672",
+          "tier2_mismatch": "5.6776875408896945"
+        }
+      ],
+      "target": {
+        "binding_mode": "pocket",
+        "chain": "A",
+        "pdb_id": "3UZS",
+        "prepared_target_identifier": "18baf4fba59a",
+        "target_config_id": "GRK2_3UZS_A_pocket"
+      }
+    },
+    {
+      "case_id": "hewl_surface",
+      "case_label": "HEWL/4M4O surface-mode descriptive case",
+      "denominators": {
+        "clusters": 1,
+        "scientific_identities": 2,
+        "scored": 2,
+        "technical_exclusions": 0,
+        "unique_cores": 2,
+        "uploaded": 2
+      },
+      "interpretation": "mixed annotations: one weak result and one moderate result only just above the 0.75 threshold",
+      "rows_in_rank_order": [
+        {
+          "candidate_shuffle": "fail",
+          "compatibility_band": "weak",
+          "length": 59,
+          "rank": 1,
+          "tier1_aptamer_likeness": "0.672566371681416",
+          "tier2_control_percentile": "0.46214355948869223",
+          "tier2_mismatch": "1118.8384492224768"
+        },
+        {
+          "candidate_shuffle": "fail",
+          "compatibility_band": "moderate",
+          "length": 45,
+          "rank": 2,
+          "tier1_aptamer_likeness": "0.5893805309734514",
+          "tier2_control_percentile": "0.7529990167158309",
+          "tier2_mismatch": "374.7085147871943"
+        }
+      ],
+      "target": {
+        "binding_mode": "surface",
+        "chain": "A",
+        "pdb_id": "4M4O",
+        "prepared_target_identifier": "57c827a3f21a",
+        "target_config_id": "HEWL_4M4O_A_surface"
+      }
+    }
+  ],
+  "historical_section8_closure_preserved": true,
+  "schema_version": "mres-aptarank-section8-exact-tier2-supplement-v1",
+  "scientific_result_committed": false,
+  "scope_limits": [
+    "target-specific mismatch and percentile values are not compared numerically across GRK2 pocket and lysozyme surface modes",
+    "the three cognate cores do not calibrate sensitivity or specificity",
+    "no binding, affinity, specificity, inhibition, target-discrimination or experimental-function claim"
+  ],
+  "scores_recomputed": false,
+  "source": "untouched deployed AptaRank exact Tier 1/Tier 2 exports",
+  "status": "PROVISIONAL_SECTION8_EXACT_TIER2_SUPPLEMENT_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RECOMMITMENT",
+  "updated_panel_interpretation": "The exact target-control percentiles sharpen but do not materially change the closed conclusion. The illustrative panel remains weak to mixed and not confirmatory: GRK2 is weak at 0.106, the two lysozyme cores are weak at 0.462 and moderate at 0.753, no core is strong, and all candidate-specific shuffle checks fail."
+}

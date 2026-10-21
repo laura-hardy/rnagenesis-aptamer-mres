@@ -1,0 +1,233 @@
+{
+  "cases": [
+    {
+      "automated_checks": {
+        "compatibility_and_shuffle_tokens": "pass",
+        "complete_rank_set_and_order": "pass",
+        "finite_closed_interval_aptamer_likeness": "pass",
+        "public_and_target_package_manifests": "pass",
+        "raw_artifact_hashes": "pass",
+        "upload_export_id_sequence_digest_and_length_join": "pass",
+        "upload_private_key_expected_cells_join": "pass"
+      },
+      "case_id": "grk2_pocket",
+      "case_label": "GRK2/3UZS pocket-mode descriptive case",
+      "case_role": "pocket_mode_descriptive_case",
+      "denominators": {
+        "clusters": 1,
+        "scientific_identities": 1,
+        "scored": 1,
+        "technical_exclusions": 0,
+        "unique_cores": 1,
+        "uploaded": 1
+      },
+      "exported_results": {
+        "aptamer_likeness_max": "0.3415929203539823",
+        "aptamer_likeness_min": "0.3415929203539823",
+        "candidate_shuffle_counts": {
+          "fail": 1
+        },
+        "compatibility_band_counts": {
+          "weak": 1
+        },
+        "raw_numeric_tier2_score": {
+          "available": false,
+          "reason": "no untouched deployed artifact exposed a numeric Tier 2 score",
+          "reconstructed": false
+        },
+        "rows_in_rank_order": [
+          {
+            "aptamer_likeness": "0.3415929203539823",
+            "candidate_shuffle": "fail",
+            "compatibility_band": "weak",
+            "length": 28,
+            "rank": 1
+          }
+        ]
+      },
+      "interpretation_complete": false,
+      "pdf_visual_evidence": {
+        "automated_content_extraction": false,
+        "compatibility_bank": {
+          "content_hash_exposed": false,
+          "identifier_exposed": false,
+          "moderate_threshold": 0.75,
+          "realized_count": 5085,
+          "strong_threshold": 0.95
+        },
+        "evidence_class": "manual visual review of all pages bound to the exact PDF SHA-256",
+        "known_publication_eligible_false_marker": "ignored under the documented thesis-wide interface-bug decision",
+        "layout_readable": true,
+        "pages_reviewed": 3,
+        "target_diagnostics": {
+          "binding_mode_display": "Pocket/groove recognition",
+          "cavities_detected": 64,
+          "chain": "A",
+          "characteristic_width_angstrom": 15.1,
+          "electrostatics": "skipped",
+          "pdb_id": "3UZS",
+          "prepared_target_identifier": "18baf4fba59a",
+          "selected_cavity": 59,
+          "selected_cavity_volume_angstrom3": 410,
+          "selection_statement": "cavity selected by overlap with literature-confirmed binding-site residues"
+        },
+        "warnings": [
+          "target chain isolated computationally from a multi-chain complex",
+          "coordinates remain in the bound-state conformation and do not represent a relaxed unbound structure"
+        ]
+      },
+      "scientific_result_committed": false,
+      "scope_limits": [
+        "descriptive target case only",
+        "no cross-target numerical comparison",
+        "no target-discrimination claim",
+        "no binding, affinity, specificity, inhibition or experimental-function claim",
+        "no confidence interval or inferential test with these one- and two-core denominators"
+      ],
+      "settings": {
+        "candidate_shuffles": 99,
+        "composite_method": "corpus_weighted_mean",
+        "preset": "Evaluation",
+        "sampled_structures": 200,
+        "sampled_structures_evidence": "pinned run sheet; not independently displayed in result PDF",
+        "scoring_signature": "95a49467ef3c6186",
+        "seed": 42
+      },
+      "status": "SECTION8_TECHNICAL_VALIDATION_PASS_INTERPRETATION_AND_COMMITMENT_PENDING",
+      "target": {
+        "binding_mode": "pocket",
+        "chain": "A",
+        "pdb_id": "3UZS",
+        "prepared_target_identifier": "18baf4fba59a",
+        "target_config_id": "GRK2_3UZS_A_pocket"
+      },
+      "technical_validation_pass": true
+    },
+    {
+      "automated_checks": {
+        "compatibility_and_shuffle_tokens": "pass",
+        "complete_rank_set_and_order": "pass",
+        "finite_closed_interval_aptamer_likeness": "pass",
+        "public_and_target_package_manifests": "pass",
+        "raw_artifact_hashes": "pass",
+        "upload_export_id_sequence_digest_and_length_join": "pass",
+        "upload_private_key_expected_cells_join": "pass"
+      },
+      "case_id": "hewl_surface",
+      "case_label": "HEWL/4M4O surface-mode descriptive case",
+      "case_role": "surface_mode_descriptive_case",
+      "denominators": {
+        "clusters": 1,
+        "scientific_identities": 2,
+        "scored": 2,
+        "technical_exclusions": 0,
+        "unique_cores": 2,
+        "uploaded": 2
+      },
+      "exported_results": {
+        "aptamer_likeness_max": "0.672566371681416",
+        "aptamer_likeness_min": "0.5893805309734514",
+        "candidate_shuffle_counts": {
+          "fail": 2
+        },
+        "compatibility_band_counts": {
+          "moderate": 1,
+          "weak": 1
+        },
+        "raw_numeric_tier2_score": {
+          "available": false,
+          "reason": "no untouched deployed artifact exposed a numeric Tier 2 score",
+          "reconstructed": false
+        },
+        "rows_in_rank_order": [
+          {
+            "aptamer_likeness": "0.672566371681416",
+            "candidate_shuffle": "fail",
+            "compatibility_band": "weak",
+            "length": 59,
+            "rank": 1
+          },
+          {
+            "aptamer_likeness": "0.5893805309734514",
+            "candidate_shuffle": "fail",
+            "compatibility_band": "moderate",
+            "length": 45,
+            "rank": 2
+          }
+        ]
+      },
+      "interpretation_complete": false,
+      "pdf_visual_evidence": {
+        "automated_content_extraction": false,
+        "compatibility_bank": {
+          "content_hash_exposed": false,
+          "identifier_exposed": false,
+          "moderate_threshold": 0.75,
+          "realized_count": 5085,
+          "strong_threshold": 0.95
+        },
+        "evidence_class": "manual visual review of all pages bound to the exact PDF SHA-256",
+        "known_publication_eligible_false_marker": "ignored under the documented thesis-wide interface-bug decision",
+        "layout_readable": true,
+        "pages_reviewed": 4,
+        "target_diagnostics": {
+          "binding_mode_display": "Surface-patch recognition",
+          "binding_site_area_angstrom2": 678,
+          "binding_site_electrostatics_kt_per_e": 8.28,
+          "chain": "A",
+          "elongation": 3.44,
+          "flatness_angstrom": 3.6,
+          "pdb_id": "4M4O",
+          "prepared_target_identifier": "57c827a3f21a",
+          "site_residue_count": 9
+        },
+        "warnings": [
+          "supplied binding-site residues overlapped no cavity; expected surface-mode fallback used the highest fpocket score and must not be described as binding-site selected",
+          "target chain isolated computationally from a multi-chain complex",
+          "coordinates remain in the bound-state conformation and do not represent a relaxed unbound structure"
+        ]
+      },
+      "scientific_result_committed": false,
+      "scope_limits": [
+        "descriptive target case only",
+        "no cross-target numerical comparison",
+        "no target-discrimination claim",
+        "no binding, affinity, specificity, inhibition or experimental-function claim",
+        "no confidence interval or inferential test with these one- and two-core denominators"
+      ],
+      "settings": {
+        "candidate_shuffles": 99,
+        "composite_method": "corpus_weighted_mean",
+        "preset": "Evaluation",
+        "sampled_structures": 200,
+        "sampled_structures_evidence": "pinned run sheet; not independently displayed in result PDF",
+        "scoring_signature": "95a49467ef3c6186",
+        "seed": 42
+      },
+      "status": "SECTION8_TECHNICAL_VALIDATION_PASS_INTERPRETATION_AND_COMMITMENT_PENDING",
+      "target": {
+        "binding_mode": "surface",
+        "chain": "A",
+        "pdb_id": "4M4O",
+        "prepared_target_identifier": "57c827a3f21a",
+        "target_config_id": "HEWL_4M4O_A_surface"
+      },
+      "technical_validation_pass": true
+    }
+  ],
+  "cross_target_numeric_comparison_performed": false,
+  "generated_at_utc": "2026-10-20T12:29:14Z",
+  "governing_plan": {
+    "section": 8,
+    "sha256": "24ae601f4c9bf64325ec8aa509ef7a5eafefd5b77a7610fbd014554e16553db9",
+    "version": "3.7"
+  },
+  "interpretation_complete": false,
+  "panel_id": "section8_two_target_panel_v1",
+  "raw_tier2_scores_reconstructed": false,
+  "schema_version": "mres-aptarank-section8-validation-summary-v1",
+  "scientific_result_committed": false,
+  "scores_recomputed": false,
+  "status": "SECTION8_TECHNICAL_VALIDATION_PASS_INTERPRETATION_AND_COMMITMENT_PENDING",
+  "technical_validation_pass": true
+}

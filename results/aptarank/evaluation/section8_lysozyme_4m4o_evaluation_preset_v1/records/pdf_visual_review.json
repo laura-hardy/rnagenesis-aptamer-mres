@@ -1,0 +1,75 @@
+{
+  "automated_content_extraction": false,
+  "layout_readable": true,
+  "pages_rendered_and_reviewed": 4,
+  "review_scope": "sequence-free run, target, compatibility-band and warning evidence",
+  "schema_version": "mres-aptarank-section8-pdf-visual-review-v1",
+  "source_pdf": {
+    "byte_count": 504709,
+    "path": "raw/4m4o_1025.pdf",
+    "sha256": "114efec24fd3e25e92cc7b15d71b1abec7835b0201806d85ef918843a39d994c"
+  },
+  "status": "VISUALLY_REVIEWED_SOURCE_HASH_PINNED",
+  "visual_observations": {
+    "accounting": {
+      "candidates": 2,
+      "scored": 2
+    },
+    "compatibility": {
+      "bank_content_hash_exposed": false,
+      "bank_identifier_exposed": false,
+      "bank_realized_count": 5085,
+      "bands": {
+        "moderate": 1,
+        "moderate_threshold": 0.75,
+        "strong_threshold": 0.95,
+        "weak": 1
+      },
+      "raw_numeric_tier2_score_exposed": false
+    },
+    "deployment": {
+      "aptarank_version": "0.1.0",
+      "forgi_version": "2.2.3",
+      "fpocket_version": "4.0",
+      "git_revision": "49a85609e352",
+      "schema_version": "1.0.0",
+      "ushuffle_version": "unknown",
+      "viennarna_version": "2.7.2"
+    },
+    "displayed_settings": {
+      "candidate_shuffles": 99,
+      "composite_method": "corpus_weighted_mean",
+      "ranking_runtime_seconds": 1,
+      "sampled_structures_displayed": false,
+      "scoring_signature": "95a49467ef3c6186",
+      "seed": 42
+    },
+    "known_interface_marker": {
+      "publication_eligible_false_displayed": true,
+      "treatment": "ignored under the documented thesis-wide interface-bug decision"
+    },
+    "reference": {
+      "accepted": 113,
+      "dropped": 0,
+      "sha256_prefix_displayed": "5f5c90572263818b",
+      "upload_name": "m9c_reference_upload_attempt3.csv"
+    },
+    "run_label": "section8_4m4o_1025",
+    "target": {
+      "binding_mode_display": "Surface-patch recognition",
+      "binding_site_area_angstrom2": 678,
+      "binding_site_electrostatics_kt_per_e": 8.28,
+      "chain": "A",
+      "elongation": 3.44,
+      "flatness_angstrom": 3.6,
+      "pdb_id": "4M4O",
+      "prepared_target_identifier": "57c827a3f21a",
+      "site_residue_count": 9
+    },
+    "warnings": [
+      "supplied binding-site residues overlapped no cavity; expected surface-mode fallback used the highest fpocket score and must not be described as binding-site selected",
+      "target chain isolated computationally from a multi-chain complex",
+      "coordinates remain in the bound-state conformation and do not represent a relaxed unbound structure"
+    ]
+  }
+}

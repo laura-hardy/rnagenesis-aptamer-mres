@@ -1,0 +1,51 @@
+{
+  "schema_version": "mres-aptarank-section10-pdf-visual-review-v1",
+  "status": "PASS",
+  "pdf": {
+    "path": "raw/d1_ndm1_125.pdf",
+    "sha256": "9ebc8fe271bb78268cbd601254fdbff6232cf535bef3c3bd185c1708e2719d6b",
+    "pages_reviewed": [1, 2, 3]
+  },
+  "visible_run_accounting": {
+    "analysis_name": "D1_ndm1_125",
+    "scored_candidates": 29583,
+    "rejected_candidates": 417,
+    "target": "5ZGX",
+    "binding_mode": "pocket/groove recognition",
+    "candidate_shuffled_controls": 99,
+    "seed": 42,
+    "ranking_runtime_seconds": 1140
+  },
+  "visible_provenance": {
+    "candidate_upload_sha256_prefix": "e932bf9db6b7bc8d",
+    "reference_upload_sha256_prefix": "5f5c90572263818b",
+    "reference_rows": 113,
+    "reference_dropped": 0,
+    "composite_method": "corpus_weighted_mean",
+    "scoring_signature": "95a49467ef3c6186",
+    "aptarank_version": "0.1.0",
+    "schema_version": "1.0.0",
+    "git_revision": "49a85609e352",
+    "viennarna_version": "2.7.2",
+    "forgi_version": "2.2.3",
+    "fpocket_version": "4.0",
+    "ushuffle_version": "unknown",
+    "prepared_target_identifier": "0fde4d5e4370"
+  },
+  "visible_target_warning": "This cavity is oddly shaped: its robust extent and equivalent-sphere diameter disagree by more than 2x. The geometric comparison assumes a roughly convex pocket.",
+  "visible_tier_relationship": {
+    "plotted_rows": 1000,
+    "spearman_rho": 0.008,
+    "two_sided_p": 0.804,
+    "moderate_threshold": 0.75,
+    "strong_threshold": 0.95,
+    "compatibility_control_bank_count": 5085,
+    "bands_are_against_same_target_cavity": true
+  },
+  "independent_numeric_check": {
+    "spearman_rho_from_exact_export": 0.007855649652876636,
+    "reported_rounding_matches": true
+  },
+  "known_interface_flag_decision": "The publication_eligible false marker is the previously documented interface bug and is ignored for thesis evaluation; substantive provenance and result validation remain mandatory.",
+  "interpretation_boundary": "Compatibility is a control-relative geometric prioritisation output and is not evidence of binding, affinity, specificity, inhibition or experimental function."
+}

@@ -1,0 +1,50 @@
+{
+  "artifacts": {
+    "downloaded_shortlist": {
+      "byte_count": 99871,
+      "path": "raw/run_ndm1_section9_1134.csv",
+      "sha256": "30182cfe8eb9691c5e816c1dffd1aac02a83b5d0ef42f5cba172b05c82a5e985"
+    },
+    "result_pdf": {
+      "byte_count": 1560823,
+      "path": "raw/section9_ndm1_1134.pdf",
+      "sha256": "931850ac4cd51a4fa291bfc1d8fdd757fd4c20f6362f3ec87615dcdf63bfe5c7"
+    }
+  },
+  "candidate_upload": {
+    "row_count": 800,
+    "sha256": "abb9ab3281b972c77486306b5a15302a6aee7ee98b3011fb52946fb8cd4f4b0b"
+  },
+  "download_accounting": {
+    "exclusion_register_available": false,
+    "other_raw_artifacts_available": false,
+    "scored_rows": 800,
+    "uploaded_rows": 800
+  },
+  "package_id": "section9_generated_conditions_ndm1_evaluation_preset_v1",
+  "reference_upload": {
+    "accepted_rows": 113,
+    "dropped_rows": 0,
+    "sha256": "5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6"
+  },
+  "run": {
+    "aptarank_version": "0.1.0",
+    "candidate_shuffled_controls": 99,
+    "composite_method": "corpus_weighted_mean",
+    "git_revision": "49a85609e352",
+    "ranking_runtime_seconds": 29,
+    "schema_version": "1.0.0",
+    "scoring_signature": "95a49467ef3c6186",
+    "seed": 42
+  },
+  "schema_version": "mres-aptarank-section9-raw-artifact-manifest-v1",
+  "status": "RAW_BROWSER_DOWNLOADS_PRESERVED_UNCHANGED",
+  "target": {
+    "binding_mode": "pocket/groove recognition",
+    "chain": "A",
+    "pdb_id": "5ZGX",
+    "prepared_target_identifier": "0fde4d5e4370",
+    "target_name": "NDM-1"
+  }
+}
+

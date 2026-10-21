@@ -1,0 +1,41 @@
+{
+  "analysis_v1_revalidated": {
+    "all_800_candidates_scored": true,
+    "all_pinned_hashes_match": true,
+    "condition_and_subgroup_denominators_reconcile": true,
+    "numeric_tier2_values_not_reconstructed": true,
+    "ranks_complete_and_score_ordered": true,
+    "scores_recomputed": false,
+    "target_geometry_warning_preserved": true,
+    "upload_export_join_by_opaque_id": true,
+    "upload_export_sequences_and_lengths_match": true
+  },
+  "checks": {
+    "bands_follow_0_75_and_0_95_thresholds": true,
+    "combined_tier_score_created": false,
+    "condition_and_subgroup_denominators_reconcile": true,
+    "control_percentiles_finite_and_in_closed_unit_interval": true,
+    "exact_ids_ranks_tier1_and_bands_reconcile": true,
+    "existing_section9_analysis_rerun": true,
+    "scores_reconstructed": false,
+    "spearman_recomputed_from_export": true,
+    "target_geometry_warning_preserved": true
+  },
+  "exact_score_input": {
+    "byte_count": 91436,
+    "path": "results/aptarank/evaluation/section9_generated_conditions_ndm1_evaluation_preset_v1/supplemental_exact_tier2_v1/raw/section9_ndm1.csv",
+    "sha256": "6d0255ea827bf2e2156873737a59eee3f7c7aa54e02f5ff2dc60315aa617def0"
+  },
+  "historical_inputs": {
+    "section9_analysis_v1_manifest": {
+      "byte_count": 2908,
+      "sha256": "1c94133aef4372aaee84843665c5f68528eed0312ece9fb10d5539584da4d51a"
+    },
+    "section9_analysis_v1_summary": {
+      "byte_count": 10195,
+      "sha256": "391e4cc2489965aa8465ff2c6eb99d9adac7b9f908aa50d6686dfcecec4c109f"
+    }
+  },
+  "schema_version": "mres-aptarank-section9-analysis-manifest-v2-exact-tier2",
+  "status": "PROVISIONAL_SECTION9_ANALYSIS_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RESULT_COMMITMENT"
+}

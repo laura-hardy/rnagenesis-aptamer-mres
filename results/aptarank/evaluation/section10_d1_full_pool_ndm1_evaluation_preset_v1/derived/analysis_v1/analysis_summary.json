@@ -1,0 +1,191 @@
+{
+  "claim_boundary": "The pool contains computationally prioritised D1 candidates for joint supervisor review and future experimental consideration; it is not a binder set or evidence of affinity, specificity, inhibition, target recognition, experimental function, or predictive validity.",
+  "combined_tier1_tier2_score_created": false,
+  "denominators": {
+    "capped_out": 37,
+    "exact_tier2_exported": 1000,
+    "finally_retained_after_supervisor_review": null,
+    "jointly_eligible": 137,
+    "manually_reviewed": 0,
+    "moderate_top_1000": 167,
+    "not_retained_after_supervisor_review": null,
+    "otherwise_missing": 0,
+    "pooled_favourable_top_1000": 236,
+    "retained_for_supervisor_review": 100,
+    "scored": 29583,
+    "shuffle_pass_full_scored_export": 1486,
+    "shuffle_pass_top_1000": 558,
+    "strong_top_1000": 69,
+    "technical_exclusions": 417,
+    "uploaded": 30000,
+    "weak_top_1000": 764
+  },
+  "funnel": [
+    {
+      "count": 30000,
+      "pass_rate_from_previous_percent": null,
+      "previous_denominator": null,
+      "retained_from_upload_percent": "100",
+      "stage": "uploaded_sequences"
+    },
+    {
+      "count": 29583,
+      "pass_rate_from_previous_percent": "98.61",
+      "previous_denominator": 30000,
+      "retained_from_upload_percent": "98.61",
+      "stage": "valid_scored_records"
+    },
+    {
+      "count": 1000,
+      "pass_rate_from_previous_percent": "3.3803197782510225467329209343203867085826319169793",
+      "previous_denominator": 29583,
+      "retained_from_upload_percent": "3.3333333333333333333333333333333333333333333333333",
+      "stage": "exact_top_1000_target_results"
+    },
+    {
+      "count": 558,
+      "pass_rate_from_previous_percent": "55.8",
+      "previous_denominator": 1000,
+      "retained_from_upload_percent": "1.86",
+      "stage": "top_1000_shuffle_pass"
+    },
+    {
+      "count": 137,
+      "pass_rate_from_previous_percent": "24.551971326164874551971326164874551971326164874552",
+      "previous_denominator": 558,
+      "retained_from_upload_percent": "0.45666666666666666666666666666666666666666666666667",
+      "stage": "shuffle_pass_and_favourable_compatibility"
+    },
+    {
+      "count": 137,
+      "pass_rate_from_previous_percent": "100",
+      "previous_denominator": 137,
+      "retained_from_upload_percent": "0.45666666666666666666666666666666666666666666666667",
+      "stage": "tier1_ordered_jointly_eligible"
+    },
+    {
+      "count": 100,
+      "pass_rate_from_previous_percent": "72.992700729927007299270072992700729927007299270073",
+      "previous_denominator": 137,
+      "retained_from_upload_percent": "0.33333333333333333333333333333333333333333333333333",
+      "stage": "supervisor_review_pool_after_cap"
+    }
+  ],
+  "interpretation": "The deterministic computational pool contains the 100 best Tier 1 ranks among 137 D1 candidates that passed the candidate-specific shuffle check and had strong or moderate NDM-1 compatibility. Compatibility was a pooled coarse gate, not an ordering variable, and no Tier 1/Tier 2 composite was formed.",
+  "package_id": "section10_d1_full_pool_ndm1_evaluation_preset_v1",
+  "review_pool": {
+    "capped_out": 37,
+    "capped_out_compatibility": {
+      "moderate": 27,
+      "strong": 10
+    },
+    "eligible_compatibility": {
+      "moderate": 94,
+      "strong": 43
+    },
+    "eligible_training_seed": {
+      "43": 76,
+      "44": 61
+    },
+    "finally_retained_after_supervisor_review": null,
+    "jointly_eligible": 137,
+    "manual_supervisor_decisions_complete": false,
+    "retained_compatibility": {
+      "moderate": 67,
+      "strong": 33
+    },
+    "retained_for_supervisor_review": 100,
+    "retained_length": {
+      "maximum": 96,
+      "minimum": 32,
+      "unique_lengths": 46
+    },
+    "retained_tier1_rank": {
+      "best": 2,
+      "first_capped_out": 619,
+      "worst": 616
+    },
+    "retained_training_seed": {
+      "43": 58,
+      "44": 42
+    }
+  },
+  "schema_version": "mres-aptarank-section10-analysis-summary-v1",
+  "scientific_result_committed": false,
+  "score_analysis": {
+    "tier1_all_scored": {
+      "maximum": "0.9681415929203541",
+      "mean": "0.43602592256554904411134773349558868268938241557651",
+      "median_type7": "0.4230088495575222",
+      "minimum": "0.03539823008849561",
+      "q1_type7": "0.309734513274336285",
+      "q3_type7": "0.5575221238938054"
+    },
+    "tier1_jointly_eligible": {
+      "maximum": "0.9486725663716815",
+      "mean": "0.8041405593953879",
+      "median_type7": "0.7964601769911506",
+      "minimum": "0.7469026548672566",
+      "q1_type7": "0.7699115044247788",
+      "q3_type7": "0.831858407079646"
+    },
+    "tier1_supervisor_pool": {
+      "maximum": "0.9486725663716815",
+      "mean": "0.820079646017699124",
+      "median_type7": "0.8159292035398229",
+      "minimum": "0.7716814159292037",
+      "q1_type7": "0.791150442477876",
+      "q3_type7": "0.8407079646017699"
+    },
+    "tier1_tier2_spearman": {
+      "n": 1000,
+      "p_value_pdf": 0.804,
+      "rho_exact_export": 0.007855649652876637,
+      "rho_pdf_rounded": 0.008
+    },
+    "tier1_top_1000": {
+      "maximum": "0.9681415929203541",
+      "mean": "0.7928902654867256736",
+      "median_type7": "0.7823008849557522",
+      "minimum": "0.7469026548672566",
+      "q1_type7": "0.7628318584070797",
+      "q3_type7": "0.8159292035398229"
+    },
+    "tier2_control_percentile_jointly_eligible": {
+      "maximum": "0.9946902654867257",
+      "mean": "0.88908339254570116569343065693430656934306569343066",
+      "median_type7": "0.8712881022615536",
+      "minimum": "0.7618485742379548",
+      "q1_type7": "0.8027531956735496",
+      "q3_type7": "0.9537856440511308"
+    },
+    "tier2_control_percentile_supervisor_pool": {
+      "maximum": "0.9946902654867257",
+      "mean": "0.890750245821042266",
+      "median_type7": "0.88402163225172075",
+      "minimum": "0.7618485742379548",
+      "q1_type7": "0.8027531956735496",
+      "q3_type7": "0.957423795476892825"
+    },
+    "tier2_control_percentile_top_1000": {
+      "maximum": "0.9946902654867257",
+      "mean": "0.463530285152409037408",
+      "median_type7": "0.4067846607669616",
+      "minimum": "0.005211406096361848",
+      "q1_type7": "0.12114060963618485",
+      "q3_type7": "0.7117994100294985"
+    }
+  },
+  "scores_recomputed": false,
+  "status": "PROVISIONAL_SECTION10_VALIDATION_ANALYSIS_AND_REVIEW_POOL_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RESULT_COMMITMENT",
+  "supervisor_review_complete": false,
+  "target_geometry_limitation": {
+    "applies_to_every_review_candidate": true,
+    "warning_exact": "This cavity is oddly shaped: its robust extent and equivalent-sphere diameter disagree by more than 2\u00d7. The geometric comparison assumes a roughly convex pocket."
+  },
+  "technical_exclusions": {
+    "above_100_nt": 406,
+    "below_20_nt": 11,
+    "replaced_or_replenished": false
+  }
+}

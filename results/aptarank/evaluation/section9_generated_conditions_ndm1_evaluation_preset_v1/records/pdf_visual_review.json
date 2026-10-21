@@ -1,0 +1,43 @@
+{
+  "all_pages_reviewed": true,
+  "automated_content_extraction": false,
+  "compatibility_bank": {
+    "construction_displayed": "5085 fixed dinucleotide-shuffled controls derived from the uploaded reference and scored against the same cavity",
+    "content_hash_exposed": false,
+    "identifier_exposed": false,
+    "moderate_threshold": 0.75,
+    "realized_count": 5085,
+    "strong_threshold": 0.95
+  },
+  "layout_readable": true,
+  "page_count": 3,
+  "package_id": "section9_generated_conditions_ndm1_evaluation_preset_v1",
+  "run_observations": {
+    "candidate_count": 800,
+    "candidate_shuffled_controls": 99,
+    "ranking_runtime_seconds": 29,
+    "scored_count": 800,
+    "seed": 42
+  },
+  "schema_version": "mres-aptarank-section9-pdf-visual-review-v1",
+  "source_pdf": {
+    "byte_count": 1560823,
+    "path": "raw/section9_ndm1_1134.pdf",
+    "sha256": "931850ac4cd51a4fa291bfc1d8fdd757fd4c20f6362f3ec87615dcdf63bfe5c7"
+  },
+  "status": "VISUALLY_REVIEWED_SOURCE_HASH_PINNED",
+  "target_geometry": {
+    "cavities_detected": 15,
+    "characteristic_width_angstrom": 23.0,
+    "cavity_volume_angstrom_cubed": 744.0,
+    "electrostatics": "skipped",
+    "selected_cavity": 1,
+    "warning_exact": "This cavity is oddly shaped: its robust extent and equivalent-sphere diameter disagree by more than 2\u00d7. The geometric comparison assumes a roughly convex pocket."
+  },
+  "tier_relationship_display": {
+    "n": 800,
+    "p_value": 0.0421,
+    "raw_tier2_numeric_values_exported": false,
+    "spearman_rho": -0.072
+  }
+}

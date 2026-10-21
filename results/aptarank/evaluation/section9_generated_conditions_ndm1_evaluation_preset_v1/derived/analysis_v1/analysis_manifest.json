@@ -1,0 +1,76 @@
+{
+  "checks": {
+    "all_800_candidates_scored": true,
+    "all_pinned_hashes_match": true,
+    "condition_and_subgroup_denominators_reconcile": true,
+    "numeric_tier2_values_not_reconstructed": true,
+    "ranks_complete_and_score_ordered": true,
+    "scores_recomputed": false,
+    "target_geometry_warning_preserved": true,
+    "upload_export_join_by_opaque_id": true,
+    "upload_export_sequences_and_lengths_match": true
+  },
+  "inputs": {
+    "governing_plan": {
+      "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_7.md",
+      "sha256": "24ae601f4c9bf64325ec8aa509ef7a5eafefd5b77a7610fbd014554e16553db9"
+    },
+    "pdf_visual_review": {
+      "byte_count": 1534,
+      "sha256": "64fa94ef3e4dac03f684e763b572e239c8c4b2393f48f6fc3428f63748d2b6bc"
+    },
+    "public_package": {
+      "records/expected_cell_manifest.json": {
+        "byte_count": 36934,
+        "sha256": "91848e59d20205a360a9f74b97edea57eac2ff781c01c3e2a923a1b241715a71"
+      },
+      "records/preparation_manifest.json": {
+        "byte_count": 5686,
+        "sha256": "c9bf3bf6f74a212033324661e614b9105f8e7cb9e41b4a579383e6b5c75acfed"
+      },
+      "records/run_sheet.json": {
+        "byte_count": 2916,
+        "sha256": "371f5c59052972aeda69fb6e63f16278a8cd1a09cdb6f8305539e84b6f7e5a87"
+      },
+      "records/target_settings.json": {
+        "byte_count": 1286,
+        "sha256": "6c311ed838ad8e1b0cf22527f80e8d91a9b5bbb67347d3d0eef04d9682476541"
+      },
+      "records/validation_report.json": {
+        "byte_count": 1982,
+        "sha256": "b977440aa94df0b7570c8b4ba1a499733ddd4edf03b4f9e2f1e445602991fb74"
+      },
+      "upload/candidate_upload.csv": {
+        "byte_count": 70418,
+        "sha256": "abb9ab3281b972c77486306b5a15302a6aee7ee98b3011fb52946fb8cd4f4b0b"
+      }
+    },
+    "raw_artifact_manifest": {
+      "byte_count": 1548,
+      "sha256": "0093442d88b03f626014110da2ae04a1417acccb5018ecbf47a69ff7f8ed2199"
+    },
+    "raw_run_artifacts": {
+      "raw/run_ndm1_section9_1134.csv": {
+        "byte_count": 99871,
+        "sha256": "30182cfe8eb9691c5e816c1dffd1aac02a83b5d0ef42f5cba172b05c82a5e985"
+      },
+      "raw/section9_ndm1_1134.pdf": {
+        "byte_count": 1560823,
+        "sha256": "931850ac4cd51a4fa291bfc1d8fdd757fd4c20f6362f3ec87615dcdf63bfe5c7"
+      }
+    },
+    "restricted_inputs": {
+      "m9b2_private_membership_key.jsonl": {
+        "byte_count": 452507,
+        "sha256": "904e8fa58f67c3d57563e03dba40db0a60a9229d015c354ae1e848c9f9d8468c"
+      },
+      "source_candidate_key.json": {
+        "byte_count": 291626,
+        "sha256": "746f0eea3e53de4550284865a6f4f2a763b339557d4ab45885cb67f9ecd46356"
+      }
+    }
+  },
+  "package_id": "section9_generated_conditions_ndm1_evaluation_preset_v1",
+  "schema_version": "mres-aptarank-section9-analysis-manifest-v1",
+  "status": "PROVISIONAL_SECTION9_ANALYSIS_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RESULT_COMMITMENT"
+}

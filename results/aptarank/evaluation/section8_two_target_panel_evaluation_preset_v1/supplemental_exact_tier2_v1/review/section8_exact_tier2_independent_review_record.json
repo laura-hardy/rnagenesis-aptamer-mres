@@ -1,0 +1,39 @@
+{
+  "historical_section8_closure_unchanged": true,
+  "independent_review_complete": true,
+  "material_blockers": [],
+  "material_defects": [],
+  "optional_observations": [
+    "the panel prose lists target-specific percentiles together but calculates no cross-mode difference and explicitly refuses a GRK2-versus-lysozyme numerical comparison",
+    "manifest booleans are written as constants after fail-closed checks; the reviewer independently recomputed and confirmed them",
+    "fixed narrative values match the calculated tables"
+  ],
+  "optional_observations_actioned": false,
+  "review_outcome": "PASS_NO_MATERIAL_DEFECT_OR_BLOCKER",
+  "review_scope": [
+    "raw exact-export hashes and regular-file status",
+    "opaque-ID, rank, Tier 1 decimal and compatibility-band reconciliation",
+    "closed-unit-interval control percentiles and 0.75/0.95 band thresholds",
+    "derived checksums and privacy",
+    "preservation of historical validation, interpretation and closure hashes",
+    "absence of Tier 2 reconstruction, combined scoring and cross-target numerical comparison",
+    "scientific interpretation and claim boundaries"
+  ],
+  "review_source": "Cursor read-only review supplied by Laura",
+  "reviewed_artifacts": {
+    "analysis_manifest": {
+      "path": "derived/analysis_v1/analysis_manifest.json",
+      "sha256": "4f627c3b7a1237fa127d9736ba55e8a0acfa16e47724ebcf535f4f98bcdebf85"
+    },
+    "analysis_summary": {
+      "path": "derived/analysis_v1/analysis_summary.json",
+      "sha256": "03267e2dce8f1d550cc9cece6333da26df15e12720ddb8a8fbd467f7dd38ce8a"
+    },
+    "results_note": {
+      "path": "derived/analysis_v1/section8_exact_tier2_addendum.md",
+      "sha256": "3fabe6a2ceea1d7b2b63a3e089a28d07ab6b0a3205f7a07d38897be38463db44"
+    }
+  },
+  "scientific_result_committed": false,
+  "status": "SECTION8_EXACT_TIER2_SUPPLEMENT_INDEPENDENTLY_REVIEWED_AWAITING_EXPLICIT_RECOMMITMENT"
+}

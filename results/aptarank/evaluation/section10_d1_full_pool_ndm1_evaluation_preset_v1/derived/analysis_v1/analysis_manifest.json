@@ -1,0 +1,113 @@
+{
+  "analysis_adapter": {
+    "byte_count": 43111,
+    "sha256": "af579a1784bcc9e2198dba5ffac3b6d405974c701bd78953a0c8550d6b275dd1"
+  },
+  "checks": {
+    "29583_scored_plus_417_excluded_equals_30000_uploaded": true,
+    "Tier_1_primary_order_and_cap_100_applied": true,
+    "all_30000_opaque_ids_recomputed_from_restricted_secret": true,
+    "all_scored_and_excluded_rows_join_by_opaque_id": true,
+    "exact_top_1000_reconciles_to_full_export": true,
+    "frozen_D1_source_and_attempt_membership_rebuilt": true,
+    "no_combined_score_created": true,
+    "no_gate_relaxed_and_no_exclusion_replenished": true,
+    "ranks_scores_sequences_lengths_and_ties_validate": true,
+    "strong_does_not_precede_moderate": true,
+    "target_geometry_warning_preserved": true,
+    "tier2_bands_follow_0_75_and_0_95_thresholds": true,
+    "upload_and_both_restricted_keys_reproduced_byte_exactly": true,
+    "v3_8_shuffle_and_pooled_favourable_gates_applied": true
+  },
+  "inputs": {
+    "plans": {
+      "v3_8": {
+        "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_8.md",
+        "sha256": "8cf982180663ad8591583bd5e37613be4ce8234cfc8a2b82822a36b756d661dc"
+      },
+      "v3_9": {
+        "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_9.md",
+        "sha256": "88be515dcb04dd3db9f4ec7392b70ce90de085a601d15ac00facc43f509ad274"
+      }
+    },
+    "public_package": {
+      "README.md": {
+        "byte_count": 1247,
+        "sha256": "f11da39adb11dcd610aee0648710543c5da7115cdf272033782c22e1c0fadaf4"
+      },
+      "records/expected_cell_manifest.json": {
+        "byte_count": 1350913,
+        "sha256": "fe573aabe13facd7dfae06984ba9be0c79973f2f9803d50598e7cafe9d011846"
+      },
+      "records/preparation_manifest.json": {
+        "byte_count": 5075,
+        "sha256": "786a56c972cb993184cf8f64293d4d314c5ca73a17cd9823d324710b9dd605a1"
+      },
+      "records/review_pool_rule.json": {
+        "byte_count": 1004,
+        "sha256": "ba62d76f6f690559b1b1d4988ced580c40252d844ebe8160ef3abe4bc72974cd"
+      },
+      "records/run_sheet.json": {
+        "byte_count": 3118,
+        "sha256": "f30721375ba1794fc20c4ec09284ebb9c65dd5f5d1022e198fe68f7506ea1b32"
+      },
+      "records/target_settings.json": {
+        "byte_count": 1191,
+        "sha256": "e24246e3743f8707251829452acf79eefad0aafd1347d600a06cd1abcfaa7972"
+      },
+      "records/validation_report.json": {
+        "byte_count": 1914,
+        "sha256": "9909e92d2842075db48b1b6c6be39c63fea71b57ac427dc2cf6473ed5e4a9e92"
+      },
+      "upload/candidate_upload.csv": {
+        "byte_count": 2810088,
+        "sha256": "e932bf9db6b7bc8d29ccdffa4289f37cca87bab3f7ca77c002f81377ad1f284b"
+      }
+    },
+    "raw_artifacts": {
+      "raw/d1_ndm1_125.pdf": {
+        "byte_count": 1802263,
+        "sha256": "9ebc8fe271bb78268cbd601254fdbff6232cf535bef3c3bd185c1708e2719d6b"
+      },
+      "raw/excluded_sequences_d1_ndm1_125.csv": {
+        "byte_count": 56099,
+        "sha256": "d5259d83ad7616b4499255a2039fbe6ba97f0df511239784934edeb0aabc1915"
+      },
+      "raw/run_d1_ndm1_125_shortlist.csv": {
+        "byte_count": 4124969,
+        "sha256": "257cbaa523638abf67aa6109bfce37127aab07eccfbcf82e6cfe448a9d8a650f"
+      },
+      "raw/tier1_tier2_exact_d1_ndm1_125.csv": {
+        "byte_count": 114184,
+        "sha256": "b5501b2004e26f6345ec0ad6ddd00892c4460ed67243feeffed34115db4e32b3"
+      }
+    },
+    "restricted_package": {
+      "blinding_secret.bin": {
+        "byte_count": 32,
+        "sha256": "cd04c8eebf31985bb0057e369805e82939b89010802334f66b3683e79fdde7b7"
+      },
+      "m9b2_private_membership_key.jsonl": {
+        "byte_count": 21655682,
+        "sha256": "f247a7465c9d8e07f35b5db944ca479dff6eb5a8a9de02f116b4d075688202b6"
+      },
+      "source_candidate_key.json": {
+        "byte_count": 11580738,
+        "sha256": "fb7e6b0248f3748a1ec4280327e3669b5422c173ec085f30417ae851250d153d"
+      }
+    },
+    "run_records": {
+      "records/pdf_visual_review.json": {
+        "byte_count": 2141,
+        "sha256": "5065cea943bf09b8681494adf660944e708262f755324d608e300a784b411f17"
+      },
+      "records/raw_archive_inventory.json": {
+        "byte_count": 2703,
+        "sha256": "14fb973ed6f18cdbc70e8825c57962159ec76663212c24753f3a20c6718fee05"
+      }
+    }
+  },
+  "package_id": "section10_d1_full_pool_ndm1_evaluation_preset_v1",
+  "schema_version": "mres-aptarank-section10-analysis-manifest-v1",
+  "status": "PROVISIONAL_SECTION10_VALIDATION_ANALYSIS_AND_REVIEW_POOL_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RESULT_COMMITMENT"
+}

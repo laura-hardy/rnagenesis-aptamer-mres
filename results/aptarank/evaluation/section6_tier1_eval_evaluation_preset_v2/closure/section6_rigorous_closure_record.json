@@ -1,0 +1,92 @@
+{
+  "schema_version": "1.0.0",
+  "status": "SECTION6_RIGOROUS_SCIENTIFIC_RESULT_COMMITTED_AND_CLOSED",
+  "closed_at_date": "2026-10-20",
+  "scientific_result_committed": true,
+  "git_commit_claimed": false,
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_7.md",
+    "sha256": "24ae601f4c9bf64325ec8aa509ef7a5eafefd5b77a7610fbd014554e16553db9"
+  },
+  "approval": {
+    "source": "explicit_user_instruction",
+    "decision": "approve_and_close_rigorous_section_6"
+  },
+  "preset": {
+    "ui_name": "Evaluation",
+    "role": "paper_rigorous_mode",
+    "seed": 42,
+    "candidate_shuffles": 99,
+    "sampled_structures": 200,
+    "sampled_structures_source": "pinned_run_sheet_and_operator_execution_record; not independently displayed in result PDF"
+  },
+  "independent_review": {
+    "outcome": "no_material_defect_or_blocker",
+    "blocking_issue": false,
+    "optional_change_required": false,
+    "independent_recalculation_matched": true,
+    "run_sheet_compatibility_handoff_accepted_as_narrow_and_fail_closed": true,
+    "cluster_bootstrap_replicates": 10000,
+    "review_evidence_sha256": "ff11cc5a2581b3538689499f971719a0f4a88f7e85c409a897ba4a131b1c3854"
+  },
+  "accounting": {
+    "input_candidates": 308,
+    "scored_candidates": 306,
+    "technical_exclusions": 2,
+    "complete_pairs": 153,
+    "incomplete_pairs": 1,
+    "clusters_before_rejection": 79,
+    "clusters_represented": 79
+  },
+  "results": {
+    "eval_mean": 0.513,
+    "control_mean": 0.429,
+    "eval_median": 0.512,
+    "control_median": 0.409,
+    "median_paired_difference_eval_minus_control": 0.108,
+    "median_paired_difference_cluster_bootstrap_95_ci": [0.064, 0.164],
+    "mean_paired_difference_eval_minus_control": 0.083,
+    "tie_aware_auroc": 0.638,
+    "auroc_cluster_bootstrap_95_ci": [0.555, 0.717],
+    "wilcoxon_w_plus": 7959,
+    "wilcoxon_two_sided_p": 0.000164702,
+    "eval_shuffle_pass": "15/153",
+    "control_shuffle_pass": "9/153",
+    "paired_shuffle_pass_difference_percentage_points": 3.9,
+    "paired_shuffle_pass_difference_cluster_bootstrap_95_ci_percentage_points": [-3.2, 11.1]
+  },
+  "historical_standard_relationship": {
+    "historical_result_preserved": true,
+    "results_pooled": false,
+    "result_selected_by_favourability": false,
+    "aptamer_likeness_scores_and_ranks_identical_for_all_306_scored_candidates": true,
+    "shuffle_fail_to_pass_transitions": 11,
+    "shuffle_pass_to_fail_transitions": 3,
+    "transition_accounting_role": "technical_descriptive_sensitivity_not_primary_inference"
+  },
+  "artifact_sha256": {
+    "candidate_upload": "5554f68fd94d1754ff9bcc87fba81be7dc8391af7e45703400796f4a5a336ad2",
+    "private_key": "be1a40990875a3d02bcdf3ebed6a6a5fb57104fa93f78df41c2ca544b7dc8408",
+    "run_sheet": "0dbe9ab773d68537605990d50df1cc50e4f5c8080118b3d6e25d5f683603db0f",
+    "shortlist": "e5db367e2f2ea9e6f023db32345533d1a7a09a26996166700ed02c4cd6e97e4c",
+    "exclusion_register": "91ff501e648389b2c8234c0bd2460ea8a8c2d63ccf56a37c8079abc2b82d3d3e",
+    "result_pdf": "e511504b1f912c26950ba3702de6ef7c102cff0219ba8cb7e9d0c736af05fd46",
+    "raw_manifest": "87380a7adb8e8f698cb1db320dea8b07f0d5a8548f947c8e0a790deeed5e99c0",
+    "analysis_summary": "23861254eb86506e3df23954bf0f327a8ca634722b66273f7c9b242b74bbedb6",
+    "analysis_manifest": "d19cd0e82a48cde88e972c42fcd8b83590ca11bb81fc4d6a39f323579680f633",
+    "results_markdown": "36a3a406cc61c49bdb31749c38762cbde81ec7725d1ed4ce8809a966668acc0b",
+    "analysis_adapter": "c37a2b008f1ec0123480114d7130633a28660844e77423efdfe141a80ca2ebe0",
+    "analysis_tests": "0329e42ded89edea1b5092de213e3070bf16f21479b1a333816910e601304a3e"
+  },
+  "component_table": {
+    "status": "unavailable",
+    "reason": "component_artifact_unavailable",
+    "recomputed": false
+  },
+  "interpretation": "Moderate Tier 1 score separation from the paired exact-length uniform null; a larger but still uncertain candidate-specific shuffle-pass difference whose confidence interval includes no difference.",
+  "claim_boundary": "This result is not evidence of universal aptamer classification, binding, affinity, specificity, inhibition or target-specific function.",
+  "historical_standard_result_status": "preserved_as_immutable_historical_evidence_and_superseded_for_final_thesis_reporting",
+  "reviewed_artifacts_modified_during_closure": false,
+  "aptarank_rerun_during_closure": false
+}
+

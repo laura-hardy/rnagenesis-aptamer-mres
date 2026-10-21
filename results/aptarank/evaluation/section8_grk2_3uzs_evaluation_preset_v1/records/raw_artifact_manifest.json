@@ -1,0 +1,43 @@
+{
+  "schema_version": "mres-aptarank-raw-artifact-manifest-v1",
+  "status": "RAW_RESULTS_ARCHIVED_INTERPRETATION_PENDING",
+  "section": "section8_grk2_3uzs_descriptive_tier2",
+  "run_label": "section_8_3uzs_1021",
+  "package_id": "section8_grk2_tier2_evaluation_preset_v2",
+  "candidate_upload_sha256": "e7589866fb3322eb3d9ea90a8276d613720ff9d64e59bfed6f7cb47433b9572f",
+  "reference_upload_sha256": "5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6",
+  "displayed_settings": {
+    "target_pdb_id": "3UZS",
+    "target_chain": "A",
+    "binding_mode": "pocket",
+    "seed": 42,
+    "candidate_shuffles": 99,
+    "ranking_runtime_seconds": 0,
+    "composite_method": "corpus_weighted_mean",
+    "scoring_signature": "95a49467ef3c6186"
+  },
+  "run_sheet_setting_not_independently_displayed_in_pdf": {
+    "sampled_structures": 200
+  },
+  "accounting": {
+    "uploaded": 1,
+    "scored": 1,
+    "shortlist_rows": 1,
+    "exclusion_register": "not_supplied; pdf_shows_no_rejection_indicator",
+    "input_join_pass": true
+  },
+  "raw_artifacts": [
+    {
+      "path": "raw/run_3uzs_1021_shortlist.csv",
+      "byte_count": 168,
+      "sha256": "d9ecbb4b3745b496832575bba7b9ccbcba5850dd838e178810fa8eea6fd644c7"
+    },
+    {
+      "path": "raw/section8_3uzs_1021.pdf",
+      "byte_count": 463121,
+      "sha256": "cec6ad469ccab822818f92aeee6addc15368ed54d6f99cfb07cf45754ac782fb"
+    }
+  ],
+  "scientific_result_committed": false
+}
+

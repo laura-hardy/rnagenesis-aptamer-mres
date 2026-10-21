@@ -1,0 +1,14 @@
+{
+  "strip_leading_11": true,
+  "enforce_rna_alphabet": true,
+  "min_length": null,
+  "max_length": null,
+  "enforce_exact_deduplication": true,
+  "homopolymer_max_run_fail_threshold": 5,
+  "enforce_homopolymer_filter": true,
+  "min_gc_fraction": null,
+  "max_gc_fraction": null,
+  "max_normalised_mfe": null,
+  "near_dedup_max_edit_distance": null,
+  "write_passed_fasta": true
+}

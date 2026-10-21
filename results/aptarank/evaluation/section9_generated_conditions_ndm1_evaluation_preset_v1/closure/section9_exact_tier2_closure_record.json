@@ -1,0 +1,77 @@
+{
+  "active_remaining_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_9.md",
+    "sha256": "88be515dcb04dd3db9f4ec7392b70ce90de085a601d15ac00facc43f509ad274"
+  },
+  "approval": {
+    "decision": "commit_and_close_section9_exact_score_v2",
+    "source": "explicit_user_instruction"
+  },
+  "aptarank_rerun_during_closure": false,
+  "artifact_sha256": {
+    "analysis_manifest_v2": "9ebaf6ac936ccf5eac693ee490aa7090d8d971bea57da5e683da9a8f4cd105f7",
+    "analysis_summary_v2": "e2bd0a924beff948d8a8715298c5cb1b45de3fd9b330418514056ed29c40705b",
+    "analysis_v1_manifest": "1c94133aef4372aaee84843665c5f68528eed0312ece9fb10d5539584da4d51a",
+    "analysis_v1_summary": "391e4cc2489965aa8465ff2c6eb99d9adac7b9f908aa50d6686dfcecec4c109f",
+    "exact_export": "6d0255ea827bf2e2156873737a59eee3f7c7aa54e02f5ff2dc60315aa617def0",
+    "independent_review_record": "b7f3e1fdd72730e435c4ffee87810e536d4a3d6b6e75027f100052c7e6202061",
+    "original_result_pdf": "931850ac4cd51a4fa291bfc1d8fdd757fd4c20f6362f3ec87615dcdf63bfe5c7",
+    "original_shortlist": "30182cfe8eb9691c5e816c1dffd1aac02a83b5d0ef42f5cba172b05c82a5e985",
+    "results_note_v2": "d3c16e7c562b013be75ddfb4e880123f8534b250c40372a9171f8b19d0f511a3"
+  },
+  "claim_boundary": "The condition-level differences and exact target-control percentiles are descriptive computational prioritisation evidence only. They do not demonstrate binding, affinity, specificity, inhibition, target recognition, target discrimination or experimental function.",
+  "closed_at_date": "2026-10-21",
+  "denominators": {
+    "b0": 200,
+    "b1": 200,
+    "b1_block_a": 100,
+    "b1_block_b": 100,
+    "b2": 200,
+    "d1": 200,
+    "d1_seed_43": 100,
+    "d1_seed_44": 100,
+    "scored": 800,
+    "technical_exclusions": 0,
+    "uploaded": 800
+  },
+  "final_interpretation": "Exact Tier 2 values sharpen but do not materially change the provisional Section 9 interpretation. D1 has a modest target-control-percentile advantage over B1 that is carried by more moderate annotations rather than more strong annotations. D1 is only slightly above B2 on mean percentile and has the same median. Tier 1 and Tier 2 remain separate, and the NDM-1 oddly-shaped-cavity warning materially limits target-aware interpretation.",
+  "git_commit_claimed": false,
+  "independent_review": {
+    "blocking_issue": false,
+    "material_defect": false,
+    "optional_change_required": false,
+    "outcome": "no_material_defect_or_blocker",
+    "review_record_sha256": "b7f3e1fdd72730e435c4ffee87810e536d4a3d6b6e75027f100052c7e6202061"
+  },
+  "ndm1_target_geometry_warning": "This cavity is oddly shaped: its robust extent and equivalent-sphere diameter disagree by more than 2\u00d7. The geometric comparison assumes a roughly convex pocket.",
+  "prespecified_comparisons": {
+    "primary_d1_minus_b1": {
+      "mean_control_percentile_difference": "0.02869321533923303541145",
+      "median_control_percentile_difference": "0.1622418879056048",
+      "moderate_percentage_point_difference": "6",
+      "strong_percentage_point_difference": "-0.5"
+    },
+    "secondary_d1_minus_b2": {
+      "mean_control_percentile_difference": "0.01584070796460176791855",
+      "median_control_percentile_difference": "0",
+      "moderate_percentage_point_difference": "4",
+      "strong_percentage_point_difference": "0.5"
+    }
+  },
+  "reviewed_artifacts_modified_during_closure": false,
+  "run_governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_7.md",
+    "sha256": "24ae601f4c9bf64325ec8aa509ef7a5eafefd5b77a7610fbd014554e16553db9"
+  },
+  "schema_version": "1.0.0",
+  "scientific_result_committed": true,
+  "scores_recomputed": false,
+  "status": "SECTION9_EXACT_TIER2_SCIENTIFIC_RESULT_COMMITTED_AND_CLOSED",
+  "tier_relationship": {
+    "combined_score_created": false,
+    "n": 800,
+    "pdf_p_value": 0.0421,
+    "spearman_rho_exact_export": -0.071883614342812,
+    "spearman_rho_pdf_rounded": -0.072
+  }
+}

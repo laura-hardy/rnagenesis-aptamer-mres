@@ -1,0 +1,42 @@
+{
+  "schema_version": "mres-aptarank-raw-artifact-manifest-v1",
+  "status": "RAW_RESULTS_ARCHIVED_INTERPRETATION_PENDING",
+  "section": "section8_lysozyme_4m4o_descriptive_tier2",
+  "run_label": "section8_4m4o_1025",
+  "package_id": "section8_lysozyme_tier2_evaluation_preset_v2",
+  "candidate_upload_sha256": "ade52448da9a6b8630f082df446745f28c649031df460c7b8eb13c4c9b47ab9d",
+  "reference_upload_sha256": "5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6",
+  "displayed_settings": {
+    "target_pdb_id": "4M4O",
+    "target_chain": "A",
+    "binding_mode": "surface",
+    "seed": 42,
+    "candidate_shuffles": 99,
+    "ranking_runtime_seconds": 1,
+    "composite_method": "corpus_weighted_mean",
+    "scoring_signature": "95a49467ef3c6186"
+  },
+  "run_sheet_setting_not_independently_displayed_in_pdf": {
+    "sampled_structures": 200
+  },
+  "accounting": {
+    "uploaded": 2,
+    "scored": 2,
+    "shortlist_rows": 2,
+    "exclusion_register": "not_supplied; pdf_shows_no_rejection_indicator",
+    "input_join_pass": true
+  },
+  "raw_artifacts": [
+    {
+      "path": "raw/4m4o_1025.csv",
+      "byte_count": 320,
+      "sha256": "1cea5620a0a1a938b454c6c4b612c105fa2423fe8eeb7e66e9cd9b706dc70a6a"
+    },
+    {
+      "path": "raw/4m4o_1025.pdf",
+      "byte_count": 504709,
+      "sha256": "114efec24fd3e25e92cc7b15d71b1abec7835b0201806d85ef918843a39d994c"
+    }
+  ],
+  "scientific_result_committed": false
+}

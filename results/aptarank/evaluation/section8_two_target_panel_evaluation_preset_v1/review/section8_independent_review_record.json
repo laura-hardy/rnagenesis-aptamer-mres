@@ -1,0 +1,58 @@
+{
+  "binding_decision_review": {
+    "conclusion": "scientifically justified for conservative within-target NDM-1 prioritisation",
+    "major_limit": "the weak-to-mixed cognate results limit biological meaning and do not calibrate binding or target recognition",
+    "passed": true
+  },
+  "generated_on": "2026-10-20",
+  "independent_review_complete": true,
+  "material_blockers": [],
+  "material_defects": [],
+  "optional_observations": [
+    "the lysozyme PDF contains additional geometric explanation for the 59-nt weak result",
+    "GRK2 electrostatics were skipped and this is retained in validation diagnostics rather than repeated in interpretation prose",
+    "the lysozyme site potential is target-constant and cannot reorder candidates or change a band",
+    "the structured interpretation record is intentionally more compact than the prose and omits target-warning text",
+    "the 200 sampled-structure setting remains run-sheet evidence rather than PDF-displayed evidence",
+    "the ushuffle version remains unknown",
+    "the 45-nt moderate core matches supporting structure 4M6D and the 59-nt weak core matches configured structure 4M4O"
+  ],
+  "optional_observations_actioned": false,
+  "review_outcome": "PASS_NO_MATERIAL_DEFECT_OR_BLOCKER",
+  "review_scope": [
+    "frozen Section 8 plan compliance",
+    "candidate and denominator accounting",
+    "upload, private-key and export joins",
+    "raw, validation and interpretation hashes",
+    "target-specific warnings",
+    "compatibility-bank provenance and direction",
+    "cross-target, binding and target-discrimination claim boundaries",
+    "downstream strong-or-moderate compatibility-band decision"
+  ],
+  "review_source": "Cursor read-only review supplied by Laura",
+  "reviewed_artifacts": {
+    "interpretation_record": {
+      "path": "interpretation_v1/interpretation_record.json",
+      "sha256": "70ed1bce9a1b8985d34d03ff212a4b7b4514a1916886d9c040987e1110191bf7"
+    },
+    "interpretation_text": {
+      "path": "interpretation_v1/section8_interpretation.md",
+      "sha256": "a329222f632751bc478f9a2b54dedd7de719f86630e53556874ed80abd8742c0"
+    },
+    "validation_manifest": {
+      "path": "validation_v1/validation_manifest.json",
+      "sha256": "768528e6687ede28a530088068bb6c137cf3a9f3b41009a77bd43f3671904af3"
+    },
+    "validation_report": {
+      "path": "validation_v1/section8_validation_report.md",
+      "sha256": "0548d191df77354f893e1ed7fea2636c25bb11da470ec68d848ca79d1c2e7b69"
+    },
+    "validation_summary": {
+      "path": "validation_v1/section8_validation_summary.json",
+      "sha256": "163f1f1b0b994015ee9f6827064142ae3ead4905743eba04a1b61fdfa8db1218"
+    }
+  },
+  "scientific_result_committed": false,
+  "section8_closed": false,
+  "status": "SECTION8_INDEPENDENTLY_REVIEWED_AWAITING_EXPLICIT_RESULT_COMMITMENT"
+}

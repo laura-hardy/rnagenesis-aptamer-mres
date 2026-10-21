@@ -1,0 +1,76 @@
+{
+  "schema_version": "mres-aptarank-section10-raw-archive-v1",
+  "status": "RAW_ARTIFACTS_ARCHIVED_AND_INITIAL_STRUCTURAL_VALIDATION_PASS",
+  "archive_date_local": "2026-10-21",
+  "aptarank_result_committed": false,
+  "raw_files_unchanged_from_downloads": true,
+  "artifacts": {
+    "exact_tier1_tier2_export": {
+      "path": "raw/tier1_tier2_exact_d1_ndm1_125.csv",
+      "sha256": "b5501b2004e26f6345ec0ad6ddd00892c4460ed67243feeffed34115db4e32b3",
+      "byte_count": 114184,
+      "rows": 1000
+    },
+    "full_scored_export": {
+      "path": "raw/run_d1_ndm1_125_shortlist.csv",
+      "sha256": "257cbaa523638abf67aa6109bfce37127aab07eccfbcf82e6cfe448a9d8a650f",
+      "byte_count": 4124969,
+      "rows": 29583
+    },
+    "result_pdf": {
+      "path": "raw/d1_ndm1_125.pdf",
+      "sha256": "9ebc8fe271bb78268cbd601254fdbff6232cf535bef3c3bd185c1708e2719d6b",
+      "byte_count": 1802263,
+      "pages": 3
+    },
+    "exclusion_register": {
+      "path": "raw/excluded_sequences_d1_ndm1_125.csv",
+      "sha256": "d5259d83ad7616b4499255a2039fbe6ba97f0df511239784934edeb0aabc1915",
+      "byte_count": 56099,
+      "rows": 417
+    },
+    "raw_checksum_manifest": {
+      "path": "raw/SHA256SUMS",
+      "sha256": "6560fb672cbd5a1e025a9340845249f362f9d78a4b539d0886de83b21555cf20"
+    }
+  },
+  "initial_accounting": {
+    "uploaded": 30000,
+    "scored": 29583,
+    "excluded": 417,
+    "scored_plus_excluded_equals_uploaded": true,
+    "excluded_below_20": 11,
+    "excluded_above_100": 406,
+    "replacement_or_replenishment": false
+  },
+  "exact_export_scope": {
+    "rows": 1000,
+    "tier1_rank_min": 1,
+    "tier1_rank_max": 1000,
+    "candidate_ids_match_first_1000_full_export_rows_in_order": true,
+    "tier1_values_match_full_export_exactly": true,
+    "numeric_tier2_field": "control_percentile",
+    "numeric_tier2_values_recomputed_locally": false,
+    "weak_rows": 764,
+    "moderate_rows": 167,
+    "strong_rows": 69,
+    "band_thresholds_reconcile": true,
+    "control_percentile_min": 0.005211406096361848,
+    "control_percentile_max": 0.9946902654867257,
+    "unique_control_percentile_values": 30,
+    "rows_outside_top_1000_have_compatibility_token": "not evaluated"
+  },
+  "initial_gate_accounting": {
+    "shuffle_pass_full_scored_export": 1486,
+    "joint_shuffle_pass_and_strong_or_moderate": 137,
+    "jointly_eligible_inside_exact_top_1000": 137,
+    "jointly_eligible_outside_exact_top_1000": 0,
+    "deterministic_at_most_100_pool_feasible": true
+  },
+  "boundaries": {
+    "full_provenance_validation_complete": false,
+    "supervisor_review_pool_built": false,
+    "manual_supervisor_assessment_complete": false,
+    "scientific_interpretation_complete": false
+  }
+}

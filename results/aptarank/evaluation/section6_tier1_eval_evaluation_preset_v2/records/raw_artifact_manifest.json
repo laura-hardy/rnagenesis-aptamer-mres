@@ -1,0 +1,47 @@
+{
+  "schema_version": "mres-aptarank-raw-artifact-manifest-v1",
+  "status": "RAW_RESULTS_ARCHIVED_ANALYSIS_PENDING",
+  "section": "section6_tier1_eval_rigorous_rerun",
+  "run_label": "section6_1030",
+  "package_id": "section6_eval_tier1_evaluation_preset_v4",
+  "candidate_upload_sha256": "5554f68fd94d1754ff9bcc87fba81be7dc8391af7e45703400796f4a5a336ad2",
+  "reference_upload_sha256": "5f5c90572263818b5eae55198ef811ade0cd5291a7e09a9708866abfa191ccd6",
+  "displayed_settings": {
+    "target": null,
+    "seed": 42,
+    "candidate_shuffles": 99,
+    "ranking_runtime_seconds": 20,
+    "composite_method": "corpus_weighted_mean",
+    "scoring_signature": "95a49467ef3c6186"
+  },
+  "run_sheet_setting_not_independently_displayed_in_pdf": {
+    "sampled_structures": 200
+  },
+  "accounting": {
+    "uploaded": 308,
+    "scored": 306,
+    "excluded": 2,
+    "replaced": 0,
+    "reconciled": true
+  },
+  "raw_artifacts": [
+    {
+      "path": "raw/run_section6_1030_shortlist.csv",
+      "byte_count": 42480,
+      "sha256": "e5db367e2f2ea9e6f023db32345533d1a7a09a26996166700ed02c4cd6e97e4c"
+    },
+    {
+      "path": "raw/excluded_sequences_section6_1030.csv",
+      "byte_count": 289,
+      "sha256": "91ff501e648389b2c8234c0bd2460ea8a8c2d63ccf56a37c8079abc2b82d3d3e"
+    },
+    {
+      "path": "raw/section6_1030.pdf",
+      "byte_count": 485498,
+      "sha256": "e511504b1f912c26950ba3702de6ef7c102cff0219ba8cb7e9d0c736af05fd46"
+    }
+  ],
+  "scientific_analysis_complete": false,
+  "scientific_result_committed": false
+}
+

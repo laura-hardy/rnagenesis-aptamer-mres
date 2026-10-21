@@ -1,0 +1,576 @@
+{
+  "by_condition": {
+    "B0": {
+      "aptamer_likeness": {
+        "maximum": "0.7761061946902655",
+        "mean": "0.33428318584070797942",
+        "median_type7": "0.30353982300884957",
+        "minimum": "0.046017699115044254",
+        "q1_type7": "0.20530973451327433",
+        "q3_type7": "0.4331858407079646525"
+      },
+      "compatibility": {
+        "moderate": 12,
+        "strong": 4,
+        "weak": 184
+      },
+      "compatibility_favourable_strong_or_moderate": 16,
+      "n": 200,
+      "shuffle": {
+        "fail": 190,
+        "pass": 10
+      },
+      "tier_cross_tabulation": {
+        "moderate": {
+          "fail": 12,
+          "pass": 0
+        },
+        "strong": {
+          "fail": 3,
+          "pass": 1
+        },
+        "weak": {
+          "fail": 175,
+          "pass": 9
+        }
+      }
+    },
+    "B1": {
+      "aptamer_likeness": {
+        "maximum": "0.8690265486725665",
+        "mean": "0.4019203539823008965",
+        "median_type7": "0.3893805309734513",
+        "minimum": "0.0672566371681416",
+        "q1_type7": "0.279203539823008825",
+        "q3_type7": "0.5203539823008849"
+      },
+      "compatibility": {
+        "moderate": 34,
+        "strong": 11,
+        "weak": 155
+      },
+      "compatibility_favourable_strong_or_moderate": 45,
+      "n": 200,
+      "shuffle": {
+        "fail": 189,
+        "pass": 11
+      },
+      "tier_cross_tabulation": {
+        "moderate": {
+          "fail": 33,
+          "pass": 1
+        },
+        "strong": {
+          "fail": 11,
+          "pass": 0
+        },
+        "weak": {
+          "fail": 145,
+          "pass": 10
+        }
+      }
+    },
+    "B2": {
+      "aptamer_likeness": {
+        "maximum": "0.856637168141593",
+        "mean": "0.49221238938053098225",
+        "median_type7": "0.48318584070796457",
+        "minimum": "0.0955752212389381",
+        "q1_type7": "0.36150442477876107",
+        "q3_type7": "0.635840707964601775"
+      },
+      "compatibility": {
+        "moderate": 38,
+        "strong": 9,
+        "weak": 153
+      },
+      "compatibility_favourable_strong_or_moderate": 47,
+      "n": 200,
+      "shuffle": {
+        "fail": 187,
+        "pass": 13
+      },
+      "tier_cross_tabulation": {
+        "moderate": {
+          "fail": 35,
+          "pass": 3
+        },
+        "strong": {
+          "fail": 9,
+          "pass": 0
+        },
+        "weak": {
+          "fail": 143,
+          "pass": 10
+        }
+      }
+    },
+    "D1": {
+      "aptamer_likeness": {
+        "maximum": "0.8849557522123895",
+        "mean": "0.45958407079646018335",
+        "median_type7": "0.44513274336283187",
+        "minimum": "0.12389380530973453",
+        "q1_type7": "0.338053097345132775",
+        "q3_type7": "0.592035398230088575"
+      },
+      "compatibility": {
+        "moderate": 46,
+        "strong": 10,
+        "weak": 144
+      },
+      "compatibility_favourable_strong_or_moderate": 56,
+      "n": 200,
+      "shuffle": {
+        "fail": 183,
+        "pass": 17
+      },
+      "tier_cross_tabulation": {
+        "moderate": {
+          "fail": 44,
+          "pass": 2
+        },
+        "strong": {
+          "fail": 10,
+          "pass": 0
+        },
+        "weak": {
+          "fail": 129,
+          "pass": 15
+        }
+      }
+    }
+  },
+  "denominators": {
+    "b1_technical_block": {
+      "A": 100,
+      "B": 100
+    },
+    "condition_memberships": {
+      "B0": 200,
+      "B1": 200,
+      "B2": 200,
+      "D1": 200
+    },
+    "d1_training_seed": {
+      "43": 100,
+      "44": 100
+    },
+    "scored": 800,
+    "technically_excluded": 0,
+    "uploaded": 800
+  },
+  "exact_tier2": {
+    "by_condition": {
+      "B0": {
+        "compatibility": {
+          "moderate": 12,
+          "strong": 4,
+          "weak": 184
+        },
+        "control_percentile": {
+          "maximum": "0.9946902654867257",
+          "mean": "0.3763947885939036306055",
+          "median_type7": "0.4067846607669616",
+          "minimum": "0.00019665683382497542",
+          "q1_type7": "0.21789577187807276",
+          "q3_type7": "0.5690265486725664"
+        },
+        "n": 200,
+        "strong_or_moderate": 16
+      },
+      "B1": {
+        "compatibility": {
+          "moderate": 34,
+          "strong": 11,
+          "weak": 155
+        },
+        "control_percentile": {
+          "maximum": "0.9946902654867257",
+          "mean": "0.4718628318584070709871",
+          "median_type7": "0.4067846607669616",
+          "minimum": "0.00019665683382497542",
+          "q1_type7": "0.25014749262536873",
+          "q3_type7": "0.7117994100294985"
+        },
+        "n": 200,
+        "strong_or_moderate": 45
+      },
+      "B2": {
+        "compatibility": {
+          "moderate": 38,
+          "strong": 9,
+          "weak": 153
+        },
+        "control_percentile": {
+          "maximum": "0.9946902654867257",
+          "mean": "0.48471533923303833848",
+          "median_type7": "0.5690265486725664",
+          "minimum": "0.005211406096361848",
+          "q1_type7": "0.25014749262536873",
+          "q3_type7": "0.7117994100294985"
+        },
+        "n": 200,
+        "strong_or_moderate": 47
+      },
+      "D1": {
+        "compatibility": {
+          "moderate": 46,
+          "strong": 10,
+          "weak": 144
+        },
+        "control_percentile": {
+          "maximum": "0.9946902654867257",
+          "mean": "0.50055604719764010639855",
+          "median_type7": "0.5690265486725664",
+          "minimum": "0",
+          "q1_type7": "0.25014749262536873",
+          "q3_type7": "0.8027531956735496"
+        },
+        "n": 200,
+        "strong_or_moderate": 56
+      }
+    },
+    "overall": {
+      "compatibility": {
+        "moderate": 130,
+        "strong": 34,
+        "weak": 636
+      },
+      "control_percentile": {
+        "maximum": "0.9946902654867257",
+        "mean": "0.4583822517207472866177875",
+        "median_type7": "0.4067846607669616",
+        "minimum": "0",
+        "q1_type7": "0.25014749262536873",
+        "q3_type7": "0.7117994100294985"
+      },
+      "n": 800,
+      "strong_or_moderate": 164
+    },
+    "prespecified_comparisons": {
+      "external_D1_minus_B0_descriptive_only": {
+        "mean_control_percentile_difference": "0.12416125860373647579305",
+        "median_control_percentile_difference": "0.1622418879056048",
+        "moderate_percentage_point_difference": "17",
+        "strong_percentage_point_difference": "3"
+      },
+      "primary_D1_minus_B1": {
+        "mean_control_percentile_difference": "0.02869321533923303541145",
+        "median_control_percentile_difference": "0.1622418879056048",
+        "moderate_percentage_point_difference": "6",
+        "strong_percentage_point_difference": "-0.5"
+      },
+      "secondary_D1_minus_B2": {
+        "mean_control_percentile_difference": "0.01584070796460176791855",
+        "median_control_percentile_difference": "0",
+        "moderate_percentage_point_difference": "4",
+        "strong_percentage_point_difference": "0.5"
+      }
+    },
+    "scores_recomputed": false,
+    "source": "untouched deployed AptaRank exact Tier 1/Tier 2 export",
+    "subgroups": {
+      "B1_technical_block": {
+        "A": {
+          "compatibility": {
+            "moderate": 17,
+            "strong": 3,
+            "weak": 80
+          },
+          "control_percentile": {
+            "maximum": "0.9537856440511308",
+            "mean": "0.4614582104228121830942",
+            "median_type7": "0.487905604719764",
+            "minimum": "0.00019665683382497542",
+            "q1_type7": "0.2284660766961651925",
+            "q3_type7": "0.7117994100294985"
+          },
+          "n": 100,
+          "strong_or_moderate": 20
+        },
+        "B": {
+          "compatibility": {
+            "moderate": 17,
+            "strong": 8,
+            "weak": 75
+          },
+          "control_percentile": {
+            "maximum": "0.9946902654867257",
+            "mean": "0.48226745329400195888",
+            "median_type7": "0.4067846607669616",
+            "minimum": "0.005211406096361848",
+            "q1_type7": "0.25014749262536873",
+            "q3_type7": "0.734537856440511275"
+          },
+          "n": 100,
+          "strong_or_moderate": 25
+        }
+      },
+      "D1_training_seed": {
+        "43": {
+          "compatibility": {
+            "moderate": 27,
+            "strong": 3,
+            "weak": 70
+          },
+          "control_percentile": {
+            "maximum": "0.9946902654867257",
+            "mean": "0.4876991150442477758371",
+            "median_type7": "0.5690265486725664",
+            "minimum": "0.00009832841691248771",
+            "q1_type7": "0.12114060963618485",
+            "q3_type7": "0.8027531956735496"
+          },
+          "n": 100,
+          "strong_or_moderate": 30
+        },
+        "44": {
+          "compatibility": {
+            "moderate": 19,
+            "strong": 7,
+            "weak": 74
+          },
+          "control_percentile": {
+            "maximum": "0.9946902654867257",
+            "mean": "0.51341297935103243696",
+            "median_type7": "0.5690265486725664",
+            "minimum": "0",
+            "q1_type7": "0.25014749262536873",
+            "q3_type7": "0.8027531956735496"
+          },
+          "n": 100,
+          "strong_or_moderate": 26
+        }
+      }
+    }
+  },
+  "method_boundaries": {
+    "binding_or_function_claimed": false,
+    "candidate_rows_or_seeds_treated_as_independent_training_replicates": false,
+    "combined_score_created": false,
+    "section9_candidates_enter_supervisor_shortlist": false,
+    "tier1_and_tier2_reported_separately": true
+  },
+  "overall": {
+    "aptamer_likeness": {
+      "maximum": "0.8849557522123895",
+      "mean": "0.42200000000000001038",
+      "median_type7": "0.40707964601769914",
+      "minimum": "0.046017699115044254",
+      "q1_type7": "0.2845132743362832125",
+      "q3_type7": "0.559734513274336225"
+    },
+    "compatibility": {
+      "moderate": 130,
+      "strong": 34,
+      "weak": 636
+    },
+    "compatibility_favourable_strong_or_moderate": 164,
+    "n": 800,
+    "shuffle": {
+      "fail": 749,
+      "pass": 51
+    },
+    "tier_cross_tabulation": {
+      "moderate": {
+        "fail": 124,
+        "pass": 6
+      },
+      "strong": {
+        "fail": 33,
+        "pass": 1
+      },
+      "weak": {
+        "fail": 592,
+        "pass": 44
+      }
+    }
+  },
+  "package_id": "section9_generated_conditions_ndm1_evaluation_preset_v1",
+  "prespecified_comparisons": {
+    "external_D1_minus_B0_descriptive_only": {
+      "mean_aptamer_likeness_difference": "0.12530088495575220393",
+      "median_aptamer_likeness_difference": "0.1415929203539823",
+      "shuffle_pass_percentage_point_difference": "3.5",
+      "strong_or_moderate_percentage_point_difference": "20"
+    },
+    "primary_D1_minus_B1": {
+      "mean_aptamer_likeness_difference": "0.05766371681415928685",
+      "median_aptamer_likeness_difference": "0.05575221238938057",
+      "shuffle_pass_percentage_point_difference": "3",
+      "strong_or_moderate_percentage_point_difference": "5.5"
+    },
+    "secondary_D1_minus_B2": {
+      "mean_aptamer_likeness_difference": "-0.0326283185840707989",
+      "median_aptamer_likeness_difference": "-0.0380530973451327",
+      "shuffle_pass_percentage_point_difference": "2",
+      "strong_or_moderate_percentage_point_difference": "4.5"
+    }
+  },
+  "schema_version": "mres-aptarank-section9-analysis-summary-v2-exact-tier2",
+  "scientific_result_committed": false,
+  "status": "PROVISIONAL_SECTION9_ANALYSIS_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RESULT_COMMITMENT",
+  "subgroups": {
+    "B1_technical_block": {
+      "A": {
+        "aptamer_likeness": {
+          "maximum": "0.8690265486725665",
+          "mean": "0.4157433628318584242",
+          "median_type7": "0.415929203539822975",
+          "minimum": "0.11858407079646019",
+          "q1_type7": "0.2831858407079646625",
+          "q3_type7": "0.521238938053097325"
+        },
+        "compatibility": {
+          "moderate": 17,
+          "strong": 3,
+          "weak": 80
+        },
+        "compatibility_favourable_strong_or_moderate": 20,
+        "n": 100,
+        "shuffle": {
+          "fail": 93,
+          "pass": 7
+        },
+        "tier_cross_tabulation": {
+          "moderate": {
+            "fail": 16,
+            "pass": 1
+          },
+          "strong": {
+            "fail": 3,
+            "pass": 0
+          },
+          "weak": {
+            "fail": 74,
+            "pass": 6
+          }
+        }
+      },
+      "B": {
+        "aptamer_likeness": {
+          "maximum": "0.8247787610619468",
+          "mean": "0.3880973451327433688",
+          "median_type7": "0.35132743362831858",
+          "minimum": "0.0672566371681416",
+          "q1_type7": "0.279203539823008825",
+          "q3_type7": "0.51106194690265485"
+        },
+        "compatibility": {
+          "moderate": 17,
+          "strong": 8,
+          "weak": 75
+        },
+        "compatibility_favourable_strong_or_moderate": 25,
+        "n": 100,
+        "shuffle": {
+          "fail": 96,
+          "pass": 4
+        },
+        "tier_cross_tabulation": {
+          "moderate": {
+            "fail": 17,
+            "pass": 0
+          },
+          "strong": {
+            "fail": 8,
+            "pass": 0
+          },
+          "weak": {
+            "fail": 71,
+            "pass": 4
+          }
+        }
+      }
+    },
+    "D1_training_seed": {
+      "43": {
+        "aptamer_likeness": {
+          "maximum": "0.7522123893805309",
+          "mean": "0.4541238938053097468",
+          "median_type7": "0.4442477876106195",
+          "minimum": "0.1539823008849558",
+          "q1_type7": "0.3376106194690265075",
+          "q3_type7": "0.571238938053097375"
+        },
+        "compatibility": {
+          "moderate": 27,
+          "strong": 3,
+          "weak": 70
+        },
+        "compatibility_favourable_strong_or_moderate": 30,
+        "n": 100,
+        "shuffle": {
+          "fail": 94,
+          "pass": 6
+        },
+        "tier_cross_tabulation": {
+          "moderate": {
+            "fail": 27,
+            "pass": 0
+          },
+          "strong": {
+            "fail": 3,
+            "pass": 0
+          },
+          "weak": {
+            "fail": 64,
+            "pass": 6
+          }
+        }
+      },
+      "44": {
+        "aptamer_likeness": {
+          "maximum": "0.8849557522123895",
+          "mean": "0.4650442477876106199",
+          "median_type7": "0.453097345132743355",
+          "minimum": "0.12389380530973453",
+          "q1_type7": "0.3380530973451328",
+          "q3_type7": "0.6022123893805309"
+        },
+        "compatibility": {
+          "moderate": 19,
+          "strong": 7,
+          "weak": 74
+        },
+        "compatibility_favourable_strong_or_moderate": 26,
+        "n": 100,
+        "shuffle": {
+          "fail": 89,
+          "pass": 11
+        },
+        "tier_cross_tabulation": {
+          "moderate": {
+            "fail": 17,
+            "pass": 2
+          },
+          "strong": {
+            "fail": 7,
+            "pass": 0
+          },
+          "weak": {
+            "fail": 65,
+            "pass": 9
+          }
+        }
+      }
+    }
+  },
+  "supersedes_analysis_version": "analysis_v1",
+  "target_geometry_limitation": {
+    "implication": "Tier 2 geometry is less reliable for this non-convex cavity because the displayed comparison simplifies the pocket to a roughly convex shape.",
+    "warning_exact": "This cavity is oddly shaped: its robust extent and equivalent-sphere diameter disagree by more than 2\u00d7. The geometric comparison assumes a roughly convex pocket."
+  },
+  "tier_relationship": {
+    "interpretation": "negligible-magnitude weak negative association; not evidence of biological dependence or independence",
+    "n": 800,
+    "numeric_tier2_values_exported": true,
+    "p_value_pdf": 0.0421,
+    "scores_locally_reconstructed": false,
+    "source": "untouched exact scorer export; p-value retained from result PDF",
+    "spearman_rho_pdf_rounded": -0.072,
+    "spearman_rho_recomputed_from_export": -0.07188361434281156
+  },
+  "updated_interpretation": "Exact control percentiles sharpen but do not materially change the provisional conclusion. D1 exceeds B1 in mean and median percentile and in moderate-band count, but not in strong-band count; D1 is only slightly above B2 in mean percentile and has the same median. Tier 1 and Tier 2 remain separate."
+}

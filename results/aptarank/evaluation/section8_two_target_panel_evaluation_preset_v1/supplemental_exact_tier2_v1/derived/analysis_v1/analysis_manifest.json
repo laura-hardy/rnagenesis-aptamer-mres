@@ -1,0 +1,39 @@
+{
+  "checks": {
+    "bands_follow_0_75_and_0_95_thresholds": true,
+    "control_percentiles_finite_and_in_closed_unit_interval": true,
+    "cross_target_numeric_comparison_performed": false,
+    "exact_ids_ranks_tier1_and_bands_reconcile": true,
+    "existing_section8_validation_rerun": true,
+    "historical_closure_modified": false,
+    "scores_recomputed": false
+  },
+  "exact_score_inputs": {
+    "grk2_pocket": {
+      "byte_count": 177,
+      "path": "results/aptarank/evaluation/section8_grk2_3uzs_evaluation_preset_v1/supplemental_exact_tier2_v1/raw/section8_3uzs.csv",
+      "sha256": "9845ba9cc1fbbd713ce9be5316a0a6911b0c378bfb58cfac347efad01bc9fe57"
+    },
+    "hewl_surface": {
+      "byte_count": 289,
+      "path": "results/aptarank/evaluation/section8_lysozyme_4m4o_evaluation_preset_v1/supplemental_exact_tier2_v1/raw/section8_4m4o.csv",
+      "sha256": "6fa421f8c2b0b1981324884d84b3c5e24bfad48805c4350ed724dcf9e1626cd2"
+    }
+  },
+  "historical_inputs": {
+    "section8_closure": {
+      "byte_count": 5011,
+      "sha256": "7de67471948c0630595342879c5da4fd091442271cf462321fc624eb139b5da8"
+    },
+    "section8_interpretation": {
+      "byte_count": 3295,
+      "sha256": "70ed1bce9a1b8985d34d03ff212a4b7b4514a1916886d9c040987e1110191bf7"
+    },
+    "section8_validation_summary": {
+      "byte_count": 8902,
+      "sha256": "163f1f1b0b994015ee9f6827064142ae3ead4905743eba04a1b61fdfa8db1218"
+    }
+  },
+  "schema_version": "mres-aptarank-section8-exact-tier2-supplement-manifest-v1",
+  "status": "PROVISIONAL_SECTION8_EXACT_TIER2_SUPPLEMENT_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RECOMMITMENT"
+}

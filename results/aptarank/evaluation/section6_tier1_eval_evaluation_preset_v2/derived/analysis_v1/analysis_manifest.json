@@ -1,0 +1,62 @@
+{
+  "generated_at_utc": "2026-10-20T11:42:56Z",
+  "inputs": {
+    "candidate_upload": {
+      "byte_count": 29048,
+      "sha256": "5554f68fd94d1754ff9bcc87fba81be7dc8391af7e45703400796f4a5a336ad2"
+    },
+    "downloaded_export": {
+      "byte_count": 42480,
+      "sha256": "e5db367e2f2ea9e6f023db32345533d1a7a09a26996166700ed02c4cd6e97e4c"
+    },
+    "exclusion_register": {
+      "byte_count": 289,
+      "sha256": "91ff501e648389b2c8234c0bd2460ea8a8c2d63ccf56a37c8079abc2b82d3d3e"
+    },
+    "private_key": {
+      "byte_count": 135789,
+      "sha256": "be1a40990875a3d02bcdf3ebed6a6a5fb57104fa93f78df41c2ca544b7dc8408"
+    },
+    "raw_artifact_manifest": {
+      "sha256": "87380a7adb8e8f698cb1db320dea8b07f0d5a8548f947c8e0a790deeed5e99c0"
+    },
+    "result_page_pdf": {
+      "byte_count": 485498,
+      "sha256": "e511504b1f912c26950ba3702de6ef7c102cff0219ba8cb7e9d0c736af05fd46"
+    },
+    "run_sheet": {
+      "byte_count": 1004,
+      "sha256": "0dbe9ab773d68537605990d50df1cc50e4f5c8080118b3d6e25d5f683603db0f"
+    }
+  },
+  "lineage": {
+    "frozen_standard_only_run_sheet_gate_invoked": false,
+    "historical_standard_result": "results/aptarank/evaluation/section6_tier1_eval_v1",
+    "only_intended_method_change": "Standard_to_Evaluation_preset",
+    "reason": "the frozen module accepts only the historical Standard template; v3.7 requires strict Evaluation-preset validation before unchanged calculations",
+    "result_selected_by_favourability": false,
+    "results_pooled": false,
+    "run_sheet_validation_owner": "v3.7_evaluation_preset_adapter",
+    "same_candidate_upload": true,
+    "same_private_key_pairs_clusters_and_controls": true
+  },
+  "method": {
+    "analysis_module_sha256": "f4051c232d1a5be0c12fc959006957c439973e67baf32e4e3fdd31544f0ae3bf",
+    "frozen_standard_only_run_sheet_gate_invoked": false,
+    "historical_adapter_sha256": "db0127ec0c245e187a482dc2c00330dccc1b0d9e8e28f8bfdca1d87f80317286",
+    "run_sheet_validation_owner": "v3.7_evaluation_preset_adapter",
+    "scores_recomputed": false,
+    "statistical_method_changed": false
+  },
+  "outputs": {
+    "analysis_summary.json": {
+      "byte_count": 9158,
+      "sha256": "23861254eb86506e3df23954bf0f327a8ca634722b66273f7c9b242b74bbedb6"
+    },
+    "section6_tier1_rigorous_results.md": {
+      "byte_count": 2243,
+      "sha256": "36a3a406cc61c49bdb31749c38762cbde81ec7725d1ed4ce8809a966668acc0b"
+    }
+  },
+  "status": "PROVISIONAL_SECTION6_EVALUATION_PRESET_ANALYSIS_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RESULT_COMMITMENT"
+}

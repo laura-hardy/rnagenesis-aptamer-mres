@@ -1,0 +1,84 @@
+{
+  "active_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_9.md",
+    "sha256": "88be515dcb04dd3db9f4ec7392b70ce90de085a601d15ac00facc43f509ad274"
+  },
+  "approval": {
+    "decision": "approve_and_close_section10",
+    "source": "explicit_user_instruction"
+  },
+  "aptarank_rerun_during_closure": false,
+  "artifact_sha256": {
+    "analysis_adapter": "af579a1784bcc9e2198dba5ffac3b6d405974c701bd78953a0c8550d6b275dd1",
+    "analysis_manifest": "bd354377cbe26da62afd534eecfdf2d8afbef661c038ae8c30d311ac99e312f5",
+    "analysis_summary": "648011cfdd0a1369454aa283608426e6957a9dfa81b6c10188b18c73fbb1f563",
+    "dashboard_candidate_numbers": "6e6e0a8f057025a73d2f7936acbb7b621bc63e4f56d78cfc302def02890989b4",
+    "independent_review_record": "d30f00a102f8b904030f07e1eec9e1809d4b5cc85a0a7c39f3a58d355cd7f919",
+    "restricted_manifest": "17e3d8d3dd196a565cd6c2ba201d77ffbfd3400275c8f57bc88a8ac494692e16",
+    "results_note": "7e2f0e1a65c61cde59169645dd44fa1fec695986fc755eb09b2e820a8340c773",
+    "supervisor_review_records": "9e661faf2f170a1a7adcf61d9a7599af3873e01ceb009605552b11da9baffc91",
+    "supervisor_review_sequences": "00fa4d577f13376df474f472cfea092611df08247e32156042074a9bb6588ac7",
+    "tests": "648ede31ebd94c144c8356efd2783ba3d32898e8a872acbff788e1e53374f035"
+  },
+  "claim_boundary": "The 100-candidate pool is a computationally prioritised D1 review set. It is not a binder set and is not evidence of affinity, specificity, inhibition, target recognition, experimental function or predictive validity.",
+  "closed_at_date": "2026-10-21",
+  "closure_scope": {
+    "computational_validation_analysis_and_deterministic_pool": "closed",
+    "joint_biologist_supervisor_assessment": "pending",
+    "post_review_maximum_50_decision_record": "pending"
+  },
+  "denominators": {
+    "capped_out": 37,
+    "exact_tier2_exported": 1000,
+    "finally_retained_after_supervisor_review": null,
+    "jointly_eligible": 137,
+    "manually_reviewed": 0,
+    "otherwise_missing": 0,
+    "pooled_favourable_top_1000": 236,
+    "retained_for_supervisor_review": 100,
+    "scored": 29583,
+    "shuffle_pass_full_scored_export": 1486,
+    "shuffle_pass_top_1000": 558,
+    "technical_exclusions": 417,
+    "uploaded": 30000
+  },
+  "final_interpretation": "The validated Section 10 run produced 137 D1 candidates satisfying both the candidate-specific shuffle-pass gate and pooled strong-or-moderate NDM-1 compatibility gate. Tier 1 ordering retained the best 100 for joint supervisor review and capped out 37. The retained pool contains 33 strong and 67 moderate annotations. Compatibility was a coarse eligibility gate rather than an ordering variable, no combined Tier 1/Tier 2 score was created, and the NDM-1 cavity warning materially limits target-aware interpretation.",
+  "git_commit_claimed": false,
+  "independent_review": {
+    "blocking_issue": false,
+    "material_defect": false,
+    "optional_change_required": false,
+    "outcome": "no_material_defect_or_blocker",
+    "review_record_sha256": "d30f00a102f8b904030f07e1eec9e1809d4b5cc85a0a7c39f3a58d355cd7f919"
+  },
+  "ndm1_target_geometry_warning": "This cavity is oddly shaped: its robust extent and equivalent-sphere diameter disagree by more than 2\u00d7. The geometric comparison assumes a roughly convex pocket.",
+  "post_review_rule": {
+    "final_maximum": 50,
+    "manual_decision_complete": false,
+    "manual_review_may_add_candidates_outside_pool": false,
+    "manual_review_may_reduce_pool": true,
+    "retain_not_retain_reason_required": true
+  },
+  "reviewed_artifacts_modified_during_closure": false,
+  "run_governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_8.md",
+    "sha256": "8cf982180663ad8591583bd5e37613be4ce8234cfc8a2b82822a36b756d661dc"
+  },
+  "schema_version": "1.0.0",
+  "scientific_result_committed": true,
+  "scores_recomputed": false,
+  "selection_rule": {
+    "combined_score_created": false,
+    "compatibility_gate": [
+      "strong",
+      "moderate"
+    ],
+    "compatibility_ordering_used": false,
+    "primary_order": "Tier 1 rank",
+    "shuffle_token_required": "pass",
+    "supervisor_pool_cap": 100,
+    "tie_break": "ascending opaque candidate ID"
+  },
+  "status": "SECTION10_COMPUTATIONAL_VALIDATION_ANALYSIS_AND_SUPERVISOR_REVIEW_POOL_SCIENTIFICALLY_COMMITTED_AND_CLOSED",
+  "supervisor_review_complete": false
+}

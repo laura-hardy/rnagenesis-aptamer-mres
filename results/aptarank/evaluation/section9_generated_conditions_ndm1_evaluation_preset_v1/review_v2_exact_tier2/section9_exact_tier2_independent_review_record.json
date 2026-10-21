@@ -1,0 +1,42 @@
+{
+  "independent_review_complete": true,
+  "material_blockers": [],
+  "material_defects": [],
+  "optional_observations": [
+    "only 35 distinct control percentiles occur, so the B1-versus-D1 median contrast is coarse and tie-sensitive; the mean contrast and moderate-versus-strong split are the more stable summaries",
+    "the retained p-value is the pinned PDF visual-review value; rho was independently recomputed from the exact export",
+    "manifest booleans are written as constants after fail-closed checks; the reviewer independently recomputed and confirmed them",
+    "fixed narrative values match the calculated tables"
+  ],
+  "optional_observations_actioned": false,
+  "review_outcome": "PASS_NO_MATERIAL_DEFECT_OR_BLOCKER",
+  "review_scope": [
+    "raw exact-export hash and regular-file status",
+    "800-of-800 opaque-ID, rank, Tier 1 decimal and compatibility-band reconciliation",
+    "closed-unit-interval control percentiles and 0.75/0.95 band thresholds",
+    "condition, B1 block and D1 seed denominators",
+    "condition summaries and prespecified contrasts",
+    "tie-aware Spearman recomputation",
+    "derived checksums and privacy",
+    "preservation of analysis v1 hashes",
+    "absence of Tier 2 reconstruction and combined scoring",
+    "NDM-1 cavity warning and scientific claim boundaries"
+  ],
+  "review_source": "Cursor read-only review supplied by Laura",
+  "reviewed_artifacts": {
+    "analysis_manifest": {
+      "path": "derived/analysis_v2_exact_tier2/analysis_manifest.json",
+      "sha256": "9ebaf6ac936ccf5eac693ee490aa7090d8d971bea57da5e683da9a8f4cd105f7"
+    },
+    "analysis_summary": {
+      "path": "derived/analysis_v2_exact_tier2/analysis_summary.json",
+      "sha256": "e2bd0a924beff948d8a8715298c5cb1b45de3fd9b330418514056ed29c40705b"
+    },
+    "results_note": {
+      "path": "derived/analysis_v2_exact_tier2/section9_results.md",
+      "sha256": "d3c16e7c562b013be75ddfb4e880123f8534b250c40372a9171f8b19d0f511a3"
+    }
+  },
+  "scientific_result_committed": false,
+  "status": "SECTION9_EXACT_TIER2_ANALYSIS_INDEPENDENTLY_REVIEWED_AWAITING_EXPLICIT_RESULT_COMMITMENT"
+}

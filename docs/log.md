@@ -12434,3 +12434,301 @@ The manifest status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN` and `publica
 **Checks:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.modelling.test_aptarank_section6_method tests.modelling.test_aptarank_io_preflight tests.modelling.test_aptarank_export_validation tests.modelling.test_aptarank_section6_prepare_upload tests.modelling.test_aptarank_section6_production_analysis` passed 63 tests. `git diff --check` passed. The closure `SHA256SUMS` manifest passed. The frozen v3.5 plan and the three reviewed Section 6 analysis artifacts retained their pinned hashes.
 
 **Boundary:** No raw sequence-bearing AptaRank export, candidate upload, reference upload, private key, blinding secret or protected M10 evidence is included in the public closure commit. No AptaRank run or score recomputation occurred. This finalization does not push the branch.
+
+## 2026-10-20 — rigorous AptaRank production-preset correction
+
+**Stage:** Aim 2 / AptaRank evaluation / Sections 6–10 production-preset correction
+
+**Status:** `RIGOROUS_PRESET_CORRECTION_FROZEN; SECTION6_RERUN_PREPARED; APTARANK_NOT_RUN`. Laura specified that all thesis AptaRank production runs, including the final full-pool run, must use rigorous mode. In the deployed UI this is the named **Evaluation** preset, expected to display seed 42, 99 candidate shuffles and 200 sampled structures. Standard was the verified M9C development-validation configuration, but it was carried forward too broadly and is not the final thesis production preset.
+
+**Plan succession:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_7.md`, SHA-256 `24ae601f4c9bf64325ec8aa509ef7a5eafefd5b77a7610fbd014554e16553db9`, is the active corrective plan. v3.6 remains unchanged at SHA-256 `77fcefc24787faa464c3206a1571127e6042cb9db3089a745a2a5d681bf10120`. The first Section 6 result and its independent review remain immutable historical evidence. That result is superseded for final thesis reporting solely because it used Standard; it is not deleted, relabelled, pooled with the rerun or selected according to outcome.
+
+**Section 6 reopening:** The new package `data/aptarank_eval/sequence/section6_eval_tier1_evaluation_preset_v4/` reuses the exact 308-row candidate-upload bytes, SHA-256 `5554f68fd94d1754ff9bcc87fba81be7dc8391af7e45703400796f4a5a336ad2`, the exact 113-row attempt-3 REF upload, the existing restricted private key, opaque identifiers, pair and cluster assignments, exclusion policy, estimands and analysis module. It uses no target. Only the preset changes to Evaluation/99/200. Its run-sheet SHA-256 is `0dbe9ab773d68537605990d50df1cc50e4f5c8080118b3d6e25d5f683603db0f`; its package `SHA256SUMS` SHA-256 is `678a7096fe6df562f9239a40c503539bd1411fb88885f5a57d181bc82a9e28cb`. The package checksum manifest passed and the copied upload is byte-identical to the reviewed predecessor.
+
+**Section 8 prospective correction:** No Section 8 score had been observed. Versioned rigorous packages were prepared without changing candidate membership, target configuration or uploaded sequence bytes. The GRK2 package is `data/aptarank_eval/sequence/section8_grk2_tier2_evaluation_preset_v2/`, upload SHA-256 `e7589866fb3322eb3d9ea90a8276d613720ff9d64e59bfed6f7cb47433b9572f`, package-manifest SHA-256 `f73eab1cc7f3408b8f78caedd959b76455158ef5d2d39a88564797cbabda6682`. The lysozyme package is `data/aptarank_eval/sequence/section8_lysozyme_tier2_evaluation_preset_v2/`, upload SHA-256 `ade52448da9a6b8630f082df446745f28c649031df460c7b8eb13c4c9b47ab9d`, package-manifest SHA-256 `78c3e8b8ee4eaae5acec9b165108de99544cf6f3345d5e05fb81ca2146291329`. Both manifests passed. The v1 Standard run sheets remain historical preparation artifacts and are not production instructions.
+
+**Remaining scope:** Sections 9 and 10 retain the frozen candidate memberships, NDM-1 configuration, metrics and supervisor-review rule, but their run packages must use Evaluation/99/200. Select the named preset and stop before scoring if its displayed effective settings differ. Capture a new scoring signature; do not reuse the Standard signature.
+
+**Checks:** The focused Section 8 preparation, Section 6 method, AptaRank I/O, export-validation and manual-run test suite passed 65 tests. The correction note is `docs/fine_tuning/aptarank_rigorous_preset_correction.md`. No AptaRank run occurred, no result was recomputed, no target-aware outcome was observed, and nothing was committed or pushed during this correction.
+
+## 2026-10-20 — rigorous Section 6 and Section 8 raw-result receipt
+
+**Stage:** Aim 2 / AptaRank evaluation / raw-result archive and pre-analysis reconciliation
+
+**Status:** `RAW_RESULTS_ARCHIVED; INPUT_JOIN_AND_ACCOUNTING_PREFLIGHT_PASS; ANALYSIS_PENDING`. Laura manually ran the same-input Section 6 target-free rerun and both prospectively frozen Section 8 target cases under the named Evaluation preset. Seven untouched downloads were moved from Downloads into three versioned result directories. Raw files are mode `0600`; each run has a sequence-free artifact manifest containing exact SHA-256 and byte counts. No result was scientifically committed during this stage.
+
+**Section 6:** `results/aptarank/evaluation/section6_tier1_eval_evaluation_preset_v2/`. The exact frozen 308-row upload reconciles to 306 scored rows plus the same two length-121 exclusions. Candidate ids and scored sequences match the upload exactly, ranks are 1–306, and no candidate was replaced. The PDF displays no target, seed 42, 99 shuffled controls, the frozen deployment identity, composite method `corpus_weighted_mean`, and scoring signature `95a49467ef3c6186`. The 200 sampled-structure count is bound through the Evaluation-preset run sheet but is not independently printed in the PDF. Frozen analysis and independent review remain pending.
+
+**Section 8:** `results/aptarank/evaluation/section8_grk2_3uzs_evaluation_preset_v1/` contains one upload-matched scored candidate for 3UZS chain A in pocket mode. `results/aptarank/evaluation/section8_lysozyme_4m4o_evaluation_preset_v1/` contains two upload-matched scored candidates for 4M4O chain A in surface mode. Both PDFs display seed 42, 99 shuffled controls and scoring signature `95a49467ef3c6186`. No exclusion registers were supplied; neither PDF shows a rejection indicator. Interpretation remains descriptive and pending, with no cross-target numeric comparison.
+
+**Boundary:** The known `publication_eligible: false` interface marker remains ignored under the recorded thesis-wide decision. Raw bytes were not changed, local component scores were not recomputed, no binding claim was made, and nothing was committed or pushed.
+
+## 2026-10-20 — provisional rigorous Section 6 analysis
+
+**Stage:** Aim 2 / AptaRank evaluation / Section 6 Evaluation-preset rerun analysis
+
+**Status:** `PROVISIONAL_SECTION6_EVALUATION_PRESET_ANALYSIS_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RESULT_COMMITMENT`. The unchanged frozen Section 6 statistics were applied to the exact rigorous rerun export. The historical Standard result remains separate and immutable; the runs were not pooled or selected by favourability.
+
+**Compatibility handoff:** The first adapter invocation failed closed because the frozen analysis module's internal run-sheet checker accepts only the historical Standard template and correctly requires reviewed rerun lineage for any discrepancy. The frozen module and historical production adapter were not edited. The new v3.7 adapter pins and strictly validates the Evaluation run sheet (seed 42, 99 candidate shuffles, 200 sampled structures, no target), records the preset-correction lineage, and then calls the unchanged score, join, rank, exclusion, statistic, bootstrap and artifact calculations without invoking the obsolete Standard-only run-sheet gate. This changes validation ownership, not the statistical method.
+
+**Accounting:** 308 uploaded candidates, 306 scored, and the same two length-121 exclusions forming one whole excluded pair. The retained analysis has 153 complete pairs across all 79 pre-rejection clusters. All 10,000 cluster-bootstrap replicates were defined for every target, with zero undefined or imputed replicates.
+
+**Provisional results:** Median paired EVAL-minus-control difference 0.108, cluster-bootstrap 95% CI 0.064 to 0.164. Mean paired difference 0.083. Descriptive AUROC 0.638, 95% CI 0.555 to 0.717. Wilcoxon W+ 7,959, two-sided p = 0.000164702. Shuffle pass was 15/153 EVAL cores (9.8%) and 9/153 controls (5.9%); paired difference 3.9 percentage points, 95% CI -3.2 to 11.1 percentage points. The five-component table remains unavailable and no component was recomputed.
+
+**Preset transition diagnostic:** All 306 aptamer-likeness values and ranks are exactly identical to the historical Standard export. Fourteen candidate-specific shuffle outcomes changed with 99 rather than 20 shuffles: 11 fail-to-pass and three pass-to-fail. This is a technical descriptive sensitivity check, not pooled inference.
+
+**Artifacts:** Adapter `scripts/modelling/aptarank_section6_evaluation_preset_analysis.py`, SHA-256 `c37a2b008f1ec0123480114d7130633a28660844e77423efdfe141a80ca2ebe0`. Focused tests SHA-256 `0329e42ded89edea1b5092de213e3070bf16f21479b1a333816910e601304a3e`. Derived directory `results/aptarank/evaluation/section6_tier1_eval_evaluation_preset_v2/derived/analysis_v1/`: summary SHA-256 `23861254eb86506e3df23954bf0f327a8ca634722b66273f7c9b242b74bbedb6`, manifest SHA-256 `d19cd0e82a48cde88e972c42fcd8b83590ca11bb81fc4d6a39f323579680f633`, report SHA-256 `36a3a406cc61c49bdb31749c38762cbde81ec7725d1ed4ce8809a966668acc0b`.
+
+**Checks:** The new adapter, historical production adapter and frozen Section 6 method suite passed 27 tests. The derived `SHA256SUMS` manifest passed. Public outputs contain no opaque candidate IDs, restricted private path or private-key bytes.
+
+**Interpretation:** The rigorous result again shows moderate Tier 1 separation from exact-length uniform RNA. The candidate-specific shuffle-pass difference remains weak and uncertain because its confidence interval includes no difference. These are computational prioritisation results, not evidence of binding or target-specific function. Independent review and explicit scientific result commitment remain pending. Nothing was committed or pushed.
+
+## 2026-10-20 — rigorous Section 6 scientific closure
+
+**Stage:** Aim 2 / AptaRank evaluation / final Section 6 result commitment
+
+**Status:** `SECTION6_RIGOROUS_SCIENTIFIC_RESULT_COMMITTED_AND_CLOSED`. Independent review found no material defect or blocker, reproduced all joins, denominators, point estimates and cluster-bootstrap intervals, confirmed the v3.7 run-sheet compatibility handoff was narrow and fail-closed, and found no required optional change. Laura explicitly instructed: `approve and close rigorous section 6`.
+
+**Final result:** 153 complete EVAL/control pairs across all 79 clusters. Median paired EVAL-minus-control difference 0.108, 95% CI 0.064 to 0.164. Mean paired difference 0.083. AUROC 0.638, 95% CI 0.555 to 0.717. Wilcoxon W+ 7,959, two-sided p = 0.000164702. Shuffle pass 15/153 EVAL and 9/153 controls; paired difference 3.9 percentage points, 95% CI -3.2 to 11.1. The final interpretation is moderate Tier 1 separation from exact-length uniform RNA with a weak, uncertain shuffle-pass difference. It is not evidence of binding or function.
+
+**Closure:** `results/aptarank/evaluation/section6_tier1_eval_evaluation_preset_v2/closure/section6_rigorous_closure_record.json`, SHA-256 `ff0cfe59842c4ed63fb8619cf3957b16a29d710246dd19321e7dc1e0af281438`. The independent review evidence SHA-256 is `ff11cc5a2581b3538689499f971719a0f4a88f7e85c409a897ba4a131b1c3854`. The reviewed raw and derived artifacts were not edited during closure. The historical Standard result remains immutable and separate; it is not pooled and is superseded for final thesis reporting.
+
+**Boundary:** Scientific commitment does not claim that repository changes were Git-committed or pushed. No AptaRank run, score recomputation or method change occurred during closure. Section 8 validation and descriptive interpretation are next.
+
+## 2026-10-20 — Section 8 scientific closure
+
+**Stage:** Aim 2 / AptaRank evaluation / illustrative Tier 2 EVAL result commitment
+
+**Status:** `SECTION8_SCIENTIFIC_RESULT_COMMITTED_AND_CLOSED`. The two rigorous descriptive target runs passed technical validation. Independent review found no material defect or blocker and accepted the compatibility-band decision as scientifically justified for conservative within-target NDM-1 prioritisation. Laura explicitly instructed: `approve and close Section 8`.
+
+**Final result:** The GRK2/3UZS pocket-mode case contains one scored cognate core in one cluster, with aptamer-likeness `0.3415929203539823`, `weak` compatibility and shuffle `fail`. The HEWL/4M4O surface-mode case contains two scored cognate cores in one cluster: rank 1 has aptamer-likeness `0.672566371681416`, `weak` compatibility and shuffle `fail`; rank 2 has `0.5893805309734514`, `moderate` compatibility and shuffle `fail`. There were no technical exclusions and no `strong` compatibility result.
+
+**Interpretation:** The panel is weak to mixed and not confirmatory. It does not validate binding, affinity, specificity, inhibition, target recognition, target discrimination or experimental function. GRK2 remains a negative computational case and lysozyme a mixed case. The target-specific warnings, isolated bound-state chains, small one-cluster denominators and absence of permissible mismatches prevent broader inference.
+
+**Compatibility-bank decision:** Both result artifacts identify 5,085 fixed REF-derived dinucleotide-shuffled controls, favourable direction, `moderate` at or above 0.75 and `strong` at or above 0.95, with bands relative to each run's target geometry rather than the current candidate batch. No bank identifier, content hash or numeric Tier 2 score is exposed, and none is invented or reconstructed. The categorical bands are retained only as conservative control-relative within-target prioritisation categories for the single frozen NDM-1 configuration. Tier 1 and Tier 2 remain separate, shuffle pass remains mandatory for the Section 10 review pool, and later criteria may not be relaxed to fill a desired review count.
+
+**Closure:** `results/aptarank/evaluation/section8_two_target_panel_evaluation_preset_v1/closure/section8_closure_record.json`, SHA-256 `7de67471948c0630595342879c5da4fd091442271cf462321fc624eb139b5da8`. Independent-review record SHA-256 `827eb6c9f769bf52d425e181b29fedfc268c2e3363b78a5eff8b354b7eabc6c9`. The reviewed validation and interpretation artifacts remain at their pinned hashes and were not edited during closure.
+
+**Boundary:** No AptaRank run, score recomputation, candidate replacement, target change, threshold change or method change occurred during closure. Scientific commitment does not claim that repository changes were Git-committed or pushed. Section 9 preparation is the next bounded stage.
+
+## 2026-10-21 — Section 9 frozen sample and production package
+
+**Stage:** Aim 2 / AptaRank evaluation / Section 9 score-blind sampling and manual-run preparation
+
+**Status:** `SECTION9_PREPARED_AND_PREFLIGHT_VALIDATED_APTARANK_NOT_RUN`. The four frozen generated-candidate sources and the sequence-free attempt-membership sidecar were hash-verified and joined locally. The adapter applied only the frozen AptaRank length bound of 20 through 100 nt before sampling, then delegated the score-blind priority calculation, 200-per-condition selection, D1 seed balance, global upload deduplication and opaque identifiers to the unchanged frozen M9B-2 module. No AptaRank score or held-out outcome was used.
+
+**Source and eligibility accounting:** Frozen source denominators are B0 30,080, B1 29,983, B2 30,000 and D1 30,000 unique canonical RNA sequences. AptaRank-eligible denominators are respectively 30,080, 29,548, 29,475 and 29,583. The pre-score technical ineligibility counts are B0 0, B1 435, B2 525 and D1 417. The 120,080-row attempt-membership sidecar joins completely, preserves all B1 duplicate occurrences and reconciles every declared multiplicity.
+
+**Frozen selection:** Exactly 200 condition memberships were selected from each condition. D1 contains 100 seed-43 and 100 seed-44 memberships. The selected B1 sample contains 100 block-A and 100 block-B memberships; B1 balance was observed, not imposed. No selected sequence is shared across conditions, so the deduplicated upload has 800 unique rows. Technical exclusions after upload remain record-only and will not be replaced.
+
+**Target and run sheet:** One target-enabled manual run is prepared for NDM-1, PDB 5ZGX, chain A, pocket mode, residues 120, 122, 124, 189, 208 and 250, prepared-target identifier `0fde4d5e4370`. The named Evaluation preset is required with seed 42, 99 candidate shuffles, 200 sampled structures, composite method `corpus_weighted_mean` and expected rigorous scoring signature `95a49467ef3c6186`. Tier 1 and Tier 2 remain separate; Section 9 candidates do not enter supervisor shortlisting.
+
+**Artifacts:** Public/local ignored package `data/aptarank_eval/sequence/section9_generated_conditions_ndm1_evaluation_preset_v1/`. Candidate-upload SHA-256 `abb9ab3281b972c77486306b5a15302a6aee7ee98b3011fb52946fb8cd4f4b0b`; preparation-manifest SHA-256 `c9bf3bf6f74a212033324661e614b9105f8e7cb9e41b4a579383e6b5c75acfed`; run-sheet SHA-256 `371f5c59052972aeda69fb6e63f16278a8cd1a09cdb6f8305539e84b6f7e5a87`; validation-report SHA-256 `b977440aa94df0b7570c8b4ba1a499733ddd4edf03b4f9e2f1e445602991fb74`; package `SHA256SUMS` SHA-256 `8690bbfd7a79704fa7ffa35de6f074dc3dfec1ba84fc757a6119ef23efd78bfa`.
+
+**Restricted artifacts:** `/Users/laura/Desktop/rnagenesis-aptamer-mres-private/aptarank_eval/section9_generated_conditions_ndm1_evaluation_preset_v1/`, directory mode `0700`, files mode `0600`. M9B-2 private-membership-key SHA-256 `904e8fa58f67c3d57563e03dba40db0a60a9229d015c354ae1e848c9f9d8468c`; source-candidate-key SHA-256 `746f0eea3e53de4550284865a6f4f2a763b339557d4ab45885cb67f9ecd46356`; restricted checksum-manifest SHA-256 `7325e206d562d5af81d1d9475576059884685925ae89a4ebd563c417f6c6c0c5`. The temporary input copy of the secret was deleted after byte-verified publication; the retained restricted copy remains available.
+
+**Implementation and checks:** `scripts/modelling/aptarank_section9_prepare_candidates.py`, SHA-256 `e0f4f2f334ff635f0ee8a7e280d694c1c4729c106baaae8f35be00bb43a5dd13`; focused tests `tests/modelling/test_aptarank_section9_prepare_candidates.py`, SHA-256 `0478002ed11a9d847f90fe93ab096b754d355f1be4a14076807e22c479b86931`. The focused adapter, frozen M9B-2, AptaRank I/O, export-validation and manual-run suites passed 68 tests. Independent recomputation matched all 800 sampling memberships and every opaque HMAC identifier. Public and restricted checksum manifests passed, and `git diff --check` found no whitespace errors.
+
+**Boundary:** AptaRank was not run. No score, target outcome, candidate replacement, threshold change, manual shortlist or scientific result was produced. Nothing was committed or pushed.
+
+## 2026-10-21 — provisional Section 9 NDM-1 result analysis
+
+**Stage:** Aim 2 / AptaRank evaluation / Section 9 raw-result archive, validation and provisional interpretation
+
+**Status:** `PROVISIONAL_SECTION9_ANALYSIS_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RESULT_COMMITMENT`. Laura completed the single prespecified Evaluation-preset run of the frozen 800-row B0/B1/B2/D1 sample against NDM-1. The untouched shortlist and three-page PDF were copied from Downloads into `results/aptarank/evaluation/section9_generated_conditions_ndm1_evaluation_preset_v1/raw/` without altering the source files. Their SHA-256 values are respectively `30182cfe8eb9691c5e816c1dffd1aac02a83b5d0ef42f5cba172b05c82a5e985` and `931850ac4cd51a4fa291bfc1d8fdd757fd4c20f6362f3ec87615dcdf63bfe5c7`.
+
+**Accounting and validation:** All 800 uploaded opaque identifiers reconcile exactly to 800 unique scored rows and sequences. Ranks are complete 1 through 800 and follow non-increasing aptamer-likeness, with ascending opaque ID on exact score ties. No candidate was technically excluded, replaced or replenished, and no exclusion register was returned. Each condition contributes 200 scored memberships. D1 retains 100 seed-43 and 100 seed-44 candidates; B1 retains the observed 100/100 split across technical blocks A/B. The PDF and run records agree on AptaRank 0.1.0, schema 1.0.0, git `49a85609e352`, Evaluation/42/99/200, `corpus_weighted_mean`, scoring signature `95a49467ef3c6186`, the 113-row frozen REF and prepared NDM-1 target identifier `0fde4d5e4370`.
+
+**Condition results:** Tier 1 means for B0/B1/B2/D1 are 0.334/0.402/0.492/0.460 and medians are 0.304/0.389/0.483/0.445. Shuffle-pass counts are 10/11/13/17 of 200. Strong/moderate/weak Tier 2 counts are B0 4/12/184, B1 11/34/155, B2 9/38/153 and D1 10/46/144. The primary D1-minus-B1 differences are +0.058 mean, +0.056 median, +3.0 percentage points shuffle pass and +5.5 points strong-or-moderate compatibility. Relative to B2, D1 is lower by 0.033 in mean and 0.038 in median but higher by 2.0 points in shuffle pass and 4.5 points in strong-or-moderate compatibility. B0 remains an external different-length comparator.
+
+**Relationship between separate outputs:** The untouched PDF reports Spearman rho `-0.072`, p `0.0421`, n `800` between Tier 1 aptamer-likeness and the compatibility-control percentile. The magnitude is negligible and weakly negative; the nominal p-value is not evidence of biological dependence or independence. Numeric Tier 2 percentiles were not exported and were not reconstructed. As a descriptive cross-tabulation only, shuffle pass coincided with a strong or moderate compatibility band in 1/200 B0, 1/200 B1, 3/200 B2 and 2/200 D1 candidates. No combined score, Section 9 selection rule or shortlist was created.
+
+**Required target limitation:** The PDF states: “This cavity is oddly shaped: its robust extent and equivalent-sphere diameter disagree by more than 2×. The geometric comparison assumes a roughly convex pocket.” This is retained as a material limitation on the NDM-1 Tier 2 geometry. The target bands remain target-specific REF-control-relative prioritisation categories, not probabilities of binding or evidence of affinity, specificity, inhibition, target recognition or experimental function.
+
+**Artifacts and checks:** Analysis adapter `scripts/modelling/aptarank_section9_analyze_results.py`, SHA-256 `9a0d71578686f7fed8d8b3466b75b939f6c6c2039bfe26b305fbf2152338c267`; focused tests SHA-256 `6c8abe74ffacfec3960bba9953f53cf789280d1a89f60f57d9ae6977ececf7a5`; sequence-free summary SHA-256 `391e4cc2489965aa8465ff2c6eb99d9adac7b9f908aa50d6686dfcecec4c109f`; manifest SHA-256 `1c94133aef4372aaee84843665c5f68528eed0312ece9fb10d5539584da4d51a`; results note SHA-256 `0cd602cf0a729b810327eb0763f008d9832a0567218b51698f9039bb38c30ccf`. Twenty-five focused Section 9 preparation/analysis and export-validation tests passed. Raw and derived checksum manifests passed, the public aggregate privacy scan found no opaque IDs, source IDs or 20-nt RNA strings, and `git diff --check` passed.
+
+**Boundary:** Tier 1 and Tier 2 remain separate. Candidate rows, technical blocks and generation seeds are not treated as independent training replicates, and two D1 training seeds do not support a training-population confidence interval. Section 6 and Section 8 limitations remain part of interpretation. No Section 9 candidate enters the supervisor-review shortlist. Independent review and explicit scientific result commitment remain pending. Nothing was committed or pushed.
+
+## 2026-10-21 — prospective Section 10 prioritisation amendment
+
+**Stage:** Aim 2 / AptaRank evaluation / post-evaluation, pre-Section-10 prioritisation freeze
+
+**Status:** `SECTION10_TIER1_PRIMARY_POOL_ORDERING_AMENDMENT_FROZEN_BEFORE_FULL_POOL_RUN`. Laura explicitly accepted a revised supervisor-review ordering after the closed Section 8 evaluation and validated provisional Section 9 NDM-1 evidence had been observed, but before any full-pool D1 upload preparation, AptaRank execution or candidate result. This is transparently outcome-aware in timing and is not described as prespecified from the beginning of the evaluation.
+
+**Scientific reasoning:** Section 6 showed moderate Tier 1 separation between EVAL cores and paired exact-length uniform RNA, providing the stronger discrimination signal in the completed computational evaluation. Section 8 supplied insufficient evidence that Tier 2 reliably recognizes known cognates or that `strong` should be treated as a meaningfully better biological-prioritisation category than `moderate`: the three cognate cores were one `moderate` and two `weak`, none `strong`, and all failed their candidate-specific shuffle checks. The provisional Section 9 target artifact additionally warns that the selected NDM-1 cavity is oddly shaped and that its robust extent and equivalent-sphere diameter disagree by more than 2× while the geometric comparison assumes a roughly convex pocket. The full-pool shortlist is intended to select candidates for future laboratory validation, not to conduct another performance test of the target-aware tool.
+
+**Amended rule:** A valid scored D1 candidate must still have shuffle token `pass` and compatibility token `strong` or `moderate`. The two favourable compatibility bands are now pooled as one eligibility class. All eligible candidates are ordered by better Tier 1 rank, then ascending stable opaque ID on an exact Tier 1 tie, and the first 100 are retained when more than 100 qualify. If 100 or fewer qualify, all are retained. If fewer than 50 qualify, all qualifying candidates are retained without relaxing the gates. Technical exclusions are recorded and never replaced. The original compatibility token remains in the review table.
+
+**Interpretation boundary:** Pooling the bands does not assert that they are biologically equivalent. Tier 1 has shown computational discrimination, not prediction of laboratory binding or function. Shuffle remains a binary gate rather than a continuous ordering variable. No Tier 1/Tier 2 numerical composite is created.
+
+**Unchanged decisions:** The complete frozen 30,000-member D1 source pool and hash, one-run design, opaque-ID and private-provenance procedure, frozen 113-row REF, NDM-1/5ZGX chain A pocket/groove target and residues, prepared-target identifier `0fde4d5e4370`, Evaluation preset, seed 42, 99 shuffles, 200 sampled structures, `corpus_weighted_mean`, expected scoring signature `95a49467ef3c6186`, cap of 100, no-relaxation rule, no replenishment, raw-artifact preservation and scientific claim boundaries are unchanged.
+
+**Plan succession:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_8.md`, SHA-256 `8cf982180663ad8591583bd5e37613be4ce8234cfc8a2b82822a36b756d661dc`, is the active remaining-evaluation plan. It incorporates v3.7 by reference and replaces only the Section 10 band-first ordering. Version 3.7 remains unchanged at SHA-256 `24ae601f4c9bf64325ec8aa509ef7a5eafefd5b77a7610fbd014554e16553db9`.
+
+**Boundary:** This documentation stage did not commit the provisional Section 9 result, prepare a Section 10 upload, inspect any full-pool score, select any candidate, execute AptaRank, change the target or preset, commit Git changes or push the branch. Future Section 10 preparation must pin v3.8 and fail closed if an implementation still orders `strong` before `moderate`.
+
+## 2026-10-21 — Section 10 full-pool D1 production preparation
+
+**Stage:** Aim 2 / AptaRank evaluation / full-pool D1 manual-run preparation
+
+**Status:** `PREPARED_AND_PREFLIGHT_VALIDATED_APTARANK_NOT_RUN`. A fresh blinded upload was prepared from the complete frozen 30,000-row D1 unique-valid source under active plan v3.8. No score-informed selection, sampling or pre-upload length filtering occurred. AptaRank was not run and no Section 10 outcome or supervisor-review pool was observed.
+
+**Accounting:** The upload contains 30,000 unique D1 sequences and 30,000 unique fresh M9B-2 opaque identifiers. It deliberately retains 11 sequences below 20 nt and 406 above 100 nt, alongside 29,583 sequences within the deployed 20–100 nt range, so the tool can record technical exclusions. Exclusions will not be replaced or replenished. The complete D1 source is 15,000 seed-43/block-A and 15,000 seed-44/block-B sequences.
+
+**Run freeze:** The manual run uses the frozen 113-row attempt-3 REF and NDM-1 target: PDB 5ZGX, chain A, pocket mode, residues 120, 122, 124, 189, 208 and 250, prepared-target identifier `0fde4d5e4370`. The named Evaluation preset is required with seed 42, 99 candidate shuffles, 200 sampled structures, composite method `corpus_weighted_mean` and expected scoring signature `95a49467ef3c6186`.
+
+**Prospective review rule:** A valid scored D1 candidate must have shuffle `pass` and compatibility `strong` or `moderate`. Those two favourable bands are pooled as one eligibility class, Tier 1 rank supplies the primary ordering, and opaque ID breaks an exact Tier 1 tie. At most 100 candidates are retained; fewer than 50 does not permit relaxing the gates. No combined Tier 1/Tier 2 score is formed.
+
+**Artifacts:** Public/local ignored package `data/aptarank_eval/sequence/section10_d1_full_pool_ndm1_evaluation_preset_v1/`. Candidate-upload SHA-256 `e932bf9db6b7bc8d29ccdffa4289f37cca87bab3f7ca77c002f81377ad1f284b`; preparation-manifest SHA-256 `786a56c972cb993184cf8f64293d4d314c5ca73a17cd9823d324710b9dd605a1`; run-sheet SHA-256 `f30721375ba1794fc20c4ec09284ebb9c65dd5f5d1022e198fe68f7506ea1b32`; review-rule SHA-256 `ba62d76f6f690559b1b1d4988ced580c40252d844ebe8160ef3abe4bc72974cd`; validation-report SHA-256 `9909e92d2842075db48b1b6c6be39c63fea71b57ac427dc2cf6473ed5e4a9e92`.
+
+**Restricted evidence:** `/Users/laura/Desktop/rnagenesis-aptamer-mres-private/aptarank_eval/section10_d1_full_pool_ndm1_evaluation_preset_v1/`, directory mode `0700`, files mode `0600`. M9B-2 private-membership-key SHA-256 `f247a7465c9d8e07f35b5db944ca479dff6eb5a8a9de02f116b4d075688202b6`; source-candidate-key SHA-256 `fb7e6b0248f3748a1ec4280327e3669b5422c173ec085f30417ae851250d153d`. The retained 32-byte secret and restricted keys must not be uploaded or committed.
+
+**Checks:** Public and restricted checksum manifests passed. An independent read-only recomputation reproduced all 30,000 opaque HMAC identifiers from the retained secret and reconciled the upload, frozen D1 source and both restricted keys. Public records contain neither the secret nor source-candidate provenance. The focused Section 10, Section 9 preparation and frozen M9B-2 suites passed 30 tests. The package awaits the requested independent Cursor review before manual execution.
+
+**Boundary:** Nothing was committed or pushed. Section 9 remains provisional pending independent review and explicit scientific result commitment. Section 10 production results remain unobserved.
+
+## 2026-10-21 — Section 10 production-preparation review gate
+
+**Stage:** Aim 2 / AptaRank evaluation / independent review before the full-pool D1 manual run
+
+**Status:** `SECTION10_PRODUCTION_PREPARATION_INDEPENDENTLY_REVIEWED_AND_READY_FOR_MANUAL_RUN`. The read-only Cursor review found no material defect or blocker. The reviewed public and restricted package bytes were not changed.
+
+**Independent checks:** The review matched all 14 pinned inputs and rebuilt both published package trees exactly from the frozen inputs and retained 32-byte secret. It confirmed all 30,000 source sequences are present once, with the frozen 11/29,583/406 length accounting; 15,000 seed-43/block-A and 15,000 seed-44/block-B rows; multiplicity one throughout; zero opaque-ID mismatches; exact upload, expected-cell and restricted-key reconciliation; a fresh secret distinct from Section 9; and no reuse of Section 9 opaque identifiers. It also confirmed the frozen 113-row REF, NDM-1 target, Evaluation/42/99/200 settings, scoring signature and v3.8 pooled-band Tier-1-primary review rule.
+
+**Privacy and state:** Checksums and filesystem protections passed, no symlinks were present, the public data tree is ignored by Git, and the restricted tree remains outside the repository. No Section 10 score export, exclusion register, PDF, shortlist or results directory existed at review time. AptaRank had not been run.
+
+**Optional observations:** The focused unit tests use a three-row synthetic fixture; the complete 30,000-row package was independently rebuilt directly during review. The `records/` and `upload/` child directories are mode `0755` but remain unreachable to other users through the mode-`0700` package root, while the sequence upload itself is mode `0600`. Neither observation requires a change.
+
+**Gate:** The earlier manual-production authorization now applies to this exact independently reviewed package. Stop and reassess if the effective target identifier, preset, seed, shuffle count, sampled-structure count, scoring signature or uploaded file hashes differ.
+
+## 2026-10-21 — prospective Section 10 post-supervisor retention amendment
+
+**Stage:** Aim 2 / AptaRank evaluation / pre-run final decision-rule clarification
+
+**Status:** `SECTION10_POST_SUPERVISOR_RETENTION_RULE_FROZEN_BEFORE_MANUAL_RUN`. Laura clarified before the Section 10 upload was run and before any Section 10 score, shuffle token, compatibility token, exclusion or candidate outcome was observed that the maximum of 50 applies after supervisor review, not to the deterministic computational pool.
+
+**Computational pool unchanged:** A valid scored candidate must have shuffle `pass` and `strong` or `moderate` compatibility, pooled as one favourable class. Eligible candidates remain ordered by Tier 1 rank, with ascending opaque ID only for an exact Tier 1 tie. The v3.8 deterministic pool remains capped at 100 candidates. Its gates may not be relaxed and technical exclusions may not be replaced or replenished.
+
+**Manual decision stage:** The at-most-100 computational pool is assessed jointly with the biologist supervisor. After that assessment, at most 50 candidates may be retained for future experimental consideration. The final set may be smaller or empty. Manual review may remove candidates but cannot introduce one that failed the computational gates or fell outside the deterministic pool. Every reviewed candidate requires a dated retain/not-retain decision and concise reason.
+
+**Plan:** `docs/aptarank_full_mres_thesis_evaluation_plan_v3_9.md`, SHA-256 `88be515dcb04dd3db9f4ec7392b70ce90de085a601d15ac00facc43f509ad274`. Version 3.8 remains unchanged at SHA-256 `8cf982180663ad8591583bd5e37613be4ce8234cfc8a2b82822a36b756d661dc` and remains the controlling specification for construction of the at-most-100 computational pool.
+
+**Production impact:** The reviewed Section 10 candidate upload, opaque identifiers, REF, target, run sheet and Evaluation/42/99/200 settings are unchanged. The new rule affects only the downstream manual decision stage, so the candidate package is not rebuilt and does not require repeat preparation review. AptaRank was not run during this amendment.
+
+## 2026-10-21 — Section 10 raw result archive and exact Tier 2 discovery
+
+**Stage:** Aim 2 / AptaRank evaluation / full-pool D1 raw evidence intake
+
+**Status:** `RAW_ARTIFACTS_ARCHIVED_AND_INITIAL_STRUCTURAL_VALIDATION_PASS_PENDING_FULL_PROVENANCE_VALIDATION_AND_ANALYSIS`. Laura completed the single authorized full-pool D1 run against the frozen NDM-1 target and supplied the untouched full scored export, exclusion register, result PDF and a newly discovered exact Tier 1/Tier 2 export. The source files remain in Downloads and byte-identical copies are stored under `results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/raw/`.
+
+**Raw artifacts:** Exact Tier 1/Tier 2 CSV SHA-256 `b5501b2004e26f6345ec0ad6ddd00892c4460ed67243feeffed34115db4e32b3`; full scored CSV `257cbaa523638abf67aa6109bfce37127aab07eccfbcf82e6cfe448a9d8a650f`; result PDF `9ebc8fe271bb78268cbd601254fdbff6232cf535bef3c3bd185c1708e2719d6b`; exclusion register `d5259d83ad7616b4499255a2039fbe6ba97f0df511239784934edeb0aabc1915`. The raw checksum manifest passed.
+
+**Initial accounting:** All 30,000 uploaded IDs are accounted for as 29,583 scored plus 417 excluded. The exclusions are exactly the expected 11 sequences below 20 nt and 406 above 100 nt. No exclusion was replaced or replenished. Ranks are complete 1 through 29,583, scores are finite in `[0,1]`, ordering is non-increasing with ascending opaque ID on exact ties, and every scored sequence and length matches the reviewed upload.
+
+**Exact Tier 2 scope:** The new scorer export contains exactly Tier 1 ranks 1 through 1,000 in the same order and with byte-equivalent numeric Tier 1 values. It exposes the raw AptaRank `control_percentile`, mismatch value and compatibility band for those rows. The percentiles are scorer outputs and were not reconstructed locally. They reconcile to 764 `weak`, 167 `moderate` and 69 `strong` rows under the displayed 0.75/0.95 thresholds. Rows 1,001 through 29,583 have `not evaluated` compatibility in the full export.
+
+**Gate feasibility:** The full export contains 1,486 shuffle-pass candidates. Exactly 137 candidates pass both shuffle and pooled `strong`/`moderate` compatibility, and all 137 are inside the exact-score top 1,000. The deterministic at-most-100 supervisor-review pool can therefore be built from complete scorer-provided Tier 1 and Tier 2 evidence after full restricted-provenance validation. It has not yet been built.
+
+**PDF review:** The three-page PDF displays 29,583 scored, 417 rejected, target 5ZGX, pocket/groove mode, seed 42, 99 shuffles, runtime 1,140 seconds, candidate/reference hash prefixes, 113 accepted references, scoring signature `95a49467ef3c6186`, prepared-target identifier `0fde4d5e4370`, and the required oddly-shaped-cavity warning. It reports Spearman rho `0.008`, p `0.804`, n `1,000`; independent calculation from the exact export gives rho `0.007855649652876636`. The previously documented `publication_eligible: false` interface bug remains disregarded without weakening substantive validation.
+
+**Exact-score consequence for earlier runs:** Exact Tier 2 values can now be added from untouched scorer exports for the two Section 8 target runs and the 800-row Section 9 run. Section 6 is target-free and has no Tier 2 score to backfill. Section 9 is still provisional, so its exact export can be incorporated before commitment. Closed Section 8 requires a clearly versioned supplemental evidence addendum and later explicit approval rather than silent alteration of its closed artifacts. No previous run is rerun by this discovery.
+
+**Boundary:** This stage archived and structurally inventoried raw evidence. Full restricted-key reconciliation, exact-score analysis, construction of the at-most-100 computational pool, supervisor review and scientific result commitment remain pending. Nothing was committed or pushed.
+
+## 2026-10-21 — Section 8 and Section 9 exact Tier 2 quantitative update
+
+**Stage:** Aim 2 / AptaRank evaluation / later-discovered exact-score validation and provisional reanalysis
+
+**Status:** `SECTION8_EXACT_TIER2_SUPPLEMENT_PROVISIONAL; SECTION9_EXACT_TIER2_ANALYSIS_V2_PROVISIONAL`. Laura supplied untouched AptaRank exact Tier 1/Tier 2 exports for both closed Section 8 target cases and the provisional 800-row Section 9 NDM-1 run. The raw files were preserved unchanged in versioned supplemental directories. Their SHA-256 values are GRK2 `9845ba9cc1fbbd713ce9be5316a0a6911b0c378bfb58cfac347efad01bc9fe57`, lysozyme `6fa421f8c2b0b1981324884d84b3c5e24bfad48805c4350ed724dcf9e1626cd2` and Section 9 `6d0255ea827bf2e2156873737a59eee3f7c7aa54e02f5ff2dc60315aa617def0`.
+
+**Validation:** The previous Section 8 and Section 9 validation gates were rerun. Every exact-score row reconciles to the earlier export on opaque candidate ID, rank, Tier 1 value and compatibility band. Percentiles are finite in `[0,1]`; bands follow the displayed `moderate >= 0.75` and `strong >= 0.95` thresholds. The values are scorer outputs and were not reconstructed. No combined Tier 1/Tier 2 score was created.
+
+**Section 8:** The exact values sharpen but do not materially change the closed conclusion. GRK2 is `weak` at percentile 0.106. The two lysozyme cores are `weak` at 0.462 and `moderate` at 0.753; the latter is only 0.003 above the moderate threshold. None is `strong`, and all three candidate-specific shuffle checks fail. The cases remain weak to mixed and not confirmatory. Because Section 8 was already closed, the historical closure is preserved and the exact-score evidence is a versioned provisional addendum requiring independent review and explicit re-approval.
+
+**Section 9:** B0/B1/B2/D1 mean exact target-control percentiles are 0.376/0.472/0.485/0.501 and medians are 0.407/0.407/0.569/0.569. Strong/moderate/weak counts remain 4/12/184, 11/34/155, 9/38/153 and 10/46/144. Relative to B1, D1 is +0.029 in mean and +0.162 in median percentile, but has one fewer `strong` candidate and 12 more `moderate` candidates; the favourable-band advantage is therefore carried by moderate rather than strong annotations. Relative to B2, D1 is +0.016 in mean and equal in median. The exact-export Spearman rho is `-0.071883614342812`, matching the PDF's rounded `-0.072`. The NDM-1 oddly-shaped-cavity warning remains material. The overall provisional interpretation is sharpened rather than reversed.
+
+**Artifacts:** Adapter `scripts/modelling/aptarank_exact_tier2_update.py`, SHA-256 `64589872c0012edceac6722e492a12192ab0a6237e1c6587faee448326a4fd85`; focused tests SHA-256 `999ba1d278a40bd13a8b98ea580621fce37ccdb198ef37bea3c66043fdb8de70`. Section 8 supplemental summary/manifest/report SHA-256 values are `03267e2dce8f1d550cc9cece6333da26df15e12720ddb8a8fbd467f7dd38ce8a`, `4f627c3b7a1237fa127d9736ba55e8a0acfa16e47724ebcf535f4f98bcdebf85` and `3fabe6a2ceea1d7b2b63a3e089a28d07ab6b0a3205f7a07d38897be38463db44`. Section 9 v2 summary/manifest/report SHA-256 values are `e2bd0a924beff948d8a8715298c5cb1b45de3fd9b330418514056ed29c40705b`, `9ebaf6ac936ccf5eac693ee490aa7090d8d971bea57da5e683da9a8f4cd105f7` and `d3c16e7c562b013be75ddfb4e880123f8534b250c40372a9171f8b19d0f511a3`. Twenty-one focused exact-update and historical Section 8/9 tests passed, and both derived checksum manifests passed.
+
+**Boundary:** Section 8 has not been re-approved and Section 9 has not been scientifically committed. The historical Section 8 closure and Section 9 analysis v1 remain unchanged. Section 10 analysis was not advanced during this stage. Nothing was committed or pushed.
+
+## 2026-10-21 — independent review of exact Tier 2 updates
+
+**Stage:** Aim 2 / AptaRank evaluation / Section 8 supplemental and Section 9 v2 independent-review gate
+
+**Status:** `PASS_NO_MATERIAL_DEFECT_OR_BLOCKER; EXPLICIT_RESULT_COMMITMENT_PENDING`. Cursor's read-only review independently confirmed the three raw hashes, all 803 exact row joins, closed-interval percentiles, 0.75/0.95 band rules, Section 9 condition and subgroup denominators, contrasts, tie-aware Spearman rho, derived checksum manifests, privacy boundaries and preservation of the historical Section 8 closure plus Section 9 analysis v1.
+
+**Scientific review:** The review supports the documented interpretation. Section 8 remains weak to mixed, with one marginally moderate lysozyme result and three shuffle failures. Section 9's modest D1-over-B1 compatibility advantage is carried by `moderate`, not `strong`, annotations; D1 remains only slightly above B2 on mean percentile. Tier 1 and Tier 2 remain separate and the NDM-1 cavity warning remains verbatim.
+
+**Optional observation retained:** Only 35 distinct Section 9 control-percentile levels occur. The B1-versus-D1 median contrast is therefore coarse and tie-sensitive; mean percentile and the separate moderate/strong counts are more stable descriptive summaries. This does not invalidate the reported median and requires no outcome change.
+
+**Boundary:** The review record does not itself recommit the Section 8 supplement or commit the Section 9 result. Both remain awaiting Laura's explicit approval. No analysis artifact was edited, AptaRank was not run, and Section 10 analysis was not advanced.
+
+## 2026-10-21 — Section 8 exact-score recommitment and Section 9 scientific closure
+
+**Stage:** Aim 2 / AptaRank evaluation / explicit quantitative-result commitment
+
+**Status:** `SECTION8_EXACT_TIER2_SUPPLEMENT_SCIENTIFICALLY_RECOMMITTED_AND_CLOSED; SECTION9_EXACT_TIER2_SCIENTIFIC_RESULT_COMMITTED_AND_CLOSED`. Laura explicitly instructed: `Approve the Section 8 exact-score supplement and commit/close Section 9 exact-score v2.` The independently reviewed analysis artifacts were not edited.
+
+**Section 8:** The original Section 8 closure remains unchanged. The supplemental exact-score evidence is now committed as a versioned addendum: GRK2 percentile 0.106 (`weak`); lysozyme percentiles 0.462 (`weak`) and 0.753 (`moderate`); no `strong` result; all three candidate-specific shuffle checks `fail`. The final interpretation remains weak to mixed and not confirmatory. Supplemental closure record SHA-256: `fbe9e4a09b5726f6f936dc5d8d78bd64a4f7d1ab98fa634dcb386e685d66b936`.
+
+**Section 9:** Exact-score v2 is the committed Section 9 thesis result. D1's modest advantage over B1 is carried by more `moderate`, not more `strong`, annotations; D1 is only slightly above B2 on mean control percentile and has the same median. The exact Tier 1/Tier 2 Spearman rho is `-0.071883614342812`, and the NDM-1 oddly-shaped-cavity warning remains a material limitation. Closure record SHA-256: `92e0b07324cfe0da598147b10ad11a1674fe09cac2036283a7f669681bc86d22`.
+
+**Boundary:** These are computational prioritisation findings, not evidence of binding, affinity, specificity, inhibition, target recognition or experimental function. No combined score was created, no AptaRank run occurred during closure, and Section 10 analysis was not advanced. Nothing was committed to Git or pushed.
+
+## 2026-10-21 — provisional Section 10 validation, analysis and supervisor-review pool
+
+**Stage:** Aim 2 / AptaRank evaluation / full-pool D1 provenance validation, filtering and deterministic review-pool construction
+
+**Status:** `PROVISIONAL_SECTION10_VALIDATION_ANALYSIS_AND_REVIEW_POOL_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RESULT_COMMITMENT`. The frozen D1 source and 120,080-row attempt-membership sidecar were revalidated. All 30,000 opaque IDs were recomputed from the retained 32-byte secret, and the candidate upload plus both restricted keys reproduced byte-for-byte. Every scored and excluded row reconciles to the reviewed upload by opaque ID.
+
+**Accounting:** 30,000 uploaded = 29,583 scored + 417 technical exclusions, with zero otherwise missing. The exclusions are the expected 11 below 20 nt and 406 above 100 nt; none was replaced or replenished. The exact target-aware export contains ranks 1 through 1,000 and reconciles on ID, rank, Tier 1 decimal and compatibility band. Across all scored candidates, 1,486 have shuffle `pass`. Within the exact top 1,000, 558 have shuffle `pass`; bands are 69 `strong`, 167 `moderate` and 764 `weak`, giving 236 pooled favourable annotations.
+
+**Frozen filtering:** Applying shuffle `pass` and pooled `strong`/`moderate` compatibility jointly leaves 137 candidates. Ordering across that pooled class by better Tier 1 rank retains 100 and caps out 37. The retained pool contains 33 `strong` and 67 `moderate` annotations, 58 seed-43 and 42 seed-44 candidates, lengths 32–96 nt, and Tier 1 ranks 2–616. The first capped-out eligible candidate is rank 619. `Strong` does not precede `moderate`, and no Tier 1/Tier 2 composite was formed.
+
+**Score analysis:** Tier 1 mean/median values are 0.436/0.423 across all 29,583 scored rows, 0.793/0.782 in the exact top 1,000, 0.804/0.796 among 137 jointly eligible candidates and 0.820/0.816 in the retained 100. Exact top-1,000 Tier 1 versus control-percentile Spearman rho is `0.007855649652876636`, matching the PDF's rounded `0.008` with p `0.804`; the negligible association is not used in selection. The oddly-shaped NDM-1 cavity warning applies to every review candidate.
+
+**Outputs:** Sequence-free analysis is under `results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/derived/analysis_v1/`. The owner-only sequence-bearing supervisor package is under the ignored `restricted/supervisor_review_v1/` directory and includes a one-number-per-line dashboard list, a tab-separated candidate-number/sequence list and full JSONL provenance with blank manual-decision fields. Its directory is mode `0700` and files are mode `0600`.
+
+**Artifacts and checks:** Adapter SHA-256 `af579a1784bcc9e2198dba5ffac3b6d405974c701bd78953a0c8550d6b275dd1`; focused tests SHA-256 `648ede31ebd94c144c8356efd2783ba3d32898e8a872acbff788e1e53374f035`. Public summary/manifest/report SHA-256 values are `648011cfdd0a1369454aa283608426e6957a9dfa81b6c10188b18c73fbb1f563`, `bd354377cbe26da62afd534eecfdf2d8afbef661c038ae8c30d311ac99e312f5` and `7e2f0e1a65c61cde59169645dd44fa1fec695986fc755eb09b2e820a8340c773`. Thirty-three focused Section 10 preparation/analysis and M9B-2 tests passed. Public and restricted checksum manifests passed.
+
+**Boundary:** This pool contains computationally prioritised candidates for manual review, not validated binders. Manual biologist-supervisor review, the at-most-50 post-review decision, independent analysis review and explicit scientific result commitment remain pending. Nothing was committed to Git or pushed.
+
+## 2026-10-21 — Section 10 computational result commitment and closure
+
+**Stage:** Aim 2 / AptaRank evaluation / independent review, explicit commitment and closure of the deterministic supervisor-review pool
+
+**Status:** `SECTION10_COMPUTATIONAL_VALIDATION_ANALYSIS_AND_SUPERVISOR_REVIEW_POOL_SCIENTIFICALLY_COMMITTED_AND_CLOSED`. Laura explicitly instructed: `Approve and close section 10.` The independently reviewed analysis artifacts and restricted supervisor package were not edited during closure.
+
+**Independent review:** Cursor independently recomputed every pinned hash and lineage check, all 30,000 opaque identifiers, byte-exact upload and restricted-key reconciliation, 29,583 scored plus 417 excluded accounting, exact top-1,000 joins and compatibility thresholds, the 558 shuffle-pass / 236 favourable / 137 jointly eligible funnel, Tier 1 ordering, the 100 retained and 37 capped-out candidates, retained band/seed/length composition, restricted supervisor-file reconciliation, privacy controls and the NDM-1 cavity warning. It found no material defect or blocker. Review-record SHA-256: `d30f00a102f8b904030f07e1eec9e1809d4b5cc85a0a7c39f3a58d355cd7f919`.
+
+**Committed result:** The complete 30,000-row D1 upload yielded 29,583 valid scored records and 417 recorded technical exclusions. Within the exact top 1,000 target-aware export, 558 candidates passed the candidate-specific shuffle check and 236 had pooled strong-or-moderate compatibility. Both mandatory gates left 137 candidates. Tier 1 ordering retained 100 for supervisor review and capped out 37. The retained pool contains 33 `strong` and 67 `moderate` annotations and 58 seed-43 plus 42 seed-44 candidates. No combined Tier 1/Tier 2 score was created, compatibility did not order the pool, and no gate was relaxed.
+
+**Closure:** `results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/closure/section10_computational_pool_closure_record.json`, SHA-256 `305367b52eee1cfa56892200db053f67c5652bdb1832ff342b957a16fe1040ee`. The reviewed public analysis files retain their provisional historical status fields and exact hashes; the separate closure record is the current authority for commitment state.
+
+**Remaining manual decision:** This closure covers the validated computational analysis and deterministic 100-candidate pool. Joint assessment with the biologist supervisor has not occurred. Under plan v3.9 it may remove candidates and retain at most 50 for future experimental consideration, with a dated reason for every decision, but may not introduce candidates outside the closed pool.
+
+**Boundary:** The pool is computational prioritisation evidence, not a binder set or evidence of affinity, specificity, inhibition, target recognition, experimental function or predictive validity. The oddly-shaped NDM-1 cavity warning remains material. No AptaRank run, score recomputation, candidate replacement, gate change, Git commit or push occurred during closure. The next documentation stage is a self-contained supervisor briefing covering Sections 6–10 with a separate tables-and-figures pack.
+
+## 2026-10-21 — Sections 6–10 AptaRank supervisor briefing
+
+**Stage:** Aim 2 / AptaRank evaluation / aggregate supervisor-facing documentation
+
+**Status:** `SUPERVISOR_BRIEFING_AND_TABLE_FIGURE_PACK_PREPARED`. A self-contained, sequence-free briefing now synthesizes the independently reviewed and closed computational evidence from Section 6 Tier 1 calibration, Section 8 illustrative target cases, Section 9 generated-condition comparison and Section 10 full-pool D1 prioritisation. It leads with the main findings, explains the minimum method required to interpret them, retains weak and mixed results, and separates the closed 100-candidate computational pool from the pending joint supervisor decision capped at 50.
+
+**Outputs:** `docs/evaluation/aptarank_evaluation_report_supervisor.md`, SHA-256 `286d061a11025162d457152087ede3470b46de371dfb57f4e92c566d847f89ea`; `docs/evaluation/aptarank_evaluation_supervisor_tables.md`, SHA-256 `8cf1ed13bd881e4e5ad09b585080027114b7d4cc27ce75575ffab84a959e4849`. Four aggregate figures are stored as PNG and SVG under `docs/evaluation/assets/figures/`; their checksums are bound by `docs/evaluation/SHA256SUMS`. Figure generator `scripts/modelling/aptarank_supervisor_report_figures.py`, SHA-256 `ef151e51c0ce711748772f27f3e30d708f4ae1dad23a88d7b9b7e35c5c1f7de0`.
+
+**Scientific narrative:** Tier 1 showed moderate separation from paired uniform RNA but low and uncertain shuffle-pass sensitivity. The known-cognate Tier 2 panel was weak to mixed. D1 modestly exceeded B1 in the 800-candidate comparison while B2 remained competitive or better on important outputs. The full D1 run yielded 137 jointly eligible candidates and a Tier-1-ordered 100-candidate review pool. The NDM-1 cavity warning and the absence of experimental validation remain prominent.
+
+**Boundary:** This documentation stage uses closed aggregate values only. It did not open sequence-bearing candidate files, rerun AptaRank, recompute scores, change any scientific result, alter the closed pool or make a manual retain/not-retain decision. Nothing was committed or pushed.
+
+## 2026-10-21 — AptaRank evaluation paused after computational closure
+
+**Stage:** Aim 2 / AptaRank evaluation / repository hand-off and pause point
+
+**Status:** `APTARANK_EVALUATION_PAUSED_WITH_ONLY_JOINT_SUPERVISOR_REVIEW_REMAINING`. Sections 6–10 are computationally complete, independently reviewed and closed. The sequence-free supervisor briefing and supporting tables and figures are prepared. No further AptaRank production run is planned at this pause point.
+
+**Remaining stage:** Jointly assess the closed 100-candidate D1 pool with the biology supervisor and create the final dated decision record. Every reviewed candidate requires a retain/not-retain decision and concise reason. At most 50 candidates may be retained; the set may be smaller or empty. The review may remove candidates but may not relax the frozen computational gates, replenish exclusions or introduce a candidate from outside the closed pool.
+
+**Documentation organization:** Evaluation plans, reconciliation notes, result narratives and supervisor materials now have canonical locations under `docs/evaluation/`; the dataset-search workbook is under `docs/data_curation/`; and the fine-tuning implementation plan is under `docs/fine_tuning/`. Byte-identical compatibility copies preserve the former paths used by frozen scripts, tests, contracts and historical manifests, whose fail-closed readers reject symlinks. The Stage 1 config has likewise moved from `configs/` to `config/` with a compatibility copy at its former path.
+
+**Privacy boundary:** Raw AptaRank browser exports remain in ignored `raw/` directories. The sequence-bearing Section 10 supervisor package remains in its ignored, owner-only `restricted/` directory. Neither belongs in Git.

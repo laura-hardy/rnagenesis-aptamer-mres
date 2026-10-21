@@ -1,0 +1,291 @@
+{
+  "analyzed_bytes": {
+    "candidate_upload": {
+      "byte_count": 29048,
+      "sha256": "5554f68fd94d1754ff9bcc87fba81be7dc8391af7e45703400796f4a5a336ad2"
+    },
+    "downloaded_export": {
+      "byte_count": 42480,
+      "sha256": "e5db367e2f2ea9e6f023db32345533d1a7a09a26996166700ed02c4cd6e97e4c"
+    }
+  },
+  "auroc": {
+    "complete_pairs": 153,
+    "positive_class": "eval_core",
+    "technical_incompleteness": null,
+    "tie_credit": "0.5",
+    "value": "29863/46818"
+  },
+  "bootstrap": {
+    "auroc": {
+      "defined_replicates": 10000,
+      "imputed_replicates": 0,
+      "interval": {
+        "high": "1027700639/1433552640",
+        "level": "0.95",
+        "low": "20759531143/37376658000",
+        "probabilities": [
+          "0.025",
+          "0.975"
+        ],
+        "quantile": "hyndman_fan_type_7"
+      },
+      "point": "29863/46818",
+      "replicates": 10000,
+      "technical_incompleteness": null,
+      "undefined_replicates": 0
+    },
+    "control_shuffle_pass_rate": {
+      "defined_replicates": 10000,
+      "imputed_replicates": 0,
+      "interval": {
+        "high": "30147/308560",
+        "level": "0.95",
+        "low": "2/77",
+        "probabilities": [
+          "0.025",
+          "0.975"
+        ],
+        "quantile": "hyndman_fan_type_7"
+      },
+      "point": "1/17",
+      "replicates": 10000,
+      "technical_incompleteness": null,
+      "undefined_replicates": 0
+    },
+    "paired_median_difference": {
+      "defined_replicates": 10000,
+      "imputed_replicates": 0,
+      "interval": {
+        "high": "0.163716814159292115",
+        "level": "0.95",
+        "low": "0.06371681415929205",
+        "probabilities": [
+          "0.025",
+          "0.975"
+        ],
+        "quantile": "hyndman_fan_type_7"
+      },
+      "point": "0.10796460176991136",
+      "replicates": 10000,
+      "technical_incompleteness": null,
+      "undefined_replicates": 0
+    },
+    "paired_shuffle_pass_difference": {
+      "defined_replicates": 10000,
+      "imputed_replicates": 0,
+      "interval": {
+        "high": "1/9",
+        "level": "0.95",
+        "low": "-1/31",
+        "probabilities": [
+          "0.025",
+          "0.975"
+        ],
+        "quantile": "hyndman_fan_type_7"
+      },
+      "point": "2/51",
+      "replicates": 10000,
+      "technical_incompleteness": null,
+      "undefined_replicates": 0
+    },
+    "real_shuffle_pass_rate": {
+      "defined_replicates": 10000,
+      "imputed_replicates": 0,
+      "interval": {
+        "high": "21/136",
+        "level": "0.95",
+        "low": "1/22",
+        "probabilities": [
+          "0.025",
+          "0.975"
+        ],
+        "quantile": "hyndman_fan_type_7"
+      },
+      "point": "5/51",
+      "replicates": 10000,
+      "technical_incompleteness": null,
+      "undefined_replicates": 0
+    }
+  },
+  "class_summaries": {
+    "eval_core": {
+      "count": 153,
+      "iqr": "0.24601769911504416",
+      "mean": "7843805309734513387/15300000000000000000",
+      "median": "0.511504424778761",
+      "q1": "0.39469026548672564",
+      "q3": "0.6407079646017698",
+      "undefined": false
+    },
+    "paired_uniform_shuffle": {
+      "count": 153,
+      "iqr": "0.2619469026548673",
+      "mean": "82100663716814161/191250000000000000",
+      "median": "0.40884955752212393",
+      "q1": "0.3008849557522124",
+      "q3": "0.5628318584070797",
+      "undefined": false
+    }
+  },
+  "denominators": {
+    "bootstrap_defined_replicates": {
+      "auroc": 10000,
+      "control_shuffle_pass_rate": 10000,
+      "paired_median_difference": 10000,
+      "paired_shuffle_pass_difference": 10000,
+      "real_shuffle_pass_rate": 10000
+    },
+    "bootstrap_replicates": 10000,
+    "bootstrap_undefined_replicates": {
+      "auroc": 0,
+      "control_shuffle_pass_rate": 0,
+      "paired_median_difference": 0,
+      "paired_shuffle_pass_difference": 0,
+      "real_shuffle_pass_rate": 0
+    },
+    "clusters_with_complete_score_pairs": 79,
+    "complete_score_pairs": 153,
+    "evaluable_scores": 306,
+    "evaluable_scores_by_class": {
+      "eval_core": 153,
+      "paired_uniform_shuffle": 153
+    },
+    "imputed_replicates": 0,
+    "incomplete_score_pairs": 1,
+    "input_candidates": 308,
+    "paired_shuffle_pairs": 153,
+    "pre_rejection_clusters": 79,
+    "shuffle_pass_by_class": {
+      "eval_core": 15,
+      "paired_uniform_shuffle": 9
+    },
+    "shuffle_valid_by_class": {
+      "eval_core": 153,
+      "paired_uniform_shuffle": 153
+    },
+    "technical_failures": 2
+  },
+  "favourable_direction": "higher_aptamer_likeness",
+  "five_component_table": {
+    "acceptance_gate": {
+      "recomputing_component_values": "refused",
+      "schema_frozen": false,
+      "schema_observed": false,
+      "status": "future",
+      "steps": [
+        "capture and hash the untouched artifact",
+        "review and freeze its real schema",
+        "enforce unique candidate ids and reconciliation against the analyzed export and private key",
+        "compute a compact class-level descriptive table from the exported component values"
+      ],
+      "summarizing_exported_values": "allowed",
+      "when": "the deployed AptaRank UI exposes component values"
+    },
+    "inspected": [],
+    "local_recomputation": "not_attempted",
+    "policy": "production_table_unavailable_until_a_deployed_component_artifact_schema_is_observed_and_frozen",
+    "reason": "component_artifact_unavailable",
+    "recomputed": false,
+    "rows": null,
+    "schema_frozen": false,
+    "schema_observed": false,
+    "source_role": null,
+    "source_sha256": null,
+    "status": "unavailable",
+    "verification": "not_presented"
+  },
+  "generated_at_utc": "2026-10-20T11:42:56Z",
+  "governing_plan": {
+    "section": 6,
+    "sha256": "24ae601f4c9bf64325ec8aa509ef7a5eafefd5b77a7610fbd014554e16553db9",
+    "version": "3.7"
+  },
+  "independent_review_complete": false,
+  "interpretation_limits": [
+    "uniform RNA is a synthetic floor, not an experimental non-binder",
+    "AUROC is descriptive against the paired uniform null, not universal aptamer classification",
+    "AptaRank scores are computational prioritisation evidence, not binding or functional validation",
+    "the five-component descriptive table is unavailable because no verified deployed component export exists",
+    "two technical exclusions removed one complete matched pair and were not replaced",
+    "the historical Standard result is preserved separately and is not pooled with this rerun"
+  ],
+  "lineage": {
+    "frozen_standard_only_run_sheet_gate_invoked": false,
+    "historical_standard_result": "results/aptarank/evaluation/section6_tier1_eval_v1",
+    "only_intended_method_change": "Standard_to_Evaluation_preset",
+    "reason": "the frozen module accepts only the historical Standard template; v3.7 requires strict Evaluation-preset validation before unchanged calculations",
+    "result_selected_by_favourability": false,
+    "results_pooled": false,
+    "run_sheet_validation_owner": "v3.7_evaluation_preset_adapter",
+    "same_candidate_upload": true,
+    "same_private_key_pairs_clusters_and_controls": true
+  },
+  "paired": {
+    "count": 153,
+    "direction": "eval_core_minus_paired_uniform_shuffle",
+    "mean_difference": "1275752212389380507/15300000000000000000",
+    "median_difference": "0.10796460176991136",
+    "technical_incompleteness": null
+  },
+  "preset": {
+    "candidate_shuffles": 99,
+    "role": "paper_rigorous_mode",
+    "sampled_structures": 200,
+    "sampled_structures_source": "pinned_run_sheet_not_independently_displayed_in_result_pdf",
+    "seed": 42,
+    "ui_name": "Evaluation"
+  },
+  "production_run": true,
+  "raw_run_artifacts": {
+    "captured": [
+      {
+        "byte_count": 289,
+        "role": "excluded_sequences_register",
+        "sha256": "91ff501e648389b2c8234c0bd2460ea8a8c2d63ccf56a37c8079abc2b82d3d3e"
+      },
+      {
+        "byte_count": 485498,
+        "role": "result_page_pdf",
+        "sha256": "e511504b1f912c26950ba3702de6ef7c102cff0219ba8cb7e9d0c736af05fd46"
+      }
+    ],
+    "captured_count": 2,
+    "unavailable": [
+      {
+        "reason": "unavailable",
+        "role": "five_component_export"
+      },
+      {
+        "reason": "unavailable",
+        "role": "ui_log"
+      }
+    ],
+    "unavailable_count": 2
+  },
+  "scientific_result_committed": false,
+  "scorer_owner": "deployed AptaRank UI",
+  "scores_recomputed": false,
+  "secondary_test": {
+    "alternative": "two-sided",
+    "approximation": "normal",
+    "continuity_correction": false,
+    "disposition": "wilcoxon_signed_rank",
+    "nonzero_count": 153,
+    "p_value": 0.00016470171329721164,
+    "statistic": "7959",
+    "technical_incompleteness": null,
+    "tie_method": "average_ranks",
+    "variance": "301396.75",
+    "variance_formula": "n(n+1)(2n+1)/24 - sum(t^3-t)/48",
+    "zero_count": 0,
+    "zero_method": "wilcox"
+  },
+  "shuffle": {
+    "control_pass_rate": "1/17",
+    "paired_direction": "eval_core_minus_paired_uniform_shuffle",
+    "paired_pass_difference": "2/51",
+    "real_pass_rate": "5/51"
+  },
+  "status": "PROVISIONAL_SECTION6_EVALUATION_PRESET_ANALYSIS_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RESULT_COMMITMENT"
+}

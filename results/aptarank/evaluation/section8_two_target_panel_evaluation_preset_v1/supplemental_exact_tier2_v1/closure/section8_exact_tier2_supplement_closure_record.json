@@ -1,0 +1,71 @@
+{
+  "active_remaining_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_9.md",
+    "sha256": "88be515dcb04dd3db9f4ec7392b70ce90de085a601d15ac00facc43f509ad274"
+  },
+  "approval": {
+    "decision": "approve_section8_exact_score_supplement",
+    "source": "explicit_user_instruction"
+  },
+  "aptarank_rerun_during_closure": false,
+  "artifact_sha256": {
+    "analysis_manifest": "4f627c3b7a1237fa127d9736ba55e8a0acfa16e47724ebcf535f4f98bcdebf85",
+    "analysis_summary": "03267e2dce8f1d550cc9cece6333da26df15e12720ddb8a8fbd467f7dd38ce8a",
+    "grk2_exact_export": "9845ba9cc1fbbd713ce9be5316a0a6911b0c378bfb58cfac347efad01bc9fe57",
+    "historical_section8_closure": "7de67471948c0630595342879c5da4fd091442271cf462321fc624eb139b5da8",
+    "independent_review_record": "42a30cc308ffec7d83af9d5bb65318c9ed889ca2e3e88a4138e79c999e741e6e",
+    "lysozyme_exact_export": "6fa421f8c2b0b1981324884d84b3c5e24bfad48805c4350ed724dcf9e1626cd2",
+    "results_note": "3fabe6a2ceea1d7b2b63a3e089a28d07ab6b0a3205f7a07d38897be38463db44"
+  },
+  "claim_boundary": "The exact target-control percentiles are computational prioritisation evidence only and do not demonstrate binding, affinity, specificity, inhibition, target recognition, target discrimination or experimental function.",
+  "closed_at_date": "2026-10-21",
+  "exact_results": {
+    "grk2_pocket": {
+      "candidate_shuffle": "fail",
+      "compatibility_band": "weak",
+      "control_percentile": "0.10619469026548672",
+      "mismatch": "5.6776875408896945"
+    },
+    "hewl_surface": [
+      {
+        "candidate_shuffle": "fail",
+        "compatibility_band": "weak",
+        "control_percentile": "0.46214355948869223",
+        "length": 59,
+        "mismatch": "1118.8384492224768",
+        "rank": 1
+      },
+      {
+        "candidate_shuffle": "fail",
+        "compatibility_band": "moderate",
+        "control_percentile": "0.7529990167158309",
+        "length": 45,
+        "mismatch": "374.7085147871943",
+        "rank": 2
+      }
+    ]
+  },
+  "final_interpretation": "The exact target-control percentiles sharpen but do not materially change the original Section 8 conclusion. The illustrative panel remains weak to mixed and not confirmatory: GRK2 is weak at 0.106, the lysozyme cores are weak at 0.462 and marginally moderate at 0.753, no core is strong, and all three candidate-specific shuffle checks fail.",
+  "git_commit_claimed": false,
+  "historical_section8_closure": {
+    "modified": false,
+    "preserved": true,
+    "status": "SECTION8_SCIENTIFIC_RESULT_COMMITTED_AND_CLOSED"
+  },
+  "independent_review": {
+    "blocking_issue": false,
+    "material_defect": false,
+    "optional_change_required": false,
+    "outcome": "no_material_defect_or_blocker",
+    "review_record_sha256": "42a30cc308ffec7d83af9d5bb65318c9ed889ca2e3e88a4138e79c999e741e6e"
+  },
+  "reviewed_artifacts_modified_during_closure": false,
+  "run_governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_7.md",
+    "sha256": "24ae601f4c9bf64325ec8aa509ef7a5eafefd5b77a7610fbd014554e16553db9"
+  },
+  "schema_version": "1.0.0",
+  "scientific_result_committed": true,
+  "scores_recomputed": false,
+  "status": "SECTION8_EXACT_TIER2_SUPPLEMENT_SCIENTIFICALLY_RECOMMITTED_AND_CLOSED"
+}

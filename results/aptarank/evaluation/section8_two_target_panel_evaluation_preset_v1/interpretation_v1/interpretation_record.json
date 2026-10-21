@@ -1,0 +1,84 @@
+{
+  "compatibility_bank_decision": {
+    "basis": [
+      "the deployed UI identifies 5085 fixed dinucleotide-shuffled controls derived from uploaded REF",
+      "REF is disjoint from EVAL under the frozen corpus split",
+      "higher percentile is favourable and the displayed thresholds are moderate >= 0.75 and strong >= 0.95",
+      "bands are target-specific and do not depend on current candidate-batch composition",
+      "both rigorous runs expose the same deployment, bank count and scoring signature"
+    ],
+    "biological_validation_strength": "weak",
+    "content_hash_exposed": false,
+    "downstream_use": "retain strong and moderate tokens as conservative control-relative within-target prioritisation categories for the single frozen NDM-1 configuration",
+    "identifier_exposed": false,
+    "operationally_interpretable": true,
+    "prohibitions": [
+      "no binding, affinity, specificity, inhibition, target-recognition or experimental-function claim",
+      "no cross-target numerical comparison",
+      "no Tier 1 and Tier 2 composite",
+      "no raw Tier 2 score reconstruction",
+      "no relaxation of the frozen Section 10 filter after observing outcomes"
+    ],
+    "raw_numeric_tier2_score_available": false,
+    "raw_numeric_tier2_score_reconstructed": false,
+    "realized_bank_count": 5085
+  },
+  "generated_on": "2026-10-20",
+  "governing_plan": {
+    "section": 8,
+    "sha256": "24ae601f4c9bf64325ec8aa509ef7a5eafefd5b77a7610fbd014554e16553db9",
+    "version": "3.7"
+  },
+  "interpretation": {
+    "grk2_pocket": {
+      "candidate_shuffle": "fail",
+      "compatibility_band": "weak",
+      "conclusion": "negative computational result for this configured case; not evidence against experimental binding",
+      "denominator": {
+        "clusters": 1,
+        "scored_unique_cores": 1
+      },
+      "tier1_aptamer_likeness": "0.3415929203539823"
+    },
+    "hewl_surface": {
+      "candidate_shuffle_counts": {
+        "fail": 2
+      },
+      "compatibility_band_counts": {
+        "moderate": 1,
+        "strong": 0,
+        "weak": 1
+      },
+      "conclusion": "mixed computational result with limited sensitivity to known cognate examples",
+      "denominator": {
+        "clusters": 1,
+        "scored_unique_cores": 2
+      },
+      "ranked_rows": [
+        {
+          "aptamer_likeness": "0.672566371681416",
+          "candidate_shuffle": "fail",
+          "compatibility_band": "weak",
+          "length": 59,
+          "rank": 1
+        },
+        {
+          "aptamer_likeness": "0.5893805309734514",
+          "candidate_shuffle": "fail",
+          "compatibility_band": "moderate",
+          "length": 45,
+          "rank": 2
+        }
+      ]
+    },
+    "panel_conclusion": "weak_to_mixed_not_confirmatory",
+    "target_discrimination_evidence": false
+  },
+  "scientific_result_committed": false,
+  "status": "PROVISIONAL_SECTION8_INTERPRETATION_AWAITING_INDEPENDENT_REVIEW_AND_EXPLICIT_RESULT_COMMITMENT",
+  "validation_inputs": {
+    "validation_manifest_sha256": "768528e6687ede28a530088068bb6c137cf3a9f3b41009a77bd43f3671904af3",
+    "validation_report_sha256": "0548d191df77354f893e1ed7fea2636c25bb11da470ec68d848ca79d1c2e7b69",
+    "validation_summary_sha256": "163f1f1b0b994015ee9f6827064142ae3ead4905743eba04a1b61fdfa8db1218"
+  }
+}

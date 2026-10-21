@@ -1,0 +1,74 @@
+{
+  "automated_content_extraction": false,
+  "layout_readable": true,
+  "pages_rendered_and_reviewed": 3,
+  "review_scope": "sequence-free run, target, compatibility-band and warning evidence",
+  "schema_version": "mres-aptarank-section8-pdf-visual-review-v1",
+  "source_pdf": {
+    "byte_count": 463121,
+    "path": "raw/section8_3uzs_1021.pdf",
+    "sha256": "cec6ad469ccab822818f92aeee6addc15368ed54d6f99cfb07cf45754ac782fb"
+  },
+  "status": "VISUALLY_REVIEWED_SOURCE_HASH_PINNED",
+  "visual_observations": {
+    "accounting": {
+      "candidates": 1,
+      "scored": 1
+    },
+    "compatibility": {
+      "bank_content_hash_exposed": false,
+      "bank_identifier_exposed": false,
+      "bank_realized_count": 5085,
+      "bands": {
+        "moderate_threshold": 0.75,
+        "strong_threshold": 0.95,
+        "weak": 1
+      },
+      "raw_numeric_tier2_score_exposed": false
+    },
+    "deployment": {
+      "aptarank_version": "0.1.0",
+      "forgi_version": "2.2.3",
+      "fpocket_version": "4.0",
+      "git_revision": "49a85609e352",
+      "schema_version": "1.0.0",
+      "ushuffle_version": "unknown",
+      "viennarna_version": "2.7.2"
+    },
+    "displayed_settings": {
+      "candidate_shuffles": 99,
+      "composite_method": "corpus_weighted_mean",
+      "ranking_runtime_seconds": 0,
+      "sampled_structures_displayed": false,
+      "scoring_signature": "95a49467ef3c6186",
+      "seed": 42
+    },
+    "known_interface_marker": {
+      "publication_eligible_false_displayed": true,
+      "treatment": "ignored under the documented thesis-wide interface-bug decision"
+    },
+    "reference": {
+      "accepted": 113,
+      "dropped": 0,
+      "sha256_prefix_displayed": "5f5c90572263818b",
+      "upload_name": "m9c_reference_upload_attempt3.csv"
+    },
+    "run_label": "section_8_3uzs_1021",
+    "target": {
+      "binding_mode_display": "Pocket/groove recognition",
+      "cavities_detected": 64,
+      "chain": "A",
+      "characteristic_width_angstrom": 15.1,
+      "electrostatics": "skipped",
+      "pdb_id": "3UZS",
+      "prepared_target_identifier": "18baf4fba59a",
+      "selected_cavity": 59,
+      "selected_cavity_volume_angstrom3": 410,
+      "selection_statement": "cavity selected by overlap with literature-confirmed binding-site residues"
+    },
+    "warnings": [
+      "target chain isolated computationally from a multi-chain complex",
+      "coordinates remain in the bound-state conformation and do not represent a relaxed unbound structure"
+    ]
+  }
+}

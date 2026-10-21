@@ -1,0 +1,105 @@
+{
+  "accounting": {
+    "grk2_pocket": {
+      "clusters": 1,
+      "scientific_identities": 1,
+      "scored_unique_cores": 1,
+      "technical_exclusions": 0,
+      "uploaded_unique_cores": 1
+    },
+    "hewl_surface": {
+      "clusters": 1,
+      "scientific_identities": 2,
+      "scored_unique_cores": 2,
+      "technical_exclusions": 0,
+      "uploaded_unique_cores": 2
+    }
+  },
+  "approval": {
+    "decision": "approve_and_close_section_8",
+    "source": "explicit_user_instruction"
+  },
+  "artifact_sha256": {
+    "grk2_candidate_upload": "e7589866fb3322eb3d9ea90a8276d613720ff9d64e59bfed6f7cb47433b9572f",
+    "grk2_raw_manifest": "826649e6200818f8a665eb40e60dff12b89d474f3d7971204dde36bf9d150389",
+    "grk2_result_pdf": "cec6ad469ccab822818f92aeee6addc15368ed54d6f99cfb07cf45754ac782fb",
+    "grk2_shortlist": "d9ecbb4b3745b496832575bba7b9ccbcba5850dd838e178810fa8eea6fd644c7",
+    "grk2_target_freeze": "49d1c32db6b460a20cda0e712cd3e31120aa17ec7f1ed0d30d6cae815de31d18",
+    "interpretation_record": "70ed1bce9a1b8985d34d03ff212a4b7b4514a1916886d9c040987e1110191bf7",
+    "interpretation_text": "a329222f632751bc478f9a2b54dedd7de719f86630e53556874ed80abd8742c0",
+    "lysozyme_candidate_upload": "ade52448da9a6b8630f082df446745f28c649031df460c7b8eb13c4c9b47ab9d",
+    "lysozyme_raw_manifest": "590f6df0f5b436ffdc0b3a4cd6ee72de8451fdc966c9ff9460a219dd7daf88b3",
+    "lysozyme_result_pdf": "114efec24fd3e25e92cc7b15d71b1abec7835b0201806d85ef918843a39d994c",
+    "lysozyme_shortlist": "1cea5620a0a1a938b454c6c4b612c105fa2423fe8eeb7e66e9cd9b706dc70a6a",
+    "lysozyme_target_freeze": "6d9e69b7f61488d610ac58b421b1f852ea866e65a8fa4d4d5aaa014798db320c",
+    "panel_freeze": "49d4aa9dcf2b17d6cd03317f0cc7222512473d5af7f02688b3661022923e34b7",
+    "review_record": "827eb6c9f769bf52d425e181b29fedfc268c2e3363b78a5eff8b354b7eabc6c9",
+    "validation_manifest": "768528e6687ede28a530088068bb6c137cf3a9f3b41009a77bd43f3671904af3",
+    "validation_report": "0548d191df77354f893e1ed7fea2636c25bb11da470ec68d848ca79d1c2e7b69",
+    "validation_summary": "163f1f1b0b994015ee9f6827064142ae3ead4905743eba04a1b61fdfa8db1218"
+  },
+  "aptarank_rerun_during_closure": false,
+  "claim_boundary": "The results are computational prioritisation evidence only and do not demonstrate binding, affinity, specificity, inhibition, target recognition, target discrimination or experimental function.",
+  "closed_at_date": "2026-10-20",
+  "compatibility_bank_decision": {
+    "biological_validation_strength": "weak",
+    "content_hash_exposed": false,
+    "downstream_use": "retain strong and moderate tokens as conservative control-relative within-target prioritisation categories for the single frozen NDM-1 configuration",
+    "identifier_exposed": false,
+    "operationally_interpretable": true,
+    "raw_numeric_tier2_score_available": false,
+    "raw_numeric_tier2_score_reconstructed": false,
+    "realized_bank_count": 5085
+  },
+  "final_interpretation": "The illustrative panel is weak to mixed and not confirmatory: the GRK2 cognate core has weak pocket compatibility, while the two lysozyme cognate cores have one moderate and one weak surface-compatibility annotation. No candidate has strong compatibility and every candidate-specific shuffled-control check fails. The compatibility bands remain usable only as conservative within-target prioritisation categories under the frozen downstream workflow.",
+  "git_commit_claimed": false,
+  "governing_plan": {
+    "path": "docs/aptarank_full_mres_thesis_evaluation_plan_v3_7.md",
+    "sha256": "24ae601f4c9bf64325ec8aa509ef7a5eafefd5b77a7610fbd014554e16553db9"
+  },
+  "independent_review": {
+    "blocking_issue": false,
+    "compatibility_band_decision_accepted": true,
+    "material_defect": false,
+    "optional_change_required": false,
+    "outcome": "no_material_defect_or_blocker",
+    "review_record_sha256": "827eb6c9f769bf52d425e181b29fedfc268c2e3363b78a5eff8b354b7eabc6c9"
+  },
+  "preset": {
+    "candidate_shuffles": 99,
+    "role": "paper_rigorous_mode",
+    "sampled_structures": 200,
+    "sampled_structures_source": "pinned run sheets and operator execution record; not independently displayed in result PDFs",
+    "seed": 42,
+    "ui_name": "Evaluation"
+  },
+  "results": {
+    "grk2_pocket": {
+      "aptamer_likeness": "0.3415929203539823",
+      "candidate_shuffle": "fail",
+      "compatibility_band": "weak",
+      "length": 28
+    },
+    "hewl_surface": [
+      {
+        "aptamer_likeness": "0.672566371681416",
+        "candidate_shuffle": "fail",
+        "compatibility_band": "weak",
+        "length": 59,
+        "rank": 1
+      },
+      {
+        "aptamer_likeness": "0.5893805309734514",
+        "candidate_shuffle": "fail",
+        "compatibility_band": "moderate",
+        "length": 45,
+        "rank": 2
+      }
+    ]
+  },
+  "reviewed_artifacts_modified_during_closure": false,
+  "schema_version": "1.0.0",
+  "scientific_result_committed": true,
+  "section8_closed": true,
+  "status": "SECTION8_SCIENTIFIC_RESULT_COMMITTED_AND_CLOSED"
+}
