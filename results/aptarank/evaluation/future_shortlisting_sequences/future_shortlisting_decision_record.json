@@ -1,0 +1,36 @@
+{
+  "active_plan": {
+    "path": "docs/evaluation/aptarank_full_mres_thesis_evaluation_plan_v3_10.md",
+    "sha256": "08b019ce00ea87485dee1c1d436eca3d1b9780d3506ad8c88716cf089f53c020"
+  },
+  "advanced_to_experimental_validation": 0,
+  "candidate_specific_manual_review_performed": false,
+  "claim_boundary": "These 50 sequences are progressing towards shortlisting for experimental validation in future work. They are not experimentally selected, validated, predicted NDM-1 binders or approved for laboratory progression.",
+  "decision_date": "2026-10-30",
+  "decision_source": "explicit project-owner instruction following biology-supervisor consultation",
+  "historical_section10_closure": {
+    "path": "results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/closure/section10_computational_pool_closure_record.json",
+    "sha256": "305367b52eee1cfa56892200db053f67c5652bdb1832ff342b957a16fe1040ee"
+  },
+  "ndm1_target_geometry_warning": "This cavity is oddly shaped: its robust extent and equivalent-sphere diameter disagree by more than 2\u00d7. The geometric comparison assumes a roughly convex pocket.",
+  "retained_as_progressing_towards_future_shortlisting": 50,
+  "schema_version": "mres-aptarank-future-shortlisting-v1",
+  "scientific_reasoning": [
+    "The selected NDM-1 cavity has a material geometry warning.",
+    "Tier 2 and the shuffled-control check had limited validation evidence in the completed evaluation.",
+    "D1 did not establish a decisive advantage over the B2 TRAIN-matched non-neural null model across the sequence and structural evaluation."
+  ],
+  "selection_rule": {
+    "aptarank_rerun": false,
+    "combined_score_created": false,
+    "primary_and_only_selection_metric": "AptaRank Tier 1 rank",
+    "retained_ranks": [
+      1,
+      50
+    ],
+    "shuffle_role": "coarse annotation only",
+    "source_review_option": "previously prepared Tier-1-only top 100",
+    "tier2_role": "coarse annotation only"
+  },
+  "status": "FUTURE_SHORTLISTING_SET_SCIENTIFICALLY_COMMITTED"
+}

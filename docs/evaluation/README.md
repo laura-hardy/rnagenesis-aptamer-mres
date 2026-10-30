@@ -9,11 +9,11 @@ scripts, contracts and manifests cite those exact locations and reject symlinks.
 
 - Sections 6–10 of the computational evaluation are complete, independently reviewed
   and closed.
-- The deterministic 100-candidate D1 pool is ready for joint review with the biology
-  supervisor.
-- The only remaining evaluation task is that manual review and its dated decision
-  record, retaining at most 50 candidates and introducing none from outside the
-  closed pool.
+- Following biology-supervisor consultation, no MRes candidate will progress to
+  experimental validation.
+- The final v3.10 output retains Tier 1 ranks 1–50 as candidates progressing towards
+  shortlisting for experimental validation in future work. Tier 2 and shuffle are
+  coarse annotations only.
 - No further AptaRank run is planned at this pause point.
 
 See [the concise status tracker](aptarank_evaluation_status.md) for the hand-off state.
@@ -30,5 +30,5 @@ See [the concise status tracker](aptarank_evaluation_status.md) for the hand-off
 checksum catalogue for every historical document in this directory.
 
 No sequence-bearing candidate material is stored here. Raw AptaRank exports remain
-inside ignored `raw/` result directories. The restricted Section 10 candidate list
-remains inside the ignored, owner-only `restricted/` directory.
+inside ignored `raw/` result directories. The final sequence-bearing future-work
+hand-off is stored under `results/aptarank/evaluation/future_shortlisting_sequences/`.

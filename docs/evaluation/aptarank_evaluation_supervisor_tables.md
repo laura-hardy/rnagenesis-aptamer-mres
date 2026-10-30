@@ -10,7 +10,7 @@ This pack contains the exact aggregate values supporting the [supervisor briefin
 | GRK2 target illustration | 1 cognate core | 1 | Descriptive pocket-mode annotation | 0 |
 | Lysozyme target illustration | 2 cognate cores | 2 | Descriptive surface-mode annotations | 0 |
 | Four-condition NDM-1 comparison | 800 memberships; 200 per condition | 800 | B1 versus D1 primary; B2 secondary; B0 external | 0 |
-| Full D1 NDM-1 prioritisation | 30,000 unique D1 sequences | 29,583 | Frozen shuffle and compatibility gates; Tier 1 ordering | 417: 11 below 20 nt, 406 above 100 nt |
+| Full D1 NDM-1 prioritisation | 30,000 unique D1 sequences | 29,583 | Historical frozen gates and Tier 1 ordering; later v3.10 Tier-1-only final disposition reported separately | 417: 11 below 20 nt, 406 above 100 nt |
 
 ## Table 2. Frozen AptaRank production configuration
 
@@ -151,7 +151,24 @@ Tier 1 versus target-control percentile in the exact top 1,000: Spearman rho = 0
 
 **Figure 4.** Run accounting and filtering within the exact target-aware top 1,000. Both mandatory gates left 137 candidates; Tier 1 ordering and the cap retained 100.
 
-## Table 13. Interpretation boundaries by evidence source
+## Table 13. Final v3.10 future-shortlisting outcome
+
+| Quantity | Result |
+|---|---:|
+| Valid scored candidates available | 29,583 |
+| Previously prepared Tier-1-only sensitivity pool | 100 |
+| Retained future-shortlisting candidates | 50 |
+| Advanced to experimental validation | 0 |
+| Tier 1 rank range | 1–50 |
+| Shuffle `pass` / `fail` annotations | 48 / 2 |
+| Tier 2 `strong` / `moderate` / `weak` annotations | 3 / 6 / 41 |
+| Shuffle-pass and moderate-or-strong annotations | 8 |
+| D1 training seed 43 / 44 | 21 / 29 |
+| Length range | 25–96 nt |
+
+The v3.10 set is selected and ordered only by Tier 1 rank. Shuffle and Tier 2 are retained as coarse annotations and do not define eligibility. This later, explicitly outcome-aware disposition does not modify the historical Section 10 funnel or closed 100-candidate gate-based pool.
+
+## Table 14. Interpretation boundaries by evidence source
 
 | Evidence | Supports | Does not support |
 |---|---|---|
@@ -160,8 +177,9 @@ Tier 1 versus target-control percentile in the exact top 1,000: Spearman rho = 0
 | Section 8 cognate cases | Identification of limitations and target-specific warnings | Reliable known-binder recognition; target discrimination; cross-mode ranking |
 | Section 9 condition comparison | Descriptive differences in the frozen samples | Population-level training effect; independent biological validation |
 | Section 10 review pool | Transparent reduction from 30,000 to 100 candidates | Binder prediction; laboratory success; automatic final candidate selection |
+| v3.10 future-shortlisting set | Reproducible Tier-1-led future-work hand-off | Experimental selection; NDM-1 binding; permission to begin laboratory validation |
 
-## Table 14. Closed result records
+## Table 15. Closed result records
 
 | Result | Status | Record | Record SHA-256 |
 |---|---|---|---|
@@ -170,6 +188,7 @@ Tier 1 versus target-control percentile in the exact top 1,000: Spearman rho = 0
 | Section 8 exact-score supplement | Closed | `results/aptarank/evaluation/section8_two_target_panel_evaluation_preset_v1/supplemental_exact_tier2_v1/closure/section8_exact_tier2_supplement_closure_record.json` | `fbe9e4a09b5726f6f936dc5d8d78bd64a4f7d1ab98fa634dcb386e685d66b936` |
 | Section 9 generated-condition comparison | Closed | `results/aptarank/evaluation/section9_generated_conditions_ndm1_evaluation_preset_v1/closure/section9_exact_tier2_closure_record.json` | `92e0b07324cfe0da598147b10ad11a1674fe09cac2036283a7f669681bc86d22` |
 | Section 10 computational review pool | Closed | `results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/closure/section10_computational_pool_closure_record.json` | `305367b52eee1cfa56892200db053f67c5652bdb1832ff342b957a16fe1040ee` |
+| Final future-shortlisting disposition | Committed | `results/aptarank/evaluation/future_shortlisting_sequences/future_shortlisting_decision_record.json` | `02da670c3c2fd80f4e7efa1b9e093324bca30ea75b8adb0fb0409ebfc47d4d39` |
 
 ## Figure files
 

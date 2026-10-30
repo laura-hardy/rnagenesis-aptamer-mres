@@ -1,0 +1,76 @@
+{
+  "checks": {
+    "closed_section10_lineage_revalidated": true,
+    "d1_provenance_complete": true,
+    "full_and_exact_exports_reconcile": true,
+    "no_aptarank_rerun": true,
+    "no_candidate_advanced_to_experimental_validation": true,
+    "no_score_recomputed": true,
+    "opaque_and_source_identifiers_reconcile": true,
+    "ranks_are_exactly_1_through_50": true,
+    "sequence_hashes_and_lengths_reconcile": true,
+    "shuffle_and_tier2_not_used_as_gates_or_ordering": true
+  },
+  "inputs": {
+    "analysis_adapter": {
+      "byte_count": 21211,
+      "sha256": "83055064edc3b6c0568d9d3b312a90cce0a005ac37fe266b5a0fe969263eba6b"
+    },
+    "exact_tier2_export": {
+      "byte_count": 114184,
+      "sha256": "b5501b2004e26f6345ec0ad6ddd00892c4460ed67243feeffed34115db4e32b3"
+    },
+    "full_scored_export": {
+      "byte_count": 4124969,
+      "sha256": "257cbaa523638abf67aa6109bfce37127aab07eccfbcf82e6cfe448a9d8a650f"
+    },
+    "private_membership_key": {
+      "byte_count": 21655682,
+      "sha256": "f247a7465c9d8e07f35b5db944ca479dff6eb5a8a9de02f116b4d075688202b6"
+    },
+    "section10_closure": {
+      "byte_count": 4372,
+      "path": "results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/closure/section10_computational_pool_closure_record.json",
+      "sha256": "305367b52eee1cfa56892200db053f67c5652bdb1832ff342b957a16fe1040ee"
+    },
+    "source_candidate_key": {
+      "byte_count": 11580738,
+      "sha256": "fb7e6b0248f3748a1ec4280327e3669b5422c173ec085f30417ae851250d153d"
+    },
+    "v3_10_plan": {
+      "byte_count": 6126,
+      "path": "docs/evaluation/aptarank_full_mres_thesis_evaluation_plan_v3_10.md",
+      "sha256": "08b019ce00ea87485dee1c1d436eca3d1b9780d3506ad8c88716cf089f53c020"
+    }
+  },
+  "schema_version": "mres-aptarank-future-shortlisting-v1",
+  "selection": {
+    "aptarank_tier1_ranks": [
+      1,
+      50
+    ],
+    "d1_training_seed_counts": {
+      "43": 21,
+      "44": 29
+    },
+    "length_nt": {
+      "maximum": 96,
+      "minimum": 25
+    },
+    "pass_and_moderate_or_strong_annotation": 8,
+    "requested_length_differs_from_realised_sequence": 2,
+    "retained": 50,
+    "sensitivity_review_pool": 100,
+    "shuffle_annotation_counts": {
+      "fail": 2,
+      "pass": 48
+    },
+    "tier2_band_annotation_counts": {
+      "moderate": 6,
+      "strong": 3,
+      "weak": 41
+    },
+    "valid_scored_input": 29583
+  },
+  "status": "FUTURE_SHORTLISTING_SET_SCIENTIFICALLY_COMMITTED"
+}

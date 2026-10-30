@@ -12732,3 +12732,19 @@ The manifest status is `REFERENCE_UPLOAD_PREPARED_APTARANK_NOT_RUN` and `publica
 **Documentation organization:** Evaluation plans, reconciliation notes, result narratives and supervisor materials now have canonical locations under `docs/evaluation/`; the dataset-search workbook is under `docs/data_curation/`; and the fine-tuning implementation plan is under `docs/fine_tuning/`. Byte-identical compatibility copies preserve the former paths used by frozen scripts, tests, contracts and historical manifests, whose fail-closed readers reject symlinks. The Stage 1 config has likewise moved from `configs/` to `config/` with a compatibility copy at its former path.
 
 **Privacy boundary:** Raw AptaRank browser exports remain in ignored `raw/` directories. The sequence-bearing Section 10 supervisor package remains in its ignored, owner-only `restricted/` directory. Neither belongs in Git.
+
+## 2026-10-30 — supervisor-informed final future-shortlisting disposition
+
+**Stage:** Aim 2 / AptaRank evaluation / final thesis candidate disposition
+
+**Status:** `FUTURE_SHORTLISTING_SET_SCIENTIFICALLY_COMMITTED`. Following consultation with the biology supervisor, Laura decided that no MRes sequence will progress to experimental validation. The decision is based on the material geometry warning for the configured NDM-1 cavity, limited validation evidence for Tier 2 and the shuffled-control check, and the absence of a decisive D1 advantage over the B2 TRAIN-matched non-neural null model across the sequence and structural evaluation.
+
+**Methodological amendment:** Evaluation plan v3.10, SHA-256 `08b019ce00ea87485dee1c1d436eca3d1b9780d3506ad8c88716cf089f53c020`, supersedes v3.9 only for final candidate disposition. It is explicitly outcome-aware and was adopted after Sections 6–10 and the two alternative 100-candidate review options were available. The closed Section 10 run, gate-based analysis, 137 jointly eligible candidates and historical 100-candidate review pool remain unchanged.
+
+**Final rule:** The previously prepared Tier-1-only top-100 option is the sensitivity-review source. AptaRank Tier 1 ranks 1–50 are retained without replacement or manual reordering. The candidate-specific shuffle token and exact Tier 2 control percentile, mismatch and band remain visible as coarse annotations only; neither is an eligibility gate or ordering variable, and no combined score is formed.
+
+**Output:** `results/aptarank/evaluation/future_shortlisting_sequences/` contains 50 unique sequences with opaque and D1 source identifiers, exact Tier 1 scores and ranks, shuffle and Tier 2 annotations, sequence hashes, and complete D1 seed/block/checkpoint/generation provenance. The set contains 21 seed-43 and 29 seed-44 candidates and spans 25–96 nt. Annotation counts are 48 shuffle `pass` and 2 `fail`; 3 `strong`, 6 `moderate` and 41 `weak`; 8/50 carry both shuffle-pass and moderate-or-strong annotations. Two records preserve a documented difference between requested generation length and realised sequence length.
+
+**Validation:** The closed Section 10 fail-closed lineage checks were rerun. The 29,583-row scored export, 1,000-row exact Tier 2 export, 30,000-row source key and 30,000-row private membership key matched their frozen hashes. Ranks are exactly 1–50; every sequence, length, digest, identifier and source record reconciles; all output checksums pass. Seven focused tests passed. AptaRank was not rerun and no score was recomputed.
+
+**Claim boundary:** The 50 sequences are described as **progressing towards shortlisting for experimental validation** after future work develops a better computational prioritisation and evaluation approach. They are not an experimental shortlist, validated binders, predicted NDM-1 inhibitors or approval to begin laboratory work. The number advanced to experimental validation in the MRes thesis is zero.

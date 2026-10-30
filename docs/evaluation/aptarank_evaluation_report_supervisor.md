@@ -1,10 +1,10 @@
 # Supervisor briefing: AptaRank evaluation and NDM-1 candidate prioritisation
 
-**Status: Sections 6–10 computational evaluation complete, independently reviewed and closed — 21 October 2026.**
+**Status: computational evaluation complete and final future-shortlisting outcome adopted — 30 October 2026.**
 
-The final computational output is a **100-candidate D1 pool for joint biological review**. Supervisor assessment has not yet occurred. That later review may retain at most 50 candidates for future experimental consideration, but it cannot add candidates from outside the closed pool.
+Following supervisor consultation, no MRes candidate will be progressed to experimental validation. The final sequence-bearing output is the **50 highest Tier 1 ranked D1 candidates**, retained as candidates progressing towards shortlisting for experimental validation after future work improves the computational prioritisation and evaluation approach.
 
-- Active decision plan: `docs/aptarank_full_mres_thesis_evaluation_plan_v3_9.md`, SHA-256 `88be515dcb04dd3db9f4ec7392b70ce90de085a601d15ac00facc43f509ad274`.
+- Active decision plan: `docs/evaluation/aptarank_full_mres_thesis_evaluation_plan_v3_10.md`, SHA-256 `08b019ce00ea87485dee1c1d436eca3d1b9780d3506ad8c88716cf089f53c020`.
 - Detailed quantitative material: [AptaRank supervisor tables and figures](aptarank_evaluation_supervisor_tables.md).
 - Closed Section 10 result: [Section 10 closure record](../../results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/closure/section10_computational_pool_closure_record.json).
 
@@ -20,11 +20,11 @@ Second, the target-aware Tier 2 annotation was tested on three known cognate apt
 
 Third, 200 candidates from each of four generation conditions were compared in one NDM-1 run. The aptamer-adapted model, D1, outperformed the matched generic neural baseline, B1, on mean Tier 1 score (0.460 versus 0.402), shuffle-pass rate (8.5% versus 5.5%), mean NDM-1 target-control percentile (0.501 versus 0.472), and strong-or-moderate compatibility rate (28.0% versus 22.5%). However, the simple non-neural B2 sampler had a higher mean Tier 1 score than D1 (0.492 versus 0.460) and a very similar mean target-control percentile (0.485 versus 0.501). The D1 advantage over B1 is therefore modest and does not show that fine-tuning produced uniquely target-ready sequences.
 
-Finally, the complete 30,000-sequence D1 pool was run once against NDM-1. AptaRank scored 29,583 sequences and recorded 417 length exclusions. Exact target-aware values were exported for the Tier 1 top 1,000. Of these, 558 passed the candidate-specific shuffle check, 236 were strong or moderate for NDM-1, and 137 passed both mandatory gates. Tier 1 rank ordered those 137 candidates, and the first 100 formed the closed supervisor-review pool. The pool contains 33 strong and 67 moderate annotations.
+Finally, the complete 30,000-sequence D1 pool was run once against NDM-1. AptaRank scored 29,583 sequences and recorded 417 length exclusions. The original, prospectively frozen rule produced 137 candidates passing both computational gates and a closed 100-candidate review pool. After the complete evidence was considered with the biology supervisor, that historical pool was not used to advance candidates to laboratory work. A later, explicitly outcome-aware amendment instead retained Tier 1 ranks 1–50 as a reproducible future-work hand-off; shuffle and Tier 2 are carried forward only as coarse annotations.
 
 The central conclusion is:
 
-> AptaRank Tier 1 provided a moderate aptamer-likeness signal and a transparent way to rank a large generated pool. The target-aware layer supplied only weak-to-mixed validation evidence and is further limited by the selected NDM-1 cavity geometry. The resulting 100 sequences are therefore defensible candidates for expert review, not predicted binders or experimentally validated NDM-1 aptamers.
+> AptaRank Tier 1 provided a moderate aptamer-likeness signal and a transparent way to rank a large generated pool. The target-aware layer supplied only weak-to-mixed validation evidence and is further limited by the selected NDM-1 cavity geometry. No sequence was progressed to experimental validation. The 50 highest Tier 1 ranked D1 candidates are retained only as candidates progressing towards future shortlisting, not as predicted binders or experimentally selected NDM-1 aptamers.
 
 ## What was evaluated
 
@@ -33,7 +33,7 @@ The central conclusion is:
 | Tier 1 calibration | Does the target-independent ranking distinguish held-out aptamers from a simple synthetic floor? | 154 held-out sequence cores paired with exact-length uniform RNA; one pair excluded for length, leaving 153 complete pairs across 79 sequence clusters. | Moderate separation; low and uncertain shuffle-pass sensitivity. |
 | Target-aware illustration | Does the target-aware pathway give sensible annotations to known cognate examples? | One GRK2 pocket-mode core and two lysozyme surface-mode cores, assessed as separate descriptive cases. | Weak to mixed; no strong annotations and three shuffle failures. |
 | Generated-condition comparison | How do four generation approaches compare on the same Tier 1 and NDM-1 outputs? | 200 score-blind candidates each from B0, B1, B2 and D1; 800 scored in one target-enabled run. | D1 modestly exceeded B1, but B2 remained competitive or better on key outputs. |
-| Full D1 prioritisation | Which D1 candidates pass the frozen computational gates and should be shown to supervisors? | One run of all 30,000 D1 sequences; valid score, shuffle pass and strong-or-moderate NDM-1 compatibility required; Tier 1 supplied the order. | 137 eligible; 100 retained for joint supervisor review. |
+| Full D1 prioritisation | What did the frozen gate-based rule produce, and what future-work hand-off is scientifically supportable after reviewing all evidence? | One run of all 30,000 D1 sequences; historical gate-based analysis preserved, followed by a transparent outcome-aware final-disposition amendment. | Historical result: 137 eligible and 100 retained for review. Final disposition: ranks 1–50 retained for future shortlisting; none advanced to experimental validation. |
 
 The stages answer different questions. The first two assess the prioritisation tool. The 800-candidate comparison then describes how its outputs vary across generation conditions. The final run uses the resulting evidence to screen D1 candidates for human assessment.
 
@@ -122,7 +122,7 @@ The comparison with B2 is an important limitation. B2 had the highest mean Tier 
 
 Tier 1 and target-control percentile were essentially unrelated at candidate level: Spearman rho was −0.0719 across the 800-candidate comparison. The weak numerical association reinforces the decision to report and use the two outputs separately.
 
-### 4. The full D1 run produced a 100-candidate supervisor-review pool
+### 4. The full D1 run produced a historical review pool and a later Tier-1-led future hand-off
 
 All 30,000 frozen D1 sequences were uploaded once. AptaRank scored 29,583 and recorded 417 technical length exclusions: 11 shorter than 20 nt and 406 longer than 100 nt. Nothing was silently dropped, replaced or replenished.
 
@@ -135,13 +135,15 @@ The tool supplied exact target-aware values for the Tier 1 top 1,000. Within the
 
 The 137 jointly eligible candidates were ordered by Tier 1 rank, with opaque identifier used only for an exact Tier 1 tie. The first 100 entered the supervisor-review pool and 37 were capped out. Compatibility remained visible but did not determine the order. The retained pool contains 33 strong and 67 moderate candidates, with 58 from D1 training seed 43 and 42 from seed 44.
 
-This ordering rule was frozen before any Section 10 candidate score was observed, but after the Section 8 and provisional Section 9 evidence had shown stronger support for Tier 1 discrimination than for a biologically meaningful distinction between `strong` and `moderate`. Its timing is therefore transparently outcome-aware with respect to the earlier tool evaluation, while remaining prospective with respect to the full-pool candidate outcomes.
+This gate-based ordering rule was frozen before any Section 10 candidate score was observed, but after the Section 8 and provisional Section 9 evidence had shown stronger support for Tier 1 discrimination than for a biologically meaningful distinction between `strong` and `moderate`. Its timing is therefore transparently outcome-aware with respect to the earlier tool evaluation, while remaining prospective with respect to the full-pool candidate outcomes.
 
 ![Two-panel funnel showing run accounting and frozen screening of the top 1,000 D1 candidates.](assets/figures/figure_4_section10_shortlisting_funnel.png)
 
 **Figure 4. Section 10 accounting and deterministic screening.** The top-1,000 export is the scope of exact target-aware annotation, not a biological pass. Both mandatory gates reduced it to 137 candidates; the prespecified cap retained 100 for review.
 
-Among the exact top 1,000, Tier 1 and target-control percentile again showed no meaningful monotonic relationship: Spearman rho was 0.00786. This supports using target compatibility as a coarse eligibility screen while retaining Tier 1 as the ordering signal. It does not establish that Tier 1 predicts laboratory success.
+Among the exact top 1,000, Tier 1 and target-control percentile again showed no meaningful monotonic relationship: Spearman rho was 0.00786. Together with the cognate-case results and cavity warning, this did not support using target compatibility as a decisive final gate. Following supervisor consultation, v3.10 therefore retained the first 50 candidates by Tier 1 rank alone. Within those 50, 48 had shuffle `pass`, three were `strong`, six were `moderate` and 41 were `weak`; eight carried both shuffle-pass and moderate-or-strong annotations. These annotation counts did not affect selection.
+
+The final 50 contain 21 candidates from D1 training seed 43 and 29 from seed 44, span 25–96 nt, and retain complete sequence, score, identifier and D1 provenance records. No candidate was progressed to experimental validation. The output is a reproducible set progressing towards future shortlisting after improved computational methods become available.
 
 ## The NDM-1 target warning is material
 
@@ -156,11 +158,11 @@ The warning means that the selected cavity is sufficiently non-convex that diffe
 The evaluation supports four conclusions.
 
 1. **Tier 1 contains a real but moderate signal.** Held-out aptamers scored higher than paired uniform controls under the prespecified analysis, with a cluster-aware interval excluding no difference. The overlap remains substantial, and the result is against a synthetic floor rather than experimental non-binders.
-2. **The shuffled-control token is conservative and insensitive.** Pass rates were low in calibration and in the generated-condition comparison. It is useful as a strict gate, but a failure cannot be read as evidence that a sequence is not an aptamer.
+2. **The shuffled-control token is conservative and insensitive.** Pass rates were low in calibration and in the generated-condition comparison. It is retained as a coarse annotation, and a failure cannot be read as evidence that a sequence is not an aptamer.
 3. **Tier 2 is interpretable but weakly validated.** The known-cognate panel was weak to mixed, the NDM-1 cavity carries a major geometry warning, and Tier 1/Tier 2 correlations were negligible. A favourable percentile is therefore a plausibility annotation, not a binding prediction.
 4. **D1 shows a modest downstream improvement over B1, not a decisive advantage over simple sampling.** D1 improved on B1 across the reported AptaRank summaries, but B2 remained better on mean Tier 1 and close on NDM-1 percentile. This supports cautious prioritisation, not a claim that domain adaptation generated validated NDM-1 aptamers.
 
-The final 100-candidate pool is scientifically useful because its construction is transparent, deterministic and conservative. Its value is to reduce 30,000 generated sequences to a manageable set for informed biological review. Its value does not depend on treating the retained candidates as known binders.
+The historical 100-candidate pool remains scientifically useful for documenting the effect of the original gate-based rule. The final 50-candidate future-work set answers a narrower question: which sequences rank highest under the part of AptaRank that showed the strongest evaluation signal? Its value is reproducibility and traceability, not evidence of experimental readiness.
 
 ## What the evaluation does not establish
 
@@ -172,13 +174,13 @@ The final 100-candidate pool is scientifically useful because its construction i
 - It does not make B0 a controlled comparator; its fixed 36-nt regime differs materially.
 - It does not turn 800 candidate rows, generation seeds or AptaRank controls into independent model-training replicates.
 - It does not model modified nucleotides, full binding kinetics, target flexibility, induced fit or a complete molecular complex.
-- It does not complete the final experimental-candidate decision. Joint supervisor review remains pending.
+- It does not produce an experimental-candidate set. The supervisor-informed decision is that no MRes sequence will progress to experimental validation.
 
-## Next decision: joint biological review
+## Supervisor decision and future use
 
-The owner-only supervisor package contains the 100 candidate numbers, sequences, scores, provenance and warnings. During joint review, the sequence and dashboard evidence can be considered alongside experimental feasibility, including synthesis constraints, motif or structure concerns, assay design and any target-specific biological knowledge.
+The completed evidence was considered with the biology supervisor at the methodological level. Given the NDM-1 cavity warning, weak Tier 2 validation and the D1-versus-B2 limitation, candidate-specific accept/reject review was not used to endorse laboratory progression.
 
-For every reviewed candidate, record the reviewer, date, retain/not-retain decision and concise reason. The review may reduce the pool below 50, including to zero, but it must not introduce a sequence that failed the frozen computational gates or fell outside the closed 100-candidate pool. The final maximum of 50 is a human decision limit, not a second AptaRank cutoff.
+The final hand-off retains Tier 1 ranks 1–50 with sequences, exact AptaRank outputs, identifiers and D1 provenance. Future work may reconsider these candidates only after developing a stronger computational prioritisation and evaluation framework and should perform a new biological and experimental-feasibility review before any laboratory decision.
 
 ## Reproducibility and provenance
 
@@ -191,6 +193,7 @@ The computational results were produced through manual AptaRank UI runs followed
 | Exact target-score supplement | [Section 8 exact-score closure](../../results/aptarank/evaluation/section8_two_target_panel_evaluation_preset_v1/supplemental_exact_tier2_v1/closure/section8_exact_tier2_supplement_closure_record.json) | `fbe9e4a09b5726f6f936dc5d8d78bd64a4f7d1ab98fa634dcb386e685d66b936` |
 | Four-condition NDM-1 comparison | [Section 9 closure](../../results/aptarank/evaluation/section9_generated_conditions_ndm1_evaluation_preset_v1/closure/section9_exact_tier2_closure_record.json) | `92e0b07324cfe0da598147b10ad11a1674fe09cac2036283a7f669681bc86d22` |
 | Full D1 pool and computational shortlist | [Section 10 closure](../../results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/closure/section10_computational_pool_closure_record.json) | `305367b52eee1cfa56892200db053f67c5652bdb1832ff342b957a16fe1040ee` |
+| Final future-shortlisting disposition | [Decision record](../../results/aptarank/evaluation/future_shortlisting_sequences/future_shortlisting_decision_record.json) | Bound by the result-directory `SHA256SUMS` |
 
 The reviewed result files retain their original provisional status fields because closure was recorded separately rather than rewriting scientific artifacts after review. The closure records above are the authority for their committed state.
 
@@ -207,10 +210,11 @@ The reviewed result files retain their original provisional status fields becaus
 - **D1:** RNAGenesis fine-tuned on the curated aptamer training corpus, represented by two retained training seeds.
 - **B2:** a non-neural sampler matched to simple properties of the training data.
 - **B0:** a released external aptamer-model output set with a different fixed-length regime.
-- **Computational supervisor-review pool:** the 100 candidates that passed the frozen gates and cap; not a validated binder set.
+- **Historical computational review pool:** the 100 candidates that passed the v3.8/v3.9 gates and cap; preserved as a closed result, not a validated binder set.
+- **Future-shortlisting set:** Tier 1 ranks 1–50 retained under v3.10 for possible reconsideration after improved computational evaluation; no member is advanced to experimental validation.
 
 ## Figure and table files
 
 Presentation-ready PNG and SVG versions of all four figures are stored under `docs/evaluation/assets/figures/`. Exact plotted values, additional tables, captions and source records are in the [supervisor tables and figures pack](aptarank_evaluation_supervisor_tables.md).
 
-This documentation stage only summarizes closed aggregate evidence. It does not rerun AptaRank, reopen or alter raw exports, recompute scores, inspect protected candidate sequences, change the closed 100-candidate pool or make the pending biological retention decisions.
+The v3.10 update does not rerun AptaRank, reopen or alter raw exports, recompute scores or change the closed 100-candidate pool. It records the later supervisor-informed disposition and derives a separate, fully traceable 50-candidate future-work hand-off from existing ranks.
