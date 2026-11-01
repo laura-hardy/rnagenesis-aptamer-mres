@@ -20,7 +20,10 @@ demonstration track. Proceedings details and a paper DOI were not supplied; the
 link below identifies its implementation, not a published proceedings record.
 The MRes RNAGenesis training implementation is available on the
 [pinned training branch](https://github.com/laura-hardy/RNAGenesis/tree/e3b855bbf4d1af376f43747643fa30afd662828c).
-Checkpoint availability is documented [separately](DATA_AVAILABILITY.md).
+The original B1 generic and B0 aptamer-adapted checkpoints are distributed in the
+[RNAGenesis Zenodo release (DOI 10.5281/zenodo.15203813)](https://zenodo.org/records/15203813).
+Their archive paths and the separate MRes D1 checkpoint identities are documented
+in [model availability](DATA_AVAILABILITY.md).
 
 - Hardy, Laura et al. (2026). [AptaRank: Interpretable Ranking and Target-Aware Annotation of Foundation-Model-Generated RNA Aptamers](https://github.com/alishahsvnd/AptaRank).
 

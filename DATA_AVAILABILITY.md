@@ -40,9 +40,16 @@ scholarly metadata, without local attachment paths, abstracts or personal notes.
 ## Model code and checkpoints
 
 - Original RNAGenesis implementation: [upstream repository](https://github.com/zaixizhang/RNAGenesis).
-- Original released model assets: [upstream Zenodo record 15203813](https://zenodo.org/records/15203813).
+- Released B1 and B0 model assets: [RNAGenesis Zenodo release, DOI 10.5281/zenodo.15203813](https://zenodo.org/records/15203813). The archive supplies two distinct diffusion checkpoints:
+
+  | Thesis label | Archive | Directory after extraction | Role |
+  | --- | --- | --- | --- |
+  | B1 | `configs.zip` | `configs/rnagenesis/diffusion` | Generic diffusion checkpoint without aptamer-specific adaptation; initialisation for D1 |
+  | B0 | `checkpoints.zip` | `checkpoints/Aptamer/diffusion` | Released aptamer-adapted comparator, reported by the authors as fine-tuned on IGFBP3-targeting SELEX sequences |
+
+  The two released checkpoints were confirmed distinct by byte comparison in the thesis work; see the [B0 verification record](docs/fine_tuning/m2_published_aptamer_comparator_verification.md) and [asset manifest](docs/fine_tuning/model_asset_manifest.md).
 - Adaptation training implementation: [MRes training branch pinned at e3b855b](https://github.com/laura-hardy/RNAGenesis/tree/e3b855bbf4d1af376f43747643fa30afd662828c), including `train_diffusion_mres.py`.
-- Adapted D1 weights: stored separately on Zenodo, as reported by the repository owner. The adapted-record DOI/link has not yet been verified in this companion. The upstream Zenodo record above identifies the original release and must not be substituted for the adapted-model record.
+- MRes-adapted D1 weights: separate training outputs for seeds 43 and 44, identified by the hashes below. They are not bundled in this Git repository, and no public download URL for those outputs is established here. The linked Zenodo release supplies B1 and B0; it is not evidence that the MRes D1 outputs are distributed there.
 
 This Git repository does not distribute model weights. The selected D1 checkpoints
 are both epoch 5, update 105; their recorded weight-file SHA-256 identities are:
