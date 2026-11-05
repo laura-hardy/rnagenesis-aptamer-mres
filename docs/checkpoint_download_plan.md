@@ -1,50 +1,12 @@
-# RNAGenesis Checkpoint Download Plan (Phase 1.5)
+# Model asset records
 
-## Required assets (Zenodo)
-- checkpoints.zip
-- configs.zip
-- progen2-base.zip
-- progen2-small.zip
+The preliminary checkpoint download plan previously stored here has been
+superseded. This path is retained for existing references.
 
-Source:
-https://zenodo.org/records/15203813
+The [frozen model asset manifest](fine_tuning/model_asset_manifest.md) records
+the RNAGenesis source revision, released assets, their roles and their hashes.
+The [biomap reconstruction decision](fine_tuning/biomap_reconstruction_decision.md)
+records the separately pinned encoder integration.
 
-## Expected directory structure
-
-checkpoints/
-configs/
-models/autoencoder/decoder/checkpoints/progen2-base/
-models/autoencoder/decoder/checkpoints/progen2-small/
-
-## Known issues
-- README typo: "confiigs/" should be "configs/"
-- README refers to generate.py, but repo uses generation.py
-
-## Key runtime paths
-- --enc_dec_file → configs/rnagenesis/autoencoder
-- --dm_file → checkpoints/Aptamer/diffusion
-
-## Strategy
-- Download directly on H200 (avoid transferring large files)
-- Verify extracted paths before running anything
-- Log all commands, file names, and structure
-
-## Open questions
-- Exact contents of configs.zip
-- Correct decoder_config argument
-- Minimal working generation command
-
-## Server storage policy alignment
-
-- Datasets → /Datasets (if used)
-- Model checkpoints and configs → ~/RNAGenesis/
-- Code and environments → home directory (~)
-
-~/RNAGenesis/              # code
-~/rnagenesis-aptamer-mres/ # your project repo
-~/envs/                    # conda envs (optional)
-~/checkpoints/             # model weights (optional)
-
-Decision:
-- Zenodo model weights treated as model artifacts, not datasets.
-- Will not store large files in /Datasets unless explicitly required.
+Model code and downloaded weights are external dependencies; their source
+licences and distribution terms continue to apply.

@@ -1,0 +1,102 @@
+{
+  "artifacts": {
+    "README.md": {
+      "bytes": 3534,
+      "sha256": "23fc56c71eac19b8c30fe6194e8bfc686034c3b8e4d3749256bb350821b9b3ab"
+    },
+    "eligible_candidates.jsonl": {
+      "bytes": 36307,
+      "sha256": "af200754ed9197670906c97ba47aadf4d64594e42c6836fafe04e8a0bfe3394f"
+    },
+    "selection_decision.json": {
+      "bytes": 1108,
+      "sha256": "37c30a315a4e3eeca28a4d8e85635d88638ce1989c96f8e6c88e75fe74aa3cff"
+    },
+    "thesis_filtered_candidates.jsonl": {
+      "bytes": 73357,
+      "sha256": "46e17f2e9f33039686e534958233b3f4ff2b8c0bce802d5c8e080067efda70d4"
+    },
+    "thesis_filtered_sequences.fasta": {
+      "bytes": 7391,
+      "sha256": "a238177d9089c9f805a463f8a18a1e75d458963bb943849a4a79cac675ca6971"
+    }
+  },
+  "checks": {
+    "all_137_eligible_candidates_rederived_from_frozen_exports": true,
+    "all_50_table_A13_rows_match_ids_ranks_sequences_lengths_seeds_blocks_and_rounded_scores": true,
+    "all_selected_are_unique_canonical_RNA": true,
+    "all_selected_pass_shuffle_and_moderate_or_strong_gate": true,
+    "figure_4_13_sequences_match_first_three": true,
+    "no_aptarank_rerun": true,
+    "no_experimental_validation": true,
+    "no_scores_recomputed": true,
+    "selected_50_match_first_50_of_historical_filtered_100": true
+  },
+  "denominators": {
+    "exact_tier2_top_ranks": 1000,
+    "final_thesis_selection": 50,
+    "historical_filtered_review_pool": 100,
+    "jointly_eligible": 137,
+    "moderate_or_strong_among_top_1000": 236,
+    "scored": 29583,
+    "shuffle_pass_among_top_1000": 558,
+    "technical_exclusions": 417,
+    "uploaded": 30000
+  },
+  "inputs": {
+    "exact_tier2_export": {
+      "path": "results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/raw/tier1_tier2_exact_d1_ndm1_125.csv",
+      "publicly_bundled": false,
+      "sha256": "b5501b2004e26f6345ec0ad6ddd00892c4460ed67243feeffed34115db4e32b3"
+    },
+    "frozen_section10_summary": {
+      "path": "results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/derived/analysis_v1/analysis_summary.json",
+      "sha256": "648011cfdd0a1369454aa283608426e6957a9dfa81b6c10188b18c73fbb1f563"
+    },
+    "full_scored_export": {
+      "path": "results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/raw/run_d1_ndm1_125_shortlist.csv",
+      "publicly_bundled": false,
+      "sha256": "257cbaa523638abf67aa6109bfce37127aab07eccfbcf82e6cfe448a9d8a650f"
+    },
+    "historical_filtered_100_candidate_pool": {
+      "path": "results/aptarank/evaluation/section10_d1_full_pool_ndm1_evaluation_preset_v1/restricted/supervisor_review_v1/supervisor_review_records.jsonl",
+      "publicly_bundled": false,
+      "sha256": "9e661faf2f170a1a7adcf61d9a7599af3873e01ceb009605552b11da9baffc91"
+    }
+  },
+  "schema_version": "mres-thesis-filtered-shortlist-v1",
+  "selection": {
+    "compatibility_counts": {
+      "moderate": 34,
+      "strong": 16
+    },
+    "sequence_length_nt": {
+      "max": 96,
+      "min": 32
+    },
+    "tier1_rank_max": 248,
+    "tier1_rank_min": 2,
+    "training_seed_counts": {
+      "43": 33,
+      "44": 17
+    }
+  },
+  "status": "FINAL_THESIS_FILTERED_SELECTION",
+  "thesis": {
+    "author": "Laura Hardy",
+    "figure": "4.13",
+    "month": 11,
+    "pdf_pages": [
+      128,
+      129
+    ],
+    "printed_pages": [
+      110,
+      111
+    ],
+    "sha256": "3e59a5043317bd32bc9322a3ccbf565b9c669c3fe44911856aaf8639789581f8",
+    "table": "A.13",
+    "title": "Towards Prediction-Guided Generative Design of RNA Aptamers",
+    "year": 2026
+  }
+}

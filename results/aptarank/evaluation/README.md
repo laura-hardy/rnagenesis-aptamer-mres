@@ -1,4 +1,17 @@
-# AptaRank evaluation results
+# AptaRank evaluation: final thesis entry point
+
+The final public thesis selection is the [filtered 50-candidate set](thesis_filtered_shortlist/README.md),
+matching §4.6 and Table A.13. The repository owner confirmed this choice when
+preparing the thesis companion. It supersedes the Tier-1-only v3.10 hand-off for
+final-selection purposes. The historical plan and result artifacts remain
+unchanged; no scores were recomputed. See the [thesis guide](../../../docs/THESIS_GUIDE.md).
+
+The remainder of this index records the earlier v3.10 hand-off context. Its use
+of “final” refers to that historical disposition.
+
+---
+
+# Historical evaluation and v3.10 hand-off
 
 This directory is the local root for outputs from the remaining MRes AptaRank evaluation.
 

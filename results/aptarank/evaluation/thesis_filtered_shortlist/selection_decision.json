@@ -1,0 +1,23 @@
+{
+  "aptarank_rerun": false,
+  "basis": "Repository owner explicitly selected the thesis filtered selection as the final public result.",
+  "decision_date": "2026-11-01",
+  "previous_output": {
+    "disposition": "Preserved unchanged as the historical v3.10 hand-off; superseded for the final thesis selection.",
+    "path": "results/aptarank/evaluation/future_shortlisting_sequences/",
+    "rule": "Unfiltered Tier 1 ranks 1-50; shuffle and Tier 2 were annotations only."
+  },
+  "scientific_boundary": "Computational prioritisation only. No candidate is advanced to experimental validation, and no binding, affinity, inhibition or target recognition is demonstrated.",
+  "score_recomputation": false,
+  "selection_rule": [
+    "Use the 1,000 candidates with exact Tier 2 results from the closed 30,000-member D1 run.",
+    "Require shuffle == pass and compatibility in {strong, moderate}.",
+    "Order by ascending frozen Tier 1 rank, then ascending opaque candidate ID.",
+    "Retain the first 50 without manual reordering."
+  ],
+  "thesis_sections": [
+    "4.6",
+    "Table A.13",
+    "Figure 4.13"
+  ]
+}

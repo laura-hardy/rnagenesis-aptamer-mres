@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "Please cite the accompanying thesis and identify the repository commit used. See REFERENCES.md for dependencies."
+type: software
+title: "RNAGenesis aptamer MRes thesis companion"
+authors:
+  - family-names: Hardy
+    given-names: Laura
+    affiliation: Macquarie University
+repository-code: "https://github.com/laura-hardy/rnagenesis-aptamer-mres"
+license: MIT
+abstract: >-
+  Code, configurations, provenance records and computational results accompanying
+  Towards Prediction-Guided Generative Design of RNA Aptamers. Includes aptamer
+  corpus curation, RNAGenesis adaptation orchestration and AptaRank evaluation.
+preferred-citation:
+  type: thesis
+  title: "Towards Prediction-Guided Generative Design of RNA Aptamers"
+  authors:
+    - family-names: Hardy
+      given-names: Laura
+  year: 2026
+  month: 11
+  institution:
+    name: Macquarie University
+  department: School of Computing
+  thesis-type: Master of Research thesis
