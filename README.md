@@ -1,4 +1,44 @@
-# RNAGenesis aptamer MRes companion
+# rnagenesis-aptamer-mres
+MRes Y2 Project - AI-guided design of RNA aptamers for carbapenemase targets
+
+## Overview
+General-purpose large language models or foundation models (FMs) 
+trained on RNA sequence data offer an opportunity to accelerate RNA aptamer design. These short RNA (riboonucleic acid) sequences can bind to specific molecular targets for diagnostic or therapeutic applications, and are typically designed through slow and costly experiments. FM-guided design is faster and cheaper, but unproven for low-data, clinically significant applications against antimicrobial resistance (AMR). In this thesis, we present a survey of RNA FMs, a domain-specific corpus curation, a small-data diffusion-adaptation of an RNA FM, RNA aptamer design under four comparison conditions, and computational prioritisation of aptamer candidates against the AMR enzyme NDM-1. Our adaptation demonstrates a moderate shift in the model's unconditional generative distribution toward held-out aptamer-like sequence and structural characteristics whilst retaining validity, diversity and novelty, and progresses towards shortlisting candidates for future experimental validation.
+
+
+
+
+### Aptamer applications
+
+![Conceptual diagnostic, therapeutic and targeted-delivery applications of aptamers](figures/aptamer_function_1%20copy.png)
+
+Conceptual aptamer applications. [PDF](figures/aptamer_function_1%20copy.pdf).
+
+### RNA foundation models
+
+![RNA foundation-model pretraining, representations and downstream uses](figures/RNA_FM_conceptual_figure_MQ%20copy.png)
+
+Conceptual overview of RNA foundation models. [PDF](figures/RNA_FM_conceptual_figure_MQ%20copy.pdf).
+
+### Study workflow
+
+![Study workflow from model survey through generation and computational prioritisation to future experimental validation](figures/rna-fm-pipeline-figure%20copy.png)
+
+The study proceeds from model selection to generation and computational prioritisation. Experimental validation and the single-aptamer endpoint shown are future-work goals. [PDF](figures/rna-fm-pipeline-figure%20copy.pdf).
+
+### Generation conditions
+
+![The B2 empirical null, D1 MRes-adapted model, B1 generic model and B0 released aptamer-adapted comparator](figures/generation_conditions_figure%20copy.png)
+
+The four comparison conditions and their relationship to the corpus and released RNAGenesis model. [PDF](figures/generation_conditions_figure%20copy.pdf).
+
+### Prioritised candidates
+
+![Predicted ViennaRNA secondary structures of the first three candidates in the final thesis filtered selection](figures/aptarank_top3_candidate_vienna_structures%20copy.svg)
+
+Predicted secondary structures of the first three candidates in the final filtered selection. These computational predictions do not demonstrate target binding.
+
+## Thesis companion
 
 Code, configurations, provenance records and computational results accompanying
 **Laura Hardy, _Towards Prediction-Guided Generative Design of RNA Aptamers_,
